@@ -14,6 +14,10 @@ class DatabaseSeeder extends Seeder
         // Roles y permisos (config/rbac.php). Debe ir ANTES de crear usuarios.
         $this->call(RolesPermissionsSeeder::class);
 
+        // Categorías de ticket por defecto (Soporte, Garantías, Pedidos y facturas):
+        // el portal las necesita para el desplegable de «Crear incidencia».
+        $this->call(TicketCategoriesSeeder::class);
+
         // Superadministrador por defecto. El acceso es por EMAIL.
         $admin = User::firstOrCreate(
             ['email' => 'admin@aemegroup.com'],
