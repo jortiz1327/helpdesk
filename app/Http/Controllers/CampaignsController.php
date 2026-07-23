@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use App\Services\CampaignService;
+use App\Services\GatingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +16,7 @@ class CampaignsController extends Controller
         $action = $request->query('action', '');
 
         if ($request->isMethod('post') && $action === 'run') {
+            if ($locked = GatingService::guard('wa_campaign')) return $locked;
             $id = (int) ($request->query('id') ?? $request->input('id') ?? 0);
             if (!$id) return response()->json(['ok' => false, 'error' => 'Falta id'], 400);
             [$sent, $failed, $pending] = $campaigns->process($id, 30);
@@ -30,6 +32,7 @@ class CampaignsController extends Controller
         }
 
         if ($request->isMethod('post')) {
+            if ($locked = GatingService::guard('wa_campaign')) return $locked;
             return $this->create($request, $campaigns);
         }
 

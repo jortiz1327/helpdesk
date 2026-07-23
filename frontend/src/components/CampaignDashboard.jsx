@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
+import LockTip from './LockTip.jsx'
 
 const STATUS = {
   draft:     { t: 'Borrador', c: 'gray' },
@@ -144,8 +145,11 @@ export default function CampaignDashboard({ onNew, user }) {
   const [openId, setOpenId] = useState(null)
   const canManage = (user?.permissions || []).includes('settings.manage')
 
+  const [gate, setGate] = useState(null)
   const load = useCallback(() => { api.listCampaigns().then((d) => setList(d.campaigns || [])) }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { api.gating().then((d) => setGate(d?.ok ? d : null)) }, [])
+  const waLocked = gate?.features?.wa_campaign   // WhatsApp sin configurar
 
   const del = async (id) => {
     if (!(await confirm({ title: 'Eliminar campaña', message: '¿Eliminar esta campaña y su historial de envíos?', danger: true, confirmText: 'Eliminar' }))) return
@@ -168,7 +172,14 @@ export default function CampaignDashboard({ onNew, user }) {
         <div><h1>Panel de campañas</h1></div>
         <span className="sub">· Historial y estado de tus difusiones</span>
         <div className="spacer" />
-        <button className="btn" onClick={onNew}><Icon.plus /> Nueva campaña</button>
+        {waLocked ? (
+          <span className="gated-wrap">
+            <button className="btn gated" disabled><Icon.lock /> Nueva campaña</button>
+            <LockTip info={waLocked} />
+          </span>
+        ) : (
+          <button className="btn" onClick={onNew}><Icon.plus /> Nueva campaña</button>
+        )}
       </header>
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1120 }}>
@@ -182,7 +193,7 @@ export default function CampaignDashboard({ onNew, user }) {
 
           {list === null ? <div className="center-load"><div className="spinner" /></div> :
             list.length === 0 ? (
-              <div className="empty"><div className="ico"><Icon.send /></div><p><b>Aún no hay campañas</b><br />Crea tu primera difusión para enviar plantillas a una agenda.</p><button className="btn" onClick={onNew}><Icon.plus /> Nueva campaña</button></div>
+              <div className="empty"><div className="ico"><Icon.send /></div><p><b>Aún no hay campañas</b><br />Crea tu primera difusión para enviar plantillas a una agenda.</p>{waLocked ? <button className="btn gated" disabled><Icon.lock /> Nueva campaña</button> : <button className="btn" onClick={onNew}><Icon.plus /> Nueva campaña</button>}</div>
             ) : (
               <div className="card" style={{ padding: 0, marginTop: 16 }}>
                 {list.map((c) => {

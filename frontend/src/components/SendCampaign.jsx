@@ -28,6 +28,9 @@ function varCount(text) {
 export default function SendCampaign({ onDone }) {
   const toast = useToast()
   const [step, setStep] = useState(1)
+  const [gate, setGate] = useState(null)
+  useEffect(() => { api.gating().then((d) => setGate(d?.ok ? d : null)) }, [])
+  const waLocked = gate?.features?.wa_campaign
   const [templates, setTemplates] = useState(null)
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('APPROVED')
@@ -256,7 +259,9 @@ export default function SendCampaign({ onDone }) {
                 </div>
 
                 <div className="fb-actions">
-                  <button className="btn" disabled={sending} onClick={send}><Icon.send /> {sending ? 'Enviando…' : (immediate ? 'Enviar campaña' : 'Programar campaña')}</button>
+                  {waLocked
+                    ? <button className="btn gated" disabled><Icon.lock /> WhatsApp no configurado</button>
+                    : <button className="btn" disabled={sending} onClick={send}><Icon.send /> {sending ? 'Enviando…' : (immediate ? 'Enviar campaña' : 'Programar campaña')}</button>}
                 </div>
               </div>
             </>

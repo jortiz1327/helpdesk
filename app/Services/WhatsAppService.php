@@ -28,6 +28,20 @@ class WhatsAppService
         return (string) Setting::get('wa_app_id', '');
     }
 
+    /**
+     * ¿Hay credenciales de WhatsApp? Con esto se bloquean TODOS los envíos cuando el
+     * entorno no tiene WhatsApp configurado (p. ej. el servidor de demo): así nada
+     * sale a Meta y cada intento devuelve un error limpio en vez de uno feo de la API.
+     * En cuanto se rellenen las credenciales en Configuración, se desbloquea solo.
+     */
+    public function configured(): bool
+    {
+        return $this->token() !== '' && $this->phoneId() !== '';
+    }
+
+    /** Mensaje único para cuando WhatsApp no está configurado. */
+    protected const NO_CONFIG = 'WhatsApp no está configurado en este entorno.';
+
     protected function base(): string
     {
         return 'https://graph.facebook.com/' . config('whatsapp.graph_version');
@@ -44,6 +58,8 @@ class WhatsAppService
      */
     public function graph(string $method, string $path, ?array $payload = null, array $query = []): array
     {
+        if (!$this->configured()) return [0, ['error' => ['message' => self::NO_CONFIG]]];
+
         $url = $this->base() . '/' . ltrim($path, '/');
         if ($query) {
             $url .= '?' . http_build_query($query);
@@ -127,6 +143,7 @@ class WhatsAppService
      */
     public function uploadResumable(string $tmpPath, string $fname, string $type): array
     {
+        if (!$this->configured()) return [false, self::NO_CONFIG, []];
         $appId = $this->appId();
         if (!$appId) return [false, 'Falta el App ID en Configuración', []];
         $len = filesize($tmpPath);
@@ -173,6 +190,7 @@ class WhatsAppService
     /** Sube un archivo a la cuenta de WhatsApp y devuelve [code, json] ($json['id'] = media_id). */
     public function uploadMedia(string $tmpPath, string $mime, string $filename): array
     {
+        if (!$this->configured()) return [0, ['error' => ['message' => self::NO_CONFIG]]];
         $url = $this->base() . '/' . $this->phoneId() . '/media';
         try {
             $resp = Http::withToken($this->token())

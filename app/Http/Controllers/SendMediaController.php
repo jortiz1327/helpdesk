@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\ChatService;
+use App\Services\GatingService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 
@@ -14,6 +15,8 @@ class SendMediaController extends Controller
         if (!$request->isMethod('post')) {
             return response()->json(['error' => 'Método no permitido'], 405);
         }
+
+        if ($locked = GatingService::guard('wa_send')) return $locked;
 
         $contactId = (int) $request->input('contact_id');
         $to        = preg_replace('/\D/', '', (string) $request->input('to'));

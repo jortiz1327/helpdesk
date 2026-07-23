@@ -16,6 +16,11 @@ class TemplatesController extends Controller
         $wabaId = (string) Setting::get('wa_business_id');
 
         if ($request->isMethod('get')) {
+            // Sin WhatsApp configurado no hay nada que listar en Meta: se devuelve
+            // vacío + candado, así el panel muestra el estado en vez de un error.
+            if (!GatingService::whatsappConfigured()) {
+                return response()->json(['ok' => true, 'templates' => [], 'locked' => 'wa_template']);
+            }
             [$code, $res] = $wa->graph('GET', $wabaId . '/message_templates', null, [
                 'limit'  => 200,
                 'fields' => 'name,status,category,language,components,id',
@@ -27,10 +32,12 @@ class TemplatesController extends Controller
         }
 
         if ($request->isMethod('post')) {
+            if ($locked = GatingService::guard('wa_template')) return $locked;
             return $this->create($request, $wa, $wabaId);
         }
 
         if ($request->isMethod('put')) {
+            if ($locked = GatingService::guard('wa_template')) return $locked;
             $in = $request->all();
             $id = $request->query('id') ?? ($in['template_id'] ?? '');
             if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el id de la plantilla'], 400);

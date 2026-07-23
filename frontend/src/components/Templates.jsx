@@ -63,7 +63,14 @@ export default function Templates() {
         <h1>Plantillas</h1>
         <span className="sub">· Mensajes preaprobados por Meta</span>
         <div className="spacer" />
-        <button className="btn" onClick={() => setCreating(true)}><Icon.plus /> Nueva plantilla</button>
+        {gate?.features?.wa_template ? (
+          <span className="gated-wrap">
+            <button className="btn gated" disabled><Icon.lock /> Nueva plantilla</button>
+            <LockTip info={gate.features.wa_template} />
+          </span>
+        ) : (
+          <button className="btn" onClick={() => setCreating(true)}><Icon.plus /> Nueva plantilla</button>
+        )}
       </header>
       <div className="page-scroll">
         <div className="page">

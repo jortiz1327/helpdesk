@@ -120,6 +120,9 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   assignRef.current = assignFilter
 
   useEffect(() => { api.listAgents().then((d) => setAgents(d.agents || [])) }, [])
+  // Candados: si WhatsApp no está configurado, la caja de responder queda solo lectura.
+  const [gate, setGate] = useState(null)
+  useEffect(() => { api.gating().then((d) => setGate(d?.ok ? d : null)) }, [])
 
   const loadConvs = useCallback((q) => {
     api.listConversations(q ?? '', assignRef.current).then((d) => {
@@ -324,6 +327,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
 
   const lastIn = [...messages].reverse().find((m) => m.direction === 'in')
   const windowClosed = active && (!lastIn || (Date.now() - parseDate(lastIn.created_at)?.getTime()) > 24 * 3600 * 1000)
+  const waLocked = !!gate?.features?.wa_send   // WhatsApp sin configurar → solo lectura
 
   const rows = []
   let lastDay = null
@@ -434,12 +438,14 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
               {rows.map((r) => r.sep ? <div className="day-sep" key={r.id}><span>{r.sep}</span></div> : <Bubble key={r.m.id} m={r.m} />)}
             </div>
 
-            {windowClosed && <div className="window-banner">⚠️ Ventana de 24 h cerrada. Solo puedes enviar plantillas aprobadas.</div>}
+            {waLocked
+              ? <div className="window-banner locked"><Icon.lock style={{ width: 15, height: 15, fill: 'currentColor', verticalAlign: '-2px' }} /> WhatsApp no está configurado en este entorno: la conversación es de solo lectura.</div>
+              : windowClosed && <div className="window-banner">⚠️ Ventana de 24 h cerrada. Solo puedes enviar plantillas aprobadas.</div>}
 
             <div className="composer">
               <div className="cmp-tools">
                 <div className="cmp-menu-wrap">
-                  <button className={`round tool ${attachMenu ? 'on' : ''}`} title="Adjuntar archivo" disabled={windowClosed}
+                  <button className={`round tool ${attachMenu ? 'on' : ''}`} title="Adjuntar archivo" disabled={windowClosed || waLocked}
                     onClick={(e) => { e.stopPropagation(); setBotMenu(false); setAttachMenu((v) => !v) }}><Icon.link /></button>
                   {attachMenu && (
                     <div className="cmp-menu" onClick={(e) => e.stopPropagation()}>
@@ -451,7 +457,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
                   )}
                 </div>
                 <div className="cmp-menu-wrap">
-                  <button className={`round tool ${botMenu ? 'on' : ''}`} title="Mensaje interactivo" disabled={windowClosed}
+                  <button className={`round tool ${botMenu ? 'on' : ''}`} title="Mensaje interactivo" disabled={windowClosed || waLocked}
                     onClick={(e) => { e.stopPropagation(); setAttachMenu(false); setBotMenu((v) => !v) }}><Icon.bolt /></button>
                   {botMenu && (
                     <div className="cmp-menu" onClick={(e) => e.stopPropagation()}>
@@ -460,12 +466,12 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
                     </div>
                   )}
                 </div>
-                <button className="round tpl" title="Enviar plantilla" onClick={() => setPickerOpen(true)}><Icon.templates /></button>
+                <button className="round tpl" title="Enviar plantilla" disabled={waLocked} onClick={() => setPickerOpen(true)}><Icon.templates /></button>
               </div>
-              <textarea placeholder="Escribe un mensaje" value={draft} rows={1}
+              <textarea placeholder={waLocked ? 'WhatsApp no configurado' : 'Escribe un mensaje'} value={draft} rows={1} disabled={waLocked}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
-              <button className="round send" title="Enviar" disabled={!draft.trim() || sending} onClick={send}><Icon.send /></button>
+              <button className="round send" title="Enviar" disabled={!draft.trim() || sending || waLocked} onClick={send}><Icon.send /></button>
               <input ref={fileRef} type="file" hidden onChange={onFileChosen} />
             </div>
           </>
