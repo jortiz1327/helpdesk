@@ -108,6 +108,51 @@ class TestDataSeeder extends Seeder
             ]);
         }
 
-        $this->command->info('Datos de prueba: 3 agentes (agente1234) + ' . count($tickets) . ' tickets creados.');
+        // ---------- 3 avisos de CRONES fallidos (apartado técnico, aparte de la bandeja) ----------
+        // Cada uno = ticket channel='cron' + fila en cron_alerts + ejecuciones (mensajes con payload).
+        $cronContact = DB::table('contacts')->where('email', 'noreply@etiquetaselectronicas.es')->value('id')
+            ?: DB::table('contacts')->insertGetId(['name' => 'Servidor de crones', 'email' => 'noreply@etiquetaselectronicas.es', 'created_at' => now()]);
+
+        // [nombre, params, expresión, comando, nºfallos, exit_code, motivo, salida, prioridad, díasDesdePrimero, ejecuciones a mostrar]
+        $crones = [
+            ['Sincronización de precios', 'tienda=super-ahorro', '*/5 * * * *', 'php /crons/sync_precios.php tienda=super-ahorro', 47, '1', 'Superó el tiempo límite de 400 segundos', 'Timeout conectando a la API de precios; la respuesta tardó más de 400s.', 'alta', 3, 3],
+            ['Actualización de menús', 'cliente=hotelvidal', '0 * * * *', 'php /crons/menus.php cliente=hotelvidal', 6, '255', 'General error', 'PHP Fatal error: SQLSTATE[HY000] [2002] Connection refused', 'alta', 1, 2],
+            ['Envío de etiquetas a impresora', 'farmacia=scorazon', '*/10 * * * *', 'php /crons/print_labels.php farmacia=scorazon', 3, '7', 'Conexión rechazada', 'cURL error 7: Failed to connect to 10.0.0.15 port 9100', 'media', 0, 1],
+        ];
+
+        foreach ($crones as $c) {
+            [$name, $params, $expr, $cmd, $fails, $exit, $reason, $output, $prio, $diasPrimero, $nMsgs] = $c;
+            $clave  = mb_substr(mb_strtolower($name . '|' . $params), 0, 191);
+            $primero = Carbon::now()->subDays($diasPrimero);
+            $ultimo  = Carbon::now()->subMinutes(15);
+            $n++;
+            $code = $prefix . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+
+            $ticketId = DB::table('tickets')->insertGetId([
+                'code' => $code, 'subject' => mb_substr($name . ' · ' . $params, 0, 200),
+                'category_id' => null, 'status' => 'abierto', 'priority' => $prio, 'channel' => 'cron',
+                'contact_id' => $cronContact, 'assigned_to' => null,
+                'opened_at' => $primero, 'last_message_at' => $ultimo, 'last_direction' => 'in',
+                'created_at' => $primero, 'updated_at' => $ultimo,
+            ]);
+
+            DB::table('cron_alerts')->insert([
+                'ticket_id' => $ticketId, 'cron_key' => $clave, 'cron_name' => $name, 'params' => $params,
+                'expression' => $expr, 'command' => $cmd, 'fails' => $fails, 'first_at' => $primero, 'last_at' => $ultimo,
+                'last_exit_code' => $exit, 'last_reason' => $reason, 'last_output' => $output,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+
+            for ($k = 0; $k < $nMsgs; $k++) {
+                DB::table('messages')->insert([
+                    'contact_id' => $cronContact, 'ticket_id' => $ticketId, 'direction' => 'in', 'channel' => 'cron',
+                    'type' => 'text', 'body' => '<p>Ejecución fallida del cron.</p>', 'is_html' => 1, 'status' => 'received',
+                    'created_at' => (clone $ultimo)->subMinutes($k * 20),
+                    'payload' => json_encode(['exit_code' => $exit, 'reason' => $reason, 'output' => $output], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
+        }
+
+        $this->command->info('Datos de prueba: 3 agentes (agente1234) + ' . count($tickets) . ' tickets + ' . count($crones) . ' avisos de cron.');
     }
 }
