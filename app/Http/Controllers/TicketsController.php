@@ -439,7 +439,7 @@ class TicketsController extends Controller
         $id = (int) $request->query('id');
 
         $t = (clone $this->baseQuery($me))->where('t.id', $id)->first([
-            't.*', 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
+            't.*', 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa', 'c.sede_id as contact_sede_id',
             'cat.name as category_name', 'cat.color as category_color',
             'cat.sla_response_hours', 'cat.sla_resolve_hours', 't.sla_paused_minutes', 't.sla_paused_since',
             'u.name as agent_name',

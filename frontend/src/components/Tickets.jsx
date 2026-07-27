@@ -4,6 +4,7 @@ import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import ChannelBadge from './ChannelBadge.jsx'
+import SedeField from './SedeField.jsx'
 import Composer from './Composer.jsx'
 import Agents from './Agents.jsx'
 import CronAlerts from './CronAlerts.jsx'
@@ -874,6 +875,14 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
               </div>
               {t.contact_email && t.contact_wa && (
                 <div className="tkm-extra"><Icon.phone /> +{t.contact_wa}</div>
+              )}
+
+              {/* Sede (organización) del cliente: se puede cambiar aquí mismo. */}
+              {can('contacts.edit') && (
+                <div className="tkm-block">
+                  <div className="tkm-sec">Sede</div>
+                  <SedeField contactId={t.contact_id} value={t.contact_sede_id} />
+                </div>
               )}
 
               {/*

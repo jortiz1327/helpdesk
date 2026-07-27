@@ -5,6 +5,7 @@ import { useToast } from '../App.jsx'
 import { initials, avatarBg, parseDate } from '../util.js'
 import LabelManager from './LabelManager.jsx'
 import Select from './Select.jsx'
+import SedeSelect from './SedeSelect.jsx'
 import Kanban from './Kanban.jsx'
 
 export default function Contacts({ onOpen, area = '' }) {
@@ -266,6 +267,7 @@ function ContactEdit({ contact, onClose, onSaved }) {
     email: contact.email || '',
     country_code: cc0 || '34',
     phone: phone0,
+    sede_id: contact.sede_id || null,
   })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
@@ -280,7 +282,7 @@ function ContactEdit({ contact, onClose, onSaved }) {
     if (!f.email.trim() && !f.phone.trim()) { toast('Indica al menos un correo o un teléfono', 'err'); return }
     setBusy(true)
     const r = await api.saveContact(contact.id, {
-      name: f.name, email: f.email, country_code: f.country_code, phone: f.phone,
+      name: f.name, email: f.email, country_code: f.country_code, phone: f.phone, sede_id: f.sede_id || '',
     })
     setBusy(false)
     if (r.ok) { toast('Contacto actualizado'); onSaved() }
@@ -307,6 +309,8 @@ function ContactEdit({ contact, onClose, onSaved }) {
               <input value={f.phone} onChange={set('phone')} placeholder="600123456" inputMode="numeric" /></label>
           </div>
           <p className="ct-hint">Puede tener correo, teléfono o ambos.</p>
+          <div className="field"><span className="lbl">Sede <span className="hint" style={{ fontWeight: 400 }}>· organización del cliente</span></span>
+            <SedeSelect value={f.sede_id} onChange={(v) => setF((s) => ({ ...s, sede_id: v }))} /></div>
         </div>
         <div className="modal-foot">
           <button className="btn ghost" onClick={onClose}>Cancelar</button>

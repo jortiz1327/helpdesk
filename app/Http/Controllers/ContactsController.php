@@ -161,7 +161,7 @@ class ContactsController extends Controller
         if ($optout === '1') $where[] = 'c.opted_out = 1';
         elseif ($optout === '0') $where[] = 'c.opted_out = 0';
 
-        $sql = 'SELECT c.id, c.wa_id, c.country_code, c.email, c.name, c.last_message, c.last_time, c.opted_out FROM contacts c';
+        $sql = 'SELECT c.id, c.wa_id, c.country_code, c.email, c.name, c.last_message, c.last_time, c.opted_out, c.sede_id FROM contacts c';
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
         // Tope de seguridad: el volumen real es ~1-2k contactos, 3000 da margen de sobra.
         $sql .= ' ORDER BY c.last_time IS NULL, c.last_time DESC, c.id DESC LIMIT 3000';
