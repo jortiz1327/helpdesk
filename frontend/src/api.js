@@ -96,6 +96,14 @@ export const api = {
   agentHistory: (userId) => req(`tickets.php?action=history&user_id=${userId}`),
   cannedForComposer: () => req('tickets.php?action=canned'),
 
+  // --- Organización de clientes (Grupo → Marca → Sede) ---
+  orgTree: () => req('organizations.php'),
+  orgSave: (payload) => req('organizations.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
+  orgDelete: (level, id) => req('organizations.php?action=delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level, id }),
+  }),
   // --- Configuración de Soporte (categorías + respuestas predefinidas) ---
   supCategories: () => req('support_settings.php?section=categories'),
   supSaveCategory: (payload) => req('support_settings.php?section=categories', {

@@ -21,6 +21,7 @@ use App\Http\Controllers\GatingController;
 use App\Http\Controllers\InlineImageController;
 use App\Http\Controllers\LabelsController;
 use App\Http\Controllers\MediaController;
+use App\Http\Controllers\OrganizationsController;
 use App\Http\Controllers\PhonebooksController;
 use App\Http\Controllers\ResponsesController;
 use App\Http\Controllers\RolesController;
@@ -156,6 +157,10 @@ Route::middleware('token')->group(function () {
 
     // --- Contactos y etiquetas ---
     Route::match(['get', 'post'], 'contacts.php', [ContactsController::class, 'handle'])
+        ->middleware('can:contacts.access');
+    // Organización de clientes (Grupo → Marca → Sede). Leer: cualquiera del helpdesk
+    // (para el selector); crear/editar/borrar lo filtra el controlador (contacts.edit).
+    Route::match(['get', 'post'], 'organizations.php', [OrganizationsController::class, 'handle'])
         ->middleware('can:contacts.access');
     Route::match(['get', 'post', 'delete'], 'labels.php', [LabelsController::class, 'handle'])
         ->middleware('can:contacts.access');

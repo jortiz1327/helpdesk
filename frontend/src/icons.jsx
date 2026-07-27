@@ -13,6 +13,7 @@ export const Icon = {
   logout: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M16 13v-2H7V8l-5 4 5 4v-3h9zm3-10H11a2 2 0 0 0-2 2v3h2V5h8v14h-8v-3H9v3a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" /></svg>,
   lock: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9V6zm3 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" /></svg>,
   home: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" /></svg>,
+  building: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M3 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16h3v2H1v-2h2zm4-13h2v2H7V8zm0 4h2v2H7v-2zm0 4h2v2H7v-2zm4-8h2v2h-2V8zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zM18 21h3v-8h-3v8z" /></svg>,
   info: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" /></svg>,
   download: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" /></svg>,
   tag: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M21.4 11.6 12.4 2.6A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7c0 .5.2 1 .6 1.4l9 9a2 2 0 0 0 2.8 0l7-7a2 2 0 0 0 0-2.8zM6.5 8A1.5 1.5 0 1 1 8 6.5 1.5 1.5 0 0 1 6.5 8z" /></svg>,

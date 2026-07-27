@@ -1,0 +1,168 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Grupo;
+use App\Models\Marca;
+use App\Models\Sede;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * ORGANIZACIÓN de clientes: Grupo → Marca → Sede.
+ * Leer el árbol lo puede cualquiera del helpdesk (para el selector de la ficha de
+ * contacto); crear/editar/borrar exige `contacts.edit`.
+ */
+class OrganizationsController extends Controller
+{
+    public function handle(Request $request)
+    {
+        return match ($request->query('action', 'tree')) {
+            'save'   => $this->save($request),
+            'delete' => $this->delete($request),
+            default  => $this->tree(),
+        };
+    }
+
+    /** El árbol completo con el nº de contactos por sede (para pintarlo de un viaje). */
+    protected function tree()
+    {
+        $contactosPorSede = DB::table('contacts')->whereNotNull('sede_id')
+            ->select('sede_id', DB::raw('COUNT(*) n'))->groupBy('sede_id')->pluck('n', 'sede_id');
+
+        $grupos = Grupo::with(['marcas' => fn ($q) => $q->orderBy('name'), 'marcas.sedes' => fn ($q) => $q->orderBy('name')])
+            ->orderBy('name')->get();
+
+        $out = $grupos->map(fn ($g) => [
+            'id'     => $g->id,
+            'name'   => $g->name,
+            'color'  => $g->color,
+            'note'   => $g->note,
+            'active' => $g->active,
+            'marcas' => $g->marcas->map(fn ($m) => [
+                'id'     => $m->id,
+                'name'   => $m->name,
+                'active' => $m->active,
+                'sedes'  => $m->sedes->map(fn ($s) => [
+                    'id'        => $s->id,
+                    'name'      => $s->name,
+                    'city'      => $s->city,
+                    'address'   => $s->address,
+                    'active'    => $s->active,
+                    'contactos' => (int) ($contactosPorSede[$s->id] ?? 0),
+                ])->all(),
+            ])->all(),
+        ])->all();
+
+        return response()->json(['ok' => true, 'grupos' => $out]);
+    }
+
+    protected function save(Request $request)
+    {
+        if ($no = $this->soloEditores($request)) return $no;
+
+        $level = $request->input('level');
+        $name  = trim((string) $request->input('name'));
+        if ($name === '') return response()->json(['ok' => false, 'error' => 'El nombre es obligatorio'], 400);
+
+        $id     = (int) $request->input('id');
+        $active = filter_var($request->input('active', true), FILTER_VALIDATE_BOOLEAN);
+
+        return match ($level) {
+            'grupo' => $this->saveGrupo($request, $id, $name, $active),
+            'marca' => $this->saveHijo(Marca::class, 'grupo_id', 'grupos', $request, $id, $name, $active),
+            'sede'  => $this->saveSede($request, $id, $name, $active),
+            default => response()->json(['ok' => false, 'error' => 'Nivel no válido'], 400),
+        };
+    }
+
+    protected function saveGrupo(Request $request, int $id, string $name, bool $active)
+    {
+        $data = [
+            'name'   => mb_substr($name, 0, 160),
+            'note'   => mb_substr(trim((string) $request->input('note', '')), 0, 65535) ?: null,
+            'active' => $active,
+        ];
+        $color = (string) $request->input('color', '');
+        $data['color'] = preg_match('/^#[0-9a-f]{6}$/i', $color) ? $color : null;
+
+        $cur = $id ? Grupo::find($id) : null;
+        if ($id && !$cur) return response()->json(['ok' => false, 'error' => 'Grupo no encontrado'], 404);
+        $cur ? $cur->update($data) : Grupo::create($data);
+        return response()->json(['ok' => true]);
+    }
+
+    /** Marca (hijo de grupo). Reutilizable por si hiciera falta. */
+    protected function saveHijo(string $model, string $fk, string $parentTable, Request $request, int $id, string $name, bool $active)
+    {
+        $parentId = (int) $request->input($fk);
+        if (!$parentId || !DB::table($parentTable)->where('id', $parentId)->exists()) {
+            return response()->json(['ok' => false, 'error' => 'Falta el padre o no existe'], 400);
+        }
+        $cur = $id ? $model::find($id) : null;
+        if ($id && !$cur) return response()->json(['ok' => false, 'error' => 'No encontrado'], 404);
+
+        $data = [$fk => $parentId, 'name' => mb_substr($name, 0, 160), 'active' => $active];
+        $cur ? $cur->update($data) : $model::create($data);
+        return response()->json(['ok' => true]);
+    }
+
+    protected function saveSede(Request $request, int $id, string $name, bool $active)
+    {
+        $marcaId = (int) $request->input('marca_id');
+        if (!$marcaId || !DB::table('marcas')->where('id', $marcaId)->exists()) {
+            return response()->json(['ok' => false, 'error' => 'Falta la marca o no existe'], 400);
+        }
+        $cur = $id ? Sede::find($id) : null;
+        if ($id && !$cur) return response()->json(['ok' => false, 'error' => 'Sede no encontrada'], 404);
+
+        $data = [
+            'marca_id' => $marcaId,
+            'name'     => mb_substr($name, 0, 160),
+            'city'     => mb_substr(trim((string) $request->input('city', '')), 0, 120) ?: null,
+            'address'  => mb_substr(trim((string) $request->input('address', '')), 0, 200) ?: null,
+            'active'   => $active,
+        ];
+        $cur ? $cur->update($data) : Sede::create($data);
+        return response()->json(['ok' => true]);
+    }
+
+    protected function delete(Request $request)
+    {
+        if ($no = $this->soloEditores($request)) return $no;
+
+        $id = (int) $request->input('id');
+        return match ($request->input('level')) {
+            'grupo' => $this->borrar(Grupo::find($id), fn ($g) => $g->marcas()->count(), 'El grupo tiene marcas. Bórralas antes.'),
+            'marca' => $this->borrar(Marca::find($id), fn ($m) => $m->sedes()->count(), 'La marca tiene sedes. Bórralas antes.'),
+            'sede'  => $this->borrarSede($id),
+            default => response()->json(['ok' => false, 'error' => 'Nivel no válido'], 400),
+        };
+    }
+
+    protected function borrar($modelo, \Closure $cuentaHijos, string $error)
+    {
+        if (!$modelo) return response()->json(['ok' => false, 'error' => 'No encontrado'], 404);
+        if ($cuentaHijos($modelo) > 0) return response()->json(['ok' => false, 'error' => $error], 409);
+        $modelo->delete();
+        return response()->json(['ok' => true]);
+    }
+
+    protected function borrarSede(int $id)
+    {
+        $sede = Sede::find($id);
+        if (!$sede) return response()->json(['ok' => false, 'error' => 'Sede no encontrada'], 404);
+        // Los contactos de la sede se quedan sin sede (FK nullOnDelete). No se borran.
+        $sede->delete();
+        return response()->json(['ok' => true]);
+    }
+
+    /** Crear/editar/borrar el árbol exige permiso de edición de contactos. */
+    protected function soloEditores(Request $request)
+    {
+        if (!$request->user()?->can('contacts.edit')) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para gestionar la organización'], 403);
+        }
+        return null;
+    }
+}

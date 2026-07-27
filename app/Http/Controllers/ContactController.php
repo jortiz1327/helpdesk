@@ -21,6 +21,12 @@ class ContactController extends Controller
             if (array_key_exists('name', $data)) $upd['name'] = trim((string) $data['name']) ?: null;
             if (array_key_exists('note', $data)) $upd['note'] = $data['note'];
 
+            // Sede (organización): se guarda si existe; vacío = sin sede.
+            if (array_key_exists('sede_id', $data)) {
+                $sedeId = (int) $data['sede_id'];
+                $upd['sede_id'] = ($sedeId && DB::table('sedes')->where('id', $sedeId)->exists()) ? $sedeId : null;
+            }
+
             // Correo: opcional, pero si viene tiene que ser válido.
             if (array_key_exists('email', $data)) {
                 $email = mb_strtolower(trim((string) $data['email']));

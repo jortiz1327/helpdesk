@@ -24,6 +24,7 @@ import BotResponses from "./components/BotResponses.jsx";
 import Forms from "./components/Forms.jsx";
 import Phonebook from "./components/Phonebook.jsx";
 import Contacts from "./components/Contacts.jsx";
+import Organizations from "./components/Organizations.jsx";
 import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
@@ -127,6 +128,13 @@ const CONTACTS_GROUP = {
             icon: Icon.calendar,
             perm: "contacts.access",
             color: "#54a0ff",
+        },
+        {
+            key: "organizations",
+            label: "Organización",
+            icon: Icon.building,
+            perm: "contacts.access",
+            color: "#12925a",
         },
     ],
 };
@@ -951,6 +959,7 @@ export default function App() {
                             />
                         )}
                         {view === "phonebook" && <Phonebook />}
+                        {view === "organizations" && <Organizations />}
                         {view === "webpush" && <WebNotifications />}
                         {view === "analytics" && can("analytics.view") && (
                             <Analytics />

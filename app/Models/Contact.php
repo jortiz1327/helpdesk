@@ -36,4 +36,9 @@ class Contact extends Model
     {
         return $this->belongsTo(User::class, 'assigned_to');
     }
+
+    public function sede()
+    {
+        return $this->belongsTo(Sede::class, 'sede_id');
+    }
 }
