@@ -5,6 +5,7 @@ import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import ChannelBadge from './ChannelBadge.jsx'
 import SedeField from './SedeField.jsx'
+import OrgFilter from './OrgFilter.jsx'
 import Composer from './Composer.jsx'
 import Agents from './Agents.jsx'
 import CronAlerts from './CronAlerts.jsx'
@@ -165,14 +166,14 @@ function resaltar(texto, aguja) {
 }
 
 // search_in: 'ficha' (código/asunto/cliente) o 'messages' (dentro de la conversación)
-const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', sla: 'all', ...VIEWS[0].f }
+const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', sla: 'all', org: 'all', ...VIEWS[0].f }
 
 /*
  * `initialTicket`: al llegar desde otra pantalla (p. ej. pinchando uno de los
  * «tickets recientes» del Centro de Soporte) se abre ESE ticket directamente, en
  * vez de dejar al usuario delante de la lista buscándolo otra vez.
  */
-export default function Tickets({ user, initialTab = 'tickets', initialTicket = null }) {
+export default function Tickets({ user, initialTab = 'tickets', initialTicket = null, initialOrg = null }) {
   const toast = useToast()
   const [tab, setTab] = useState(initialTab)   // tickets | agents | cron
   const [crones, setCrones] = useState(0)     // crones fallando, para el distintivo
@@ -183,8 +184,10 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
   const [open, setOpen] = useState(initialTicket)   // id del ticket abierto en el modal
   // Fusión lanzada DESDE LA LISTA (sin abrir ningún ticket): { id, preselect }
   const [openFusion, setOpenFusion] = useState(null)
-  const [f, setF] = useState(BASE_F)
+  const [f, setF] = useState(initialOrg ? { ...BASE_F, org: initialOrg, status: 'all' } : BASE_F)
   const [sel, setSel] = useState(new Set())   // ids seleccionados (acciones en lote)
+  // Al llegar desde la pantalla de Organización con un filtro, se aplica (y se ve todo).
+  useEffect(() => { if (initialOrg) setF({ ...BASE_F, org: initialOrg, status: 'all' }) }, [initialOrg])
 
   // Paginación. El tamaño de página se recuerda por agente: cada uno tiene su
   // pantalla y su forma de trabajar.
@@ -258,7 +261,7 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
   }
 
   const clear = () => setF(BASE_F)
-  const refined = f.q || f.priority !== 'all' || f.category !== 'all'   // filtros finos por encima de la vista
+  const refined = f.q || f.priority !== 'all' || f.category !== 'all' || (f.org && f.org !== 'all')   // filtros finos por encima de la vista
 
   const statusOpts = [
     { value: 'open', label: 'Activos', sub: 'Sin resueltos ni cerrados' },
@@ -355,6 +358,8 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
               <Select block value={f.category} onChange={(v) => setF((s) => ({ ...s, category: v }))}
                 options={[{ value: 'all', label: 'Todas' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
             </div>
+            {/* Filtro por organización (grupo/marca/sede). Se oculta solo si no hay grupos. */}
+            <OrgFilter value={f.org} onChange={(v) => setF((s) => ({ ...s, org: v }))} />
 
             {/* Filtrar por agente: solo tiene sentido para quien reparte el trabajo.
                 Un agente ya tiene su atajo «Mis tickets» en las vistas de arriba. */}

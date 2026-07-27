@@ -30,7 +30,11 @@ function OrgModal({ title, onClose, onSave, saveLabel, children }) {
   )
 }
 
-export default function Organizations() {
+/* Suma de tickets: marca = sus sedes; grupo = todas sus marcas. */
+const sumMarca = (m) => m.sedes.reduce((a, s) => a + (s.tickets || 0), 0)
+const sumGrupo = (g) => g.marcas.reduce((a, m) => a + sumMarca(m), 0)
+
+export default function Organizations({ onVerTickets }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [grupos, setGrupos] = useState(null)
@@ -85,6 +89,9 @@ export default function Organizations() {
               {!g.active && <span className="chip cerrado sm">Inactivo</span>}
               <span className="org-count">{g.marcas.length} marca{g.marcas.length === 1 ? '' : 's'}</span>
               <span style={{ flex: 1 }} />
+              {onVerTickets && sumGrupo(g) > 0 && (
+                <button className="btn ghost sm org-vt" title="Ver sus tickets" onClick={() => onVerTickets(`grupo:${g.id}`)}><Icon.ticket /> {sumGrupo(g)} tickets</button>
+              )}
               <button className="btn ghost sm" onClick={() => newMarca(g)}><Icon.plus /> Marca</button>
               <button className="icon-btn" title="Editar grupo" onClick={() => editGrupo(g)}><Icon.pencil /></button>
               <button className="icon-btn" title="Eliminar grupo" style={{ color: 'var(--danger)' }} onClick={() => del('grupo', g.id, g.name)}><Icon.trash /></button>
@@ -100,6 +107,9 @@ export default function Organizations() {
                   {!m.active && <span className="chip cerrado sm">Inactiva</span>}
                   <span className="org-count">{m.sedes.length} sede{m.sedes.length === 1 ? '' : 's'}</span>
                   <span style={{ flex: 1 }} />
+                  {onVerTickets && sumMarca(m) > 0 && (
+                    <button className="btn ghost sm org-vt" title="Ver sus tickets" onClick={() => onVerTickets(`marca:${m.id}`)}><Icon.ticket /> {sumMarca(m)}</button>
+                  )}
                   <button className="btn ghost sm" onClick={() => newSede(g, m)}><Icon.plus /> Sede</button>
                   <button className="icon-btn" title="Editar marca" onClick={() => editMarca(g, m)}><Icon.pencil /></button>
                   <button className="icon-btn" title="Eliminar marca" style={{ color: 'var(--danger)' }} onClick={() => del('marca', m.id, m.name)}><Icon.trash /></button>
@@ -112,6 +122,9 @@ export default function Organizations() {
                     {s.city && <span className="org-s-city">{s.city}</span>}
                     {!s.active && <span className="chip cerrado sm">Inactiva</span>}
                     <span className="org-s-count" title="Contactos en esta sede">{s.contactos} 👤</span>
+                    {onVerTickets && s.tickets > 0 && (
+                      <button className="org-s-tk" title="Ver sus tickets" onClick={() => onVerTickets(`sede:${s.id}`)}><Icon.ticket /> {s.tickets}</button>
+                    )}
                     <span style={{ flex: 1 }} />
                     <button className="icon-btn" title="Editar sede" onClick={() => editSede(g, m, s)}><Icon.pencil /></button>
                     <button className="icon-btn" title="Eliminar sede" style={{ color: 'var(--danger)' }}

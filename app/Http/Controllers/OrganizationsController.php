@@ -30,6 +30,11 @@ class OrganizationsController extends Controller
         $contactosPorSede = DB::table('contacts')->whereNotNull('sede_id')
             ->select('sede_id', DB::raw('COUNT(*) n'))->groupBy('sede_id')->pluck('n', 'sede_id');
 
+        // Tickets (no-cron, sin fusionar) por sede, para pintar el total en cada nodo.
+        $ticketsPorSede = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
+            ->whereNotNull('c.sede_id')->where('t.channel', '!=', 'cron')->whereNull('t.merged_into_id')
+            ->select('c.sede_id', DB::raw('COUNT(*) n'))->groupBy('c.sede_id')->pluck('n', 'c.sede_id');
+
         $grupos = Grupo::with(['marcas' => fn ($q) => $q->orderBy('name'), 'marcas.sedes' => fn ($q) => $q->orderBy('name')])
             ->orderBy('name')->get();
 
@@ -50,6 +55,7 @@ class OrganizationsController extends Controller
                     'address'   => $s->address,
                     'active'    => $s->active,
                     'contactos' => (int) ($contactosPorSede[$s->id] ?? 0),
+                    'tickets'   => (int) ($ticketsPorSede[$s->id] ?? 0),
                 ])->all(),
             ])->all(),
         ])->all();

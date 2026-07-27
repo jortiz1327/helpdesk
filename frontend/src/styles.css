@@ -2211,6 +2211,11 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .org-marca .btn.sm, .org-g-head .btn.sm { padding: 5px 11px; font-size: 12px; }
 .org-ctx { font-size: 13px; color: var(--ink-2); background: var(--hover); border-radius: 9px; padding: 8px 12px; margin: 0 0 14px; }
 .org-ctx b { color: var(--ink); }
+.org-vt { color: var(--primary); }
+.org-vt svg { fill: currentColor; }
+.org-s-tk { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line-2); background: var(--panel); color: var(--primary); font: inherit; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.org-s-tk:hover { border-color: var(--primary); background: var(--primary-soft); }
+.org-s-tk svg { width: 13px; height: 13px; fill: currentColor; }
 
 .cnd-input { display: flex; align-items: center; border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; }
 .cnd-input span { padding: 0 4px 0 11px; color: var(--ink-2); font-family: ui-monospace, monospace; font-weight: 700; }

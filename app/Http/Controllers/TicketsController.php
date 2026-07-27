@@ -97,6 +97,22 @@ class TicketsController extends Controller
         return $this->scope($q, $me);
     }
 
+    /** Aplica el filtro de organización («grupo:ID» / «marca:ID» / «sede:ID») a $q. */
+    protected function filtroOrg($q, string $org): void
+    {
+        if ($org === '' || $org === 'all' || !str_contains($org, ':')) return;
+        [$nivel, $oid] = explode(':', $org, 2);
+        $oid = (int) $oid;
+        if (!$oid) return;
+        match ($nivel) {
+            'sede'  => $q->where('c.sede_id', $oid),
+            'marca' => $q->whereIn('c.sede_id', fn ($sub) => $sub->select('id')->from('sedes')->where('marca_id', $oid)),
+            'grupo' => $q->whereIn('c.sede_id', fn ($sub) => $sub->select('s.id')->from('sedes as s')
+                            ->join('marcas as m', 'm.id', '=', 's.marca_id')->where('m.grupo_id', $oid)),
+            default => null,
+        };
+    }
+
     protected function list(Request $request)
     {
         $me = $request->user();
@@ -167,6 +183,10 @@ class TicketsController extends Controller
                 default       => $q->where('t.assigned_to', (int) $a),
             };
         }
+
+        // Filtro por ORGANIZACIÓN: «grupo:ID» | «marca:ID» | «sede:ID». Trae los tickets
+        // cuyos contactos cuelgan de ese nodo (subiendo por la cadena sede→marca→grupo).
+        $this->filtroOrg($q, (string) $request->query('org', ''));
 
         /*
          * ¿De quién es la ÚLTIMA respuesta del hilo? Va GUARDADO en el ticket

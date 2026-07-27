@@ -368,6 +368,8 @@ export default function App() {
     const [ticketsTab, setTicketsTab] = useState("tickets");
     // Ticket que hay que abrir nada más llegar (al pinchar uno de los recientes).
     const [ticketAbierto, setTicketAbierto] = useState(null);
+    // Filtro de organización preaplicado al saltar desde la pantalla de Organización.
+    const [orgFiltro, setOrgFiltro] = useState(null);
     const [activeArea, setActiveArea] = useState(
         () => localStorage.getItem("active_area") || "helpdesk",
     );
@@ -607,7 +609,7 @@ export default function App() {
      * porque el dato seguiría guardado aquí.
      */
     useEffect(() => {
-        if (view !== "tickets") setTicketAbierto(null);
+        if (view !== "tickets") { setTicketAbierto(null); setOrgFiltro(null); }
     }, [view]);
 
     // Y la vista sigue a la URL, que es lo que hace funcionar «atrás» y «adelante».
@@ -926,7 +928,7 @@ export default function App() {
                         {view === "shifts" && <Shifts />}
                         {view === "support_cfg" && <SupportSettings />}
                         {view === "tickets" && (
-                            <Tickets user={auth.user} initialTab={ticketsTab} initialTicket={ticketAbierto} />
+                            <Tickets user={auth.user} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
                         )}
                         {view === "kanban" && (
                             <Kanban onOpen={openConversation} />
@@ -959,7 +961,9 @@ export default function App() {
                             />
                         )}
                         {view === "phonebook" && <Phonebook />}
-                        {view === "organizations" && <Organizations />}
+                        {view === "organizations" && (
+                            <Organizations onVerTickets={(org) => { setOrgFiltro(org); setTicketsTab("tickets"); setView("tickets"); }} />
+                        )}
                         {view === "webpush" && <WebNotifications />}
                         {view === "analytics" && can("analytics.view") && (
                             <Analytics />
