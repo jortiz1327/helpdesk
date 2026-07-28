@@ -68,7 +68,32 @@ class TicketReportsController extends Controller
             'by_agent'   => $byAgent->map(fn ($r) => $this->fila($r, ['id' => (int) $r->id, 'name' => $r->name]))->all(),
             'by_category' => $byCat->map(fn ($r) => $this->fila($r, ['name' => $r->name, 'color' => $r->color]))->all(),
             'by_channel' => $byChannel,
+            'daily'      => $this->daily($request->query('period', '30d')),
         ]);
+    }
+
+    /**
+     * Serie diaria (creados vs resueltos) para el gráfico de evolución. Rellena a cero
+     * los días sin datos. Para «Hoy» muestra la última semana (un punto no es gráfico).
+     */
+    protected function daily(string $period): array
+    {
+        $dias  = match ($period) { '7d' => 7, 'today' => 7, default => 30 };
+        $desde = now()->subDays($dias - 1)->startOfDay();
+
+        $creados = DB::table('tickets')->where('channel', '!=', 'cron')->whereNull('merged_into_id')
+            ->where('created_at', '>=', $desde)
+            ->selectRaw('DATE(created_at) d, COUNT(*) n')->groupBy('d')->pluck('n', 'd');
+        $resueltos = DB::table('tickets')->where('channel', '!=', 'cron')->whereNull('merged_into_id')
+            ->whereNotNull('resolved_at')->where('resolved_at', '>=', $desde)
+            ->selectRaw('DATE(resolved_at) d, COUNT(*) n')->groupBy('d')->pluck('n', 'd');
+
+        $out = [];
+        for ($i = 0; $i < $dias; $i++) {
+            $day = $desde->copy()->addDays($i)->toDateString();
+            $out[] = ['date' => $day, 'creados' => (int) ($creados[$day] ?? 0), 'resueltos' => (int) ($resueltos[$day] ?? 0)];
+        }
+        return $out;
     }
 
     /** Normaliza una fila de métricas (enteros + tiempos en horas o null). */

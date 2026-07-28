@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
+import TrendChart from './TrendChart.jsx'
 
 /* -------------------------------------------------------------------------
  * INFORMES del helpdesk (rendimiento): KPIs + por agente / categoría / canal,
@@ -88,6 +89,8 @@ export default function Reports() {
               <KPI n={fmtH(k.resp_h)} label="1ª respuesta" hint="media" />
               <KPI n={fmtH(k.resol_h)} label="Resolución" hint="media" />
             </div>
+
+            {d.daily?.length > 0 && <TrendChart data={d.daily} />}
 
             {canales.length > 0 && (
               <div className="rep-channels card">

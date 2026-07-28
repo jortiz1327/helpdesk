@@ -2241,6 +2241,24 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .rep-ch-legend b { color: var(--ink); margin-left: 4px; }
 .rep-ch-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
 
+/* --- Gráfico de evolución --- */
+.trend { position: relative; padding: 16px 18px 8px; margin-bottom: 16px; }
+.trend-top { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; }
+.trend-h { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); margin-right: auto; }
+.trend-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+.trend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.trend-svg { width: 100%; height: 250px; display: block; }
+.trend-grid { stroke: var(--line); stroke-width: 1; }
+.trend-yl, .trend-xl { fill: var(--ink-3); font-size: 10px; font-weight: 600; }
+.trend-cross { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 3 3; }
+.trend-tip { position: absolute; top: 40px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px;
+  box-shadow: var(--shadow); padding: 8px 11px; font-size: 12px; color: var(--ink-2); pointer-events: none; white-space: nowrap; z-index: 3; }
+.trend-tip b { color: var(--ink); }
+.trend-tip > b { display: block; margin-bottom: 4px; font-size: 12.5px; }
+.trend-tip span { display: flex; align-items: center; gap: 6px; }
+.trend-tip span i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.trend-tip span b { margin-left: auto; padding-left: 12px; }
+
 .cnd-input { display: flex; align-items: center; border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; }
 .cnd-input span { padding: 0 4px 0 11px; color: var(--ink-2); font-family: ui-monospace, monospace; font-weight: 700; }
 .cnd-input input { border: 0; border-radius: 0; }
