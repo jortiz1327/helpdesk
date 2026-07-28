@@ -2226,6 +2226,21 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .org-rep-name { font-weight: 600; }
 .org-rep-bad { color: var(--danger); font-weight: 700; }
 
+/* --- Informes del helpdesk --- */
+.rep-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.rep-hint { color: var(--ink-3); font-weight: 400; }
+.rep-sec { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin: 26px 0 12px; }
+.rep-empty { color: var(--ink-3); font-size: 13.5px; padding: 16px 4px; }
+.rep-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
+.rep-channels { padding: 18px 20px; margin-bottom: 4px; }
+.rep-ch-h { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); margin-bottom: 12px; }
+.rep-ch-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--hover); }
+.rep-ch-seg { height: 100%; }
+.ch-email { background: #2563eb; } .ch-whatsapp { background: #25d366; } .ch-web { background: #f59e0b; } .ch-cron { background: #94a3b8; }
+.rep-ch-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+.rep-ch-legend b { color: var(--ink); margin-left: 4px; }
+.rep-ch-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
+
 .cnd-input { display: flex; align-items: center; border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; }
 .cnd-input span { padding: 0 4px 0 11px; color: var(--ink-2); font-family: ui-monospace, monospace; font-weight: 700; }
 .cnd-input input { border: 0; border-radius: 0; }

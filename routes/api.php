@@ -32,6 +32,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\SupportSettingsController;
 use App\Http\Controllers\TemplatesController;
+use App\Http\Controllers\TicketReportsController;
 use App\Http\Controllers\TicketPrioritiesController;
 use App\Http\Controllers\TicketRulesController;
 use App\Http\Controllers\TicketSettingsController;
@@ -187,6 +188,9 @@ Route::middleware('token')->group(function () {
 
     // --- Administración ---
     Route::get('analytics.php', [AnalyticsController::class, 'handle'])
+        ->middleware('can:analytics.view');
+    // Informes del helpdesk (rendimiento: tickets, SLA, tiempos, por agente/categoría)
+    Route::get('reports.php', [TicketReportsController::class, 'handle'])
         ->middleware('can:analytics.view');
     Route::match(['get', 'post'], 'settings.php', [SettingsController::class, 'handle'])
         ->middleware('can:settings.manage');

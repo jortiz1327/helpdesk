@@ -105,6 +105,8 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level, id }),
   }),
   orgReport: (level) => req(`organizations.php?action=report&level=${level}`),
+  // Informes del helpdesk (rendimiento)
+  reports: (period) => req(`reports.php?period=${period}`),
   // --- Configuración de Soporte (categorías + respuestas predefinidas) ---
   supCategories: () => req('support_settings.php?section=categories'),
   supSaveCategory: (payload) => req('support_settings.php?section=categories', {

@@ -25,6 +25,7 @@ import Forms from "./components/Forms.jsx";
 import Phonebook from "./components/Phonebook.jsx";
 import Contacts from "./components/Contacts.jsx";
 import Organizations from "./components/Organizations.jsx";
+import Reports from "./components/Reports.jsx";
 import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
@@ -177,6 +178,13 @@ const AREAS = [
                         icon: Icon.calendar,
                         perm: "helpdesk.access",
                         color: "#7c3aed",
+                    },
+                    {
+                        key: "reports",
+                        label: "Informes",
+                        icon: Icon.chart,
+                        perm: "analytics.view",
+                        color: "#12925a",
                     },
                     {
                         key: "support_cfg",
@@ -926,6 +934,7 @@ export default function App() {
                             />
                         )}
                         {view === "shifts" && <Shifts />}
+                        {view === "reports" && <Reports />}
                         {view === "support_cfg" && <SupportSettings />}
                         {view === "tickets" && (
                             <Tickets user={auth.user} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
