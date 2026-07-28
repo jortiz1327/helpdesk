@@ -104,6 +104,7 @@ export const api = {
   orgDelete: (level, id) => req('organizations.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level, id }),
   }),
+  orgReport: (level) => req(`organizations.php?action=report&level=${level}`),
   // --- Configuración de Soporte (categorías + respuestas predefinidas) ---
   supCategories: () => req('support_settings.php?section=categories'),
   supSaveCategory: (payload) => req('support_settings.php?section=categories', {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Grupo;
 use App\Models\Marca;
 use App\Models\Sede;
+use App\Services\SlaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -20,6 +21,7 @@ class OrganizationsController extends Controller
         return match ($request->query('action', 'tree')) {
             'save'   => $this->save($request),
             'delete' => $this->delete($request),
+            'report' => $this->report($request),
             default  => $this->tree(),
         };
     }
@@ -61,6 +63,59 @@ class OrganizationsController extends Controller
         ])->all();
 
         return response()->json(['ok' => true, 'grupos' => $out]);
+    }
+
+    /**
+     * INFORME por nivel (grupo / marca / sede): nº de tickets, abiertos, resueltos,
+     * SLA vencidos y tiempos medios de respuesta y resolución. Una fila por nodo.
+     */
+    protected function report(Request $request)
+    {
+        $level = in_array($request->query('level'), ['grupo', 'marca', 'sede'], true) ? $request->query('level') : 'grupo';
+
+        // «Vencido» = mismo criterio que la bandeja (plazo pasado y ticket vivo), y solo
+        // si el SLA está activo globalmente.
+        $vencido   = SlaService::activo()
+            ? '(t.sla_resolve_due_at < NOW() OR (t.sla_response_due_at < NOW() AND t.first_response_at IS NULL))'
+            : '0';
+        $abiertos  = "t.status IN ('nuevo','abierto','en_progreso','esperando_respuesta')";
+        $resueltos = "t.status IN ('resuelto','cerrado')";
+
+        [$idCol, $label, $group] = match ($level) {
+            'sede'  => ['s.id', "CONCAT(g.name,' · ',m.name,' · ',s.name)", 's.id, g.name, m.name, s.name'],
+            'marca' => ['m.id', "CONCAT(g.name,' · ',m.name)", 'm.id, g.name, m.name'],
+            default => ['g.id', 'g.name', 'g.id, g.name'],
+        };
+
+        $rows = DB::table('tickets as t')
+            ->join('contacts as c', 'c.id', '=', 't.contact_id')
+            ->join('sedes as s', 's.id', '=', 'c.sede_id')
+            ->join('marcas as m', 'm.id', '=', 's.marca_id')
+            ->join('grupos as g', 'g.id', '=', 'm.grupo_id')
+            ->where('t.channel', '!=', 'cron')->whereNull('t.merged_into_id')
+            ->selectRaw("$idCol AS id, $label AS label,
+                COUNT(*) AS total,
+                SUM($abiertos) AS abiertos,
+                SUM($resueltos) AS resueltos,
+                SUM(($abiertos) AND ($vencido)) AS vencidos,
+                AVG(CASE WHEN t.resolved_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.resolved_at) END) AS resol_min,
+                AVG(CASE WHEN t.first_response_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.first_response_at) END) AS resp_min")
+            ->groupByRaw($group)
+            ->orderByDesc('total')
+            ->get();
+
+        $out = $rows->map(fn ($r) => [
+            'id'        => (int) $r->id,
+            'label'     => $r->label,
+            'total'     => (int) $r->total,
+            'abiertos'  => (int) $r->abiertos,
+            'resueltos' => (int) $r->resueltos,
+            'vencidos'  => (int) $r->vencidos,
+            'resol_h'   => $r->resol_min !== null ? round($r->resol_min / 60, 1) : null,
+            'resp_h'    => $r->resp_min !== null ? round($r->resp_min / 60, 1) : null,
+        ])->all();
+
+        return response()->json(['ok' => true, 'level' => $level, 'sla_activo' => SlaService::activo(), 'rows' => $out]);
     }
 
     protected function save(Request $request)

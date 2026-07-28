@@ -34,6 +34,9 @@ function OrgModal({ title, onClose, onSave, saveLabel, children }) {
 const sumMarca = (m) => m.sedes.reduce((a, s) => a + (s.tickets || 0), 0)
 const sumGrupo = (g) => g.marcas.reduce((a, m) => a + sumMarca(m), 0)
 
+/* Horas → texto legible: «—» si no hay dato, minutos si <1 h. */
+const fmtH = (h) => h == null ? '—' : (h < 1 ? Math.round(h * 60) + ' min' : (h % 1 === 0 ? h : h.toFixed(1)) + ' h')
+
 export default function Organizations({ onVerTickets }) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -42,6 +45,16 @@ export default function Organizations({ onVerTickets }) {
 
   const load = useCallback(() => { api.orgTree().then((d) => setGrupos(d.ok ? d.grupos : [])) }, [])
   useEffect(() => { load() }, [load])
+
+  // Modo INFORME: métricas por grupo/marca/sede.
+  const [mode, setMode] = useState('arbol')      // arbol | informe
+  const [repLevel, setRepLevel] = useState('grupo')
+  const [report, setReport] = useState(null)
+  useEffect(() => {
+    if (mode !== 'informe') return
+    setReport(null)
+    api.orgReport(repLevel).then((d) => setReport(d.ok ? d : { rows: [], sla_activo: false }))
+  }, [mode, repLevel])
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
 
@@ -69,11 +82,56 @@ export default function Organizations({ onVerTickets }) {
       <header className="page-head">
         <span className="sc-ic"><Icon.building style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Organización</h1></div>
-        <span className="sub">· Grupos, marcas y sedes de tus clientes</span>
+        <div className="kb-seg" style={{ marginLeft: 16 }}>
+          <button className={mode === 'arbol' ? 'on' : ''} onClick={() => setMode('arbol')}>Árbol</button>
+          <button className={mode === 'informe' ? 'on' : ''} onClick={() => setMode('informe')}>Informe</button>
+        </div>
         <div className="spacer" />
-        <button className="btn" onClick={newGrupo}><Icon.plus /> Nuevo grupo</button>
+        {mode === 'arbol' && <button className="btn" onClick={newGrupo}><Icon.plus /> Nuevo grupo</button>}
       </header>
 
+      {mode === 'informe' ? (
+        <div className="page-scroll"><div className="page" style={{ maxWidth: 920 }}>
+          <div className="kb-seg" style={{ marginBottom: 16 }}>
+            {[['grupo', 'Por grupo'], ['marca', 'Por marca'], ['sede', 'Por sede']].map(([k, l]) => (
+              <button key={k} className={repLevel === k ? 'on' : ''} onClick={() => setRepLevel(k)}>{l}</button>
+            ))}
+          </div>
+          {report === null ? <div className="center-load"><div className="spinner" /></div> : report.rows.length === 0 ? (
+            <div className="card tk-empty">
+              <div className="e-ic"><Icon.building style={{ width: 26, height: 26, fill: 'var(--ink-2)' }} /></div>
+              <h3>Sin datos todavía</h3>
+              <p>Asigna sedes a los contactos (en su ficha) para ver aquí sus métricas.</p>
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+              <table className="org-rep">
+                <thead><tr>
+                  <th>Nombre</th><th>Tickets</th><th>Abiertos</th><th>Resueltos</th>
+                  {report.sla_activo && <th title="Tickets abiertos con el SLA pasado">SLA vencido</th>}
+                  <th title="Tiempo medio hasta resolver">T. resolución</th>
+                  <th title="Tiempo medio hasta la primera respuesta">T. 1ª resp.</th>
+                  <th></th>
+                </tr></thead>
+                <tbody>
+                  {report.rows.map((r) => (
+                    <tr key={r.id}>
+                      <td className="org-rep-name">{r.label}</td>
+                      <td><b>{r.total}</b></td>
+                      <td>{r.abiertos}</td>
+                      <td>{r.resueltos}</td>
+                      {report.sla_activo && <td className={r.vencidos ? 'org-rep-bad' : ''}>{r.vencidos}</td>}
+                      <td>{fmtH(r.resol_h)}</td>
+                      <td>{fmtH(r.resp_h)}</td>
+                      <td>{onVerTickets && <button className="org-s-tk" title="Ver sus tickets" onClick={() => onVerTickets(`${repLevel}:${r.id}`)}><Icon.ticket /> Ver</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div></div>
+      ) : (
       <div className="page-scroll"><div className="page" style={{ maxWidth: 920 }}>
         {grupos === null ? <div className="center-load"><div className="spinner" /></div> : grupos.length === 0 ? (
           <div className="card tk-empty">
@@ -136,6 +194,7 @@ export default function Organizations({ onVerTickets }) {
           </div>
         ))}
       </div></div>
+      )}
 
       {form && (
         <OrgModal
