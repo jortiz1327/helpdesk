@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
-import { api } from '../api.js'
+import { api, mediaUrl } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
@@ -1274,11 +1274,24 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                               : (t.contact_name || 'Cliente')}
                         </div>
 
+                        {/* Multimedia de WhatsApp (media_url = id de Meta; se baja por el proxy). */}
+                        {m.media_url && (m.type === 'image' || m.type === 'sticker') && (
+                          <a href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer" className="tk-media-link">
+                            <img className="tk-media" src={mediaUrl(m.media_url)} loading="lazy" alt="" />
+                          </a>
+                        )}
+                        {m.media_url && m.type === 'video' && <video className="tk-media" controls src={mediaUrl(m.media_url)} />}
+                        {m.media_url && m.type === 'audio' && <audio className="tk-audio" controls src={mediaUrl(m.media_url)} />}
+                        {m.media_url && m.type === 'document' && (
+                          <a className="tk-doc" href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer"><Icon.file /> Abrir documento</a>
+                        )}
+
                         {/* is_html = HTML ya saneado en el servidor. Si no, texto plano
-                            (WhatsApp/correo) y React lo escapa solo. */}
+                            (WhatsApp/correo) y React lo escapa solo. El «[tipo]» solo se
+                            muestra si NO hay ni texto ni multimedia. */}
                         {Number(m.is_html)
                           ? <div className={`b-html${m.channel === 'email' ? ' b-email' : ''}`} dangerouslySetInnerHTML={{ __html: m.body }} />
-                          : (m.body || <i>[{m.type}]</i>)}
+                          : (m.body || (!m.media_url && <i>[{m.type}]</i>))}
 
                         {/* Adjuntos: se excluyen las imágenes EN LÍNEA (inline), que ya
                             se muestran dentro del cuerpo del correo (firma, etc.). */}

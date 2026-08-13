@@ -20,17 +20,25 @@ class WhatsAppService
      */
     protected ?string $tokenOverride = null;
     protected ?string $phoneOverride = null;
-    protected bool $campanasFetched = false;
-    protected ?\App\Models\WhatsAppNumber $campanasCache = null;
+    protected bool $defectoFetched = false;
+    protected ?\App\Models\WhatsAppNumber $defectoCache = null;
 
-    /** El número de CAMPAÑAS (opción B), memoizado; es el que usa el envío por defecto. */
-    protected function numeroCampanas(): ?\App\Models\WhatsAppNumber
+    /**
+     * Número por defecto (opción B) sin contexto explícito: primero el de CAMPAÑAS
+     * (el envío «suelto» es de campañas), y si no hay, cualquier número activo con
+     * credenciales. Así el proxy de multimedia puede bajar imágenes con el token de
+     * un número válido aunque el único que haya sea de soporte. Memoizado.
+     */
+    protected function numeroDefecto(): ?\App\Models\WhatsAppNumber
     {
-        if (!$this->campanasFetched) {
-            $this->campanasCache = \App\Models\WhatsAppNumber::porFuncion('campanas');
-            $this->campanasFetched = true;
+        if (!$this->defectoFetched) {
+            $this->defectoCache = \App\Models\WhatsAppNumber::porFuncion('campanas')
+                ?? \App\Models\WhatsAppNumber::where('active', 1)
+                    ->whereNotNull('token')->where('token', '!=', '')
+                    ->whereNotNull('phone_number_id')->orderBy('id')->first();
+            $this->defectoFetched = true;
         }
-        return $this->campanasCache;
+        return $this->defectoCache;
     }
 
     public function paraNumero(\App\Models\WhatsAppNumber $n): static
@@ -51,7 +59,7 @@ class WhatsAppService
     protected function token(): string
     {
         if ($this->tokenOverride) return $this->tokenOverride;
-        $n = $this->numeroCampanas();
+        $n = $this->numeroDefecto();
         if ($n && $n->token) return (string) $n->token;
         return (string) Setting::get('wa_token', '');
     }
@@ -59,7 +67,7 @@ class WhatsAppService
     protected function phoneId(): string
     {
         if ($this->phoneOverride) return $this->phoneOverride;
-        $n = $this->numeroCampanas();
+        $n = $this->numeroDefecto();
         if ($n && $n->phone_number_id) return (string) $n->phone_number_id;
         return (string) Setting::get('wa_phone_number_id', '');
     }

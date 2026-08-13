@@ -1603,6 +1603,13 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .wa-ack.read { color: #34b7f1; }
 .wa-ack.fail { display: inline-flex; align-items: center; gap: 3px; color: var(--danger); }
 .wa-ack.fail svg { width: 12px; height: 12px; fill: var(--danger); }
+
+/* Multimedia de WhatsApp dentro del hilo del ticket */
+.tk-media { max-width: 260px; max-height: 320px; border-radius: 10px; display: block; margin: 2px 0; cursor: pointer; background: var(--panel-2); }
+.tk-media-link { display: inline-block; }
+.tk-audio { display: block; margin: 4px 0; max-width: 260px; }
+.tk-doc { display: inline-flex; align-items: center; gap: 7px; margin: 3px 0; padding: 8px 12px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); font-size: 13px; font-weight: 600; }
+.tk-doc svg { width: 16px; height: 16px; fill: var(--primary); }
 .tk-msg.in.is-email .b-att { padding: 0 2px; }
 .tk-av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 32px; }
 .tk-av.cli { background: rgba(37, 99, 235, 0.18); color: #93b4ff; }
