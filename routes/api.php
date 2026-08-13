@@ -53,7 +53,10 @@ use Illuminate\Support\Facades\Route;
 Route::match(['get', 'post'], 'auth.php', [AuthController::class, 'handle']);
 
 // --- Webhook de WhatsApp (PÚBLICO; lo llama Meta, sin token) ---
-Route::match(['get', 'post'], 'webhook.php', [WebhookController::class, 'handle']);
+// Rate-limit generoso: aguanta las ráfagas normales de Meta pero corta un flood.
+// Un 429 hace que Meta reintente el evento (no se pierde), así que es seguro.
+Route::match(['get', 'post'], 'webhook.php', [WebhookController::class, 'handle'])
+    ->middleware('throttle:600,1');
 
 /*
  * PORTAL PÚBLICO (la cara del cliente). SIN token de agente: la identidad es el

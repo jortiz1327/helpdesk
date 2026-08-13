@@ -122,3 +122,23 @@ lo que convierte los **correos entrantes en tickets**.
 - **Zona horaria** fijada a `Europe/Madrid` (el motor usa horarios para SLA y turnos).
 - Si tocas el `.env` después de instalar, vuelve a cachear: borra `bootstrap/cache/config.php`
   o entra por SSH y `php artisan config:cache`.
+
+## Seguridad (verificar antes de abrir al público)
+
+- **`APP_DEBUG=false`** y **`APP_ENV=production`** en el `.env` (nunca dejar `debug` en
+  producción: expone trazas y datos). El `.env.production.example` ya viene así.
+- **`LOG_LEVEL=error`**, **`SESSION_ENCRYPT=true`**, **`SESSION_SECURE_COOKIE=true`**
+  (ya en el ejemplo de producción).
+- **HTTPS obligatorio**: con el dominio en `https`, las cabeceras de seguridad activan el
+  HSTS automáticamente (`SecurityHeaders`).
+- **Cabeceras de seguridad**: van solas en toda respuesta (middleware `SecurityHeaders`):
+  X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, HSTS y CSP.
+  Si algún día se añade un recurso externo (otra fuente, un CDN…), hay que permitirlo en la
+  CSP del middleware o el navegador lo bloqueará.
+- **Rate-limiting**: el login tiene freno por cuenta+IP; el webhook de WhatsApp y el portal
+  van limitados por ruta. No hace falta tocar nada.
+- **Contraseñas**: mínimo 8 caracteres (alta, edición y cambio propio).
+- **Firma del webhook**: pon el **App Secret** del número en Configuración → WhatsApp para
+  que solo se procesen eventos firmados por Meta.
+- **Borra `install.php`** del servidor una vez instalado (deja de ser necesario y es una
+  puerta abierta).

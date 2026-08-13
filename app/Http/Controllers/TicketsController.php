@@ -869,6 +869,7 @@ class TicketsController extends Controller
         $mid = \App\Services\ChatService::storeMessage($t->contact_id, (string) $t->contact_wa, 'out', 'text', nl2br(e($texto)), [
             'ticket_id'      => $t->id,
             'channel'        => 'whatsapp',
+            'funcion'        => 'soporte',   // respuesta de soporte: va al Helpdesk, no a Campañas
             'status'         => 'sent',
             'is_html'        => true,
             'wamid'          => $res['messages'][0]['id'] ?? null,

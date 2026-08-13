@@ -88,7 +88,8 @@ class ConversationController extends Controller
         // SEPARACIÓN DE CANALES: el «Chat en vivo» es SOLO WhatsApp. Los contactos
         // que solo tienen correo/soporte (tickets) NO aparecen aquí — su sitio es el
         // Helpdesk. Se listan únicamente contactos con al menos un mensaje de WhatsApp.
-        $where = ["EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp')"];
+        // Solo conversaciones de CAMPAÑAS (el WhatsApp de soporte va al Helpdesk, no aquí).
+        $where = ["EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp' AND mw.funcion = 'campanas')"];
         $params = [];
         // Búsqueda por nombre, número O nombre de etiqueta.
         if ($q !== '') {
@@ -132,7 +133,7 @@ class ConversationController extends Controller
 
         $contact->labels = DB::select('SELECT l.id, l.name, l.color FROM contact_labels cl JOIN labels l ON l.id = cl.label_id WHERE cl.contact_id = ?', [$contactId]);
         // Solo mensajes de WhatsApp: los de correo/soporte viven en su ticket, no aquí.
-        $messages = DB::select("SELECT m.*, u.name AS sent_by_name FROM messages m LEFT JOIN users u ON u.id = m.sent_by WHERE m.contact_id = ? AND m.channel = 'whatsapp' ORDER BY m.id ASC LIMIT 500", [$contactId]);
+        $messages = DB::select("SELECT m.*, u.name AS sent_by_name FROM messages m LEFT JOIN users u ON u.id = m.sent_by WHERE m.contact_id = ? AND m.channel = 'whatsapp' AND m.funcion = 'campanas' ORDER BY m.id ASC LIMIT 500", [$contactId]);
 
         return response()->json(['contact' => $contact, 'messages' => $messages]);
     }
@@ -141,7 +142,7 @@ class ConversationController extends Controller
     {
         $contactId = (int) $r->query('contact_id', 0);
         $afterId   = (int) $r->query('after', 0);
-        $messages = DB::select("SELECT m.*, u.name AS sent_by_name FROM messages m LEFT JOIN users u ON u.id = m.sent_by WHERE m.contact_id = ? AND m.channel = 'whatsapp' AND m.id > ? ORDER BY m.id ASC", [$contactId, $afterId]);
+        $messages = DB::select("SELECT m.*, u.name AS sent_by_name FROM messages m LEFT JOIN users u ON u.id = m.sent_by WHERE m.contact_id = ? AND m.channel = 'whatsapp' AND m.funcion = 'campanas' AND m.id > ? ORDER BY m.id ASC", [$contactId, $afterId]);
         return response()->json(['messages' => $messages]);
     }
 }

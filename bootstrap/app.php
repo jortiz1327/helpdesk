@@ -36,6 +36,10 @@ return Application::configure(basePath: dirname(__DIR__))
          * datos (en terminate(), sin coste para la respuesta). Solo el superadmin lo
          * consulta. Va en el grupo `api` para verlas todas; él decide qué registra.
          */
+        // Cabeceras de seguridad en TODA respuesta (SPA + API): anti-clickjacking,
+        // nosniff, referrer, HSTS (solo https) y CSP.
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
         $middleware->appendToGroup('api', \App\Http\Middleware\LogActivity::class);
 
         // La API no usa cookies/sesión: solo token en cabecera.

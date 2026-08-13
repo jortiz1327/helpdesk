@@ -318,6 +318,20 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
     } else toast(res.error || 'No se pudo eliminar', 'err')
   }
 
+  // Cierra el chat abierto (vuelve a la lista de conversaciones).
+  const cerrarChat = useCallback(() => { setActive(null); setDetail(null); setMessages([]) }, [])
+
+  // ESC cierra el chat abierto (si no hay menú contextual ni una previsualización
+  // por encima, que gestionan su propio Escape).
+  useEffect(() => {
+    if (!active) return
+    const onEsc = (e) => {
+      if (e.key === 'Escape' && !ctx && !mediaPreview && !pickerOpen) cerrarChat()
+    }
+    document.addEventListener('keydown', onEsc)
+    return () => document.removeEventListener('keydown', onEsc)
+  }, [active, ctx, mediaPreview, pickerOpen, cerrarChat])
+
   // refrescar detalle del contacto (nombre / notas / etiquetas) tras editar en el panel
   const onContactUpdated = (patch) => {
     setDetail((d) => ({ ...d, ...patch }))
@@ -528,6 +542,9 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
             <button onClick={() => markConv(ctx.conv, true)}><Icon.check /> Marcar como leído</button>
           ) : (
             <button onClick={() => markConv(ctx.conv, false)}><Icon.dot /> Marcar como no leído</button>
+          )}
+          {active?.id === ctx.conv.id && (
+            <button onClick={() => { setCtx(null); cerrarChat() }}><Icon.x /> Cerrar chat</button>
           )}
           <button className="danger" onClick={() => deleteConv(ctx.conv)}><Icon.trash /> Eliminar conversación</button>
         </div>

@@ -172,6 +172,7 @@ class WebhookController extends Controller
         $ticketId = $this->tickets->routeIncoming($contactId, 'whatsapp', $body ?: "[$type]");
         $opts['ticket_id'] = $ticketId;
         $opts['channel'] = 'whatsapp';
+        $opts['funcion'] = $funcion;   // soporte → Helpdesk · campanas → «Chat en vivo»
 
         ChatService::storeMessage($contactId, $from, 'in', $type, $body, $opts);
 

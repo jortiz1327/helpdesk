@@ -91,8 +91,8 @@ class UsersController extends Controller
                 return response()->json(['ok' => true, 'id' => $id]);
             }
 
-            if (strlen($pass) < 6) {
-                return response()->json(['ok' => false, 'error' => 'La contraseña debe tener al menos 6 caracteres'], 400);
+            if (strlen($pass) < 8) {
+                return response()->json(['ok' => false, 'error' => 'La contraseña debe tener al menos 8 caracteres'], 400);
             }
 
             $new = User::create([

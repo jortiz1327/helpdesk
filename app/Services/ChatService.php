@@ -56,6 +56,9 @@ class ChatService
             'wa_id'            => $waId,
             'direction'        => $direction,
             'channel'          => $opts['channel'] ?? 'whatsapp',
+            // Separación Soporte ↔ Campañas: por defecto un WhatsApp es de campañas
+            // (la «Chat en vivo»); soporte se marca explícitamente por el llamante.
+            'funcion'          => $opts['funcion'] ?? ((($opts['channel'] ?? 'whatsapp') === 'whatsapp') ? 'campanas' : null),
             'author_user_id'   => $opts['author_user_id'] ?? null,
             'type'             => $type,
             'body'             => $body,

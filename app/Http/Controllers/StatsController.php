@@ -34,10 +34,16 @@ class StatsController extends Controller
             LIMIT 6
         ");
 
+        // El badge de no-leídos es el de la «Chat en vivo» de Campañas: solo cuenta
+        // contactos con conversación de CAMPAÑAS (no soporte ni contactos sueltos).
+        $esDeCampanas = fn ($q) => $q->select(DB::raw(1))->from('messages as mu')
+            ->whereColumn('mu.contact_id', 'contacts.id')
+            ->where('mu.channel', 'whatsapp')->where('mu.funcion', 'campanas');
+
         return response()->json([
             'contacts'       => DB::table('contacts')->count(),
-            'unread'         => (int) DB::table('contacts')->sum('unread'),
-            'unread_chats'   => DB::table('contacts')->where('unread', '>', 0)->count(),
+            'unread'         => (int) DB::table('contacts')->where('unread', '>', 0)->whereExists($esDeCampanas)->sum('unread'),
+            'unread_chats'   => DB::table('contacts')->where('unread', '>', 0)->whereExists($esDeCampanas)->count(),
             'messages'       => DB::table('messages')->count(),
             /*
              * Rango de fechas en vez de DATE(created_at) = CURDATE(). Envolver la

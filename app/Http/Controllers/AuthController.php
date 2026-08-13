@@ -116,8 +116,8 @@ class AuthController extends Controller
             $me->email = $newEmail;
         }
         if ($newPass !== '') {
-            if (strlen($newPass) < 6) {
-                return response()->json(['ok' => false, 'error' => 'La nueva contraseña debe tener al menos 6 caracteres'], 400);
+            if (strlen($newPass) < 8) {
+                return response()->json(['ok' => false, 'error' => 'La nueva contraseña debe tener al menos 8 caracteres'], 400);
             }
             $me->password = Hash::make($newPass);
         }

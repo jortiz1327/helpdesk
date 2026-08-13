@@ -26,12 +26,15 @@ class ImportWhatsappChats extends Command
         {--source=import-wa : Marca en tickets.source (para poder revertir)}
         {--limit=0 : Máximo de tickets a crear (0 = sin límite)}
         {--per-contact : Un solo ticket por contacto (todo el chat junto) en vez de uno por sesión}
+        {--funcion=soporte : Marca en los mensajes: soporte | campanas}
+        {--no-tickets : Solo chat (contactos + mensajes), sin crear tickets (para Campañas)}
         {--dry-run : No inserta nada, solo informa de lo que haría}
-        {--fresh : Borra antes los tickets ya importados con este source}';
+        {--fresh : Borra antes lo ya importado (tickets del source, o mensajes de la función si --no-tickets)}';
 
-    protected $description = 'Importa el histórico de WhatsApp (CSV) como tickets cerrados';
+    protected $description = 'Importa el histórico de WhatsApp (CSV) como tickets cerrados o como chat de campañas';
 
     private array $codeSeq = [];
+    private string $funcion = 'soporte';
 
     public function handle(): int
     {
@@ -43,12 +46,22 @@ class ImportWhatsappChats extends Command
         $source  = (string) $this->option('source');
         $limit   = (int) $this->option('limit');
         $dry     = (bool) $this->option('dry-run');
+        $noTickets = (bool) $this->option('no-tickets');
+        $this->funcion = ((string) $this->option('funcion')) === 'campanas' ? 'campanas' : 'soporte';
 
         if ($this->option('fresh') && !$dry) {
-            $n = DB::table('tickets')->where('source', $source)->count();
-            if ($n) {
-                $this->warn("Borrando $n tickets previos (source=$source) y sus mensajes…");
-                DB::table('tickets')->where('source', $source)->delete();   // messages caen por FK cascade
+            if ($noTickets) {
+                $n = DB::table('messages')->where('funcion', $this->funcion)->whereNull('ticket_id')->count();
+                if ($n) {
+                    $this->warn("Borrando $n mensajes de chat previos (funcion={$this->funcion})…");
+                    DB::table('messages')->where('funcion', $this->funcion)->whereNull('ticket_id')->delete();
+                }
+            } else {
+                $n = DB::table('tickets')->where('source', $source)->count();
+                if ($n) {
+                    $this->warn("Borrando $n tickets previos (source=$source) y sus mensajes…");
+                    DB::table('tickets')->where('source', $source)->delete();   // messages caen por FK cascade
+                }
             }
         }
 
@@ -62,6 +75,22 @@ class ImportWhatsappChats extends Command
         $bar = $this->output->createProgressBar(count($chats));
 
         foreach ($chats as $wa => $data) {
+            // CAMPAÑAS: chat sin tickets. Todo el chat del contacto entra como mensajes.
+            if ($noTickets) {
+                if (!$data['msgs']) { $bar->advance(); continue; }
+                if ($dry) { $contactos++; $mensajes += count($data['msgs']); $bar->advance(); continue; }
+                $contactId = $this->contacto($wa, $data['name']);
+                $contactos++;
+                $mensajes += $this->insertarChat($wa, $contactId, $data['msgs'], $channel);
+                $ult = end($data['msgs']);
+                DB::table('contacts')->where('id', $contactId)->update([
+                    'last_message' => mb_substr($ult[2], 0, 500),
+                    'last_time'    => date('Y-m-d H:i:s', $ult[0]),
+                ]);
+                $bar->advance();
+                continue;
+            }
+
             // Un ticket por contacto: todo el chat en una sola "sesión".
             $sesiones = $perContact ? [$data['msgs']] : $this->sesionizar($data['msgs'], $gap);
             $contactId = null;   // se resuelve al primer ticket real del chat
@@ -103,12 +132,16 @@ class ImportWhatsappChats extends Command
         $bar->finish();
         $this->newLine(2);
 
-        $this->table(['', 'Resultado'], [
-            ['Tickets ' . ($dry ? 'que se crearían' : 'creados'), number_format($tickets)],
-            ['Mensajes ' . ($dry ? 'que se insertarían' : 'insertados'), number_format($mensajes)],
-            ['Contactos ' . ($dry ? '(no se tocan en dry-run)' : 'dados de alta/reutilizados'), number_format($contactos)],
-            ['Sesiones saltadas (sin texto de cliente)', number_format($saltados)],
-        ]);
+        $filas = [];
+        if (!$noTickets) {
+            $filas[] = ['Tickets ' . ($dry ? 'que se crearían' : 'creados'), number_format($tickets)];
+        } else {
+            $filas[] = ['Conversaciones de chat (funcion=' . $this->funcion . ')', number_format($contactos)];
+        }
+        $filas[] = ['Mensajes ' . ($dry ? 'que se insertarían' : 'insertados'), number_format($mensajes)];
+        $filas[] = ['Contactos ' . ($dry ? '(no se tocan en dry-run)' : 'dados de alta/reutilizados'), number_format($contactos)];
+        if (!$noTickets) $filas[] = ['Sesiones saltadas (sin texto de cliente)', number_format($saltados)];
+        $this->table(['', 'Resultado'], $filas);
         if ($dry) $this->warn('DRY-RUN: no se ha insertado nada. Quita --dry-run para importar.');
 
         return 0;
@@ -263,6 +296,7 @@ class ImportWhatsappChats extends Command
                 'wa_id'            => $wa,
                 'direction'        => $m[1] ? 'out' : 'in',
                 'channel'          => $channel,
+                'funcion'          => $this->funcion,
                 'type'             => $this->tipo($m[2]),
                 'body'             => $m[2],
                 'is_internal_note' => 0,
@@ -273,6 +307,29 @@ class ImportWhatsappChats extends Command
         foreach (array_chunk($filas, 500) as $lote) DB::table('messages')->insert($lote);
 
         return [count($ses), $ticketId];
+    }
+
+    /** Inserta el chat de un contacto SIN ticket (para Campañas). Devuelve nº de mensajes. */
+    private function insertarChat(string $wa, int $contactId, array $msgs, string $channel): int
+    {
+        $filas = [];
+        foreach ($msgs as $m) {
+            $filas[] = [
+                'ticket_id'        => null,
+                'contact_id'       => $contactId,
+                'wa_id'            => $wa,
+                'direction'        => $m[1] ? 'out' : 'in',
+                'channel'          => $channel,
+                'funcion'          => $this->funcion,
+                'type'             => $this->tipo($m[2]),
+                'body'             => $m[2],
+                'is_internal_note' => 0,
+                'status'           => 'sent',
+                'created_at'       => date('Y-m-d H:i:s', $m[0]),
+            ];
+        }
+        foreach (array_chunk($filas, 500) as $lote) DB::table('messages')->insert($lote);
+        return count($filas);
     }
 
     private function tipo(string $body): string

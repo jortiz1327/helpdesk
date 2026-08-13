@@ -310,10 +310,10 @@ const ADMIN_GROUP = {
             // Config de WhatsApp (números, webhook…). Transversal: el número de
             // Soporte es del Helpdesk y el de Campañas del área Campañas, así que
             // debe alcanzarse desde cualquier área (solo superadmin). Etiqueta corta
-            // e icono de chat para que no se corte ni repita el engranaje de «Configuración».
+            // e icono del logo de WhatsApp para que no se corte ni repita el engranaje de «Configuración».
             key: "settings",
             label: "WhatsApp",
-            icon: Icon.chat,
+            icon: Icon.whatsapp,
             perm: "settings.manage",
             color: "#25d366",
         },
