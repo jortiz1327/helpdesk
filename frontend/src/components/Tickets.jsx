@@ -975,6 +975,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
     const r = await api.assignTicket(id, user_id || null)
     if (r.ok) { toast('Ticket asignado'); load(); onChange?.() } else toast(r.error || 'Error', 'err')
   }
+  const cambiarCategoria = async (category_id) => {
+    const r = await api.setTicketCategory(id, category_id || null)
+    if (r.ok) { toast('Categoría actualizada'); load(); onChange?.() } else toast(r.error || 'Error', 'err')
+  }
   const del = async () => {
     const ok = await confirm({
       title: 'Eliminar ticket',
@@ -1056,7 +1060,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                 <div className="tkm-row"><span>Referencia</span><b className="tk-code">{t.code}</b></div>
                 <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} /></div>
                 <div className="tkm-row"><span>Categoría</span>
-                  {t.category_name ? <span className="chip cat">{t.category_name}</span> : <i className="tk-time">Sin categoría</i>}
+                  <Select value={t.category_id ? String(t.category_id) : ''} onChange={(v) => cambiarCategoria(v || null)}
+                    options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
                 </div>
                 <div className="tkm-row"><span>Prioridad</span>
                   {prChip(t.priority, meta)}

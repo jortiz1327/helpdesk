@@ -279,6 +279,9 @@ export const api = {
   assignTicket: (id, user_id) => req('tickets.php?action=assign', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, user_id }),
   }),
+  setTicketCategory: (id, category_id) => req('tickets.php?action=category', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, category_id }),
+  }),
   // Nota interna (no se envía al cliente): body en HTML
   ticketNote: (id, body, sla = false) => req('tickets.php?action=note', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, body, sla }),

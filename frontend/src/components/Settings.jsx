@@ -99,9 +99,10 @@ export default function Settings() {
             <label className="field" style={{ marginBottom: 0 }}>
               <span className="lbl">Verify Token</span>
               <div className="copybox">
-                <input className="mono" value={f.wa_verify_token} onChange={set('wa_verify_token')} />
+                <input className="mono" readOnly value={f.wa_verify_token} />
                 <button className="btn ghost" onClick={() => copy(f.wa_verify_token)}><Icon.copy /></button>
               </div>
+              <span className="hint">Se genera solo. Pégalo tal cual en Meta → Webhook → «Identificador de verificación».</span>
             </label>
           </div>
 

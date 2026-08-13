@@ -205,10 +205,12 @@ class ShiftService
     {
         try {
             $t = DB::table('tickets as t')->leftJoin('ticket_categories as c', 'c.id', '=', 't.category_id')
-                ->where('t.id', $ticketId)->first(['t.assigned_to', 'c.use_shift']);
+                ->where('t.id', $ticketId)->first(['t.assigned_to', 't.category_id', 'c.use_shift']);
 
-            if (!$t || $t->assigned_to) return null;      // ya tiene responsable
-            if (!$t->use_shift) return null;              // esta categoría no rota (p. ej. facturas)
+            if (!$t || $t->assigned_to) return null;                 // ya tiene responsable
+            // SIN categoría → sí se reparte al de guardia. CON categoría → solo si esa
+            // categoría rota (una categoría se puede marcar «no repartir», p. ej. facturas).
+            if ($t->category_id && !$t->use_shift) return null;
 
             $guardia = $this->deGuardia();
             if (!$guardia) return null;                   // fuera de horario o semana sin cubrir

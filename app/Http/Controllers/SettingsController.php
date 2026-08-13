@@ -30,6 +30,15 @@ class SettingsController extends Controller
     {
         $base = rtrim($request->getSchemeAndHttpHost() . $request->getBaseUrl(), '/');
 
+        // El Verify Token del webhook se AUTOGENERA si falta: nunca debe estar vacío,
+        // o la verificación de Meta compararía contra "" y devolvería 403. Es un
+        // secreto compartido entre la app y Meta (se pega igual en los dos sitios).
+        $verifyToken = (string) Setting::get('wa_verify_token', '');
+        if ($verifyToken === '') {
+            $verifyToken = \Illuminate\Support\Str::random(32);
+            Setting::put('wa_verify_token', $verifyToken);
+        }
+
         return response()->json([
             'business_name'      => Setting::get('business_name'),
             'wa_phone_number_id' => Setting::get('wa_phone_number_id'),
@@ -37,7 +46,7 @@ class SettingsController extends Controller
             'wa_app_id'          => Setting::get('wa_app_id'),
             'wa_token'           => Setting::get('wa_token'),
             'wa_app_secret'      => Setting::get('wa_app_secret'),
-            'wa_verify_token'    => Setting::get('wa_verify_token'),
+            'wa_verify_token'    => $verifyToken,
             // Firma del webhook: activa solo si hay App Secret configurado
             // Firma activa si hay App Secret global O en cualquier número de la Opción B
             // (el webhook usa el App Secret del número dueño del evento).

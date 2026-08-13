@@ -252,6 +252,22 @@ class TicketService
     }
 
     /**
+     * Cambia la categoría del ticket y lo registra. La categoría trae su propio SLA
+     * (plazos de respuesta/resolución), así que se recalcula el vencimiento.
+     */
+    public function setCategory(int $ticketId, ?int $categoryId, ?int $userId = null): void
+    {
+        $cur = DB::table('tickets')->where('id', $ticketId)->value('category_id');
+        $cur = $cur ? (int) $cur : null;
+        if ($cur === $categoryId) return;
+
+        DB::table('tickets')->where('id', $ticketId)->update(['category_id' => $categoryId]);
+        $this->recalcularSla($ticketId);
+        $this->event($ticketId, 'category', $cur ? (string) $cur : null, $categoryId ? (string) $categoryId : null, $userId);
+        $this->broadcast('category', $ticketId);
+    }
+
+    /**
      * Cambia el estado y lo registra. Rellena resolved_at / closed_at.
      * Devuelve false si no había cambio real.
      */

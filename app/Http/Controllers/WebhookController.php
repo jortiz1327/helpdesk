@@ -165,19 +165,23 @@ class WebhookController extends Controller
         }
 
         /*
-         * EL ROUTER: ¿este mensaje pertenece a un ticket abierto o abre uno nuevo?
-         * Si el contacto tiene un ticket abierto en el canal WhatsApp, el mensaje se
-         * añade a ese ticket; si no, se crea uno (con el texto como asunto provisional).
+         * ENRUTADO POR FUNCIÓN (opción B):
+         *  · SOPORTE  → crea/actualiza un TICKET (Helpdesk, se atiende a mano).
+         *  · CAMPAÑAS → es CHAT («Chat en vivo»): el mensaje va SUELTO (sin ticket) y
+         *    lo gestiona el bot / los flujos. Por eso un número de campañas NO crea
+         *    tickets (antes se creaba siempre, ese era el bug).
          */
-        $ticketId = $this->tickets->routeIncoming($contactId, 'whatsapp', $body ?: "[$type]");
+        $ticketId = $funcion === 'soporte'
+            ? $this->tickets->routeIncoming($contactId, 'whatsapp', $body ?: "[$type]")
+            : null;
         $opts['ticket_id'] = $ticketId;
         $opts['channel'] = 'whatsapp';
         $opts['funcion'] = $funcion;   // soporte → Helpdesk · campanas → «Chat en vivo»
 
         ChatService::storeMessage($contactId, $from, 'in', $type, $body, $opts);
 
-        // Aviso en tiempo real: hay un mensaje nuevo del cliente en este ticket.
-        $this->tickets->broadcast('message', $ticketId);
+        // Aviso en tiempo real del ticket (solo soporte; campañas se ve en Chat en vivo).
+        if ($ticketId) $this->tickets->broadcast('message', $ticketId);
 
         // SOPORTE (opción B): el número de tickets NO ejecuta el bot ni el
         // consentimiento de campañas. La conversación ya es un ticket y se atiende a
@@ -187,8 +191,8 @@ class WebhookController extends Controller
             return;
         }
 
-        // Todo lo que respondamos a este mensaje va al MISMO ticket.
-        $out = ['ticket_id' => $ticketId, 'channel' => 'whatsapp', 'status' => 'sent'];
+        // Campañas es chat: las respuestas del bot también van sueltas (sin ticket).
+        $out = ['channel' => 'whatsapp', 'status' => 'sent'];
 
         // Respuesta de un WhatsApp Flow (formulario nativo)
         if ($type === 'interactive' && ($msg['interactive']['type'] ?? '') === 'nfm_reply') {

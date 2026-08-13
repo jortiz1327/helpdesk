@@ -35,6 +35,7 @@ class TicketsController extends Controller
             'detail' => $this->detail($request),
             'status' => $this->status($request),
             'assign' => $this->assign($request),
+            'category' => $this->setCategory($request),
             'bulk'   => $this->bulk($request),
             'create' => $this->create($request),
             'agents'  => $this->agents($request),
@@ -1121,6 +1122,23 @@ class TicketsController extends Controller
         }
 
         $this->tickets->assign($id, $target, (int) $me->id);
+        return response()->json(['ok' => true]);
+    }
+
+    /** Cambia la categoría del ticket (o la quita si viene vacía). */
+    protected function setCategory(Request $request)
+    {
+        $me = $request->user();
+        $id = (int) $request->input('id');
+        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el ticket'], 400);
+
+        $catId = $request->input('category_id');
+        $catId = $catId ? (int) $catId : null;
+        if ($catId && !DB::table('ticket_categories')->where('id', $catId)->exists()) {
+            return response()->json(['ok' => false, 'error' => 'Categoría no válida'], 400);
+        }
+
+        $this->tickets->setCategory($id, $catId, (int) $me->id);
         return response()->json(['ok' => true]);
     }
 
