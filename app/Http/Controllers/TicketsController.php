@@ -328,7 +328,7 @@ class TicketsController extends Controller
                 // `contact_id` y `merged_into_id`: la lista necesita saber si dos
                 // tickets marcados son del mismo cliente (para poder fusionarlos) y
                 // si alguno ya está fusionado.
-                't.contact_id', 't.merged_into_id',
+                't.contact_id', 't.merged_into_id', 't.category_id',
                 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
                 'cat.name as category_name', 'cat.color as category_color',
                 'cat.sla_response_hours', 'cat.sla_resolve_hours', 't.sla_paused_minutes', 't.sla_paused_since',

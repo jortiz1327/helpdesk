@@ -321,6 +321,10 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
     const r = await api.assignTicket(id, uid || null)
     if (r.ok) { toast('Ticket asignado'); load() } else toast(r.error || 'Error', 'err')
   }
+  const quickCategory = async (id, catId) => {
+    const r = await api.setTicketCategory(id, catId || null)
+    if (r.ok) { toast('Categoría actualizada'); load() } else toast(r.error || 'Error', 'err')
+  }
 
   // --- Selección para acciones en lote ---
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -627,12 +631,13 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                             </div>
                           )}
                         </td>
-                        {/* También etiqueta cuando no hay categoría: si es texto suelto,
-                            su primera letra queda 9 px a la izquierda de la de las
-                            etiquetas y la columna se ve desalineada. */}
-                        <td>{t.category_name
-                          ? <span className="chip cat">{t.category_name}</span>
-                          : <span className="chip cat vacia">Sin categoría</span>}</td>
+                        {/* Categoría editable en la propia tabla (como el asignar).
+                            stopPropagation para que abrir el desplegable no abra el modal. */}
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <Select sm block value={t.category_id ? String(t.category_id) : ''}
+                            onChange={(v) => quickCategory(t.id, v)}
+                            options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
+                        </td>
 
                         {/* Asignar sin abrir el ticket: un encargado reparte la cola de un vistazo.
                             stopPropagation para que abrir el desplegable no abra el modal. */}
