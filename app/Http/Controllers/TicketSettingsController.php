@@ -24,6 +24,8 @@ class TicketSettingsController extends Controller
                 'ticket_lock_minutes'     => (int) Setting::get('ticket_lock_minutes', '2'),
                 'ticket_autoclose_days'   => (int) Setting::get('ticket_autoclose_days', '0'),
                 'ticket_autoclose_notify' => (string) Setting::get('ticket_autoclose_notify', '0') === '1',
+                // Encuesta de satisfacción (CSAT) en el portal
+                'csat_active'             => (string) Setting::get('csat_active', '1') === '1',
                 // Seguridad del acceso (fuerza bruta)
                 'login_max_user'     => (int) Setting::get('login_max_user', '7'),
                 'login_max_ip'       => (int) Setting::get('login_max_ip', '25'),
@@ -66,6 +68,9 @@ class TicketSettingsController extends Controller
         }
         if ($request->has('ticket_autoclose_notify')) {
             Setting::put('ticket_autoclose_notify', filter_var($request->input('ticket_autoclose_notify'), FILTER_VALIDATE_BOOLEAN) ? '1' : '0');
+        }
+        if ($request->has('csat_active')) {
+            Setting::put('csat_active', filter_var($request->input('csat_active'), FILTER_VALIDATE_BOOLEAN) ? '1' : '0');
         }
 
         // Seguridad del acceso. Se acotan para no dejar la puerta abierta ni

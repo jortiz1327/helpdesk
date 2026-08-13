@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
+import WhatsAppNumbers from './WhatsAppNumbers.jsx'
+import AiSettings from './AiSettings.jsx'
 
 const FIELDS = ['business_name', 'wa_phone_number_id', 'wa_business_id', 'wa_app_id', 'wa_token', 'wa_app_secret', 'wa_verify_token', 'consent_message']
 
@@ -70,8 +72,14 @@ export default function Settings() {
       </header>
       <div className="page-scroll">
         <div className="page">
+          {/* Opción B: los números y su función (enrutado por phone_number_id). */}
+          <WhatsAppNumbers />
+
+          {/* Agente de IA (Claude) para el WhatsApp de soporte. */}
+          <AiSettings />
+
           <div className="card">
-            <h2>Conexión con Meta</h2>
+            <h2>Conexión con Meta <span className="hint" style={{ fontWeight: 400 }}>· global (campañas / legacy)</span></h2>
             <p className="desc">Datos de tu cuenta de WhatsApp Business (Meta for Developers). Se guardan en tu base de datos local.</p>
             <div className="grid2">
               <label className="field">

@@ -119,10 +119,20 @@ Route::middleware('token')->group(function () {
     Route::match(['get', 'post'], 'ticket_rules.php', [TicketRulesController::class, 'handle'])
         ->middleware('can:support.config');
     // Prioridades configurables
+    // Vistas guardadas de la bandeja (personales de cada agente).
+    Route::match(['get', 'post'], 'ticket_views.php', [\App\Http\Controllers\TicketViewsController::class, 'handle'])
+        ->middleware('can:helpdesk.access');
+    // Etiquetas de ticket: LISTAR lo necesita cualquier agente (selector de la ficha);
+    // gestionar el catálogo exige support.config, comprobado dentro del controlador.
+    Route::match(['get', 'post'], 'ticket_labels.php', [\App\Http\Controllers\TicketLabelsController::class, 'handle'])
+        ->middleware('can:helpdesk.access');
     Route::match(['get', 'post'], 'ticket_priorities.php', [TicketPrioritiesController::class, 'handle'])
         ->middleware('can:support.config');
     // Preguntas frecuentes del portal (crear/editar/ordenar/publicar)
     Route::match(['get', 'post'], 'faqs.php', [FaqsController::class, 'handle'])
+        ->middleware('can:support.config');
+    // Documentos de la base de conocimiento de la IA (internos; PDF/TXT/MD/CSV o texto pegado)
+    Route::match(['get', 'post'], 'knowledge.php', [\App\Http\Controllers\KnowledgeController::class, 'handle'])
         ->middleware('can:support.config');
     // Ajustes del ticket (estado por defecto, bloqueo de agentes, auto-cierre, seguridad)
     Route::match(['get', 'post'], 'ticket_settings.php', [TicketSettingsController::class, 'handle'])
@@ -155,6 +165,9 @@ Route::middleware('token')->group(function () {
     Route::post('send_media.php', [SendMediaController::class, 'handle'])->middleware('can:tickets.reply');
     // Subir imagen en línea del editor (devuelve su URL firmada)
     Route::post('inline_media.php', [InlineImageController::class, 'upload'])->middleware('can:tickets.reply');
+    // Agente de IA: borrador de respuesta a demanda para un ticket (modo borrador).
+    Route::match(['get', 'post'], 'ai_draft.php', [\App\Http\Controllers\AiDraftController::class, 'handle'])
+        ->middleware('can:tickets.reply');
 
     // --- Contactos y etiquetas ---
     Route::match(['get', 'post'], 'contacts.php', [ContactsController::class, 'handle'])
@@ -192,7 +205,16 @@ Route::middleware('token')->group(function () {
     // Informes del helpdesk (rendimiento: tickets, SLA, tiempos, por agente/categoría)
     Route::get('reports.php', [TicketReportsController::class, 'handle'])
         ->middleware('can:analytics.view');
+    // Registro de acciones (auditoría). Solo superadmin (nadie más tiene activity.view).
+    Route::get('activity.php', [\App\Http\Controllers\ActivityController::class, 'handle'])
+        ->middleware('can:activity.view');
     Route::match(['get', 'post'], 'settings.php', [SettingsController::class, 'handle'])
+        ->middleware('can:settings.manage');
+    // Números de WhatsApp (opción B: enrutado por número). Solo superadmin.
+    Route::match(['get', 'post'], 'whatsapp_numbers.php', [\App\Http\Controllers\WhatsAppNumbersController::class, 'handle'])
+        ->middleware('can:settings.manage');
+    // Agente de IA (Claude) del WhatsApp de soporte — Bloque 1: ajustes + candado.
+    Route::match(['get', 'post'], 'ai_settings.php', [\App\Http\Controllers\AiSettingsController::class, 'handle'])
         ->middleware('can:settings.manage');
     Route::match(['get', 'post', 'delete'], 'users.php', [UsersController::class, 'handle'])
         ->middleware('can:users.manage');

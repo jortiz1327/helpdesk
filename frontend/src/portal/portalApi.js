@@ -70,6 +70,13 @@ export const portal = {
   tickets: () => call('tickets'),
   ticket: (code) => call('ticket', { query: { code }, ttoken: getTicketToken(code) }),
   resolve: (code) => call('resolve', { method: 'POST', body: { code }, ttoken: getTicketToken(code) }),
+  // Valorar la atención (CSAT): nota 1..5. El comentario solo se manda si se pasa
+  // (al pulsar una estrella se omite, para no pisar un comentario ya guardado).
+  rate: (code, score, comment) => {
+    const body = { code, score }
+    if (comment !== undefined) body.comment = comment
+    return call('rate', { method: 'POST', body, ttoken: getTicketToken(code) })
+  },
   // Crear es público (sin código): manda el correo en el formulario. Al crearse,
   // guarda el token que abre ese ticket, para verlo/responderlo sin pedir el código.
   create: async ({ files = [], ...fields }) => {

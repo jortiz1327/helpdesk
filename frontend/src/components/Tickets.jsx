@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
@@ -166,15 +166,63 @@ function resaltar(texto, aguja) {
 }
 
 // search_in: 'ficha' (código/asunto/cliente) o 'messages' (dentro de la conversación)
-const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', sla: 'all', org: 'all', ...VIEWS[0].f }
+const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', label: 'all', sla: 'all', org: 'all', ...VIEWS[0].f }
+
+/*
+ * ETIQUETAS de un ticket (en la ficha). Chips de color + un selector que carga el
+ * catálogo activo. Marcar/desmarcar guarda al instante (reemplaza el conjunto).
+ */
+function TicketLabels({ ticketId, initial }) {
+  const [labels, setLabels] = useState(initial || [])
+  const [catalogo, setCatalogo] = useState(null)
+  const [abierto, setAbierto] = useState(false)
+
+  useEffect(() => {
+    if (abierto && catalogo === null) api.listTicketLabels().then((d) => setCatalogo((d.labels || []).filter((l) => Number(l.active))))
+  }, [abierto, catalogo])
+
+  const tiene = (id) => labels.some((l) => l.id === id)
+  const toggle = async (l) => {
+    const next = tiene(l.id) ? labels.filter((x) => x.id !== l.id) : [...labels, { id: l.id, name: l.name, color: l.color }]
+    setLabels(next)
+    await api.setTicketLabels(ticketId, next.map((x) => x.id))
+  }
+
+  return (
+    <div className="tkm-block">
+      <div className="tkm-sec">Etiquetas</div>
+      <div className="tkm-tags">
+        {labels.map((l) => (
+          <span key={l.id} className="tk-tag" style={{ '--tc': l.color }}><span className="tk-tag-dot" />{l.name}</span>
+        ))}
+        <button className="tk-tag-add" onClick={() => setAbierto((o) => !o)}>
+          <Icon.plus />{labels.length ? '' : ' Etiqueta'}
+        </button>
+      </div>
+      {abierto && (
+        <div className="tk-tag-picker">
+          {catalogo === null ? <div className="tk-tag-empty">Cargando…</div>
+            : catalogo.length === 0 ? <div className="tk-tag-empty">No hay etiquetas. Créalas en Configuración → Etiquetas.</div>
+              : catalogo.map((l) => (
+                <label key={l.id} className="tk-tag-opt">
+                  <input type="checkbox" checked={tiene(l.id)} onChange={() => toggle(l)} />
+                  <span className="tk-tag-dot" style={{ '--tc': l.color }} />{l.name}
+                </label>
+              ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /*
  * `initialTicket`: al llegar desde otra pantalla (p. ej. pinchando uno de los
  * «tickets recientes» del Centro de Soporte) se abre ESE ticket directamente, en
  * vez de dejar al usuario delante de la lista buscándolo otra vez.
  */
-export default function Tickets({ user, initialTab = 'tickets', initialTicket = null, initialOrg = null }) {
+export default function Tickets({ user, onGo, initialTab = 'tickets', initialTicket = null, initialOrg = null }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [tab, setTab] = useState(initialTab)   // tickets | agents | cron
   const [crones, setCrones] = useState(0)     // crones fallando, para el distintivo
   const [meta, setMeta] = useState(null)
@@ -194,6 +242,14 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(() => Number(localStorage.getItem('tk_per_page')) || 25)
   const [pag, setPag] = useState({ total: 0, pages: 1 })
+
+  // Vistas guardadas (personales): combinaciones de filtros con nombre.
+  const [savedViews, setSavedViews] = useState([])
+  const [naming, setNaming] = useState(false)      // mostrando el input de «guardar vista»
+  const [newName, setNewName] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const cargarVistas = useCallback(() => { api.listTicketViews().then((d) => setSavedViews(d.views || [])) }, [])
+  useEffect(() => { cargarVistas() }, [cargarVistas])
 
   const can = (p) => (user?.permissions || []).includes(p)
 
@@ -241,6 +297,25 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
   // que las demás vistas no lo mencionan y se quedaría pegado.
   const applyView = (v) => setF((s) => ({ ...s, sla: 'all', ...v.f }))
 
+  // --- Vistas guardadas (personales) ---
+  const aplicarVista = (v) => setF({ ...BASE_F, ...v.filters })
+  // Activa si el filtro actual coincide con TODAS las claves guardadas de la vista.
+  const vistaGuardadaOn = (v) => Object.entries(v.filters || {}).every(([k, val]) => String(f[k] ?? '') === String(val ?? ''))
+  const guardarVista = async () => {
+    const nombre = newName.trim()
+    if (!nombre) return
+    // Se guarda la foto de los filtros finos + la vista base (estado/asignado/respuesta).
+    const r = await api.saveTicketView({ name: nombre, filters: f })
+    if (r.ok) { toast('Vista guardada'); setNewName(''); setNaming(false); cargarVistas() }
+    else toast(r.error || 'No se pudo guardar', 'err')
+  }
+  const borrarVista = async (v, e) => {
+    e?.stopPropagation()
+    if (!(await confirm({ title: 'Borrar vista', message: `¿Borrar «${v.name}»?`, danger: true, confirmText: 'Borrar' }))) return
+    const r = await api.deleteTicketView(v.id)
+    if (r.ok) { toast('Vista borrada'); cargarVistas() } else toast(r.error || 'Error', 'err')
+  }
+
   /** Asignar desde la propia tabla, sin abrir el ticket. */
   const quickAssign = async (id, uid) => {
     const r = await api.assignTicket(id, uid || null)
@@ -260,8 +335,21 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
     if (r.ok) { toast(`${okMsg} (${r.affected})`); clearSel(); load() } else toast(r.error || 'Error', 'err')
   }
 
+  // Exportar a Excel lo que se ve (mismos filtros). Descarga binaria vía blob.
+  const exportar = async () => {
+    setExporting(true)
+    const r = await api.exportTickets({ ...f })
+    setExporting(false)
+    if (!r.ok) { toast(r.error || 'No se pudo exportar', 'err'); return }
+    const url = URL.createObjectURL(r.blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = r.filename; document.body.appendChild(a); a.click()
+    a.remove(); URL.revokeObjectURL(url)
+    toast('Excel descargado')
+  }
+
   const clear = () => setF(BASE_F)
-  const refined = f.q || f.priority !== 'all' || f.category !== 'all' || (f.org && f.org !== 'all')   // filtros finos por encima de la vista
+  const refined = f.q || f.priority !== 'all' || f.category !== 'all' || f.label !== 'all' || (f.org && f.org !== 'all')   // filtros finos por encima de la vista
 
   const statusOpts = [
     { value: 'open', label: 'Activos', sub: 'Sin resueltos ni cerrados' },
@@ -298,7 +386,13 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
           </button>
         </div>
         {can('tickets.export') && (
-          <button className="btn ghost" disabled title="Pendiente: falta definir formato y alcance (ver NOTAS.md)"><Icon.download /> Exportar</button>
+          <button className="btn ghost" disabled={exporting} onClick={exportar}
+            title="Descargar en Excel lo que ves con los filtros actuales">
+            <Icon.download /> {exporting ? 'Exportando…' : 'Exportar'}
+          </button>
+        )}
+        {can('tickets.create') && (
+          <button className="btn" onClick={() => onGo?.('ticket_new')}><Icon.plus /> Nuevo ticket</button>
         )}
       </header>
 
@@ -324,6 +418,32 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
                 {counts[v.k] !== undefined && <span className="tkv-n">{counts[v.k]}</span>}
               </button>
             ))}
+
+            {/* Mis vistas guardadas (personales): combinaciones de filtros con nombre. */}
+            {savedViews.map((v) => (
+              <button key={`sv${v.id}`} className={`tkv sv ${vistaGuardadaOn(v) ? 'on' : ''}`} style={{ '--sv': v.color }}
+                onClick={() => aplicarVista(v)} title="Vista guardada">
+                <span className="tkv-dot" />
+                {v.name}
+                <span className="tkv-x" title="Borrar vista" onClick={(e) => borrarVista(v, e)}>×</span>
+              </button>
+            ))}
+
+            {/* Guardar la combinación de filtros actual como una vista. Solo tiene
+                sentido cuando hay filtros finos puestos (si no, es la vista de siempre). */}
+            {naming ? (
+              <span className="tkv-save">
+                <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80}
+                  onKeyDown={(e) => { if (e.key === 'Enter') guardarVista(); if (e.key === 'Escape') { setNaming(false); setNewName('') } }}
+                  placeholder="Nombre de la vista…" />
+                <button className="tkv-save-ok" onClick={guardarVista}>Guardar</button>
+                <button className="tkv-save-no" onClick={() => { setNaming(false); setNewName('') }}>✕</button>
+              </span>
+            ) : refined ? (
+              <button className="tkv add" onClick={() => setNaming(true)} title="Guardar los filtros actuales como una vista rápida">
+                <Icon.plus /> Guardar vista
+              </button>
+            ) : null}
           </div>
 
           {/* --- Filtros finos: se aplican DENTRO de la vista elegida --- */}
@@ -358,6 +478,13 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
               <Select block value={f.category} onChange={(v) => setF((s) => ({ ...s, category: v }))}
                 options={[{ value: 'all', label: 'Todas' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
             </div>
+            {/* Filtro por etiqueta. Solo si hay catálogo de etiquetas. */}
+            {meta?.labels?.length > 0 && (
+              <div className="field"><span className="lbl">Etiqueta</span>
+                <Select block value={f.label} onChange={(v) => setF((s) => ({ ...s, label: v }))}
+                  options={[{ value: 'all', label: 'Todas' }, ...meta.labels.map((l) => ({ value: String(l.id), label: l.name }))]} />
+              </div>
+            )}
             {/* Filtro por organización (grupo/marca/sede). Se oculta solo si no hay grupos. */}
             <OrgFilter value={f.org} onChange={(v) => setF((s) => ({ ...s, org: v }))} />
 
@@ -428,6 +555,15 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
                     options={[{ value: '', label: 'Sin asignar' }, ...(meta?.users || []).map((u) => ({ value: String(u.id), label: u.name }))]} />
                 </div>
               )}
+              {/* Etiquetar en lote: pone la etiqueta elegida a todos los seleccionados
+                  (quitar una etiqueta se hace desde cada ficha). */}
+              {meta?.labels?.length > 0 && (
+                <div style={{ minWidth: 160 }}>
+                  <Select sm block value="" placeholder="Etiquetar…"
+                    onChange={(lid) => lid && bulk({ op: 'label', label_id: lid, mode: 'add' }, 'Etiquetados')}
+                    options={meta.labels.map((l) => ({ value: String(l.id), label: l.name }))} />
+                </div>
+              )}
               <span className="spacer" />
               <button className="btn ghost sm" onClick={clearSel}>Cancelar</button>
             </div>
@@ -473,6 +609,13 @@ export default function Tickets({ user, initialTab = 'tickets', initialTicket = 
                           {t.subject}
                           {/* Solo se marca el SLA que pide atención (vencido o por vencer). */}
                           {(() => { const p = slaPeor(t.sla); return p ? slaChip(p[0], p[1]) : null })()}
+                          {t.labels?.length > 0 && (
+                            <div className="tk-row-tags">
+                              {t.labels.map((l) => (
+                                <span key={l.id} className="tk-tag sm" style={{ '--tc': l.color }}><span className="tk-tag-dot" />{l.name}</span>
+                              ))}
+                            </div>
+                          )}
                           {/* Al buscar en los mensajes, el trozo encontrado: si no, no se
                               entiende por qué ha salido un ticket cuyo asunto no lo menciona. */}
                           {t.match && (
@@ -763,9 +906,13 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const [d, setD] = useState(null)
   const [view, setView] = useState('chat')   // chat | history | client
   const [clientTickets, setClientTickets] = useState(null)
+  const [gate, setGate] = useState(null)     // candados (WhatsApp de soporte sin configurar…)
   const endRef = useRef(null)
 
   const can = (p) => (user?.permissions || []).includes(p)
+
+  // Candados del envío: para saber si se puede responder por WhatsApp (número de soporte).
+  useEffect(() => { api.gating().then((g) => setGate(g?.ok ? g : null)) }, [])
 
   const load = useCallback(() => { api.getTicket(id).then(setD) }, [id])
   useEffect(() => { load() }, [load])
@@ -917,6 +1064,25 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                 <div className="tkm-row"><span>Creado</span><b>{fmtDate(t.created_at)}</b></div>
               </div>
 
+              {/* Etiquetas: cualquier agente puede ponerlas/quitarlas del catálogo. */}
+              <TicketLabels ticketId={t.id} initial={t.labels} />
+
+              {/* Valoración del cliente (CSAT), si la dejó desde el portal. */}
+              {t.rating && (
+                <div className="tkm-block">
+                  <div className="tkm-sec">Valoración del cliente</div>
+                  <div className="tkm-rating">
+                    <div className="tkm-stars" title={`${t.rating.score} de 5`}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Icon.star key={n} className={n <= t.rating.score ? 'on' : 'off'} />
+                      ))}
+                      <b>{t.rating.score}/5</b>
+                    </div>
+                    {t.rating.comment && <p className="tkm-rating-cmt">“{t.rating.comment}”</p>}
+                  </div>
+                </div>
+              )}
+
               {/* Los tiempos solo para quien tiene permiso */}
               {can('tickets.view_times') && (
                 <div className="tkm-block">
@@ -1061,10 +1227,20 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
               ) : (
               <div className="tkm-thread">
                 {d.messages.length === 0 && <div className="tk-empty"><p>Este ticket aún no tiene mensajes.</p></div>}
-                {d.messages.map((m) => {
+                {(() => {
+                  // Separador «conversación más reciente»: solo en tickets ABIERTOS
+                  // (en los cerrados es todo historial) y si hay mensajes anteriores.
+                  const abierto = !['resuelto', 'cerrado'].includes(t.status)
+                  const convSince = abierto ? t.conversation_since : null
+                  let sepPuesto = false
+                  return d.messages.map((m, i) => {
                   const out = m.direction === 'out'
+                  const sep = convSince && !sepPuesto && i > 0 && m.created_at >= convSince
+                  if (sep) sepPuesto = true
                   return (
-                    <div key={m.id} className={`tk-msg ${out ? 'out' : 'in'} ${Number(m.is_internal_note) ? 'note' : ''} ${m.channel === 'email' && !out ? 'is-email' : ''}`}>
+                    <Fragment key={m.id}>
+                    {sep && <div className="tk-conv-sep"><span><Icon.chat style={{ width: 13, height: 13, fill: 'currentColor' }} /> Conversación más reciente</span></div>}
+                    <div className={`tk-msg ${out ? 'out' : 'in'} ${Number(m.is_internal_note) ? 'note' : ''} ${m.channel === 'email' && !out ? 'is-email' : ''}`}>
                       <span className={`tk-av ${Number(m.is_internal_note) ? 'note' : out ? 'sop' : 'cli'}`}>
                         {Number(m.is_internal_note)
                           ? <Icon.note style={{ width: 15, height: 15, fill: 'currentColor' }} />
@@ -1125,8 +1301,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                         <div className="b-t">{fmtTime(m.created_at)}</div>
                       </div>
                     </div>
+                    </Fragment>
                   )
-                })}
+                  })
+                })()}
                 <div ref={endRef} />
               </div>
               )}
@@ -1167,6 +1345,21 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                     : (d.lock && !d.lock.mine)
                       ? `${d.lock.user_name || 'Otro agente'} lo está atendiendo`
                       : undefined}
+                  // Candado del ENVÍO al cliente por WhatsApp (número de soporte sin
+                  // configurar). No afecta a la nota interna ni a cambiar estados.
+                  replyLock={d.ticket.channel === 'whatsapp' ? (gate?.features?.wa_ticket_reply || null) : null}
+                  replyNote={d.ticket.channel === 'whatsapp' && gate?.wa_soporte === 'prueba'
+                    ? 'Modo prueba: solo se puede escribir a destinatarios registrados en Meta.'
+                    : ''}
+                  // La IA propone un borrador con las FAQs + el historial del cliente.
+                  onAiSuggest={async () => {
+                    const r = await api.aiDraft(id)
+                    if (!r.ok) { toast(r.error || 'La IA no pudo proponer una respuesta', 'err'); return r }
+                    toast(r.modo === 'simulado'
+                      ? '✨ Borrador simulado cargado — revísalo antes de enviar (sin clave de IA)'
+                      : '✨ Borrador de la IA cargado — revísalo antes de enviar')
+                    return r
+                  }}
                   onSend={async ({ html, files, internal, cc, bcc }) => {
                     if (internal) {
                       const r = await api.ticketNote(id, html)
@@ -1175,7 +1368,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                     } else {
                       const r = await api.ticketReply(id, html, files, cc, bcc)
                       if (r.ok) {
-                        toast('✉️ Respuesta enviada por correo')
+                        toast(d.ticket.channel === 'whatsapp' ? '💬 Respuesta enviada por WhatsApp' : '✉️ Respuesta enviada por correo')
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()
                       } else toast(r.error || 'No se pudo enviar la respuesta', 'err')

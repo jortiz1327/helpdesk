@@ -16,6 +16,8 @@ class GatingController extends Controller
             'ok'            => true,
             'verified'      => GatingService::accountVerified(),
             'wa_configured' => GatingService::whatsappConfigured(),
+            // Nivel del WhatsApp de soporte: 'ninguno' | 'prueba' | 'real' (candados por nivel).
+            'wa_soporte'    => GatingService::nivelSoporte(),
             'features'      => (object) GatingService::features(),
         ]);
     }

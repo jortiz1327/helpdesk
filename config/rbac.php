@@ -65,6 +65,9 @@ return [
         // --- Administración ---
         'admin.access'       => ['Acceder a Administración',                   'admin'],
         'analytics.view'     => ['Ver analíticas',                             'admin'],
+        // Registro de acciones (auditoría). NO se asigna a ningún rol de abajo:
+        // así solo el superadministrador lo ve (bypass de Gate::before).
+        'activity.view'      => ['Ver el registro de acciones',                'admin'],
         'users.manage'       => ['Gestionar usuarios',                         'admin'],
         'roles.manage'       => ['Gestionar roles y permisos',                 'admin'],
         'settings.manage'    => ['Configuración de la plataforma',             'admin'],

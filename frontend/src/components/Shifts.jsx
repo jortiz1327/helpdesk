@@ -362,6 +362,8 @@ function PanelDia({ dia, d, puedeEditar, onClose, onRecargar, onVariosDias, toas
 
   const fecha = new Date(dia.date + 'T00:00:00')
     .toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+  // Nombre corto del día (solo el día de la semana) para el rótulo «Hoy · solo el miércoles».
+  const diaSolo = new Date(dia.date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long' })
 
   /* Cambiar quién está ESE día es una sustitución; cambiar los titulares afecta a
      toda la semana. Son dos cosas distintas y por eso van en dos controles.
@@ -450,68 +452,69 @@ function PanelDia({ dia, d, puedeEditar, onClose, onRecargar, onVariosDias, toas
                   <span className="cal-horas">{d.hours[k][0]}–{d.hours[k][1]}</span>
                 </div>
 
-                {/* QUIÉN TRABAJA HOY. Cada persona lleva su etiqueta: «titular» o «en
-                    lugar de X». Antes se ponían los nombres seguidos y con dos había
-                    que adivinar quién era quién y a quién estaba cubriendo. */}
-                {/* QUIÉN TRABAJA HOY, y la acción de cada uno al lado: al titular se
-                    le puede poner quien le cubra, y un cambio se deshace. Nada de
-                    controles permanentes que repiten lo que ya pone en la ficha. */}
-                <div className="cal-trab-l">Trabajan hoy</div>
-                {t.people?.length ? (
-                  <ul className="cal-trab">
-                    {t.people.map((p) => (
-                      <li key={p.user_id}>
-                        <div className="cal-trab-q">
-                          <Avatar id={p.user_id} name={p.name} size={28} />
-                          <b>{p.name}</b>
-                          {p.substitute
-                            ? <span className="cal-tag sust">en lugar de {p.replaces || 'el titular'}</span>
-                            : <span className="cal-tag">titular</span>}
-                          {p.reason && <span className="cal-motivo-in">{p.reason}</span>}
-                          <span className="spacer" />
-                          {puedeEditar && (p.substitute
-                            ? <button className="btn ghost sm" disabled={guardando}
-                                onClick={() => quitarCambio(p.override_id)}>Deshacer</button>
-                            : <button className="btn ghost sm" disabled={guardando}
-                                onClick={() => setCambiando(`${k}:${p.user_id}`)}>Hoy lo hace otro…</button>)}
-                        </div>
-                        {cambiando === `${k}:${p.user_id}` && selector(tit.length > 1 ? p.user_id : null, p.name)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="cal-trab-nadie">
-                    <p className="cal-vacio-tx">Nadie cubre este turno</p>
-                    {puedeEditar && cambiando !== `${k}:libre` && (
-                      <button className="btn ghost sm" onClick={() => setCambiando(`${k}:libre`)}>Que lo haga alguien hoy…</button>
-                    )}
-                    {cambiando === `${k}:libre` && selector(null, null)}
+                {/* ── ZONA «HOY»: solo este día. Resaltada porque es lo que se consulta
+                       y se toca a diario. Si hay una sustitución, se tiñe de aviso. */}
+                <div className={`cal-zona hoy ${t.substitute ? 'con-sust' : ''}`}>
+                  <div className="cal-zona-h">
+                    <Icon.calendar />
+                    <span>Hoy · solo el {diaSolo}</span>
                   </div>
-                )}
-
-                {puedeEditar && (
-                  <div className="cal-acciones">
-                    {/* TITULARES de la semana. Pueden ser varios: se añaden y se
-                        quitan de uno en uno, que es como se piensa («metemos a Ian»). */}
-                    <div className="cal-acc ancho">
-                      <span>Los de esta semana</span>
-                      <div className="cal-tit">
-                        {tit.map((h) => (
-                          <span key={h.user_id} className="cal-chip">
-                            <Avatar id={h.user_id} name={h.name} size={18} /> {h.name}
-                            <button title={`Quitar a ${h.name} de toda la semana`}
-                              onClick={() => guardarTitulares(k, ids.filter((x) => x !== h.user_id))}>✕</button>
-                          </span>
-                        ))}
-                        <Select sm value="" placeholder={tit.length ? '+ Añadir' : 'Elegir…'}
-                          options={libres} onChange={(v) => v && guardarTitulares(k, [...ids, Number(v)])} />
-                      </div>
-                      <i className="cal-pista">Cambiarlo afecta a los cinco días</i>
+                  {t.people?.length ? (
+                    <ul className="cal-trab">
+                      {t.people.map((p) => (
+                        <li key={p.user_id}>
+                          <div className="cal-trab-q">
+                            <Avatar id={p.user_id} name={p.name} size={28} />
+                            <b>{p.name}</b>
+                            {p.substitute
+                              ? <span className="cal-tag sust">en lugar de {p.replaces || 'el titular'}</span>
+                              : <span className="cal-tag">titular</span>}
+                            {p.reason && <span className="cal-motivo-in">{p.reason}</span>}
+                            <span className="spacer" />
+                            {puedeEditar && (p.substitute
+                              ? <button className="btn ghost sm" disabled={guardando}
+                                  onClick={() => quitarCambio(p.override_id)}>Deshacer</button>
+                              : <button className="btn ghost sm" disabled={guardando}
+                                  onClick={() => setCambiando(`${k}:${p.user_id}`)}>Sustituir hoy…</button>)}
+                          </div>
+                          {cambiando === `${k}:${p.user_id}` && selector(tit.length > 1 ? p.user_id : null, p.name)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="cal-trab-nadie">
+                      <p className="cal-vacio-tx">Nadie cubre este turno hoy</p>
+                      {puedeEditar && cambiando !== `${k}:libre` && (
+                        <button className="btn ghost sm" onClick={() => setCambiando(`${k}:libre`)}>Que lo haga alguien hoy…</button>
+                      )}
+                      {cambiando === `${k}:libre` && selector(null, null)}
                     </div>
+                  )}
+                </div>
 
-                    <button className="btn ghost sm cal-varios" onClick={() => onVariosDias(k, tit)}>
-                      Cambio de varios días…
-                    </button>
+                {/* ── ZONA «ROTACIÓN FIJA»: la semana entera. El alcance va escrito
+                       en el propio bloque y en el botón, no en una pista suelta. */}
+                {puedeEditar && (
+                  <div className="cal-zona semana">
+                    <div className="cal-zona-h">
+                      <Icon.refresh />
+                      <span>Rotación fija · lunes a viernes</span>
+                    </div>
+                    <div className="cal-tit">
+                      {tit.map((h) => (
+                        <span key={h.user_id} className="cal-chip">
+                          <Avatar id={h.user_id} name={h.name} size={18} /> {h.name}
+                          <button title={`Quitar a ${h.name} de toda la semana`}
+                            onClick={() => guardarTitulares(k, ids.filter((x) => x !== h.user_id))}>✕</button>
+                        </span>
+                      ))}
+                      <Select sm value="" placeholder={tit.length ? '+ Añadir' : 'Elegir…'}
+                        options={libres} onChange={(v) => v && guardarTitulares(k, [...ids, Number(v)])} />
+                    </div>
+                    <div className="cal-zona-foot">
+                      <span className="cal-pista"><Icon.info /> Cambiar aquí afecta a los 5 días</span>
+                      <button className="cal-link" onClick={() => onVariosDias(k, tit)}>Cambiar solo unos días…</button>
+                    </div>
                   </div>
                 )}
               </div>

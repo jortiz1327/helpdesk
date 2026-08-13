@@ -41,6 +41,13 @@ export default function SupportCenter({ onGo, user }) {
         <span className="sc-ic"><Icon.headset style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Centro de Soporte</h1></div>
         <span className="sub">· Gestión de tickets y atención al cliente</span>
+        {/* Resumen | Informes: los informes viven aquí mismo, sin ocupar sitio en el menú. */}
+        {can('analytics.view') && (
+          <div className="kb-seg" style={{ margin: '0 0 0 18px' }}>
+            <button className="on">Resumen</button>
+            <button onClick={() => onGo?.('reports')}><Icon.chart /> Informes</button>
+          </div>
+        )}
         <div className="spacer" />
         {can('tickets.create') && (
           <button className="btn" onClick={() => onGo?.('ticket_new')}><Icon.ticket /> Nuevo ticket</button>

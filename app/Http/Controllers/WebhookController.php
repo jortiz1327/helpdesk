@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Models\WhatsAppNumber;
 use App\Services\CampaignService;
 use App\Services\ChatService;
 use App\Services\FlowEngine;
@@ -10,6 +11,7 @@ use App\Services\TicketService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /** Webhook de WhatsApp Cloud API. Portado de api/webhook.php. Ruta PÚBLICA (Meta la llama). */
 class WebhookController extends Controller
@@ -45,7 +47,7 @@ class WebhookController extends Controller
          * hay (p. ej. pruebas locales con curl), se permite pero la protección está INACTIVA
          * (se indica en Ajustes). Configura wa_app_secret antes de producción.
          */
-        $appSecret = (string) Setting::get('wa_app_secret', '');
+        $appSecret = $this->appSecretDelEvento($raw);
         if ($appSecret !== '') {
             $sig = (string) $request->header('X-Hub-Signature-256', '');
             $expected = 'sha256=' . hash_hmac('sha256', $raw, $appSecret);
@@ -71,11 +73,43 @@ class WebhookController extends Controller
         return response('EVENT_RECEIVED', 200);
     }
 
+    /**
+     * App Secret con el que verificar la firma de ESTE evento. Cada app de Meta firma
+     * con el suyo, así que se resuelve por el `phone_number_id` del evento (todos los de
+     * un mismo POST son de la misma app). Si el número no está configurado o no tiene
+     * App Secret propio, se cae al global (`wa_app_secret`).
+     */
+    protected function appSecretDelEvento(string $raw): string
+    {
+        $data = json_decode($raw, true);
+        $phoneId = $data['entry'][0]['changes'][0]['value']['metadata']['phone_number_id'] ?? '';
+        $num = WhatsAppNumber::porPhoneId((string) $phoneId);
+
+        return ($num && $num->app_secret) ? (string) $num->app_secret : (string) Setting::get('wa_app_secret', '');
+    }
+
     protected function process(array $data): void
     {
+        // Opción B: si hay números configurados, se enruta por `phone_number_id`. Si la
+        // tabla está vacía, se mantiene el comportamiento de siempre (todo → tickets).
+        $enrutar = WhatsAppNumber::hayConfigurados();
+
         foreach ($data['entry'] as $entry) {
             foreach ($entry['changes'] ?? [] as $change) {
-                $value = $change['value'] ?? [];
+                $value   = $change['value'] ?? [];
+                $phoneId = (string) ($value['metadata']['phone_number_id'] ?? '');
+
+                // ¿A qué FUNCIÓN pertenece este número? Sin tabla → «campanas» = el
+                // comportamiento legacy completo (ticket + bot).
+                $funcion = 'campanas';
+                if ($enrutar) {
+                    $num = WhatsAppNumber::porPhoneId($phoneId);
+                    if (!$num) {
+                        Log::info("WhatsApp: evento de un número no configurado ($phoneId), se ignora.");
+                        continue;   // número desconocido → no se crea nada
+                    }
+                    $funcion = $num->funcion;
+                }
 
                 $contactNames = [];
                 foreach ($value['contacts'] ?? [] as $c) {
@@ -83,7 +117,7 @@ class WebhookController extends Controller
                 }
 
                 foreach ($value['messages'] ?? [] as $msg) {
-                    $this->handleIncoming($msg, $contactNames);
+                    $this->handleIncoming($msg, $contactNames, $funcion);
                 }
 
                 $this->handleStatuses($value['statuses'] ?? []);
@@ -91,7 +125,7 @@ class WebhookController extends Controller
         }
     }
 
-    protected function handleIncoming(array $msg, array $contactNames): void
+    protected function handleIncoming(array $msg, array $contactNames, string $funcion = 'campanas'): void
     {
         $from = $msg['from'];
         $name = $contactNames[$from] ?? null;
@@ -143,6 +177,14 @@ class WebhookController extends Controller
 
         // Aviso en tiempo real: hay un mensaje nuevo del cliente en este ticket.
         $this->tickets->broadcast('message', $ticketId);
+
+        // SOPORTE (opción B): el número de tickets NO ejecuta el bot ni el
+        // consentimiento de campañas. La conversación ya es un ticket y se atiende a
+        // mano. Todo lo de abajo (formularios, consentimiento, bajas, motor de flujos)
+        // es de CAMPAÑAS.
+        if ($funcion !== 'campanas') {
+            return;
+        }
 
         // Todo lo que respondamos a este mensaje va al MISMO ticket.
         $out = ['ticket_id' => $ticketId, 'channel' => 'whatsapp', 'status' => 'sent'];

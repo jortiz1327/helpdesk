@@ -13,14 +13,37 @@ use Illuminate\Support\Facades\Http;
  */
 class WhatsAppService
 {
+    /*
+     * Opción B: se puede enviar desde un NÚMERO concreto (su token + phone_number_id)
+     * en vez del global. `paraNumero()` devuelve un CLON con ese contexto, para no
+     * mutar la instancia compartida del contenedor. Sin contexto → credenciales globales.
+     */
+    protected ?string $tokenOverride = null;
+    protected ?string $phoneOverride = null;
+
+    public function paraNumero(\App\Models\WhatsAppNumber $n): static
+    {
+        $c = clone $this;
+        if ($n->token) $c->tokenOverride = (string) $n->token;
+        if ($n->phone_number_id) $c->phoneOverride = (string) $n->phone_number_id;
+        return $c;
+    }
+
+    /** Como `paraNumero` pero eligiendo por función (soporte/campanas); global si no hay. */
+    public function paraFuncion(string $funcion): static
+    {
+        $n = \App\Models\WhatsAppNumber::porFuncion($funcion);
+        return $n ? $this->paraNumero($n) : $this;
+    }
+
     protected function token(): string
     {
-        return (string) Setting::get('wa_token', '');
+        return $this->tokenOverride ?? (string) Setting::get('wa_token', '');
     }
 
     protected function phoneId(): string
     {
-        return (string) Setting::get('wa_phone_number_id', '');
+        return $this->phoneOverride ?? (string) Setting::get('wa_phone_number_id', '');
     }
 
     protected function appId(): string

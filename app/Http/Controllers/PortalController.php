@@ -45,6 +45,7 @@ class PortalController extends Controller
             'ticket'       => $this->ticket($request),
             'reply'        => $this->reply($request),
             'resolve'      => $this->resolve($request),
+            'rate'         => $this->rate($request),
             default        => response()->json(['ok' => false, 'error' => 'Acción no válida'], 400),
         };
     }
@@ -182,6 +183,24 @@ class PortalController extends Controller
         if (!$email) return response()->json(['ok' => false, 'error' => 'Necesitas verificar tu correo', 'reauth' => true], 401);
 
         [$ok, $error] = $this->portal->resolve($email, $code);
+        if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
+        return response()->json(['ok' => true]);
+    }
+
+    /** Valorar la atención (CSAT): nota 1..5 + comentario opcional. Token o pase. */
+    protected function rate(Request $request)
+    {
+        if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+
+        $code  = (string) $request->input('code');
+        $email = $this->correoParaTicket($request, $code);
+        if (!$email) return response()->json(['ok' => false, 'error' => 'Necesitas verificar tu correo', 'reauth' => true], 401);
+
+        // Si la petición NO trae 'comment', se conserva el que hubiera (null = no tocar).
+        [$ok, $error] = $this->portal->rate(
+            $email, $code, (int) $request->input('score'),
+            $request->has('comment') ? (string) $request->input('comment') : null,
+        );
         if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
         return response()->json(['ok' => true]);
     }

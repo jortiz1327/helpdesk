@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { Icon } from '../icons.jsx'
 import RichInput from './RichInput.jsx'
+import LockTip from './LockTip.jsx'
 
 const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
 
@@ -10,11 +11,29 @@ const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
  * En los tickets de correo lleva además los DESTINATARIOS: quien venía en copia en
  * el hilo sigue en la conversación, así que se propone solo y el agente decide.
  */
-export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [] }) {
+export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null }) {
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
   const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
   const note = mode === 'note'
+  const [sugiriendo, setSugiriendo] = useState(false)
+  const [avisosIA, setAvisosIA] = useState([])   // guardarraíles: líneas rojas a revisar
+
+  /* Pide a la IA un borrador y lo vuelca en el editor para que el agente lo revise.
+     El padre (onAiSuggest) hace la llamada y avisa de errores; aquí solo insertamos. */
+  const pedirIA = async () => {
+    if (!onAiSuggest || sugiriendo) return
+    setSugiriendo(true)
+    const r = await onAiSuggest()
+    setSugiriendo(false)
+    if (r?.ok && r.texto) { ed.current?.setText(r.texto); setEmpty(false); setAvisosIA(r.avisos || []) }
+  }
+
+  /* Candado SOLO del envío al cliente (p. ej. WhatsApp de soporte sin configurar):
+     capa el modo «Responder», pero la NOTA INTERNA sigue libre (no sale al cliente),
+     y cambiar estados tampoco se toca. En nota interna el candado no aplica. */
+  const bloqueoResp = !note && !!replyLock
+  const off = disabled || bloqueoResp
 
   const [cc, setCc] = useState([])
   const [bcc, setBcc] = useState([])
@@ -31,12 +50,13 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
     onSend?.({ html: ed.current.getHtml(), files: ed.current.getFiles(), internal: note, cc, bcc })
     ed.current.reset()
     setEmpty(true)
+    setAvisosIA([])   // al enviar se limpian los avisos de la IA
     setBcc([])   // el Cco no se arrastra al siguiente mensaje; el Cc sí (sigue el hilo)
   }
 
   return (
     <div className={`cmp-wrap ${note ? 'note-mode' : ''}`} onKeyDown={(e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !disabled && !empty) send()
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !off && !empty) send()
     }}>
       {/* Conmutador: responder al cliente vs nota interna (solo la ven los agentes) */}
       <div className="cmp-mode">
@@ -73,20 +93,47 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
       {/* canned = activa el menú «/» de respuestas predefinidas */}
       <RichInput
         ref={ed}
-        disabled={disabled}
+        disabled={off}
         canned
         minHeight={84}
         placeholder={disabled ? (disabledHint || 'No disponible')
+          : bloqueoResp ? 'Envío al cliente bloqueado — puedes cambiar a «Nota interna»'
           : note ? 'Escribe una nota interna… (solo la verán los agentes)'
           : 'Escribe tu respuesta… (o / para respuestas rápidas)'}
         onChange={() => setEmpty(ed.current.isEmpty())}
       />
+      {/* Guardarraíles: la IA propuso algo que roza una línea roja (precio, datos
+          internos). No bloquea, pero se avisa para revisarlo antes de enviar. */}
+      {!note && avisosIA.length > 0 && (
+        <div className="cmp-ia-avisos">
+          {avisosIA.map((a, i) => (
+            <span key={i} className="cmp-ia-aviso"><Icon.warn /> {a}</span>
+          ))}
+        </div>
+      )}
       <div className="cmp-foot">
         {disabled && <span className="cmp-warn"><Icon.warn /> {disabledHint}</span>}
+        {/* Candado del envío al cliente: el motivo con su detalle (LockTip). */}
+        {!disabled && bloqueoResp && (
+          <span className="cmp-warn"><Icon.lock /> {replyLock.title} <LockTip info={replyLock} /></span>
+        )}
+        {/* Aviso de «modo prueba» (número de pruebas de Meta), solo al responder. */}
+        {!disabled && !bloqueoResp && !note && replyNote && (
+          <span className="cmp-note-tag test"><Icon.warn /> {replyNote}</span>
+        )}
         {!disabled && note && <span className="cmp-note-tag"><Icon.lock /> No se envía al cliente</span>}
+        {/* Botón de la IA: propone un borrador (solo al responder, no en nota interna
+            ni con el envío bloqueado). Sustituye lo escrito por la propuesta. */}
+        {!disabled && !bloqueoResp && !note && onAiSuggest && (
+          <button type="button" className="cmp-ia" disabled={sugiriendo} onClick={pedirIA}
+            title="Que la IA proponga una respuesta con tus FAQs y el historial del cliente">
+            {sugiriendo ? <span className="cmp-ia-spin" /> : <span className="cmp-ia-star">✨</span>}
+            {sugiriendo ? 'Pensando…' : 'Sugerir (IA)'}
+          </button>
+        )}
         <span className="spacer" />
         <span className="cmp-hint">Ctrl + Enter</span>
-        <button className={`btn ${note ? 'note-btn' : ''}`} disabled={disabled || empty} onClick={send}>
+        <button className={`btn ${note ? 'note-btn' : ''}`} disabled={off || empty} onClick={send}>
           {note ? <><Icon.note /> Guardar nota</> : <><Icon.send /> Enviar respuesta</>}
         </button>
       </div>

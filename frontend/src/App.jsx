@@ -26,6 +26,7 @@ import Phonebook from "./components/Phonebook.jsx";
 import Contacts from "./components/Contacts.jsx";
 import Organizations from "./components/Organizations.jsx";
 import Reports from "./components/Reports.jsx";
+import Activity from "./components/Activity.jsx";
 import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
@@ -124,11 +125,14 @@ const CONTACTS_GROUP = {
             color: "#f4b740",
         },
         {
+            // La agenda es la de WhatsApp: en Helpdesk no aporta, así que solo
+            // sale en Campañas. Sigue siendo vista válida (permisos + enlace).
             key: "phonebook",
             label: "Agenda de contactos",
             icon: Icon.calendar,
             perm: "contacts.access",
             color: "#54a0ff",
+            hideInAreas: ["helpdesk"],
         },
         {
             key: "organizations",
@@ -166,11 +170,15 @@ const AREAS = [
                         color: "#3b82f6",
                     },
                     {
+                        // No sale en el menú: crear es una ACCIÓN, ya está como botón
+                        // «Nuevo ticket» en el Centro de Soporte y en Gestión de
+                        // tickets. Sigue siendo vista válida (permisos + enlace).
                         key: "ticket_new",
                         label: "Nuevo ticket",
                         icon: Icon.plus,
                         perm: "tickets.create",
                         color: "#10b981",
+                        hidden: true,
                     },
                     {
                         key: "shifts",
@@ -180,11 +188,15 @@ const AREAS = [
                         color: "#7c3aed",
                     },
                     {
+                        // No sale en el menú: se abre desde una pestaña dentro del
+                        // Centro de Soporte (Resumen | Informes). Sigue siendo una
+                        // vista válida (permisos + enlace directo) gracias a `hidden`.
                         key: "reports",
                         label: "Informes",
                         icon: Icon.chart,
                         perm: "analytics.view",
                         color: "#12925a",
+                        hidden: true,
                     },
                     {
                         key: "support_cfg",
@@ -272,18 +284,6 @@ const AREAS = [
                 ],
             },
             CONTACTS_GROUP,
-            {
-                title: "WhatsApp",
-                items: [
-                    {
-                        key: "settings",
-                        label: "Configuración de WhatsApp",
-                        icon: Icon.settings,
-                        perm: "settings.manage",
-                        color: "#8696a0",
-                    },
-                ],
-            },
         ],
     },
 ];
@@ -298,6 +298,24 @@ const ADMIN_GROUP = {
             icon: Icon.user,
             perm: "users.manage",
             color: "#6c8cff",
+        },
+        {
+            key: "activity",
+            label: "Acciones",
+            icon: Icon.activity,
+            perm: "activity.view",
+            color: "#12b886",
+        },
+        {
+            // Config de WhatsApp (números, webhook…). Transversal: el número de
+            // Soporte es del Helpdesk y el de Campañas del área Campañas, así que
+            // debe alcanzarse desde cualquier área (solo superadmin). Etiqueta corta
+            // e icono de chat para que no se corte ni repita el engranaje de «Configuración».
+            key: "settings",
+            label: "WhatsApp",
+            icon: Icon.chat,
+            perm: "settings.manage",
+            color: "#25d366",
         },
     ],
 };
@@ -682,7 +700,12 @@ export default function App() {
     const navGroups = [...area.groups, ADMIN_GROUP]
         .map((g) => ({
             ...g,
-            items: g.items.filter((n) => allows(auth.user, n)),
+            items: g.items.filter(
+                (n) =>
+                    allows(auth.user, n) &&
+                    !n.hidden &&
+                    !(n.hideInAreas || []).includes(areaKey),
+            ),
         }))
         .filter((g) => g.items.length);
     const viewLabel =
@@ -934,10 +957,11 @@ export default function App() {
                             />
                         )}
                         {view === "shifts" && <Shifts />}
-                        {view === "reports" && <Reports />}
+                        {view === "reports" && <Reports onGo={setView} />}
+                        {view === "activity" && <Activity />}
                         {view === "support_cfg" && <SupportSettings />}
                         {view === "tickets" && (
-                            <Tickets user={auth.user} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
+                            <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
                         )}
                         {view === "kanban" && (
                             <Kanban onOpen={openConversation} />

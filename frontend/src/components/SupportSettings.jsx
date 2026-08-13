@@ -26,6 +26,7 @@ const SECCIONES = [
   { grupo: 'Tickets', items: [
     { key: 'categories', label: 'Categorías',            icon: Icon.tag,      desc: 'Áreas de soporte, su color y su SLA.' },
     { key: 'prio',       label: 'Prioridades',           icon: Icon.warn,     desc: 'Niveles de urgencia y sus colores.' },
+    { key: 'labels',     label: 'Etiquetas',             icon: Icon.tag,      desc: 'Post-its de color para agrupar y filtrar tickets.' },
     { key: 'canned',     label: 'Respuestas predefinidas', icon: Icon.note,   desc: 'Textos que se insertan con «/» al responder.' },
     { key: 'faqs',       label: 'Base de conocimiento',  icon: Icon.search,   desc: 'Lo que ve el cliente en el portal: Centro de atención y Preguntas frecuentes.' },
     { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo.' },
@@ -36,6 +37,9 @@ const SECCIONES = [
     { key: 'email', label: 'Buzón y envío',       icon: Icon.mail,  desc: 'Entrada, salida, pie y diagnóstico.' },
     { key: 'tpl',   label: 'Avisos automáticos',  icon: Icon.send,  desc: 'Qué se envía y a quién cuando algo pasa.' },
     { key: 'bans',  label: 'Correos bloqueados',  icon: Icon.lock,  desc: 'Remitentes que no generan ticket.' },
+  ] },
+  { grupo: 'Agente IA', items: [
+    { key: 'knowledge', label: 'Documentos IA', icon: Icon.file, desc: 'Manuales y guías internas que la IA usa para responder (no los ve el cliente).' },
   ] },
   { grupo: 'Sistema', items: [
     { key: 'security', label: 'Seguridad',          icon: Icon.lock,  desc: 'Protección del acceso frente a intentos.' },
@@ -78,11 +82,13 @@ export default function SupportSettings() {
           {tab === 'bans' && <EmailBans />}
           {tab === 'tpl' && <EmailTemplates />}
           {tab === 'prio' && <Priorities />}
+          {tab === 'labels' && <Labels />}
           {tab === 'behavior' && <TicketBehavior />}
           {tab === 'hours' && <BusinessHours />}
           {tab === 'security' && <SecuritySettings />}
           {tab === 'cron' && <CronStatus />}
           {tab === 'rules' && <TicketRules />}
+          {tab === 'knowledge' && <KnowledgeDocs />}
         </div>
       </div>
     </>
@@ -678,7 +684,7 @@ function GuardarAjustes({ save, saving }) {
  * ------------------------------------------------------------------------- */
 function TicketBehavior() {
   const { d, f, setF, save, saving } = useAjustes([
-    'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify',
+    'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify', 'csat_active',
   ])
   if (!d || !f) return <div className="center-load"><div className="spinner" /></div>
 
@@ -736,6 +742,20 @@ function TicketBehavior() {
             ? <>Se cierran los resueltos con más de {f.ticket_autoclose_days} día(s) sin actividad. Ahora mismo afectaría a <b>{d.autoclose_pending}</b> ticket(s).</>
             : 'Con 0 el cierre automático queda desactivado.'}
         </p>
+      </div>
+
+      <div className="card em-card" style={{ marginTop: 16 }}>
+        <h2>Encuesta de satisfacción</h2>
+        <p className="em-desc">
+          Cuando una incidencia creada desde el <b>portal</b> queda resuelta, el cliente puede valorarla
+          con 1-5 estrellas y dejar un comentario. Aparece <b>dentro del portal</b>, no se envía nada por
+          correo. Las notas se ven en cada ticket y en <b>Informes</b>.
+        </p>
+        <label className="fb-req-row" style={{ marginTop: 4 }}>
+          <span className="fb-switch"><input type="checkbox" checked={!!f.csat_active}
+            onChange={(e) => setF((s) => ({ ...s, csat_active: e.target.checked }))} /><span className={`fb-toggle ${f.csat_active ? 'on' : ''}`} /></span>
+          <span className="fb-req-label">Pedir valoración al cliente <span className="hint">· solo incidencias del portal</span></span>
+        </label>
       </div>
 
       <GuardarAjustes save={save} saving={saving} />
@@ -1089,6 +1109,92 @@ function Priorities() {
   )
 }
 
+/* ------------------------------ Etiquetas --------------------------------
+ * Catálogo de «post-its» de color para agrupar/filtrar tickets (aparte de la
+ * categoría y la prioridad, que son únicas). Un ticket puede llevar varias.
+ * ------------------------------------------------------------------------- */
+function Labels() {
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [rows, setRows] = useState(null)
+  const [form, setForm] = useState(null)
+
+  const load = useCallback(() => { api.listTicketLabels().then((d) => setRows(d.labels || [])) }, [])
+  useEffect(() => { load() }, [load])
+
+  const blank = { id: 0, name: '', color: '#64748b', position: (rows?.length || 0) + 1, active: true }
+
+  const save = async () => {
+    if (!form.name.trim()) { toast('El nombre es obligatorio', 'err'); return }
+    const r = await api.saveTicketLabel(form)
+    if (r.ok) { toast(form.id ? 'Etiqueta actualizada' : 'Etiqueta creada'); setForm(null); load() }
+    else toast(r.error || 'Error', 'err')
+  }
+  const del = async (l) => {
+    if (!(await confirm({ title: 'Eliminar etiqueta', message: `¿Eliminar «${l.name}»?`, danger: true, confirmText: 'Eliminar' }))) return
+    const r = await api.deleteTicketLabel(l.id)
+    if (r.ok) { toast('Etiqueta eliminada'); load() } else toast(r.error || 'Error', 'err')
+  }
+
+  return (
+    <>
+      <div className="cfg-head">
+        <h2>Etiquetas de ticket</h2>
+        <button className="btn" onClick={() => setForm({ ...blank })}><Icon.plus /> Nueva etiqueta</button>
+      </div>
+      <p className="cfg-hint" style={{ margin: '0 0 14px', color: 'var(--ink-2)', fontSize: 13 }}>
+        Post-its de color libres para agrupar tickets y filtrarlos en la bandeja («pendiente proveedor», «cliente VIP»…).
+        Cualquier agente puede ponerlas o quitarlas en un ticket; el catálogo lo defines aquí.
+        Una etiqueta en uso no se puede borrar: desactívala y dejará de ofrecerse.
+      </p>
+
+      {rows === null ? <div className="center-load"><div className="spinner" /></div> : (
+        rows.length === 0 ? (
+          <div className="rep-empty">Aún no hay etiquetas. Crea la primera con «Nueva etiqueta».</div>
+        ) : (
+        <div className="cfg-grid">
+          {rows.map((l) => (
+            <div key={l.id} className="card cfg-card">
+              <div className="cfg-card-h">
+                <span className="tk-tag" style={{ '--tc': l.color }}><span className="tk-tag-dot" />{l.name}</span>
+                <span className={`chip ${Number(l.active) ? 'abierto' : 'cerrado'} sm`}>{Number(l.active) ? 'Activa' : 'Inactiva'}</span>
+              </div>
+              <p className="cfg-desc">{l.tickets} ticket{l.tickets === 1 ? '' : 's'} la usan</p>
+              <div className="cfg-actions">
+                <span className="muted" style={{ fontSize: 12, marginRight: 'auto' }}>#{l.position}</span>
+                <button className="icon-btn" title="Editar" onClick={() => setForm({
+                  id: l.id, name: l.name, color: l.color, position: l.position, active: !!Number(l.active),
+                })}><Icon.pencil /></button>
+                <button className="icon-btn" title={l.tickets ? 'En uso: desactívala en su lugar' : 'Eliminar'}
+                  style={{ color: 'var(--danger)', opacity: l.tickets ? 0.4 : 1 }} onClick={() => del(l)}><Icon.trash /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+        )
+      )}
+
+      {form && (
+        <Modal title={form.id ? 'Editar etiqueta' : 'Nueva etiqueta'} onClose={() => setForm(null)} onSave={save} saveLabel={form.id ? 'Actualizar' : 'Crear'}>
+          <div className="grid2">
+            <label className="field"><span className="lbl">Nombre <em>*</em></span>
+              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="p. ej. Pendiente proveedor" autoFocus /></label>
+            <label className="field" style={{ maxWidth: 120 }}><span className="lbl">Orden</span>
+              <input type="number" min="0" value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} /></label>
+          </div>
+          <div className="field"><span className="lbl">Color</span>
+            <Select block value={form.color} onChange={(color) => setForm((f) => ({ ...f, color }))}
+              options={COLORS.map((c) => ({ ...c, color: c.value }))} /></div>
+          <label className="fb-req-row">
+            <span className="fb-switch"><input type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} /><span className={`fb-toggle ${form.active ? 'on' : ''}`} /></span>
+            <span className="fb-req-label">Activa <span className="hint">· si no, deja de ofrecerse en los tickets</span></span>
+          </label>
+        </Modal>
+      )}
+    </>
+  )
+}
+
 /* -------------------------- Reglas automáticas ---------------------------
  * «Si el asunto o el cuerpo contiene X → asigna a Fulano, categoría Y, prioridad Z».
  * Se evalúan al CREARSE el ticket, por orden. Equivale al flujo de trabajo de osTicket.
@@ -1427,6 +1533,121 @@ function MailDiagnostic({ from }) {
           ? <span className="pill ok">Enviado a {res.to}</span>
           : <span className="pill err">{res.error}</span>}</span>}
       </div>
+    </div>
+  )
+}
+
+/* --------------------------- Documentos de la IA -------------------------- */
+/* Base de conocimiento INTERNA del agente de IA (no la ve el cliente): manuales,
+   guías, tarifas… Se sube un fichero (PDF/TXT/MD/CSV, se extrae el texto) o se
+   pega texto directamente. La IA se apoya en ellos para responder. */
+function KnowledgeDocs() {
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [rows, setRows] = useState(null)
+  const [subiendo, setSubiendo] = useState(false)
+  const [form, setForm] = useState(null)   // modal de pegar/editar texto
+
+  const load = useCallback(() => { api.listKnowledge().then((d) => setRows(d.docs || [])) }, [])
+  useEffect(() => { load() }, [load])
+
+  const subir = async (file) => {
+    if (!file) return
+    setSubiendo(true)
+    const r = await api.uploadKnowledge(file)
+    setSubiendo(false)
+    if (r.ok) { toast(`Documento añadido (${r.chars.toLocaleString('es')} caracteres leídos)`); load() }
+    else toast(r.error || 'No se pudo leer el fichero', 'err')
+  }
+
+  const guardarTexto = async () => {
+    if (!form.title.trim() || !form.content.trim()) { toast('Ponle título y texto', 'err'); return }
+    const r = await api.saveKnowledgeText({ id: form.id || 0, title: form.title, content: form.content })
+    if (r.ok) { toast(form.id ? 'Documento actualizado' : 'Documento añadido'); setForm(null); load() }
+    else toast(r.error || 'Error', 'err')
+  }
+
+  const toggle = async (d) => {
+    await api.saveKnowledgeText({ id: d.id, active: !Number(d.active) })
+    load()
+  }
+
+  const borrar = async (d) => {
+    if (!(await confirm({ title: 'Quitar documento', message: `¿Quitar «${d.title}»? La IA dejará de usarlo.`, danger: true, confirmText: 'Quitar' }))) return
+    const r = await api.deleteKnowledge(d.id)
+    if (r.ok) { toast('Documento quitado'); load() } else toast(r.error || 'Error', 'err')
+  }
+
+  // Abre el documento para VERLO y EDITARLO (trae el texto completo del servidor).
+  const abrir = async (d) => {
+    const r = await api.getKnowledge(d.id)
+    if (r.ok) setForm({ id: r.doc.id, title: r.doc.title, content: r.doc.content, filename: r.doc.filename })
+    else toast(r.error || 'No se pudo abrir el documento', 'err')
+  }
+
+  return (
+    <div className="card">
+      <div className="wa-num-head">
+        <div>
+          <h2>Documentos de la IA</h2>
+          <p className="desc" style={{ margin: '2px 0 0' }}>Manuales y guías internas que el agente de IA usa para responder. <b>No los ve el cliente</b> (para eso están las FAQs del portal). Sube un PDF/TXT/MD/CSV o pega el texto.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <label className={`btn ghost ${subiendo ? 'is-off' : ''}`} style={{ cursor: subiendo ? 'default' : 'pointer' }}>
+            <Icon.file /> {subiendo ? 'Leyendo…' : 'Subir documento'}
+            <input type="file" accept=".pdf,.txt,.md,.csv,.log" hidden disabled={subiendo}
+              onChange={(e) => { subir(e.target.files[0]); e.target.value = '' }} />
+          </label>
+          <button className="btn" onClick={() => setForm({ id: 0, title: '', content: '' })}><Icon.plus /> Pegar texto</button>
+        </div>
+      </div>
+
+      {rows === null ? <div className="center-load"><div className="spinner" /></div> : rows.length === 0 ? (
+        <div className="wa-num-empty">
+          <Icon.file style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
+          <p>Aún no hay documentos. Sube un manual o pega una guía para que la IA responda con vuestra información.</p>
+        </div>
+      ) : (
+        <div className="kb-list">
+          {rows.map((d) => (
+            <div key={d.id} className={`kb-doc ${Number(d.active) ? '' : 'off'}`}>
+              <span className="kb-ic"><Icon.file /></span>
+              <button className="kb-body kb-open" onClick={() => abrir(d)} title="Ver / editar">
+                <b>{d.title}</b>
+                <span className="kb-sub">
+                  {d.filename ? <>{d.filename} · </> : <>Texto · </>}
+                  {(d.chars || 0).toLocaleString('es')} caracteres
+                  {d.author ? <> · {d.author}</> : null}
+                </span>
+              </button>
+              <label className="fb-switch" title={Number(d.active) ? 'Activo (la IA lo usa)' : 'Inactivo'}>
+                <input type="checkbox" checked={!!Number(d.active)} onChange={() => toggle(d)} />
+                <span className={`fb-toggle ${Number(d.active) ? 'on' : ''}`} />
+              </label>
+              <button className="icon-btn" title="Ver / editar" onClick={() => abrir(d)}><Icon.pencil /></button>
+              <button className="icon-btn" title="Quitar" style={{ color: 'var(--danger)' }} onClick={() => borrar(d)}><Icon.trash /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {form && (
+        <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setForm(null)}>
+          <div className="modal" style={{ maxWidth: 620 }}>
+            <div className="modal-head"><h3>{form.id ? 'Editar documento' : 'Pegar un documento'}</h3><button className="x" onClick={() => setForm(null)}>×</button></div>
+            <div className="modal-body">
+              <label className="field"><span className="lbl">Título</span>
+                <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Manual de instalación de antenas" autoFocus /></label>
+              <label className="field"><span className="lbl">Texto del documento</span>
+                <textarea rows={12} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} placeholder="Pega aquí el contenido…" style={{ lineHeight: 1.5 }} /></label>
+            </div>
+            <div className="modal-foot">
+              <button className="btn ghost" onClick={() => setForm(null)}>Cancelar</button>
+              <button className="btn" onClick={guardarTexto}>{form.id ? 'Guardar' : 'Añadir'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

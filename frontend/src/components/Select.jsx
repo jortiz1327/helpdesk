@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '../icons.jsx'
 
@@ -50,6 +50,15 @@ export default function Select({ value, onChange, options = [], placeholder = 'S
     }
     setOpen((o) => !o)
   }
+  // El menú se ensancha para caber su opción más larga (los nombres largos ya no se
+  // recortan). Si con eso se sale por la derecha, se reajusta el `left` para que quepa.
+  useLayoutEffect(() => {
+    if (!open || !pos || !menuRef.current) return
+    const w = menuRef.current.offsetWidth
+    const maxLeft = window.innerWidth - w - 12
+    if (pos.left > maxLeft) setPos((p) => ({ ...p, left: Math.max(12, maxLeft) }))
+  }, [open, pos])
+
   const pick = (o) => { onChange(o.value); setOpen(false); setQ('') }
   const onSearchKey = (e) => {
     if (e.key === 'Enter' && filtered.length) { e.preventDefault(); pick(filtered[0]) }
@@ -63,7 +72,7 @@ export default function Select({ value, onChange, options = [], placeholder = 'S
         <Icon.chevron className="sel-caret" />
       </button>
       {open && pos && createPortal(
-        <div ref={menuRef} className={`sel-menu ${pos.up ? 'up' : ''}`} style={{ left: pos.left, top: pos.top, width: pos.width, transform: pos.up ? 'translateY(-100%)' : 'none' }}>
+        <div ref={menuRef} className={`sel-menu ${pos.up ? 'up' : ''}`} style={{ left: pos.left, top: pos.top, minWidth: pos.width, width: 'max-content', maxWidth: 'min(360px, calc(100vw - 24px))', transform: pos.up ? 'translateY(-100%)' : 'none' }}>
           {canSearch && (
             <div className="sel-search">
               <Icon.search />

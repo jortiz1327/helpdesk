@@ -50,7 +50,7 @@ function Tabla({ rows, primeraCol, colorDot }) {
   )
 }
 
-export default function Reports() {
+export default function Reports({ onGo }) {
   const [period, setPeriod] = useState('30d')
   const [d, setD] = useState(null)
 
@@ -67,9 +67,13 @@ export default function Reports() {
   return (
     <>
       <header className="page-head">
-        <span className="sc-ic"><Icon.chart style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Informes</h1></div>
-        <span className="sub">· Rendimiento del helpdesk</span>
+        <span className="sc-ic"><Icon.headset style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
+        <div><h1>Centro de Soporte</h1></div>
+        {/* Misma pestaña que en el Centro de Soporte: aquí «Informes» está activo. */}
+        <div className="kb-seg" style={{ margin: '0 0 0 18px' }}>
+          <button onClick={() => onGo?.('support')}>Resumen</button>
+          <button className="on"><Icon.chart /> Informes</button>
+        </div>
         <div className="spacer" />
         <div className="kb-seg">
           {PERIODS.map(([kk, l]) => (
@@ -104,6 +108,41 @@ export default function Reports() {
                   {canales.map(([ch, n]) => (
                     <span key={ch}><span className={`rep-ch-dot ch-${ch}`} />{CHANNEL[ch] || ch} <b>{n}</b></span>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {d.csat?.respuestas > 0 && (
+              <div className="rep-csat card">
+                <div className="rep-ch-h">Satisfacción del cliente <span className="rep-hint">· incidencias del portal</span></div>
+                <div className="csat-rep">
+                  <div className="csat-rep-nums">
+                    <div className="csat-big">
+                      <span className="csat-big-n">{d.csat.media}<Icon.star className="on" /></span>
+                      <small>nota media</small>
+                    </div>
+                    <div className="csat-big">
+                      <span className="csat-big-n" style={{ color: d.csat.satisfechos_pct >= 80 ? '#12925a' : d.csat.satisfechos_pct < 50 ? '#dc2626' : undefined }}>{d.csat.satisfechos_pct}%</span>
+                      <small>satisfechos · 4-5★</small>
+                    </div>
+                    <div className="csat-big">
+                      <span className="csat-big-n">{d.csat.respuestas}</span>
+                      <small>{d.csat.respuestas === 1 ? 'respuesta' : 'respuestas'}</small>
+                    </div>
+                  </div>
+                  <div className="csat-dist">
+                    {[5, 4, 3, 2, 1].map((s) => {
+                      const n = d.csat.dist[s - 1]
+                      const pct = Math.round((100 * n) / d.csat.respuestas)
+                      return (
+                        <div className="csat-dist-row" key={s}>
+                          <span className="csat-dist-lb">{s}<Icon.star className="on" /></span>
+                          <span className="csat-dist-bar"><span style={{ width: `${pct}%` }} /></span>
+                          <span className="csat-dist-n">{n}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             )}
