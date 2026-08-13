@@ -44,7 +44,10 @@ class ContactController extends Controller
             if (array_key_exists('phone', $data) || array_key_exists('country_code', $data)) {
                 $cc = preg_replace('/\D+/', '', (string) ($data['country_code'] ?? ''));
                 $ph = preg_replace('/\D+/', '', (string) ($data['phone'] ?? ''));
-                $wa = $ph !== '' ? $cc . $ph : null;
+                // Evita DUPLICAR el prefijo de país: si el número ya empieza por el
+                // código (p. ej. un contacto de WhatsApp cuyo wa_id ya es país+número),
+                // no se antepone otra vez → nada de «3434641510110».
+                $wa = $ph === '' ? null : (($cc !== '' && str_starts_with($ph, $cc)) ? $ph : $cc . $ph);
 
                 if ($wa !== null && strlen($wa) > 20) {
                     return response()->json(['ok' => false, 'error' => 'El teléfono es demasiado largo'], 400);

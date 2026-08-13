@@ -259,8 +259,11 @@ function ContactMerge({ pair, onClose, onMerged }) {
  * ------------------------------------------------------------------------- */
 function ContactEdit({ contact, onClose, onSaved }) {
   const toast = useToast()
-  // El wa_id guardado es país+número: se parte con el country_code conocido.
-  const cc0 = contact.country_code || ''
+  // El wa_id guardado es país+número: se parte con el country_code conocido. Si no
+  // hay código guardado (típico en contactos que llegaron por WhatsApp) pero el número
+  // empieza por 34, se separa igualmente para NO volver a anteponerlo al guardar
+  // (era la causa del «34» duplicado).
+  const cc0 = contact.country_code || (contact.wa_id && contact.wa_id.startsWith('34') && contact.wa_id.length >= 11 ? '34' : '')
   const phone0 = contact.wa_id ? (cc0 && contact.wa_id.startsWith(cc0) ? contact.wa_id.slice(cc0.length) : contact.wa_id) : ''
   const [f, setF] = useState({
     name: contact.name || '',

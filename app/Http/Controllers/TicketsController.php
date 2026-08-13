@@ -629,14 +629,18 @@ class TicketsController extends Controller
             ->get([
                 'm.id', 'm.direction', 'm.channel', 'm.type', 'm.body', 'm.is_html', 'm.is_internal_note',
                 'm.media_url', 'm.media_mime', 'm.status', 'm.author_user_id', 'm.created_at',
-                'm.cc', 'm.bcc',
+                'm.cc', 'm.bcc', 'm.payload',
                 'au.name as author_name', 'au.email as author_email',
             ]);
 
-        // Adjuntos, colgados de su mensaje
+        // Adjuntos, colgados de su mensaje. Y el motivo de fallo de entrega si lo hubo.
         $byMessage = $this->attachments->forTicket($id);
         foreach ($messages as $m) {
             $m->attachments = $byMessage[$m->id] ?? [];
+            if ($m->payload && ($p = json_decode($m->payload, true)) && !empty($p['delivery_error'])) {
+                $m->delivery_error = $p['delivery_error'];
+            }
+            unset($m->payload);
         }
 
         $events = DB::table('ticket_events as e')

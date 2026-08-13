@@ -295,6 +295,12 @@ class WebhookController extends Controller
             }
 
             DB::update("UPDATE messages SET status = ? WHERE wamid = ? AND ? > $rankCase", [$status, $wamid, $nr]);
+            // Motivo del fallo de entrega, para verlo en la ficha (solo mensajes de texto,
+            // que no usan payload; no se pisa el payload de interactivos/formularios).
+            if ($status === 'failed' && $err) {
+                DB::table('messages')->where('wamid', $wamid)->whereNull('payload')
+                    ->update(['payload' => json_encode(['delivery_error' => $err], JSON_UNESCAPED_UNICODE)]);
+            }
             $affected = DB::update("UPDATE campaign_recipients SET status = ?, error = COALESCE(?, error) WHERE wamid = ? AND ? > $rankCase", [$status, $err, $wamid, $nr]);
 
             if ($status === 'failed' && $affected > 0) {

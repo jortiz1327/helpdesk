@@ -1596,6 +1596,13 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tk-msg.in.is-email .b-who { padding: 0 2px 5px; opacity: 1; color: var(--ink-2); }
 .tk-msg.in.is-email .b-t { padding: 4px 2px 0; text-align: left; }
 .tk-msg.in.is-email .b-email { margin-top: 0; }
+
+/* Estado de entrega del WhatsApp saliente (junto a la hora) */
+.wa-ack { margin-left: 7px; font-size: 11px; font-weight: 700; }
+.wa-ack.sent, .wa-ack.delivered { color: var(--ink-3); }
+.wa-ack.read { color: #34b7f1; }
+.wa-ack.fail { display: inline-flex; align-items: center; gap: 3px; color: var(--danger); }
+.wa-ack.fail svg { width: 12px; height: 12px; fill: var(--danger); }
 .tk-msg.in.is-email .b-att { padding: 0 2px; }
 .tk-av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 32px; }
 .tk-av.cli { background: rgba(37, 99, 235, 0.18); color: #93b4ff; }

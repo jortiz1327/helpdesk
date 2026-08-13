@@ -1308,7 +1308,16 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                           </div>
                         )}
 
-                        <div className="b-t">{fmtTime(m.created_at)}</div>
+                        <div className="b-t">{fmtTime(m.created_at)}
+                          {/* Estado de entrega del WhatsApp saliente: enviado/entregado/leído/fallido */}
+                          {out && m.channel === 'whatsapp' && !Number(m.is_internal_note) && m.status && (
+                            m.status === 'failed'
+                              ? <span className="wa-ack fail" title={m.delivery_error || 'No entregado'}><Icon.warn /> No entregado</span>
+                              : <span className={`wa-ack ${m.status}`} title={m.status === 'read' ? 'Leído' : m.status === 'delivered' ? 'Entregado' : 'Enviado'}>
+                                  {m.status === 'sent' ? '✓' : '✓✓'}
+                                </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     </Fragment>
