@@ -913,6 +913,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const [clientTickets, setClientTickets] = useState(null)
   const [gate, setGate] = useState(null)     // candados (WhatsApp de soporte sin configurar…)
   const endRef = useRef(null)
+  const msgCountRef = useRef(0)
+  const lastTicketRef = useRef(null)
 
   const can = (p) => (user?.permissions || []).includes(p)
 
@@ -946,7 +948,21 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
       .then((r) => setClientTickets((r.tickets || []).filter((x) => Number(x.id) !== Number(id))))
       .catch(() => setClientTickets([]))
   }, [d?.ticket?.contact_email, d?.ticket?.contact_id, id]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [d])
+  // Auto-scroll INTELIGENTE: baja al fondo solo al abrir el ticket (carga inicial) o
+  // si llegan mensajes NUEVOS y ya estabas abajo. Si estás leyendo arriba, no te mueve
+  // (antes bajaba en cada refresco por tiempo, aunque no hubiera nada nuevo).
+  useEffect(() => {
+    if (!d) return
+    const cont = endRef.current?.parentElement
+    const count = d.messages?.length || 0
+    const ticketChanged = lastTicketRef.current !== d.ticket?.id
+    const nearBottom = cont ? (cont.scrollHeight - cont.scrollTop - cont.clientHeight < 140) : true
+    if (ticketChanged || (count > msgCountRef.current && nearBottom)) {
+      endRef.current?.scrollIntoView({ behavior: ticketChanged ? 'auto' : 'smooth' })
+    }
+    msgCountRef.current = count
+    lastTicketRef.current = d.ticket?.id
+  }, [d])
 
   // Si llega un mensaje AL TICKET QUE ESTOY MIRANDO, aparece solo en el hilo.
   useEffect(() => onTicketActivity((e) => {

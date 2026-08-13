@@ -164,6 +164,13 @@ class WebhookController extends Controller
                 $body = '[' . $type . ']';
         }
 
+        // Meta manda un mensaje 'unsupported' como contenedor de álbum (varias fotos a
+        // la vez) o para tipos que la API no soporta. Las fotos llegan luego sueltas, así
+        // que ese contenedor es ruido: no se guarda ni crea nada.
+        if ($type === 'unsupported') {
+            return;
+        }
+
         /*
          * ENRUTADO POR FUNCIÓN (opción B):
          *  · SOPORTE  → crea/actualiza un TICKET (Helpdesk, se atiende a mano).
