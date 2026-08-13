@@ -39,7 +39,10 @@ class SettingsController extends Controller
             'wa_app_secret'      => Setting::get('wa_app_secret'),
             'wa_verify_token'    => Setting::get('wa_verify_token'),
             // Firma del webhook: activa solo si hay App Secret configurado
-            'webhook_signature_active' => (string) Setting::get('wa_app_secret', '') !== '',
+            // Firma activa si hay App Secret global O en cualquier número de la Opción B
+            // (el webhook usa el App Secret del número dueño del evento).
+            'webhook_signature_active' => (string) Setting::get('wa_app_secret', '') !== ''
+                || \App\Models\WhatsAppNumber::whereNotNull('app_secret')->where('app_secret', '!=', '')->exists(),
             'account_verified'   => (string) Setting::get('account_verified', '0') === '1',
             'consent_enabled'    => (string) Setting::get('consent_enabled', '0') === '1',
             'consent_message'    => (string) Setting::get('consent_message', '') ?: self::consentDefault(),

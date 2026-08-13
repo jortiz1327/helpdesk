@@ -67,47 +67,13 @@ export default function Settings() {
         <h1>Configuración</h1>
         <span className="sub">· API de WhatsApp Cloud</span>
         <div className="spacer" />
-        {pill}
       </header>
       <div className="page-scroll">
         <div className="page">
-          {/* Opción B: los números y su función (enrutado por phone_number_id). */}
+          {/* Opción B: los números y su función (enrutado por phone_number_id).
+              Aquí se configura TODO (token, App Secret, WABA…) por número; el viejo
+              bloque global «Conexión con Meta» se retiró por redundante. */}
           <WhatsAppNumbers />
-
-          <div className="card">
-            <h2>Conexión con Meta <span className="hint" style={{ fontWeight: 400 }}>· global (campañas / legacy)</span></h2>
-            <p className="desc">Datos de tu cuenta de WhatsApp Business (Meta for Developers). Se guardan en tu base de datos local.</p>
-            <div className="grid2">
-              <label className="field">
-                <span className="lbl">Nombre del negocio</span>
-                <input value={f.business_name} onChange={set('business_name')} />
-              </label>
-              <label className="field">
-                <span className="lbl">ID del número <span className="hint">(phone_number_id)</span></span>
-                <input className="mono" value={f.wa_phone_number_id} onChange={set('wa_phone_number_id')} />
-              </label>
-              <label className="field">
-                <span className="lbl">WABA ID <span className="hint">(cuenta de WhatsApp Business)</span></span>
-                <input className="mono" value={f.wa_business_id} onChange={set('wa_business_id')} />
-              </label>
-              <label className="field">
-                <span className="lbl">ID de la app <span className="hint">(app_id)</span></span>
-                <input className="mono" value={f.wa_app_id} onChange={set('wa_app_id')} />
-              </label>
-            </div>
-            <label className="field">
-              <span className="lbl">Token de acceso</span>
-              <textarea className="mono" rows={3} value={f.wa_token} onChange={set('wa_token')} />
-            </label>
-            <label className="field">
-              <span className="lbl">App Secret <span className="hint">(Meta → tu App → Configuración → Básica → Clave secreta)</span></span>
-              <input className="mono" type="password" value={f.wa_app_secret} onChange={set('wa_app_secret')} placeholder="Necesario para verificar la firma del webhook" />
-            </label>
-            <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
-              <button className="btn" disabled={saving} onClick={save}><Icon.save /> {saving ? 'Guardando…' : 'Guardar cambios'}</button>
-              <button className="btn ghost" disabled={testing} onClick={test}>Probar conexión</button>
-            </div>
-          </div>
 
           <div className="card">
             <h2>Webhook</h2>
@@ -163,30 +129,6 @@ export default function Settings() {
               <span className="fb-req-label">Cuenta de Meta verificada (levantar candados)</span>
             </label>
             <span className="hint" style={{ display: 'block', marginTop: 8 }}>Esto solo quita los candados de la app. Si la cuenta no cumple de verdad, Meta seguirá devolviendo su propio error al intentar la acción.</span>
-          </div>
-
-          <div className="card">
-            <h2>Estado de la cuenta</h2>
-            <p className="desc">Resultado de la última prueba de conexión.</p>
-            {conn.state === 'idle' && <p className="hint">Pulsa «Probar conexión» para consultar los datos del número en Meta.</p>}
-            {conn.state === 'err' && <p style={{ color: 'var(--danger)' }}>{conn.error}</p>}
-            {conn.state === 'ok' && conn.info && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {[
-                    ['Nombre verificado', conn.info.verified_name],
-                    ['Número', conn.info.display_phone_number],
-                    ['Plataforma', conn.info.platform_type],
-                  ].map(([k, v]) => (
-                    <tr key={k}><td style={{ padding: '7px 0', color: 'var(--ink-2)' }}>{k}</td><td style={{ fontWeight: 600 }}>{v || '—'}</td></tr>
-                  ))}
-                  <tr>
-                    <td style={{ padding: '7px 0', color: 'var(--ink-2)' }}>Calidad</td>
-                    <td><span className={`pill ${conn.info.quality_rating === 'GREEN' ? 'ok' : conn.info.quality_rating === 'RED' ? 'err' : 'warn'}`}>{conn.info.quality_rating || '—'}</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
           </div>
         </div>
       </div>

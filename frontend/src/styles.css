@@ -2989,12 +2989,12 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .info-tip-q { font-size: 10px; font-weight: 800; color: var(--ink-3); line-height: 1; }
 .info-tip:hover, .info-tip:focus-visible { outline: none; border-color: var(--primary); }
 .info-tip:hover .info-tip-q, .info-tip:focus-visible .info-tip-q { color: var(--primary); }
-.info-tip-bubble { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-  width: 230px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 400; line-height: 1.45;
+.info-tip-bubble { position: absolute; bottom: calc(100% + 8px); left: 0; transform: none;
+  width: 230px; max-width: min(230px, 78vw); background: #1f2937; color: #fff; font-size: 12px; font-weight: 400; line-height: 1.45;
   padding: 9px 11px; border-radius: 9px; box-shadow: 0 6px 20px rgba(0,0,0,.28);
   opacity: 0; visibility: hidden; transition: 0.14s; z-index: 60; text-transform: none; letter-spacing: normal; pointer-events: none; }
-.info-tip.wide .info-tip-bubble { width: 300px; }
-.info-tip-bubble::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #1f2937; }
+.info-tip.wide .info-tip-bubble { width: 300px; max-width: min(300px, 82vw); }
+.info-tip-bubble::after { content: ''; position: absolute; top: 100%; left: 5px; border: 5px solid transparent; border-top-color: #1f2937; }
 .info-tip:hover .info-tip-bubble, .info-tip:focus-visible .info-tip-bubble { opacity: 1; visibility: visible; }
 
 /* ---- Números de WhatsApp (opción B) ---- */
