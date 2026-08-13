@@ -31,6 +31,9 @@ const I = {
   clock: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
   phone: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 14l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 2 6a2 2 0 0 1 2-2z" /></svg>,
   info: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5v.5" /></svg>,
+  // Estrella para la valoración (CSAT). Sin fill/stroke fijos: los pone el CSS
+  // según esté marcada o no, para poder rellenarla en dorado.
+  star: <svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.3 6.9.6-5.2 4.5 1.6 6.7L12 17.6 5.8 21.1l1.6-6.7L2.2 9.4l6.9-.6L12 2.5z" /></svg>,
 }
 
 /* Icono de la ficha del Centro de atención según su título (horario / correo /
@@ -989,6 +992,10 @@ function Detalle({ code, back, onExpire }) {
         )}
       </div>
 
+      {/* ENCUESTA DE SATISFACCIÓN (CSAT). El backend solo la manda cuando aplica
+          (incidencia del portal, resuelta y con la encuesta activada). */}
+      {t.csat && <Csat code={code} csat={t.csat} />}
+
       {/* CONVERSACIÓN + HITOS como línea de tiempo (una columna, con espina). */}
       <div className="tl">
         {linea.map((it, i) => {
@@ -1044,6 +1051,70 @@ function Detalle({ code, back, onExpire }) {
         </div>
       </div>
     </div></section>
+  )
+}
+
+/*
+ * ENCUESTA DE SATISFACCIÓN (CSAT) del portal. Al pulsar una estrella se guarda al
+ * instante (un clic y listo) y aparece el comentario opcional. La nota se puede
+ * cambiar durante unos días; el backend actualiza sin duplicar.
+ */
+function Csat({ code, csat }) {
+  const [score, setScore] = useState(csat.score || 0)
+  const [hover, setHover] = useState(0)
+  // La caja del comentario SIEMPRE nace vacía (con su placeholder): no se precarga
+  // lo ya escrito, para que nunca parezca un texto por defecto.
+  const [comment, setComment] = useState('')
+  const [rated, setRated] = useState(csat.rated)
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const pulsarEstrella = async (n) => {
+    setScore(n)
+    setBusy(true)
+    // Solo la nota: el comentario NO se toca (así cambiar de estrella no borra
+    // un comentario que ya hubiera dejado).
+    const r = await portal.rate(code, n)
+    setBusy(false)
+    if (r.ok) setRated(true)
+  }
+
+  const guardarComentario = async () => {
+    setBusy(true)
+    const r = await portal.rate(code, score, comment)   // aquí sí manda el comentario
+    setBusy(false)
+    if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2600) }
+  }
+
+  const marcadas = hover || score
+
+  return (
+    <div className={`csat ${rated ? 'done' : ''}`}>
+      <div className="csat-title">{rated ? '¡Gracias por tu valoración!' : '¿Cómo valoras la atención recibida?'}</div>
+      {!rated && <p className="csat-sub">Un clic y listo. Nos ayuda a mejorar.</p>}
+
+      <div className="csat-stars" onMouseLeave={() => setHover(0)}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" className={`csat-star ${n <= marcadas ? 'on' : ''}`} disabled={busy}
+            onMouseEnter={() => setHover(n)} onClick={() => pulsarEstrella(n)} aria-label={`${n} de 5`}>
+            {I.star}
+          </button>
+        ))}
+      </div>
+
+      {rated && (
+        <div className="csat-more">
+          <textarea value={comment} onChange={(e) => setComment(e.target.value)} maxLength={2000}
+            placeholder="¿Quieres contarnos algo más? (opcional)" />
+          <div className="csat-foot">
+            {saved && <span className="csat-saved">{I.check} Guardado</span>}
+            <button className="btn" style={{ width: 'auto', padding: '10px 20px' }} disabled={busy} onClick={guardarComentario}>
+              {busy ? 'Guardando…' : 'Enviar comentario'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

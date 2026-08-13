@@ -68,4 +68,8 @@ export const Icon = {
   arrowRight: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" /></svg>,
   // Fusionar: dos ramas que confluyen y siguen como una sola.
   merge: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M17 20.41 18.41 19 15 15.59 13.59 17 17 20.41zM7.5 8H11v5.59L5.59 19 7 20.41l6-6V8h3.5L12 3.5 7.5 8z" /></svg>,
+  // Historial: registro de acciones (auditoría). Reloj con flecha de «volver atrás».
+  activity: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M13 3a9 9 0 0 0-9 9H1l3.9 3.9.1.1L9 12H6a7 7 0 1 1 2 5l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.3 2.55.72-1.2-3.52-2.1V8z" /></svg>,
+  // Estrella: valoración del cliente (CSAT). El color (dorado/gris) lo pone el CSS.
+  star: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 2.5l2.9 6.3 6.9.6-5.2 4.5 1.6 6.7L12 17.6 5.8 21.1l1.6-6.7L2.2 9.4l6.9-.6L12 2.5z" /></svg>,
 }

@@ -79,7 +79,7 @@ export default function Contacts({ onOpen, area = '' }) {
           <button className={mode === 'list' ? 'on' : ''} onClick={() => setMode('list')} title="Vista lista"><Icon.list /> Lista</button>
           <button className={mode === 'kanban' ? 'on' : ''} onClick={() => setMode('kanban')} title="Vista kanban"><Icon.kanban /> Kanban</button>
         </div>
-        <button className="btn ghost" onClick={() => setManaging(true)}><Icon.tag /> Gestionar etiquetas</button>
+        <button className="btn ghost" onClick={() => setManaging(true)}><Icon.tag /> Etiquetas de cliente</button>
       </header>
 
       {mode === 'kanban' ? (

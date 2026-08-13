@@ -144,9 +144,21 @@ export default function Kanban({ onOpen, embedded = false, area = '' }) {
                       <div className="kb-card-top">
                         <div className="avatar md" style={{ background: avatarBg(c.wa_id || c.email || '') }}>{initials(c)}</div>
                         <div className="kb-card-info">
-                          {/* Un contacto puede tener teléfono y/o correo: se muestra lo que haya. */}
-                          <div className="kb-card-name">{c.name || (c.wa_id ? '+' + c.wa_id : c.email) || '—'}</div>
-                          <div className="kb-card-msg">{preview(c.last_message) || c.email || (c.wa_id ? '+' + c.wa_id : '—')}</div>
+                          {/* Un contacto puede tener teléfono y/o correo: se muestra lo que haya.
+                              El subtítulo NO repite lo que ya está en el título (un contacto sin
+                              nombre lleva el correo como nombre; sin esto salía dos veces). */}
+                          {(() => {
+                            const titulo = c.name || (c.wa_id ? '+' + c.wa_id : c.email) || '—'
+                            // Subtítulo: el último mensaje; si no hay, un identificador
+                            // (correo/teléfono) que NO sea ya el título (así un contacto
+                            // sin nombre —que lleva el correo de título— no lo repite).
+                            let sub = preview(c.last_message)
+                            if (!sub) sub = [c.email, c.wa_id ? '+' + c.wa_id : ''].filter(Boolean).find((id) => id !== titulo) || ''
+                            return (<>
+                              <div className="kb-card-name">{titulo}</div>
+                              {sub && <div className="kb-card-msg">{sub}</div>}
+                            </>)
+                          })()}
                         </div>
                         {parseInt(c.unread) > 0 && <span className="badge">{c.unread}</span>}
                       </div>

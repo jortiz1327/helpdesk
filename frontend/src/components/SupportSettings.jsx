@@ -26,6 +26,7 @@ const SECCIONES = [
   { grupo: 'Tickets', items: [
     { key: 'categories', label: 'Categorías',            icon: Icon.tag,      desc: 'Áreas de soporte, su color y su SLA.' },
     { key: 'prio',       label: 'Prioridades',           icon: Icon.warn,     desc: 'Niveles de urgencia y sus colores.' },
+    { key: 'labels',     label: 'Etiquetas',             icon: Icon.tag,      desc: 'Post-its de color para agrupar y filtrar tickets.' },
     { key: 'canned',     label: 'Respuestas predefinidas', icon: Icon.note,   desc: 'Textos que se insertan con «/» al responder.' },
     { key: 'faqs',       label: 'Base de conocimiento',  icon: Icon.search,   desc: 'Lo que ve el cliente en el portal: Centro de atención y Preguntas frecuentes.' },
     { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo.' },
@@ -78,6 +79,7 @@ export default function SupportSettings() {
           {tab === 'bans' && <EmailBans />}
           {tab === 'tpl' && <EmailTemplates />}
           {tab === 'prio' && <Priorities />}
+          {tab === 'labels' && <Labels />}
           {tab === 'behavior' && <TicketBehavior />}
           {tab === 'hours' && <BusinessHours />}
           {tab === 'security' && <SecuritySettings />}
@@ -678,7 +680,7 @@ function GuardarAjustes({ save, saving }) {
  * ------------------------------------------------------------------------- */
 function TicketBehavior() {
   const { d, f, setF, save, saving } = useAjustes([
-    'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify',
+    'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify', 'csat_active',
   ])
   if (!d || !f) return <div className="center-load"><div className="spinner" /></div>
 
@@ -736,6 +738,20 @@ function TicketBehavior() {
             ? <>Se cierran los resueltos con más de {f.ticket_autoclose_days} día(s) sin actividad. Ahora mismo afectaría a <b>{d.autoclose_pending}</b> ticket(s).</>
             : 'Con 0 el cierre automático queda desactivado.'}
         </p>
+      </div>
+
+      <div className="card em-card" style={{ marginTop: 16 }}>
+        <h2>Encuesta de satisfacción</h2>
+        <p className="em-desc">
+          Cuando una incidencia creada desde el <b>portal</b> queda resuelta, el cliente puede valorarla
+          con 1-5 estrellas y dejar un comentario. Aparece <b>dentro del portal</b>, no se envía nada por
+          correo. Las notas se ven en cada ticket y en <b>Informes</b>.
+        </p>
+        <label className="fb-req-row" style={{ marginTop: 4 }}>
+          <span className="fb-switch"><input type="checkbox" checked={!!f.csat_active}
+            onChange={(e) => setF((s) => ({ ...s, csat_active: e.target.checked }))} /><span className={`fb-toggle ${f.csat_active ? 'on' : ''}`} /></span>
+          <span className="fb-req-label">Pedir valoración al cliente <span className="hint">· solo incidencias del portal</span></span>
+        </label>
       </div>
 
       <GuardarAjustes save={save} saving={saving} />
@@ -1082,6 +1098,92 @@ function Priorities() {
           <label className="fb-req-row">
             <span className="fb-switch"><input type="checkbox" checked={form.is_default} onChange={(e) => setForm((f) => ({ ...f, is_default: e.target.checked }))} /><span className={`fb-toggle ${form.is_default ? 'on' : ''}`} /></span>
             <span className="fb-req-label">Por defecto <span className="hint">· la de los tickets nuevos</span></span>
+          </label>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+/* ------------------------------ Etiquetas --------------------------------
+ * Catálogo de «post-its» de color para agrupar/filtrar tickets (aparte de la
+ * categoría y la prioridad, que son únicas). Un ticket puede llevar varias.
+ * ------------------------------------------------------------------------- */
+function Labels() {
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [rows, setRows] = useState(null)
+  const [form, setForm] = useState(null)
+
+  const load = useCallback(() => { api.listTicketLabels().then((d) => setRows(d.labels || [])) }, [])
+  useEffect(() => { load() }, [load])
+
+  const blank = { id: 0, name: '', color: '#64748b', position: (rows?.length || 0) + 1, active: true }
+
+  const save = async () => {
+    if (!form.name.trim()) { toast('El nombre es obligatorio', 'err'); return }
+    const r = await api.saveTicketLabel(form)
+    if (r.ok) { toast(form.id ? 'Etiqueta actualizada' : 'Etiqueta creada'); setForm(null); load() }
+    else toast(r.error || 'Error', 'err')
+  }
+  const del = async (l) => {
+    if (!(await confirm({ title: 'Eliminar etiqueta', message: `¿Eliminar «${l.name}»?`, danger: true, confirmText: 'Eliminar' }))) return
+    const r = await api.deleteTicketLabel(l.id)
+    if (r.ok) { toast('Etiqueta eliminada'); load() } else toast(r.error || 'Error', 'err')
+  }
+
+  return (
+    <>
+      <div className="cfg-head">
+        <h2>Etiquetas de ticket</h2>
+        <button className="btn" onClick={() => setForm({ ...blank })}><Icon.plus /> Nueva etiqueta</button>
+      </div>
+      <p className="cfg-hint" style={{ margin: '0 0 14px', color: 'var(--ink-2)', fontSize: 13 }}>
+        Post-its de color libres para agrupar tickets y filtrarlos en la bandeja («pendiente proveedor», «cliente VIP»…).
+        Cualquier agente puede ponerlas o quitarlas en un ticket; el catálogo lo defines aquí.
+        Una etiqueta en uso no se puede borrar: desactívala y dejará de ofrecerse.
+      </p>
+
+      {rows === null ? <div className="center-load"><div className="spinner" /></div> : (
+        rows.length === 0 ? (
+          <div className="rep-empty">Aún no hay etiquetas. Crea la primera con «Nueva etiqueta».</div>
+        ) : (
+        <div className="cfg-grid">
+          {rows.map((l) => (
+            <div key={l.id} className="card cfg-card">
+              <div className="cfg-card-h">
+                <span className="tk-tag" style={{ '--tc': l.color }}><span className="tk-tag-dot" />{l.name}</span>
+                <span className={`chip ${Number(l.active) ? 'abierto' : 'cerrado'} sm`}>{Number(l.active) ? 'Activa' : 'Inactiva'}</span>
+              </div>
+              <p className="cfg-desc">{l.tickets} ticket{l.tickets === 1 ? '' : 's'} la usan</p>
+              <div className="cfg-actions">
+                <span className="muted" style={{ fontSize: 12, marginRight: 'auto' }}>#{l.position}</span>
+                <button className="icon-btn" title="Editar" onClick={() => setForm({
+                  id: l.id, name: l.name, color: l.color, position: l.position, active: !!Number(l.active),
+                })}><Icon.pencil /></button>
+                <button className="icon-btn" title={l.tickets ? 'En uso: desactívala en su lugar' : 'Eliminar'}
+                  style={{ color: 'var(--danger)', opacity: l.tickets ? 0.4 : 1 }} onClick={() => del(l)}><Icon.trash /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+        )
+      )}
+
+      {form && (
+        <Modal title={form.id ? 'Editar etiqueta' : 'Nueva etiqueta'} onClose={() => setForm(null)} onSave={save} saveLabel={form.id ? 'Actualizar' : 'Crear'}>
+          <div className="grid2">
+            <label className="field"><span className="lbl">Nombre <em>*</em></span>
+              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="p. ej. Pendiente proveedor" autoFocus /></label>
+            <label className="field" style={{ maxWidth: 120 }}><span className="lbl">Orden</span>
+              <input type="number" min="0" value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} /></label>
+          </div>
+          <div className="field"><span className="lbl">Color</span>
+            <Select block value={form.color} onChange={(color) => setForm((f) => ({ ...f, color }))}
+              options={COLORS.map((c) => ({ ...c, color: c.value }))} /></div>
+          <label className="fb-req-row">
+            <span className="fb-switch"><input type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} /><span className={`fb-toggle ${form.active ? 'on' : ''}`} /></span>
+            <span className="fb-req-label">Activa <span className="hint">· si no, deja de ofrecerse en los tickets</span></span>
           </label>
         </Modal>
       )}

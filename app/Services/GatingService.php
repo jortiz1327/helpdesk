@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use App\Models\WhatsAppNumber;
 use Illuminate\Http\JsonResponse;
 
 /** Candados de funciones bloqueadas por Meta hasta verificar el negocio. Portado de includes/gating.php. */
@@ -55,7 +56,45 @@ class GatingService
             $f['wa_flow']     = ['title' => 'Publicar y enviar formularios (Flows)', 'reasons' => $motivo];
         }
 
+        /*
+         * CANDADOS POR NIVEL del WhatsApp de SOPORTE (opción B):
+         *  · sin número de soporte → no se puede responder tickets por WhatsApp;
+         *  · con el número de PRUEBAS → se responde solo a destinatarios registrados;
+         *    las funciones de producción (escribir a cualquiera, plantillas propias)
+         *    siguen bloqueadas hasta poner un número REAL.
+         */
+        $nivel = self::nivelSoporte();
+        if ($nivel === 'ninguno') {
+            $f['wa_ticket_reply'] = ['title' => 'Responder tickets por WhatsApp', 'reasons' => [
+                'Aún no hay un número de WhatsApp de Soporte configurado.',
+                'Da de alta el número (al menos el de prueba de Meta) en Configuración → WhatsApp y márcalo como función «Soporte».',
+            ]];
+        }
+        if ($nivel !== 'real') {
+            $f['wa_prod'] = ['title' => 'Escribir a cualquier cliente y usar plantillas propias', 'reasons' => [
+                $nivel === 'ninguno'
+                    ? 'Aún no hay número de WhatsApp de Soporte.'
+                    : 'El número de Soporte es el de PRUEBAS de Meta: solo escribe a destinatarios que hayas registrado en la app.',
+                'Da de alta un número REAL verificado y márcalo como «real» para poder usarlo en producción.',
+            ]];
+        }
+
         return $f;
+    }
+
+    /** El número de WhatsApp de SOPORTE con credenciales, o null. */
+    public static function numeroSoporte(): ?WhatsAppNumber
+    {
+        $n = WhatsAppNumber::porFuncion('soporte');
+        return ($n && $n->token && $n->phone_number_id) ? $n : null;
+    }
+
+    /** Nivel del WhatsApp de soporte: 'ninguno' | 'prueba' | 'real'. */
+    public static function nivelSoporte(): string
+    {
+        $n = self::numeroSoporte();
+        if (!$n) return 'ninguno';
+        return $n->entorno === 'real' ? 'real' : 'prueba';
     }
 
     public static function accountVerified(): bool

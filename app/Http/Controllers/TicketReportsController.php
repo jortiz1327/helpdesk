@@ -69,7 +69,32 @@ class TicketReportsController extends Controller
             'by_category' => $byCat->map(fn ($r) => $this->fila($r, ['name' => $r->name, 'color' => $r->color]))->all(),
             'by_channel' => $byChannel,
             'daily'      => $this->daily($request->query('period', '30d')),
+            'csat'       => $this->csat($since),
         ]);
+    }
+
+    /**
+     * SATISFACCIÓN (CSAT). Sobre las incidencias del PORTAL valoradas en el periodo:
+     * nº de respuestas, nota media, % de satisfechos (4-5★) y el reparto 1..5 para
+     * una mini-barra. Si no hay valoraciones, medias a null (la UI lo oculta).
+     */
+    protected function csat($since): array
+    {
+        $q = fn () => DB::table('ticket_ratings as r')
+            ->join('tickets as t', 't.id', '=', 'r.ticket_id')
+            ->where('t.source', 'portal')->whereNull('t.merged_into_id')
+            ->when($since, fn ($qq) => $qq->where('t.created_at', '>=', $since));
+
+        $agg  = $q()->selectRaw('COUNT(*) n, AVG(r.score) media, SUM(r.score >= 4) satisfechos')->first();
+        $dist = $q()->selectRaw('r.score, COUNT(*) n')->groupBy('r.score')->pluck('n', 'score');
+
+        $n = (int) $agg->n;
+        return [
+            'respuestas'      => $n,
+            'media'           => $n ? round((float) $agg->media, 1) : null,
+            'satisfechos_pct' => $n ? (int) round(100 * $agg->satisfechos / $n) : null,
+            'dist'            => array_map(fn ($s) => (int) ($dist[$s] ?? 0), [1, 2, 3, 4, 5]),
+        ];
     }
 
     /**

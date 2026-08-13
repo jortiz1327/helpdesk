@@ -251,7 +251,7 @@ class PortalService
         $t = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
             ->where('t.code', $code)
             ->whereRaw('LOWER(c.email) = ?', [mb_strtolower($email)])
-            ->first(['t.id', 't.code', 't.subject', 't.status', 't.created_at', 't.resolved_at']);
+            ->first(['t.id', 't.code', 't.subject', 't.status', 't.source', 't.created_at', 't.resolved_at']);
         if (!$t) return null;   // no existe, o no es de este correo
 
         // Solo mensajes visibles para el cliente: NADA de notas internas.
@@ -276,6 +276,9 @@ class PortalService
             'fase'    => $this->fase($t->status),
             'fecha'   => Carbon::parse($t->created_at)->toIso8601String(),
             'resuelto_en' => $t->resolved_at ? Carbon::parse($t->resolved_at)->toIso8601String() : null,
+            // Encuesta de satisfacción (CSAT): null si no aplica (no está activa, no es
+            // del portal, o aún no está resuelta); si aplica, dice si ya votó y su nota.
+            'csat'    => $this->csatBloque((int) $t->id, $t->source, $t->status),
             // Hitos de estado que le importan al cliente, para intercalarlos en el
             // hilo: cuándo se puso en marcha, cuándo se resolvió, si se reabrió…
             'hitos'   => $this->hitosCliente((int) $t->id),
@@ -351,6 +354,7 @@ class PortalService
         $ticketId = app(TicketService::class)->create([
             'contact_id'  => $contactId,
             'channel'     => 'email',
+            'source'      => 'portal',   // nació en el portal (aunque el canal sea email): lo usa el CSAT
             'subject'     => $subject,
             'category_id' => $catId,
             'body'        => $cuerpo,
@@ -435,6 +439,80 @@ class PortalService
         if (in_array($t->status, ['resuelto', 'cerrado'], true)) return [true, null];   // ya lo estaba
 
         app(TicketService::class)->setStatus((int) $t->id, 'resuelto');
+        return [true, null];
+    }
+
+    /* -------------------------------------------------------------------------
+     * 6b) ENCUESTA DE SATISFACCIÓN (CSAT) — solo incidencias del portal, resueltas
+     * ---------------------------------------------------------------------- */
+
+    /** Estados en los que tiene sentido pedir valoración. */
+    private const CSAT_STATUSES = ['resuelto', 'cerrado'];
+
+    /** ¿Está activada la encuesta a nivel plataforma? Pasiva (solo en el portal). */
+    public static function csatActivo(): bool
+    {
+        return (string) \App\Models\Setting::get('csat_active', '1') === '1';
+    }
+
+    /**
+     * Bloque CSAT que viaja en el detalle del ticket. `null` si no aplica (encuesta
+     * apagada, no es del portal, o aún no resuelta) → el portal no muestra nada. Si
+     * aplica, dice si ya votó y con qué nota/comentario, para poder editarla.
+     */
+    private function csatBloque(int $ticketId, ?string $source, string $status): ?array
+    {
+        if (! self::csatActivo() || $source !== 'portal' || ! in_array($status, self::CSAT_STATUSES, true)) {
+            return null;
+        }
+        $r = DB::table('ticket_ratings')->where('ticket_id', $ticketId)->first(['score', 'comment']);
+        return [
+            'rated'   => (bool) $r,
+            'score'   => $r ? (int) $r->score : null,
+            'comment' => $r->comment ?? null,
+        ];
+    }
+
+    /**
+     * Guarda (o actualiza) la valoración del cliente. Solo si la incidencia es suya,
+     * nació en el portal y está resuelta. Nota 1..5 obligatoria; comentario opcional.
+     */
+    public function rate(string $email, string $code, int $score, ?string $comment): array
+    {
+        if (! self::csatActivo()) {
+            return [false, 'La encuesta no está disponible'];
+        }
+        if ($score < 1 || $score > 5) {
+            return [false, 'Elige una valoración de 1 a 5'];
+        }
+
+        $t = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
+            ->where('t.code', $code)
+            ->whereRaw('LOWER(c.email) = ?', [mb_strtolower($email)])
+            ->first(['t.id', 't.status', 't.source']);
+        if (! $t) return [false, 'No encontramos esa incidencia'];
+        if ($t->source !== 'portal' || ! in_array($t->status, self::CSAT_STATUSES, true)) {
+            return [false, 'Esta incidencia todavía no admite valoración'];
+        }
+
+        // $comment === null → solo se guarda la nota (no se toca el comentario que
+        // hubiera). Si viene (aunque sea ''), se fija: '' borra el comentario.
+        $fila = ['score' => $score, 'updated_at' => now()];
+        if ($comment !== null) {
+            $comment = trim($comment);
+            $fila['comment'] = $comment !== '' ? mb_substr($comment, 0, 2000) : null;
+        }
+
+        $existe = DB::table('ticket_ratings')->where('ticket_id', (int) $t->id)->exists();
+        if ($existe) {
+            DB::table('ticket_ratings')->where('ticket_id', (int) $t->id)->update($fila);
+        } else {
+            DB::table('ticket_ratings')->insert($fila + [
+                'ticket_id'  => (int) $t->id,
+                'comment'    => $fila['comment'] ?? null,
+                'created_at' => now(),
+            ]);
+        }
         return [true, null];
     }
 

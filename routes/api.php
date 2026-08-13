@@ -119,6 +119,13 @@ Route::middleware('token')->group(function () {
     Route::match(['get', 'post'], 'ticket_rules.php', [TicketRulesController::class, 'handle'])
         ->middleware('can:support.config');
     // Prioridades configurables
+    // Vistas guardadas de la bandeja (personales de cada agente).
+    Route::match(['get', 'post'], 'ticket_views.php', [\App\Http\Controllers\TicketViewsController::class, 'handle'])
+        ->middleware('can:helpdesk.access');
+    // Etiquetas de ticket: LISTAR lo necesita cualquier agente (selector de la ficha);
+    // gestionar el catálogo exige support.config, comprobado dentro del controlador.
+    Route::match(['get', 'post'], 'ticket_labels.php', [\App\Http\Controllers\TicketLabelsController::class, 'handle'])
+        ->middleware('can:helpdesk.access');
     Route::match(['get', 'post'], 'ticket_priorities.php', [TicketPrioritiesController::class, 'handle'])
         ->middleware('can:support.config');
     // Preguntas frecuentes del portal (crear/editar/ordenar/publicar)
@@ -192,7 +199,13 @@ Route::middleware('token')->group(function () {
     // Informes del helpdesk (rendimiento: tickets, SLA, tiempos, por agente/categoría)
     Route::get('reports.php', [TicketReportsController::class, 'handle'])
         ->middleware('can:analytics.view');
+    // Registro de acciones (auditoría). Solo superadmin (nadie más tiene activity.view).
+    Route::get('activity.php', [\App\Http\Controllers\ActivityController::class, 'handle'])
+        ->middleware('can:activity.view');
     Route::match(['get', 'post'], 'settings.php', [SettingsController::class, 'handle'])
+        ->middleware('can:settings.manage');
+    // Números de WhatsApp (opción B: enrutado por número). Solo superadmin.
+    Route::match(['get', 'post'], 'whatsapp_numbers.php', [\App\Http\Controllers\WhatsAppNumbersController::class, 'handle'])
         ->middleware('can:settings.manage');
     Route::match(['get', 'post', 'delete'], 'users.php', [UsersController::class, 'handle'])
         ->middleware('can:users.manage');

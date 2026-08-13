@@ -107,6 +107,9 @@ export const api = {
   orgReport: (level) => req(`organizations.php?action=report&level=${level}`),
   // Informes del helpdesk (rendimiento)
   reports: (period) => req(`reports.php?period=${period}`),
+  // Registro de acciones (auditoría, solo superadmin)
+  activityMeta: () => req('activity.php?action=meta'),
+  activity: (params) => req('activity.php?' + new URLSearchParams(params).toString()),
   // --- Configuración de Soporte (categorías + respuestas predefinidas) ---
   supCategories: () => req('support_settings.php?section=categories'),
   supSaveCategory: (payload) => req('support_settings.php?section=categories', {
@@ -186,6 +189,46 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   deletePriority: (id) => req('ticket_priorities.php?action=delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+  // Etiquetas de TICKET (catálogo). Nombre distinto de las etiquetas de CONTACTO
+  // (listLabels/deleteLabel de labels.php) para no pisarse en el objeto api.
+  listTicketLabels: () => req('ticket_labels.php'),
+  saveTicketLabel: (payload) => req('ticket_labels.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
+  deleteTicketLabel: (id) => req('ticket_labels.php?action=delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+  // Poner/quitar etiquetas de UN ticket (reemplaza el conjunto).
+  setTicketLabels: (id, labelIds) => req('tickets.php?action=labels', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, label_ids: labelIds }),
+  }),
+  // Exportar la bandeja a Excel: descarga BINARIA (no JSON), con el token en cabecera.
+  // Devuelve { ok, blob, filename } o { ok:false, error }.
+  exportTickets: async (f = {}) => {
+    try {
+      const r = await fetch(`${BASE}/tickets.php?action=export&` + new URLSearchParams(f), {
+        headers: { 'X-App-Token': getToken() },
+      })
+      if (!r.ok) {
+        let error = 'No se pudo exportar'
+        try { error = (await r.json()).error || error } catch { /* no-json */ }
+        return { ok: false, error }
+      }
+      const cd = r.headers.get('Content-Disposition') || ''
+      const filename = (cd.match(/filename="?([^"]+)"?/) || [])[1] || 'tickets.xlsx'
+      return { ok: true, blob: await r.blob(), filename }
+    } catch {
+      return { ok: false, error: 'Sin conexión al exportar' }
+    }
+  },
+  // Vistas guardadas de la bandeja (personales de cada agente).
+  listTicketViews: () => req('ticket_views.php'),
+  saveTicketView: (payload) => req('ticket_views.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
+  deleteTicketView: (id) => req('ticket_views.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
   // Preguntas frecuentes del portal
@@ -397,6 +440,17 @@ export const api = {
   }),
   testConnection: () => req('settings.php?action=test'),
   getSettings: () => req('settings.php?action=get'),
+  // Números de WhatsApp (opción B: enrutado por número). Solo superadmin.
+  waNumbers: () => req('whatsapp_numbers.php'),
+  saveWaNumber: (payload) => req('whatsapp_numbers.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
+  deleteWaNumber: (id) => req('whatsapp_numbers.php?action=delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+  testWaNumber: (id) => req('whatsapp_numbers.php?action=test', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
 
   // Autenticación
   me: () => req('auth.php?action=me'),

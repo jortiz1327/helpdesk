@@ -41,6 +41,8 @@ class TicketsController extends Controller
             'history' => $this->history($request),
             'canned'  => $this->cannedList(),
             'note'    => $this->note($request),
+            'labels'  => $this->setLabels($request),
+            'export'  => $this->export($request),
             'reply'   => $this->reply($request),
             'unlock'  => $this->unlock($request),
             'delete'  => $this->delete($request),
@@ -113,20 +115,98 @@ class TicketsController extends Controller
         };
     }
 
-    protected function list(Request $request)
+    /**
+     * EXPORTAR la bandeja a Excel (.xlsx) con el diseño de marca. Usa los MISMOS
+     * filtros que la lista (lo que ves = lo que sacas). Datos de clientes → permiso
+     * tickets.export. Tope de seguridad para no generar exportaciones gigantes.
+     */
+    protected function export(Request $request)
     {
         $me = $request->user();
-        $q  = $this->baseQuery($me);
+        if (!$me->can('tickets.export')) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para exportar'], 403);
+        }
 
-        /*
-         * DOS BÚSQUEDAS DISTINTAS, a propósito (decisión del usuario):
-         *   · 'ficha'    → código, asunto y datos del cliente. Es la de diario.
-         *   · 'mensajes' → DENTRO del texto de la conversación. Encuentra cosas que
-         *     nadie puso en el asunto («el pedido 4471», «error 500»), pero es otra
-         *     pregunta y por eso es otro botón, no un buscador que mezcla ambas.
-         *
-         * Las notas internas SÍ se buscan: son parte de lo que sabe el equipo.
-         */
+        $q = $this->baseQuery($me);
+        $this->aplicarFiltros($q, $request, $me);
+
+        $cap   = 5000;
+        $total = (clone $q)->count('t.id');
+        $rows  = $q->orderByDesc(DB::raw('COALESCE(t.last_message_at, t.created_at)'))->orderByDesc('t.id')
+            ->limit($cap)
+            ->get([
+                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel',
+                't.created_at', 't.first_response_at', 't.resolved_at',
+                't.sla_response_due_at', 't.sla_resolve_due_at',
+                'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
+                'cat.name as category_name', 'u.name as agent_name',
+            ]);
+
+        // Etiquetas de cada ticket, en una consulta.
+        $labels = $this->labelsFor($rows->pluck('id')->all());
+        foreach ($rows as $r) {
+            $r->labels_txt = collect($labels[$r->id] ?? [])->pluck('name')->implode(', ');
+        }
+
+        $canTimes = $me->can('tickets.view_times');
+        $slaOn = SlaService::activo();
+        foreach ($rows as $r) {
+            // Estado del SLA en una palabra (solo para quien ve tiempos y si el SLA está activo).
+            $r->sla_txt = null;
+            if ($canTimes && $slaOn) {
+                $vivo = in_array($r->status, TicketService::OPEN_STATUSES, true);
+                $vencido = ($r->sla_resolve_due_at && $r->sla_resolve_due_at < now())
+                    || ($r->sla_response_due_at && $r->sla_response_due_at < now() && !$r->first_response_at);
+                $r->sla_txt = !$r->sla_response_due_at && !$r->sla_resolve_due_at ? '—'
+                    : ($vivo && $vencido ? 'Vencido' : 'En plazo');
+            }
+        }
+
+        $xlsx = app(\App\Services\TicketXlsx::class)->build($rows, [
+            'total'     => $total,
+            'cap'       => $cap,
+            'can_times' => $canTimes,
+            'sla_on'    => $slaOn,
+            'filtros'   => $this->resumenFiltros($request),
+            'agente'    => $me->name ?: $me->email,
+        ]);
+
+        $nombre = 'tickets-' . now()->format('Ymd-Hi') . '.xlsx';
+        return response($xlsx, 200, [
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $nombre . '"',
+            'Cache-Control'       => 'no-store',
+        ]);
+    }
+
+    /** Resumen legible del filtro aplicado, para la cabecera del Excel. */
+    protected function resumenFiltros(Request $request): string
+    {
+        $p = [];
+        if (($s = trim((string) $request->query('q', ''))) !== '') $p[] = "búsqueda «{$s}»";
+        $st = (string) $request->query('status', 'open');
+        $p[] = $st === 'open' ? 'activos' : ($st === 'all' ? 'todos los estados' : (TicketService::STATUSES[$st] ?? $st));
+        if ($request->query('reply') === 'pending')  $p[] = 'sin responder';
+        if ($request->query('reply') === 'answered') $p[] = 'respondidos';
+        if ($request->query('sla') === 'late')       $p[] = 'SLA vencido';
+        $a = (string) $request->query('assigned', 'all');
+        if ($a === 'none') $p[] = 'sin asignar';
+        elseif ($a === 'me') $p[] = 'míos';
+        if (($cat = (int) $request->query('category', 0)) > 0) {
+            $p[] = 'categoría: ' . (DB::table('ticket_categories')->where('id', $cat)->value('name') ?? $cat);
+        }
+        if (($lbl = (int) $request->query('label', 0)) > 0) {
+            $p[] = 'etiqueta: ' . (DB::table('ticket_labels')->where('id', $lbl)->value('name') ?? $lbl);
+        }
+        return implode(' · ', $p);
+    }
+
+    /**
+     * Aplica al query `$q` (ya con baseQuery) TODOS los filtros de la bandeja según
+     * la petición. Vive aparte para que la LISTA y el EXPORT filtren idéntico.
+     */
+    protected function aplicarFiltros($q, Request $request, $me): void
+    {
         $s = trim((string) $request->query('q', ''));
         $donde = $request->query('search_in') === 'messages' ? 'messages' : 'ficha';
 
@@ -142,16 +222,7 @@ class TicketsController extends Controller
             $q->whereExists(function ($w) use ($s) {
                 $w->select(DB::raw(1))->from('messages as ms')
                   ->whereColumn('ms.ticket_id', 't.id');
-
-                /*
-                 * El índice de texto completo hace el trabajo duro (403 ms → 0,8 ms
-                 * sobre 100.000 mensajes) y el LIKE afina sobre los pocos mensajes
-                 * que quedan. Así una frase como «luz de error» sigue siendo exacta
-                 * —el índice ignora las palabras de menos de 3 letras— sin pagar el
-                 * recorrido completo de la tabla.
-                 */
                 [$termino, $afinar] = $this->terminoTextoCompleto($s);
-
                 if ($termino) $w->whereRaw('MATCH(ms.body) AGAINST (? IN BOOLEAN MODE)', [$termino]);
                 if ($afinar)  $w->where('ms.body', 'like', "%$s%");
             });
@@ -164,9 +235,6 @@ class TicketsController extends Controller
             $q->where('t.status', $status);
         }
 
-        // `contact_email` agrupa los tickets de un MISMO cliente aunque estén en
-        // varias fichas de contacto (entró por correo y por WhatsApp = dos filas).
-        // `contact` es el repliegue cuando el contacto no tiene correo.
         foreach ([
             'priority'      => 't.priority',
             'category'      => 't.category_id',
@@ -178,30 +246,20 @@ class TicketsController extends Controller
         }
         if (($a = $request->query('assigned', '')) !== '' && $a !== 'all') {
             match (true) {
-                $a === 'me'   => $q->where('t.assigned_to', $me->id),   // filtro «Mis tickets»
+                $a === 'me'   => $q->where('t.assigned_to', $me->id),
                 $a === 'none' => $q->whereNull('t.assigned_to'),
                 default       => $q->where('t.assigned_to', (int) $a),
             };
         }
 
-        // Filtro por ORGANIZACIÓN: «grupo:ID» | «marca:ID» | «sede:ID». Trae los tickets
-        // cuyos contactos cuelgan de ese nodo (subiendo por la cadena sede→marca→grupo).
         $this->filtroOrg($q, (string) $request->query('org', ''));
 
-        /*
-         * ¿De quién es la ÚLTIMA respuesta del hilo? Va GUARDADO en el ticket
-         * (`last_direction`, lo escribe ChatService al llegar cada mensaje):
-         *   'in'  = habló el cliente  → la pelota está en nuestro tejado (sin responder)
-         *   'out' = hablamos nosotros → ya está contestado, esperamos al cliente
-         * Antes se calculaba con una subconsulta por cada ticket, cada vez.
-         */
+        if (($lbl = (int) $request->query('label', 0)) > 0) {
+            $q->whereIn('t.id', function ($sub) use ($lbl) {
+                $sub->select('ticket_id')->from('ticket_label_ticket')->where('label_id', $lbl);
+            });
+        }
 
-        /*
-         * Vista «SLA vencido»: se pasó el plazo y el ticket sigue vivo. Se apoya en
-         * los vencimientos GUARDADOS (ver TicketService::recalcularSla) porque
-         * calcularlos al vuelo no permitiría filtrar ni paginar.
-         * El de respuesta solo cuenta si aún no se ha contestado.
-         */
         if ($request->query('sla') === 'late' && SlaService::activo()) {
             $q->whereIn('t.status', TicketService::OPEN_STATUSES)
               ->where(function ($w) {
@@ -211,12 +269,37 @@ class TicketsController extends Controller
               });
         }
 
-        // Filtro «Sin responder» / «Respondidos»
         if (($r = $request->query('reply', '')) === 'pending') {
             $q->where('t.last_direction', 'in');
         } elseif ($r === 'answered') {
             $q->where('t.last_direction', 'out');
         }
+    }
+
+    protected function list(Request $request)
+    {
+        $me = $request->user();
+        $q  = $this->baseQuery($me);
+
+        /*
+         * DOS BÚSQUEDAS DISTINTAS, a propósito (decisión del usuario):
+         *   · 'ficha'    → código, asunto y datos del cliente. Es la de diario.
+         *   · 'mensajes' → DENTRO del texto de la conversación. Encuentra cosas que
+         *     nadie puso en el asunto («el pedido 4471», «error 500»), pero es otra
+         *     pregunta y por eso es otro botón, no un buscador que mezcla ambas.
+         *
+         * Las notas internas SÍ se buscan: son parte de lo que sabe el equipo.
+         */
+        // Filtros de la bandeja (búsqueda, estado, prioridad, categoría, canal, asignado,
+        // organización, etiqueta, SLA, sin-responder). Compartidos con el EXPORT para que
+        // «lo que ves» y «lo que exportas» sean exactamente lo mismo.
+        $this->aplicarFiltros($q, $request, $me);
+
+        // La búsqueda y su modo se necesitan más abajo para resaltar el fragmento
+        // encontrado; `aplicarFiltros()` los usa por dentro, así que aquí se recalculan
+        // (mismo criterio) para tenerlos en el ámbito de list().
+        $s     = trim((string) $request->query('q', ''));
+        $donde = $request->query('search_in') === 'messages' ? 'messages' : 'ficha';
 
         /*
          * PAGINACIÓN. Antes había un `limit(200)` fijo: pasados 200 tickets, el resto
@@ -277,6 +360,10 @@ class TicketsController extends Controller
                 ] : null;
             }
         }
+
+        // Etiquetas de todos los tickets de la página, en UNA consulta (no una por fila).
+        $labels = $this->labelsFor($rows->pluck('id')->all());
+        foreach ($rows as $t) $t->labels = $labels[$t->id] ?? [];
 
         // Los tiempos solo se calculan (y se envían) a quien tiene permiso para verlos.
         $canTimes = $me->can('tickets.view_times');
@@ -448,11 +535,54 @@ class TicketsController extends Controller
             // Con su color, para pintar las etiquetas sin quemarlos en el CSS.
             'priority_meta' => TicketService::prioritiesMeta(),
             'categories' => DB::table('ticket_categories')->where('active', 1)->orderBy('position')->get(),
+            'labels'     => \App\Models\TicketLabel::activas(),   // catálogo activo (filtro + acción masiva)
             'users'      => $users,   // a quién se puede asignar
         ]);
     }
 
     /** Un ticket con su hilo completo (el chat). */
+    /**
+     * Pone/quita las ETIQUETAS de un ticket (reemplaza el conjunto entero). Cualquier
+     * agente que vea el ticket puede etiquetarlo; el catálogo lo gestionan aparte los
+     * encargados. Solo se aceptan ids de etiquetas que existan (nada de colar basura).
+     */
+    protected function setLabels(Request $request)
+    {
+        $me = $request->user();
+        $id = (int) $request->input('id');
+        $t  = (clone $this->baseQuery($me))->where('t.id', $id)->first(['t.id']);
+        if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
+
+        $pedidos = collect($request->input('label_ids', []))->map(fn ($x) => (int) $x)->filter()->unique();
+        $validos = \App\Models\TicketLabel::whereIn('id', $pedidos)->pluck('id')->all();
+
+        DB::table('ticket_label_ticket')->where('ticket_id', $id)->delete();
+        if ($validos) {
+            DB::table('ticket_label_ticket')->insert(
+                array_map(fn ($lid) => ['ticket_id' => $id, 'label_id' => $lid], $validos),
+            );
+        }
+
+        return response()->json(['ok' => true, 'labels' => $this->labelsFor([$id])[$id] ?? []]);
+    }
+
+    /** Etiquetas de un conjunto de tickets: [ticketId => [{id,name,color}, …]]. Sin N+1. */
+    protected function labelsFor(array $ticketIds): array
+    {
+        if (!$ticketIds) return [];
+        $rows = DB::table('ticket_label_ticket as p')
+            ->join('ticket_labels as l', 'l.id', '=', 'p.label_id')
+            ->whereIn('p.ticket_id', $ticketIds)
+            ->orderBy('l.position')->orderBy('l.id')
+            ->get(['p.ticket_id', 'l.id', 'l.name', 'l.color']);
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[$r->ticket_id][] = ['id' => (int) $r->id, 'name' => $r->name, 'color' => $r->color];
+        }
+        return $out;
+    }
+
     protected function detail(Request $request)
     {
         $me = $request->user();
@@ -482,6 +612,13 @@ class TicketsController extends Controller
         if (!$me->can('tickets.view_times')) {
             unset($t->first_response_at, $t->resolved_at);
         }
+
+        // Valoración del cliente (CSAT), si la dejó. null = sin valorar.
+        $t->rating = DB::table('ticket_ratings')->where('ticket_id', $id)
+            ->first(['score', 'comment', 'updated_at']);
+
+        // Etiquetas puestas a este ticket.
+        $t->labels = $this->labelsFor([$id])[$id] ?? [];
 
         // Se une con users para saber QUIÉN escribió cada respuesta. Importa: en un
         // ticket pueden contestar varios agentes, y hay que ver quién dijo qué.
@@ -610,7 +747,13 @@ class TicketsController extends Controller
             return response()->json(['ok' => false, 'error' => 'La respuesta está vacía'], 400);
         }
 
-        // De momento solo se responde por CORREO (los demás canales aún no envían).
+        // Canal WhatsApp: se responde por el número de SOPORTE (opción B). Va con
+        // CANDADO por nivel: bloqueado hasta que haya número de soporte configurado.
+        if ($t->channel === 'whatsapp') {
+            return $this->replyWhatsApp($t, $html, $me);
+        }
+
+        // De momento el resto solo se responde por CORREO (los demás canales aún no envían).
         if ($t->channel !== 'email') {
             return response()->json(['ok' => false, 'error' => 'El envío para el canal «' . $t->channel . '» aún no está disponible'], 422);
         }
@@ -688,6 +831,52 @@ class TicketsController extends Controller
         }
 
         return response()->json(['ok' => true, 'id' => $messageId, 'warnings' => $warnings]);
+    }
+
+    /**
+     * Responder un ticket por WhatsApp (canal 'whatsapp'), por el número de SOPORTE.
+     *
+     * CANDADO: si no hay número de soporte configurado, devuelve el bloqueo (la UI lo
+     * pinta como candado / solo lectura). WhatsApp es texto plano; el HTML del editor
+     * se aplana. El envío sale por `WhatsAppService::paraFuncion('soporte')`.
+     */
+    protected function replyWhatsApp($t, string $html, $me)
+    {
+        // Candado por nivel: necesita al menos el número de prueba de soporte.
+        if ($g = \App\Services\GatingService::guard('wa_ticket_reply')) {
+            return $g;
+        }
+        if (!$t->contact_wa) {
+            return response()->json(['ok' => false, 'error' => 'El contacto no tiene número de WhatsApp'], 422);
+        }
+
+        $texto = trim(HtmlSanitizer::toText($html));
+        if ($texto === '') {
+            return response()->json(['ok' => false, 'error' => 'La respuesta está vacía'], 400);
+        }
+
+        $wa = app(\App\Services\WhatsAppService::class)->paraFuncion('soporte');
+        [$code, $res] = $wa->sendText((string) $t->contact_wa, $texto);
+        if ($code < 200 || $code >= 300) {
+            // La ventana de 24 h de WhatsApp: fuera de ella Meta rechaza el texto libre
+            // (habría que enviar una plantilla). Se muestra el motivo real de Meta.
+            $err = $res['error']['message'] ?? 'No se pudo enviar por WhatsApp';
+            return response()->json(['ok' => false, 'error' => $err], 422);
+        }
+
+        // Se guarda como saliente del hilo (mismo ticket). storeMessage con autor humano
+        // marca la primera respuesta (pasa el ticket a «en progreso») igual que el correo.
+        $mid = \App\Services\ChatService::storeMessage($t->contact_id, (string) $t->contact_wa, 'out', 'text', nl2br(e($texto)), [
+            'ticket_id'      => $t->id,
+            'channel'        => 'whatsapp',
+            'status'         => 'sent',
+            'is_html'        => true,
+            'wamid'          => $res['messages'][0]['id'] ?? null,
+            'author_user_id' => $me->id,
+        ]);
+        $this->tickets->broadcast('message', (int) $t->id);
+
+        return response()->json(['ok' => true, 'id' => $mid]);
     }
 
     /**
@@ -961,6 +1150,22 @@ class TicketsController extends Controller
                 return response()->json(['ok' => false, 'error' => 'Solo puedes cogerte tickets a ti mismo'], 403);
             }
             foreach ($visible as $tid) { $this->tickets->assign($tid, $target, (int) $me->id); $n++; }
+
+        } elseif ($op === 'label') {
+            // Poner o quitar UNA etiqueta a los seleccionados (etiquetar = cualquier agente).
+            $labelId = (int) $request->input('label_id');
+            $quitar  = $request->input('mode') === 'remove';
+            if (!\App\Models\TicketLabel::where('id', $labelId)->exists()) {
+                return response()->json(['ok' => false, 'error' => 'Etiqueta no válida'], 400);
+            }
+            foreach ($visible as $tid) {
+                if ($quitar) {
+                    DB::table('ticket_label_ticket')->where('ticket_id', $tid)->where('label_id', $labelId)->delete();
+                } else {
+                    DB::table('ticket_label_ticket')->insertOrIgnore(['ticket_id' => $tid, 'label_id' => $labelId]);
+                }
+                $n++;
+            }
 
         } else {
             return response()->json(['ok' => false, 'error' => 'Operación no válida'], 400);

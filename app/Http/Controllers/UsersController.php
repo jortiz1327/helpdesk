@@ -77,8 +77,8 @@ class UsersController extends Controller
                 if ($target->isSuperAdmin() && $role !== config('rbac.super_role') && $this->superCount() <= 1) {
                     return response()->json(['ok' => false, 'error' => 'Debe quedar al menos un superadministrador'], 400);
                 }
-                if ($pass !== '' && strlen($pass) < 6) {
-                    return response()->json(['ok' => false, 'error' => 'La contraseña debe tener al menos 6 caracteres'], 400);
+                if ($pass !== '' && strlen($pass) < 8) {
+                    return response()->json(['ok' => false, 'error' => 'La contraseña debe tener al menos 8 caracteres'], 400);
                 }
 
                 $target->name = $name ?: null;

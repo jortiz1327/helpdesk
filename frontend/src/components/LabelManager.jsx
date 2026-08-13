@@ -34,8 +34,9 @@ export default function LabelManager({ labels, onClose, onChanged }) {
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 440 }}>
-        <div className="modal-head"><h3>Gestionar etiquetas</h3><button className="x" onClick={onClose}>×</button></div>
+        <div className="modal-head"><h3>Etiquetas de cliente</h3><button className="x" onClick={onClose}>×</button></div>
         <div className="modal-body">
+          <p className="lm-desc">Clasifican al <b>contacto</b> (p. ej. Cliente VIP, Distribuidor) y montan las columnas del kanban. No son las etiquetas de <b>ticket</b>, que van en Configuración → Etiquetas.</p>
           <label className="field"><span className="lbl">Nueva etiqueta</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Cliente VIP" onKeyDown={(e) => e.key === 'Enter' && create()} />
           </label>

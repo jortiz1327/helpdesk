@@ -31,6 +31,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('tickets:autoclose')->dailyAt('03:30')->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
+        /*
+         * REGISTRO DE ACCIONES: observa toda la API y anota las acciones que cambian
+         * datos (en terminate(), sin coste para la respuesta). Solo el superadmin lo
+         * consulta. Va en el grupo `api` para verlas todas; él decide qué registra.
+         */
+        $middleware->appendToGroup('api', \App\Http\Middleware\LogActivity::class);
+
         // La API no usa cookies/sesión: solo token en cabecera.
         $middleware->alias([
             'token' => \App\Http\Middleware\TokenAuth::class,

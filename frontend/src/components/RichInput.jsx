@@ -84,6 +84,17 @@ const RichInput = forwardRef(function RichInput({
     // Se lee del DOM (fresco): cuenta el texto Y las imágenes en línea, sin depender del estado.
     isEmpty: () => !area.current?.textContent.trim() && !area.current?.querySelector('img') && files.length === 0,
     reset: () => { if (area.current) area.current.innerHTML = ''; setFiles([]); setEmpty(true) },
+    // Vuelca texto plano en el editor (p. ej. el borrador de la IA). Respeta saltos
+    // de línea y párrafos, y deja el cursor listo para que el agente lo revise.
+    setText: (txt) => {
+      if (!area.current) return
+      const html = String(txt || '').split(/\n{2,}/)
+        .map((p) => `<p>${escaparHtml(p).replace(/\n/g, '<br>')}</p>`).join('')
+      area.current.innerHTML = html
+      setEmpty(!String(txt || '').trim())
+      onChange?.()
+      area.current.focus()
+    },
   }))
 
   const exec = (cmd, arg) => { document.execCommand(cmd, false, arg ?? null); area.current?.focus(); setEmpty(!area.current?.textContent.trim()); onChange?.() }
