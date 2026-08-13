@@ -1610,6 +1610,12 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tk-audio { display: block; margin: 4px 0; max-width: 260px; }
 .tk-doc { display: inline-flex; align-items: center; gap: 7px; margin: 3px 0; padding: 8px 12px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); font-size: 13px; font-weight: 600; }
 .tk-doc svg { width: 16px; height: 16px; fill: var(--primary); }
+.tk-loc { display: inline-flex; align-items: center; gap: 10px; margin: 3px 0; padding: 9px 13px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); text-decoration: none; }
+.tk-loc:hover { border-color: var(--primary); }
+.tk-loc-pin { font-size: 20px; line-height: 1; }
+.tk-loc-tx { display: flex; flex-direction: column; }
+.tk-loc-tx b { font-size: 13.5px; color: var(--ink); }
+.tk-loc-tx small { font-size: 12px; color: var(--primary); font-weight: 600; }
 .tk-msg.in.is-email .b-att { padding: 0 2px; }
 .tk-av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 32px; }
 .tk-av.cli { background: rgba(37, 99, 235, 0.18); color: #93b4ff; }

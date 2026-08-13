@@ -1286,12 +1286,23 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                           <a className="tk-doc" href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer"><Icon.file /> Abrir documento</a>
                         )}
 
-                        {/* is_html = HTML ya saneado en el servidor. Si no, texto plano
-                            (WhatsApp/correo) y React lo escapa solo. El «[tipo]» solo se
-                            muestra si NO hay ni texto ni multimedia. */}
-                        {Number(m.is_html)
-                          ? <div className={`b-html${m.channel === 'email' ? ' b-email' : ''}`} dangerouslySetInnerHTML={{ __html: m.body }} />
-                          : (m.body || (!m.media_url && <i>[{m.type}]</i>))}
+                        {/* Ubicación: tarjeta con enlace al mapa, no las coordenadas crudas. */}
+                        {m.type === 'location'
+                          ? (() => {
+                              const c = (m.body || '').match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/)
+                              return c
+                                ? <a className="tk-loc" href={`https://www.google.com/maps?q=${c[1]},${c[2]}`} target="_blank" rel="noreferrer">
+                                    <span className="tk-loc-pin">📍</span>
+                                    <span className="tk-loc-tx"><b>Ubicación compartida</b><small>Ver en el mapa →</small></span>
+                                  </a>
+                                : m.body
+                            })()
+                          /* is_html = HTML ya saneado en el servidor. Si no, texto plano
+                             (WhatsApp/correo) y React lo escapa solo. El «[tipo]» solo se
+                             muestra si NO hay ni texto ni multimedia. */
+                          : Number(m.is_html)
+                            ? <div className={`b-html${m.channel === 'email' ? ' b-email' : ''}`} dangerouslySetInnerHTML={{ __html: m.body }} />
+                            : (m.body || (!m.media_url && <i>[{m.type}]</i>))}
 
                         {/* Adjuntos: se excluyen las imágenes EN LÍNEA (inline), que ya
                             se muestran dentro del cuerpo del correo (firma, etc.). */}
