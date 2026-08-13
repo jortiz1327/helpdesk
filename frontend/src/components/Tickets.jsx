@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { api, mediaUrl } from '../api.js'
+import WaAudio from './WaAudio.jsx'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
@@ -1292,14 +1293,20 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
 
                         {/* Multimedia de WhatsApp (media_url = id de Meta; se baja por el proxy). */}
                         {m.media_url && (m.type === 'image' || m.type === 'sticker') && (
-                          <a href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer" className="tk-media-link">
+                          <a href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer" className={`tk-media-link ${m.type === 'sticker' ? 'is-sticker' : ''}`}>
                             <img className="tk-media" src={mediaUrl(m.media_url)} loading="lazy" alt="" />
                           </a>
                         )}
-                        {m.media_url && m.type === 'video' && <video className="tk-media" controls src={mediaUrl(m.media_url)} />}
-                        {m.media_url && m.type === 'audio' && <audio className="tk-audio" controls src={mediaUrl(m.media_url)} />}
+                        {m.media_url && m.type === 'video' && (
+                          <div className="tk-video"><video controls preload="metadata" src={mediaUrl(m.media_url)} /></div>
+                        )}
+                        {m.media_url && m.type === 'audio' && <WaAudio src={mediaUrl(m.media_url)} />}
                         {m.media_url && m.type === 'document' && (
-                          <a className="tk-doc" href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer"><Icon.file /> Abrir documento</a>
+                          <a className="tk-doc" href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer" download>
+                            <span className="tk-doc-ic"><Icon.file /></span>
+                            <span className="tk-doc-tx"><b>Documento</b><small>Abrir o descargar</small></span>
+                            <Icon.download />
+                          </a>
                         )}
 
                         {/* Ubicación: tarjeta con enlace al mapa, no las coordenadas crudas. */}

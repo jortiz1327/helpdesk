@@ -1605,11 +1605,38 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .wa-ack.fail svg { width: 12px; height: 12px; fill: var(--danger); }
 
 /* Multimedia de WhatsApp dentro del hilo del ticket */
-.tk-media { max-width: 260px; max-height: 320px; border-radius: 10px; display: block; margin: 2px 0; cursor: pointer; background: var(--panel-2); }
-.tk-media-link { display: inline-block; }
-.tk-audio { display: block; margin: 4px 0; max-width: 260px; }
-.tk-doc { display: inline-flex; align-items: center; gap: 7px; margin: 3px 0; padding: 8px 12px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); font-size: 13px; font-weight: 600; }
-.tk-doc svg { width: 16px; height: 16px; fill: var(--primary); }
+.tk-media-link { display: inline-block; line-height: 0; margin: 2px 0; }
+.tk-media { max-width: 260px; max-height: 340px; border-radius: 14px; display: block; cursor: zoom-in;
+  border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(16,30,51,.10); transition: transform .14s, box-shadow .14s; background: var(--panel-2); }
+.tk-media-link:hover .tk-media { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16,30,51,.16); }
+.tk-media-link.is-sticker .tk-media { max-width: 130px; max-height: 130px; border: 0; box-shadow: none; background: none; cursor: pointer; }
+
+.tk-video { max-width: 300px; margin: 2px 0; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(16,30,51,.10); line-height: 0; }
+.tk-video video { display: block; width: 100%; max-height: 360px; }
+
+/* Documento: tarjeta con icono, texto y descarga */
+.tk-doc { display: inline-flex; align-items: center; gap: 11px; margin: 3px 0; padding: 10px 13px; border-radius: 12px;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); text-decoration: none; transition: border-color .14s; max-width: 300px; }
+.tk-doc:hover { border-color: var(--primary); }
+.tk-doc-ic { flex: none; width: 38px; height: 38px; border-radius: 10px; background: var(--primary-soft); display: grid; place-items: center; }
+.tk-doc-ic svg { width: 18px; height: 18px; fill: var(--primary); }
+.tk-doc-tx { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.tk-doc-tx b { font-size: 13.5px; }
+.tk-doc-tx small { font-size: 12px; color: var(--ink-3); }
+.tk-doc > svg:last-child { width: 17px; height: 17px; fill: var(--ink-3); flex: none; }
+
+/* Reproductor de audio de marca (notas de voz) */
+.wa-au { display: flex; align-items: center; gap: 11px; margin: 3px 0; padding: 8px 12px 8px 8px; border-radius: 24px;
+  background: var(--panel-2); border: 1px solid var(--line); max-width: 300px; }
+.wa-au-btn { flex: none; width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--primary); cursor: pointer;
+  display: grid; place-items: center; transition: filter .12s, transform .12s; }
+.wa-au-btn:hover { filter: brightness(1.08); }
+.wa-au-btn:active { transform: scale(.94); }
+.wa-au-btn svg { width: 17px; height: 17px; fill: #fff; }
+.wa-au-wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 28px; cursor: pointer; }
+.wa-au-bar { flex: 1; min-width: 2px; border-radius: 2px; background: var(--line-2); transition: background .1s; }
+.wa-au-bar.on { background: var(--primary); }
+.wa-au-t { flex: none; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
 .tk-loc { display: inline-flex; align-items: center; gap: 10px; margin: 3px 0; padding: 9px 13px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); text-decoration: none; }
 .tk-loc:hover { border-color: var(--primary); }
 .tk-loc-pin { font-size: 20px; line-height: 1; }

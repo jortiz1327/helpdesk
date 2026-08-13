@@ -51,6 +51,7 @@ export const Icon = {
   headset: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 1a9 9 0 0 0-9 9v7a3 3 0 0 0 3 3h3v-8H5v-2a7 7 0 1 1 14 0v2h-4v8h4v1h-7v2h6a3 3 0 0 0 3-3V10a9 9 0 0 0-9-9z" /></svg>,
   warn: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" /></svg>,
   play: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M8 5v14l11-7z" /></svg>,
+  pause: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>,
   forms: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 5h7V6H7v2zm0 4h7v-2H7v2zm0 4h5v-2H7v2zm10-1.5 1.4 1.4-1 2.1 2.1-1 1.4 1.4V14h-3.9z" /></svg>,
   mail: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" /></svg>,
   hash: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M9 3 8 8H4v2h3.6l-.8 4H3v2h3.4L5.5 21h2l.9-5h4l-.9 5h2l.9-5H18v-2h-3.6l.8-4H20V8h-3.4l.9-5h-2l-.9 5h-4l.9-5H9zm.2 7h4l-.8 4h-4l.8-4z" /></svg>,
