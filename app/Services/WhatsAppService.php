@@ -20,6 +20,18 @@ class WhatsAppService
      */
     protected ?string $tokenOverride = null;
     protected ?string $phoneOverride = null;
+    protected bool $campanasFetched = false;
+    protected ?\App\Models\WhatsAppNumber $campanasCache = null;
+
+    /** El número de CAMPAÑAS (opción B), memoizado; es el que usa el envío por defecto. */
+    protected function numeroCampanas(): ?\App\Models\WhatsAppNumber
+    {
+        if (!$this->campanasFetched) {
+            $this->campanasCache = \App\Models\WhatsAppNumber::porFuncion('campanas');
+            $this->campanasFetched = true;
+        }
+        return $this->campanasCache;
+    }
 
     public function paraNumero(\App\Models\WhatsAppNumber $n): static
     {
@@ -38,12 +50,18 @@ class WhatsAppService
 
     protected function token(): string
     {
-        return $this->tokenOverride ?? (string) Setting::get('wa_token', '');
+        if ($this->tokenOverride) return $this->tokenOverride;
+        $n = $this->numeroCampanas();
+        if ($n && $n->token) return (string) $n->token;
+        return (string) Setting::get('wa_token', '');
     }
 
     protected function phoneId(): string
     {
-        return $this->phoneOverride ?? (string) Setting::get('wa_phone_number_id', '');
+        if ($this->phoneOverride) return $this->phoneOverride;
+        $n = $this->numeroCampanas();
+        if ($n && $n->phone_number_id) return (string) $n->phone_number_id;
+        return (string) Setting::get('wa_phone_number_id', '');
     }
 
     protected function appId(): string

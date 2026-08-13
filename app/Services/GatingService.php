@@ -105,7 +105,13 @@ class GatingService
     /** ¿Hay credenciales de WhatsApp (token + phone number id)? */
     public static function whatsappConfigured(): bool
     {
-        return (string) Setting::get('wa_token', '') !== '' && (string) Setting::get('wa_phone_number_id', '') !== '';
+        // Config global antigua…
+        if ((string) Setting::get('wa_token', '') !== '' && (string) Setting::get('wa_phone_number_id', '') !== '') {
+            return true;
+        }
+        // …o un número de CAMPAÑAS de la Opción B (lo que usa el envío por defecto).
+        $n = WhatsAppNumber::porFuncion('campanas');
+        return $n && $n->token && $n->phone_number_id;
     }
 
     /** Motivos si la función está capada AHORA, o null si está permitida. */
