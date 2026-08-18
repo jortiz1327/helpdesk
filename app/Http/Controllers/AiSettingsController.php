@@ -62,6 +62,11 @@ TXT;
                 // La clave NUNCA se devuelve entera: solo si está puesta y sus 4 últimos.
                 'api_key_set'      => $key !== '',
                 'api_key_hint'     => $key !== '' ? '····' . substr($key, -4) : '',
+                // Lector de fotos soporteQA (endpoint externo Base44).
+                'soporteqa_activo'  => (string) Setting::get('soporteqa_activo', '0') === '1',
+                'soporteqa_url'     => (string) Setting::get('soporteqa_url', \App\Services\SoporteQaClient::URL_DEF),
+                'soporteqa_key_set' => ($sqk = (string) Setting::get('soporteqa_key', '')) !== '',
+                'soporteqa_key_hint' => $sqk !== '' ? '····' . substr($sqk, -4) : '',
             ],
             'personalidad_def' => self::PERSONALIDAD_DEF,
             // Contexto del candado para la pantalla.
@@ -103,6 +108,23 @@ TXT;
                 Setting::put('ia_api_key', '');
             } elseif ($k !== '') {
                 Setting::put('ia_api_key', $k);
+            }
+        }
+
+        // --- Lector de fotos soporteQA ---
+        if ($request->has('soporteqa_activo')) {
+            Setting::put('soporteqa_activo', filter_var($request->input('soporteqa_activo'), FILTER_VALIDATE_BOOLEAN) ? '1' : '0');
+        }
+        if ($request->has('soporteqa_url')) {
+            $u = trim((string) $request->input('soporteqa_url'));
+            Setting::put('soporteqa_url', filter_var($u, FILTER_VALIDATE_URL) ? $u : '');
+        }
+        if ($request->has('soporteqa_key')) {
+            $sk = trim((string) $request->input('soporteqa_key'));
+            if ($sk === '__CLEAR__') {
+                Setting::put('soporteqa_key', '');
+            } elseif ($sk !== '') {
+                Setting::put('soporteqa_key', $sk);
             }
         }
 

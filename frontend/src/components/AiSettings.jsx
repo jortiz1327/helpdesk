@@ -25,6 +25,7 @@ export default function AiSettings() {
   const [keySet, setKeySet] = useState(false)
   const [keyHint, setKeyHint] = useState('')
   const [keyInput, setKeyInput] = useState('')   // clave nueva a escribir (vacío = no cambiar)
+  const [sqKeyInput, setSqKeyInput] = useState('')   // clave de soporteQA a escribir
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(() => {
@@ -35,6 +36,7 @@ export default function AiSettings() {
       setKeySet(!!d.settings.api_key_set)
       setKeyHint(d.settings.api_key_hint || '')
       setKeyInput('')
+      setSqKeyInput('')
     })
   }, [])
   useEffect(() => { load() }, [load])
@@ -49,6 +51,8 @@ export default function AiSettings() {
     // La clave solo viaja si el usuario escribió una nueva (vacío = no tocar).
     if (keyInput.trim()) payload.ia_api_key = keyInput.trim()
     else delete payload.ia_api_key
+    if (sqKeyInput.trim()) payload.soporteqa_key = sqKeyInput.trim()
+    else delete payload.soporteqa_key
     const r = await api.saveAiSettings(payload)
     setSaving(false)
     if (r.ok) { toast('Ajustes del agente guardados'); load() }
@@ -59,6 +63,12 @@ export default function AiSettings() {
     if (!(await confirm({ title: 'Quitar la clave', message: 'El agente de IA quedará INACTIVO hasta que vuelvas a poner una clave. ¿Continuar?', danger: true, confirmText: 'Quitar clave' }))) return
     const r = await api.saveAiSettings({ ia_api_key: '__CLEAR__', ia_activa: false })
     if (r.ok) { toast('Clave eliminada — agente inactivo'); load() } else toast(r.error || 'Error', 'err')
+  }
+
+  const quitarClaveSq = async () => {
+    if (!(await confirm({ title: 'Quitar la clave de soporteQA', message: 'El lector de fotos quedará inactivo. ¿Continuar?', danger: true, confirmText: 'Quitar clave' }))) return
+    const r = await api.saveAiSettings({ soporteqa_key: '__CLEAR__', soporteqa_activo: false })
+    if (r.ok) { toast('Clave de soporteQA eliminada'); load() } else toast(r.error || 'Error', 'err')
   }
 
   const restaurarPersonalidad = async () => {
@@ -149,6 +159,31 @@ export default function AiSettings() {
         <textarea rows={14} value={s.ia_personalidad} onChange={(e) => set('ia_personalidad', e.target.value)} style={{ lineHeight: 1.5 }} />
         <button type="button" className="btn ghost sm" style={{ marginTop: 8, alignSelf: 'flex-start' }} onClick={restaurarPersonalidad}>Restaurar el de fábrica</button>
       </label>
+
+      {/* Lector de fotos · soporteQA */}
+      <div className="field" style={{ borderTop: '1px solid var(--line)', paddingTop: 16, marginTop: 4 }}>
+        <span className="lbl" style={{ fontSize: 14, fontWeight: 700 }}>
+          Lector de fotos · soporteQA
+          <InfoTip text="Endpoint externo (Base44) que lee el código de barras de una foto de etiqueta y responde. Cuando el cliente manda una foto, el borrador lo genera soporteQA en vez de Claude." wide />
+        </span>
+        <p className="desc" style={{ margin: '2px 0 10px' }}>Cuando un cliente manda una <b>foto</b> de una etiqueta, el borrador lo genera soporteQA (lee el código + responde). Si no puede leerla, avisa y no redacta.</p>
+
+        <label className="fb-req-row" style={{ marginBottom: 12 }}>
+          <span className="fb-switch"><input type="checkbox" checked={!!s.soporteqa_activo} onChange={(e) => set('soporteqa_activo', e.target.checked)} /><span className={`fb-toggle ${s.soporteqa_activo ? 'on' : ''}`} /></span>
+          <span className="fb-req-label">Usar soporteQA para las fotos <span className="hint">· necesita la clave de abajo</span></span>
+        </label>
+
+        <label className="field">
+          <span className="lbl">URL del endpoint</span>
+          <input className="mono" value={s.soporteqa_url || ''} onChange={(e) => set('soporteqa_url', e.target.value)} placeholder="https://…/functions/soporteQA" />
+        </label>
+
+        <label className="field" style={{ marginBottom: 0 }}>
+          <span className="lbl">Clave (x-api-key) {s.soporteqa_key_set && <span className="hint">(guardada {s.soporteqa_key_hint} · vacío = no cambiar)</span>}</span>
+          <input className="mono" type="password" autoComplete="off" value={sqKeyInput} onChange={(e) => setSqKeyInput(e.target.value)} placeholder={s.soporteqa_key_set ? '••••••••  (vacío = conservar)' : 'clave del endpoint'} />
+          {s.soporteqa_key_set && <button type="button" className="btn ghost sm" style={{ marginTop: 8, alignSelf: 'flex-start', color: 'var(--danger)' }} onClick={quitarClaveSq}>Quitar clave</button>}
+        </label>
+      </div>
 
       {/* Interruptor maestro + guardar */}
       <div className="ai-foot">

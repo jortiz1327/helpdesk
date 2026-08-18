@@ -1355,9 +1355,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                   onAiSuggest={async () => {
                     const r = await api.aiDraft(id)
                     if (!r.ok) { toast(r.error || 'La IA no pudo proponer una respuesta', 'err'); return r }
-                    toast(r.modo === 'simulado'
-                      ? '✨ Borrador simulado cargado — revísalo antes de enviar (sin clave de IA)'
-                      : '✨ Borrador de la IA cargado — revísalo antes de enviar')
+                    toast(r.modo === 'soporteqa'
+                      ? `🏷️ Borrador de soporteQA (leyó la foto${r.barcode ? ` · código ${r.barcode}` : ''}) — revísalo antes de enviar`
+                      : r.modo === 'simulado'
+                        ? '✨ Borrador simulado cargado — revísalo antes de enviar (sin clave de IA)'
+                        : '✨ Borrador de la IA cargado — revísalo antes de enviar')
                     return r
                   }}
                   onSend={async ({ html, files, internal, cc, bcc }) => {

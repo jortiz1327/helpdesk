@@ -36,6 +36,20 @@ class ClaudeBrain
      */
     public function sugerir(int $ticketId): array
     {
+        $ctx = $this->contexto($ticketId);
+        if (!$ctx) return ['ok' => false, 'error' => 'No se encontró el ticket.'];
+
+        /*
+         * CEREBRO PARA FOTOS: si el cliente ha mandado una imagen recientemente y el
+         * lector soporteQA está activo, la respuesta la genera soporteQA (lee el código
+         * de la etiqueta + responde). Es independiente de la clave de Claude. Si falla o
+         * no puede leerla, se avisa y NO se redacta (decisión de negocio: nada de inventar).
+         */
+        $foto = $this->ultimaFotoEntrante($ticketId);
+        if ($foto && SoporteQaClient::activo()) {
+            return $this->viaSoporteQa($ctx, $foto);
+        }
+
         $hayClave = GatingService::iaConfigurada();
         $activa   = (string) Setting::get('ia_activa', '0') === '1';
 
@@ -43,9 +57,6 @@ class ClaudeBrain
         if ($hayClave && !$activa) {
             return ['ok' => false, 'error' => 'El agente de IA está en pausa. Actívalo en Configuración → Agente de IA.'];
         }
-
-        $ctx = $this->contexto($ticketId);
-        if (!$ctx) return ['ok' => false, 'error' => 'No se encontró el ticket.'];
 
         // SIN clave → simulado (para probar el flujo sin gastar). CON clave → real.
         if (!$hayClave) {
@@ -95,8 +106,11 @@ class ClaudeBrain
     {
         $t = DB::table('tickets as t')
             ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+            ->leftJoin('sedes as s', 's.id', '=', 'c.sede_id')
+            ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
             ->where('t.id', $ticketId)
-            ->first(['t.id', 't.subject', 't.channel', 'c.name as contact_name']);
+            ->first(['t.id', 't.subject', 't.channel', 'c.name as contact_name',
+                     's.name as sede_name', 'cat.name as category_name']);
         if (!$t) return null;
 
         // Hilo de la conversación SIN notas internas (decisión de negocio). Últimos 20.
@@ -127,6 +141,8 @@ class ClaudeBrain
             'subject'      => (string) $t->subject,
             'channel'      => (string) $t->channel,
             'contact_name' => (string) ($t->contact_name ?? ''),
+            'hotel'        => (string) ($t->sede_name ?? ''),        // sede del contacto → contexto de soporteQA
+            'category'     => (string) ($t->category_name ?? ''),
             'hilo'         => $hilo,
             'faqs'         => $faqs,
             'plantillas'   => $plantillas,
@@ -142,6 +158,78 @@ class ClaudeBrain
             if ($ctx['hilo'][$i]['dir'] === 'in') return $ctx['hilo'][$i]['texto'];
         }
         return '';
+    }
+
+    // ------------------------------------------------------- cerebro para fotos
+
+    /**
+     * La última FOTO entrante del cliente entre los mensajes recientes (para no coger
+     * una foto vieja cuando la consulta actual ya es de texto). null si no hay.
+     */
+    private function ultimaFotoEntrante(int $ticketId): ?object
+    {
+        $recientes = DB::table('messages')
+            ->where('ticket_id', $ticketId)
+            ->orderByDesc('id')->limit(6)
+            ->get(['direction', 'media_mime', 'media_url', 'body']);
+
+        foreach ($recientes as $m) {
+            if ($m->direction === 'in' && $m->media_mime
+                && str_starts_with((string) $m->media_mime, 'image/') && $m->media_url) {
+                return $m;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Genera el borrador delegando en soporteQA: descarga la foto, la manda con la
+     * pregunta del cliente y la sede como contexto, y usa su respuesta. Si no se puede
+     * leer o soporteQA no responde, devuelve un aviso (ok=false) y NO redacta.
+     */
+    private function viaSoporteQa(array $ctx, object $foto): array
+    {
+        // La pregunta: el pie de la foto, si no el último texto del cliente, si no el asunto.
+        $pregunta = $this->aTexto((string) $foto->body);
+        if ($pregunta === '') $pregunta = $this->ultimoCliente($ctx);
+        if ($pregunta === '') $pregunta = $ctx['subject'];
+
+        // Bytes de la imagen. Por ahora solo WhatsApp (el canal del agente).
+        $b64 = null;
+        if ($ctx['channel'] === 'whatsapp') {
+            $bin = app(WhatsAppService::class)->mediaBinary((string) $foto->media_url);
+            if ($bin && !empty($bin['binary'])) $b64 = base64_encode($bin['binary']);
+        }
+        if (!$b64) {
+            return ['ok' => false, 'error' => 'No pude descargar la foto del cliente para leerla. Escribe la respuesta a mano.'];
+        }
+
+        $r = app(SoporteQaClient::class)->preguntar(
+            $pregunta ?: null,
+            $b64,
+            $ctx['hotel'] ?: null,
+            $ctx['category'] ?: null,
+        );
+        if (!($r['ok'] ?? false)) {
+            return ['ok' => false, 'error' => ($r['error'] ?? 'soporteQA no pudo procesar la foto.') . ' Escribe la respuesta a mano.'];
+        }
+
+        $answer  = trim((string) ($r['answer'] ?? ''));
+        $barcode = $r['barcode'] ?? null;
+
+        if ($answer === '') {
+            $msg = 'soporteQA no generó una respuesta para la foto';
+            $msg .= $barcode ? " (código leído: {$barcode})." : '.';
+            return ['ok' => false, 'error' => $msg . ' Escribe la respuesta a mano.'];
+        }
+
+        return [
+            'ok'      => true,
+            'modo'    => 'soporteqa',
+            'texto'   => $answer,
+            'barcode' => $barcode,
+            'avisos'  => $this->avisos($answer),
+        ];
     }
 
     // -------------------------------------------------------------- simulado
