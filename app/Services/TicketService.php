@@ -290,6 +290,9 @@ class TicketService
         if (in_array($cur, ['resuelto', 'cerrado'], true) && in_array($status, self::OPEN_STATUSES, true)) {
             $upd['resolved_at'] = null;
             $upd['closed_at']   = null;
+            // Y se rearman los avisos de SLA: un ticket reabierto puede volver a vencer.
+            $upd['sla_warned_at']   = null;
+            $upd['sla_breached_at'] = null;
         }
 
         $upd += $this->pausaSla($t, $status);
@@ -325,11 +328,13 @@ class TicketService
     {
         try {
             $t = DB::table('tickets as t')->leftJoin('ticket_categories as c', 'c.id', '=', 't.category_id')
+                ->leftJoin('ticket_priorities as p', 'p.key', '=', 't.priority')
                 ->where('t.id', $ticketId)
                 ->first([
                     't.opened_at', 't.created_at', 't.first_response_at', 't.resolved_at', 't.closed_at',
                     't.sla_paused_minutes', 't.sla_paused_since',
                     'c.sla_response_hours', 'c.sla_resolve_hours',
+                    'p.sla_response_mins as pri_response_mins', 'p.sla_resolve_mins as pri_resolve_mins',
                 ]);
             if (!$t) return;
 

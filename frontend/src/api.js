@@ -145,6 +145,9 @@ export const api = {
   toggleSla: (active) => req('business_hours.php?action=toggle_sla', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }),
   }),
+  toggleSlaAlerts: (active) => req('business_hours.php?action=toggle_alerts', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }),
+  }),
   delHoliday: (id) => req('business_hours.php?action=del_holiday', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),

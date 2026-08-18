@@ -29,6 +29,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('email:fetch')->everyMinute()->withoutOverlapping();
         // Cierra los tickets que llevan X días resueltos (si está configurado)
         $schedule->command('tickets:autoclose')->dailyAt('03:30')->withoutOverlapping();
+        // Avisos de SLA por correo (por vencer / vencido) — si están activados
+        $schedule->command('sla:check')->everyFiveMinutes()->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         /*

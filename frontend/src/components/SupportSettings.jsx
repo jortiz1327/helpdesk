@@ -841,10 +841,33 @@ function BusinessHours() {
         </label>
 
         <div className="sla-sw-cats">
-          {d.sla_cats?.length
-            ? <>Con plazo puesto: {d.sla_cats.map((c) => <span key={c} className="chip sm">{c}</span>)}</>
-            : <i>Ninguna categoría tiene plazo configurado todavía: el SLA no hará nada hasta que pongas horas en alguna.</i>}
+          {(d.sla_cats?.length || d.sla_prios?.length)
+            ? <>
+                Con plazo puesto:
+                {d.sla_prios?.map((c) => <span key={'p' + c} className="chip sm" title="Prioridad">{c}</span>)}
+                {d.sla_cats?.map((c) => <span key={'c' + c} className="chip sm" title="Categoría">{c}</span>)}
+              </>
+            : <i>Nadie tiene plazo configurado todavía: el SLA no hará nada hasta que pongas plazos en alguna <b>prioridad</b> o <b>categoría</b>.</i>}
         </div>
+
+        {/* Avisos por correo del SLA: interruptor global, aparte del cálculo. */}
+        <label className="fb-req-row" style={{ marginTop: 14, opacity: d.sla_active ? 1 : 0.5 }}>
+          <span className="fb-switch">
+            <input type="checkbox" checked={!!d.sla_alerts_active} disabled={!d.sla_active} onChange={async (e) => {
+              const r = await api.toggleSlaAlerts(e.target.checked)
+              if (r.ok) { toast(r.active ? 'Avisos por correo activados' : 'Avisos por correo desactivados'); load() }
+              else toast(r.error || 'Error', 'err')
+            }} />
+            <span className={`fb-toggle ${d.sla_alerts_active ? 'on' : ''}`} />
+          </span>
+          <span className="fb-req-label">
+            <b>{d.sla_alerts_active ? 'Avisos por correo activados' : 'Avisos por correo desactivados'}</b>
+            <small>
+              Manda un correo al <b>agente</b> cuando un ticket suyo está <b>por vencer</b> o <b>vencido</b> (los vencidos escalan también a los <b>responsables</b>).
+              Cada agente lo puede desactivar en su ficha. Necesita activar las plantillas <b>«SLA por vencer»</b> y <b>«SLA vencido»</b> en Plantillas de aviso.
+            </small>
+          </span>
+        </label>
       </div>
 
       {/* El reloj se para cuando la pelota no está en nuestro tejado. */}
@@ -1019,6 +1042,34 @@ const fmtFecha = (s) => s ? new Date(s.replace(' ', 'T')).toLocaleString('es-ES'
  * una es lo que se guarda en el ticket, así que se genera del nombre al crearla
  * y ya no se toca (cambiarla dejaría huérfanos los tickets que la usan).
  * ------------------------------------------------------------------------- */
+/* Editor de duración en horas + minutos. Guarda el total en MINUTOS: un caso grave
+   puede necesitar respuesta en minutos (0 h 15 min) y uno leve, horas (8 h 0 min). */
+function HM({ value, onChange, autoFocus }) {
+  const mins = Number(value) || 0
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  const set = (nh, nm) => {
+    nh = Math.max(0, Math.floor(Number(nh) || 0))
+    nm = Math.max(0, Math.min(59, Math.floor(Number(nm) || 0)))
+    onChange(nh * 60 + nm)
+  }
+  return (
+    <div className="hm-row">
+      <input type="number" min="0" value={h} autoFocus={autoFocus} onChange={(e) => set(e.target.value, m)} /><span>h</span>
+      <input type="number" min="0" max="59" value={m} onChange={(e) => set(h, e.target.value)} /><span>min</span>
+    </div>
+  )
+}
+
+/** «135» → «2 h 15 min». null si no hay plazo. */
+function fmtDur(mins) {
+  const n = Number(mins) || 0
+  if (n <= 0) return null
+  const h = Math.floor(n / 60)
+  const m = n % 60
+  return h && m ? `${h} h ${m} min` : h ? `${h} h` : `${m} min`
+}
+
 function Priorities() {
   const toast = useToast()
   const confirm = useConfirm()
@@ -1028,7 +1079,7 @@ function Priorities() {
   const load = useCallback(() => { api.listPriorities().then((d) => setRows(d.priorities || [])) }, [])
   useEffect(() => { load() }, [load])
 
-  const blank = { id: 0, name: '', color: '#64748b', position: (rows?.length || 0) + 1, active: true, is_default: false }
+  const blank = { id: 0, name: '', color: '#64748b', position: (rows?.length || 0) + 1, active: true, is_default: false, sla_response_mins: 0, sla_resolve_mins: 0 }
 
   const save = async () => {
     if (!form.name.trim()) { toast('El nombre es obligatorio', 'err'); return }
@@ -1066,11 +1117,20 @@ function Priorities() {
                 {p.tickets} ticket{p.tickets === 1 ? '' : 's'} la usan
                 <span className="muted" style={{ marginLeft: 8, fontFamily: 'var(--mono, monospace)', fontSize: 11.5 }}>{p.key}</span>
               </p>
+              {(fmtDur(p.sla_response_mins) || fmtDur(p.sla_resolve_mins)) && (
+                <p className="cfg-desc prio-sla-tag">
+                  <Icon.clock />
+                  {fmtDur(p.sla_response_mins) && <span>Respuesta <b>{fmtDur(p.sla_response_mins)}</b></span>}
+                  {fmtDur(p.sla_resolve_mins) && <span>Resolver <b>{fmtDur(p.sla_resolve_mins)}</b></span>}
+                </p>
+              )}
               <div className="cfg-actions">
                 <span className="muted" style={{ fontSize: 12, marginRight: 'auto' }}>#{p.position}</span>
                 <button className="icon-btn" title="Editar" onClick={() => setForm({
                   id: p.id, name: p.name, color: p.color, position: p.position,
                   active: !!Number(p.active), is_default: !!Number(p.is_default),
+                  sla_response_mins: Number(p.sla_response_mins) || 0,
+                  sla_resolve_mins: Number(p.sla_resolve_mins) || 0,
                 })}><Icon.pencil /></button>
                 <button className="icon-btn" title={p.tickets ? 'En uso: desactívala en su lugar' : 'Eliminar'}
                   style={{ color: 'var(--danger)', opacity: p.tickets ? 0.4 : 1 }} onClick={() => del(p)}><Icon.trash /></button>
@@ -1091,6 +1151,22 @@ function Priorities() {
           <div className="field"><span className="lbl">Color</span>
             <Select block value={form.color} onChange={(color) => setForm((f) => ({ ...f, color }))}
               options={COLORS.map((c) => ({ ...c, color: c.value }))} /></div>
+
+          {/* Plazos de SLA de esta prioridad. Mandan sobre los de la categoría: un caso
+              grave (Urgente) puede exigir respuesta en minutos tenga la categoría que tenga. */}
+          <div className="field">
+            <span className="lbl">Plazos de SLA <span className="hint">· opcionales</span></span>
+            <div className="prio-sla">
+              <div className="prio-sla-row"><span>Primera respuesta</span>
+                <HM value={form.sla_response_mins} onChange={(v) => setForm((f) => ({ ...f, sla_response_mins: v }))} /></div>
+              <div className="prio-sla-row"><span>Resolución</span>
+                <HM value={form.sla_resolve_mins} onChange={(v) => setForm((f) => ({ ...f, sla_resolve_mins: v }))} /></div>
+            </div>
+            <span className="hint" style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)', fontSize: 12 }}>
+              Se cuentan en horario laboral. Mandan sobre el plazo de la categoría; en 0, se usa el de la categoría.
+            </span>
+          </div>
+
           <label className="fb-req-row">
             <span className="fb-switch"><input type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} /><span className={`fb-toggle ${form.active ? 'on' : ''}`} /></span>
             <span className="fb-req-label">Activa <span className="hint">· si no, deja de ofrecerse</span></span>

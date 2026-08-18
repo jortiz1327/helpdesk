@@ -1244,6 +1244,87 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .usr-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .usr-row:last-child { border-bottom: none; }
 
+/* ======================= Roster de usuarios (fichas) ======================= */
+.um { --u-super: #7c3aed; --u-mgr: var(--primary); --u-agent: #0d8f86; --u-online: #12a150; --u-away: var(--warn); }
+
+/* Tiles de resumen */
+.um-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+.um-tile { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 13px 16px; }
+.um-tile .k { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 700; }
+.um-tile .v { display: block; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.um-tile .v small { font-size: 12.5px; font-weight: 600; color: var(--ink-3); margin-left: 5px; }
+
+/* Barra de herramientas */
+.um-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.um-search { position: relative; flex: 1; min-width: 200px; }
+.um-search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; fill: var(--ink-3); }
+.um-search input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13.5px; }
+.um-search input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.um-filters { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); padding: 4px; border-radius: 11px; }
+.um-filters button { border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: .14s; }
+.um-filters button.on { background: var(--primary); color: #fff; }
+.um-filters button:not(.on):hover { background: var(--hover); color: var(--ink); }
+
+/* Rejilla y ficha */
+.um-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(318px, 1fr)); gap: 14px; }
+.um-empty { grid-column: 1 / -1; text-align: center; color: var(--ink-3); padding: 30px; font-size: 13.5px; }
+.um-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); transition: transform .16s, box-shadow .16s, border-color .16s; }
+.um-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg, 0 12px 30px rgba(0,0,0,.12)); border-color: var(--line-2); }
+.um-accent { height: 4px; background: var(--role); }
+.um-cbody { padding: 15px 16px 12px; }
+.um-head { display: flex; gap: 12px; align-items: flex-start; }
+.um-av { position: relative; flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-weight: 800; font-size: 16px; color: #fff; background: var(--role); }
+.um-dot { position: absolute; right: -3px; bottom: -3px; width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--panel); background: var(--ink-3); }
+.um-dot.on { background: var(--u-online); } .um-dot.away { background: var(--u-away); } .um-dot.off { background: var(--ink-3); }
+.um-who { min-width: 0; flex: 1; }
+.um-name { font-weight: 700; font-size: 14.5px; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.um-email { color: var(--ink-3); font-size: 12px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.um-rolechip { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; color: var(--role); background: color-mix(in srgb, var(--role) 14%, transparent); text-transform: uppercase; letter-spacing: .03em; }
+.um-rolechip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--role); }
+.um-areas { display: flex; flex-wrap: wrap; gap: 6px; margin: 13px 0 2px; align-items: center; }
+.um-areas-lbl { width: 100%; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 700; margin-bottom: -3px; }
+.um-area { font-size: 11.5px; font-weight: 600; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line); padding: 3px 9px; border-radius: 8px; }
+.um-area.all { color: var(--primary); background: var(--primary-soft); border-color: transparent; }
+.um-area.none { color: var(--ink-3); font-style: italic; background: transparent; border-style: dashed; }
+.um-stats { display: flex; gap: 20px; margin-top: 13px; padding-top: 11px; border-top: 1px dashed var(--line); }
+.um-stats .s { display: flex; flex-direction: column; }
+.um-stats .s b { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.um-stats .s b.bad { color: var(--danger); }
+.um-stats .s span { font-size: 10.5px; color: var(--ink-3); font-weight: 600; }
+.um-foot { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-top: 1px solid var(--line); background: var(--panel-2); }
+.um-foot-sp { flex: 1; }
+.um-notify { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-2); cursor: pointer; padding: 4px 6px; border-radius: 8px; }
+.um-notify:hover { background: var(--hover); }
+.um-notify.off { color: var(--ink-3); }
+.um-notify svg { width: 14px; height: 14px; fill: currentColor; }
+
+/* Interruptor reutilizable del roster */
+.um-sw { position: relative; width: 32px; height: 19px; border-radius: 999px; background: var(--line-2); transition: .16s; flex: none; }
+.um-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: .16s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.um-sw.on { background: var(--u-online); } .um-sw.on::after { transform: translateX(13px); }
+.um-sw.lg { width: 40px; height: 23px; } .um-sw.lg::after { width: 19px; height: 19px; } .um-sw.lg.on::after { transform: translateX(17px); }
+
+/* Ficha de edición: formulario + columna de avisos */
+.um-sheet { display: grid; grid-template-columns: 1.35fr 1fr; gap: 0; padding: 0; overflow: hidden; margin-bottom: 18px; }
+.um-form { padding: 18px 20px; }
+.um-aside { padding: 18px 20px; background: var(--panel-2); border-left: 1px solid var(--line); }
+.um-pref { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 12px; margin-bottom: 10px; cursor: pointer; transition: .14s; }
+.um-pref:hover { border-color: var(--line-2); }
+.um-pref.on { border-color: color-mix(in srgb, var(--primary) 40%, var(--line)); }
+.um-pref-ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; }
+.um-pref-ic svg { width: 17px; height: 17px; }
+.um-pref-ic.amber { background: rgba(244,183,64,.16); } .um-pref-ic.amber svg { fill: var(--warn); }
+.um-pref-ic.blue { background: var(--primary-soft); } .um-pref-ic.blue svg { fill: var(--primary); }
+.um-pref-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.um-pref-tx b { font-size: 13px; }
+.um-pref-tx small { font-size: 11.5px; color: var(--ink-3); }
+
+@media (max-width: 760px) {
+  .um-tiles { grid-template-columns: repeat(2, 1fr); }
+  .um-sheet { grid-template-columns: 1fr; }
+  .um-aside { border-left: 0; border-top: 1px solid var(--line); }
+}
+
 /* --- Roles: filas alineadas por columnas + editor de permisos --- */
 .role-row { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
 .role-row:last-child { border-bottom: none; }
@@ -2195,6 +2276,19 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cfg-card-h b { font-size: 14.5px; flex: 1; }
 .cfg-tag svg { width: 18px; height: 18px; }
 .cfg-desc { font-size: 12.5px; color: var(--ink-2); margin: 0 0 16px; line-height: 1.5; min-height: 34px; }
+
+/* Plazos de SLA de una prioridad (formulario y tarjeta). */
+.prio-sla { display: flex; flex-direction: column; gap: 8px; }
+.prio-sla-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.prio-sla-row > span { font-size: 12.5px; color: var(--ink-2); }
+.hm-row { display: inline-flex; align-items: center; gap: 5px; }
+.hm-row input { width: 58px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); font-size: 13px; text-align: right; }
+.hm-row input:focus { outline: none; border-color: var(--primary); }
+.hm-row span { font-size: 12px; color: var(--ink-3); }
+.prio-sla-tag { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; min-height: 0; margin: -8px 0 14px; }
+.prio-sla-tag svg { width: 13px; height: 13px; fill: var(--ink-3); flex: none; }
+.prio-sla-tag span { font-size: 12px; color: var(--ink-2); }
+.prio-sla-tag b { color: var(--ink); font-weight: 600; }
 .cfg-sla { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--line); }
 .cfg-sla span { font-size: 12px; color: var(--ink-2); }
 .cfg-sla b { font-size: 14px; }
@@ -2428,7 +2522,8 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tn-l-d.hoy { border-color: var(--primary); background: var(--primary); }
 .tn-l-d.hoy i, .tn-l-d.hoy b { color: #fff; }
 .tn-l-d.pasado { opacity: 0.55; }
-.tn-l-d.fest { border-style: dashed; }
+.tn-l-d.fest { border-style: dashed; border-color: rgba(244, 183, 64, 0.7); background: rgba(244, 183, 64, 0.12); }
+.tn-l-d.fest i, .tn-l-d.fest b { color: var(--warn); }
 /* Puntitos: ámbar = hay una sustitución, azul = hay nota. Los mismos colores que
    en el calendario, para no tener que aprenderse dos códigos. */
 .tn-l-marcas { position: absolute; bottom: 2px; display: flex; gap: 2px; }
@@ -2706,7 +2801,17 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cal-dia.pasado { opacity: 0.55; }
 .cal-dia.pasado:hover { opacity: 1; }
 .cal-dia.hoy { border-color: var(--primary); border-width: 2px; padding: 7px; background: var(--panel); }
-.cal-dia.festivo { background: repeating-linear-gradient(135deg, transparent, transparent 6px, var(--hover) 6px, var(--hover) 7px); }
+/* Festivo: día claramente distinto del normal. Tinte ámbar + trama diagonal suave
+   + borde ámbar y el número del día en ámbar. Misma familia de color que la
+   sustitución (rgba 244,183,64), así el calendario habla un solo idioma. */
+.cal-dia.festivo {
+  background:
+    repeating-linear-gradient(135deg, transparent, transparent 7px, rgba(244, 183, 64, 0.10) 7px, rgba(244, 183, 64, 0.10) 9px),
+    rgba(244, 183, 64, 0.12);
+  border-color: rgba(244, 183, 64, 0.55);
+}
+.cal-dia.festivo:hover { border-color: var(--warn); }
+.cal-dia.festivo .cal-dia-h b { color: var(--warn); }
 
 .cal-dia-h { display: flex; align-items: center; gap: 5px; }
 .cal-dia-h b { font-size: 13px; }
@@ -2723,17 +2828,26 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cal-turno.sust .cal-t { color: var(--warn); }
 .cal-ic-sust { width: 11px; height: 11px; fill: var(--warn); margin-left: auto; flex: none; }
 .cal-replaces { font-size: 10px; color: var(--warn); font-weight: 600; line-height: 1.3; margin-top: 1px; }
-.cal-festivo { font-size: 11px; color: var(--ink-3); font-style: italic; line-height: 1.35; }
+.cal-festivo { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: rgba(244, 183, 64, 0.18); color: var(--warn); font-size: 10.5px; font-weight: 700; line-height: 1.3; }
+.cal-festivo svg { width: 11px; height: 11px; fill: var(--warn); flex: none; }
 
 .cal-leyenda { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px; color: var(--ink-3); }
 .cal-leyenda span { display: inline-flex; align-items: center; gap: 5px; }
 .cal-leyenda svg { width: 12px; height: 12px; fill: currentColor; }
 .cal-leyenda span:first-child svg { fill: var(--warn); }
 .cal-l-vacio { color: var(--danger); font-style: italic; }
+.cal-l-fest::before { content: ''; display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: rgba(244, 183, 64, 0.25); border: 1px solid rgba(244, 183, 64, 0.7); }
 
 /* --- Panel del día --- */
 .cal-panel { max-width: 560px; }
-.cal-panel-fest { margin: 0 0 12px; font-size: 12.5px; color: var(--ink-2); font-style: italic; }
+/* Atajo de festivo dentro del panel del día. */
+.cal-fest-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; min-height: 30px; }
+.cal-fest-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; background: rgba(244, 183, 64, 0.18); color: var(--warn); font-size: 12px; font-weight: 700; }
+.cal-fest-badge svg { width: 13px; height: 13px; fill: var(--warn); }
+.cal-fest-add svg { width: 13px; height: 13px; }
+.cal-fest-new { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
+.cal-fest-new input { flex: 1 1 180px; min-width: 140px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); font-size: 12.5px; }
+.cal-fest-new input:focus { outline: none; border-color: var(--warn); }
 .cal-turno-ed { padding: 10px 10px 12px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
 .cal-turno-ed.sust { border-color: var(--line); background: var(--panel); }   /* el aviso lo lleva la zona «Hoy», no toda la tarjeta */
 .cal-turno-ed-h { display: flex; align-items: center; gap: 8px; margin: 2px 4px 6px; }

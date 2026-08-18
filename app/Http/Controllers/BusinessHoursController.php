@@ -25,6 +25,7 @@ class BusinessHoursController extends Controller
             'add_holiday'   => $this->addHoliday($request),
             'del_holiday'   => $this->delHoliday($request),
             'toggle_sla'    => $this->toggleSla($request),
+            'toggle_alerts' => $this->toggleAlerts($request),
             default         => $this->get(),
         };
     }
@@ -55,10 +56,15 @@ class BusinessHoursController extends Controller
             'holidays'  => DB::table('holidays')->orderBy('date')->get(['id', 'date', 'name']),
             'week_hours' => round($minutos / 60, 1),
             'open_now'  => $svc->abierto(),
-            // Interruptor general del SLA + qué categorías tienen plazo puesto.
+            // Interruptor general del SLA + qué categorías y prioridades tienen plazo.
+            // El SLA de un ticket puede venir por cualquiera de las dos vías.
             'sla_active' => (string) \App\Models\Setting::get('sla_active', '1') === '1',
+            'sla_alerts_active' => (string) \App\Models\Setting::get('sla_alerts_active', '1') === '1',
             'sla_cats'   => DB::table('ticket_categories')
                 ->where(fn ($q) => $q->whereNotNull('sla_response_hours')->orWhereNotNull('sla_resolve_hours'))
+                ->pluck('name'),
+            'sla_prios'  => DB::table('ticket_priorities')
+                ->where(fn ($q) => $q->whereNotNull('sla_response_mins')->orWhereNotNull('sla_resolve_mins'))
                 ->pluck('name'),
         ]);
     }
@@ -70,6 +76,14 @@ class BusinessHoursController extends Controller
     protected function toggleSla(Request $request)
     {
         \App\Models\Setting::put('sla_active', $request->boolean('active') ? '1' : '0');
+
+        return response()->json(['ok' => true, 'active' => $request->boolean('active')]);
+    }
+
+    /** Enciende o apaga los AVISOS de SLA por correo (aparte del cálculo del SLA). */
+    protected function toggleAlerts(Request $request)
+    {
+        \App\Models\Setting::put('sla_alerts_active', $request->boolean('active') ? '1' : '0');
 
         return response()->json(['ok' => true, 'active' => $request->boolean('active')]);
     }

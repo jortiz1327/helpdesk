@@ -172,7 +172,7 @@ export default function Shifts() {
           {Array.from({ length: hueco }, (_, i) => <div key={'h' + i} className="cal-hueco" />)}
 
           {d.days.map((x) => (
-            <button key={x.date} className={`cal-dia ${x.today ? 'hoy' : ''} ${x.past ? 'pasado' : ''} ${x.holiday ? 'festivo' : ''} ${x.note ? 'con-nota' : ''}`}
+            <button key={x.date} className={`cal-dia ${x.today ? 'hoy' : ''} ${x.past ? 'pasado' : ''} ${x.holiday_id ? 'festivo' : ''} ${x.note ? 'con-nota' : ''}`}
               onClick={() => setDia(x)} title={x.note || undefined}>
               <div className="cal-dia-h">
                 <b>{x.day}</b>
@@ -181,8 +181,8 @@ export default function Shifts() {
                 {x.note && <Icon.note className="cal-ic-nota" />}
               </div>
 
-              {x.holiday
-                ? <div className="cal-festivo">{x.holiday}</div>
+              {x.holiday_id
+                ? <div className="cal-festivo"><Icon.star />{x.holiday || 'Festivo'}</div>
                 : Object.keys(d.shifts).map((k) => {
                     const t = x.shifts[k]
                     /* Un turno lo pueden cubrir varios. El icono va PEGADO al que
@@ -206,7 +206,7 @@ export default function Shifts() {
                   })}
 
               {/* Lo que la versión anterior escondía: a quién se está sustituyendo. */}
-              {!x.holiday && Object.keys(d.shifts).some((k) => x.shifts[k].replaces) && (
+              {!x.holiday_id && Object.keys(d.shifts).some((k) => x.shifts[k].replaces) && (
                 <div className="cal-replaces">
                   {Object.keys(d.shifts).filter((k) => x.shifts[k].replaces)
                     .map((k) => 'sustituye a ' + x.shifts[k].replaces).join(' · ')}
@@ -261,7 +261,7 @@ function Listado({ d, onDia }) {
     if (!s) { s = { week: x.week, dias: [], titulares: {}, tramos: [], notas: [] }; semanas.push(s) }
     s.dias.push(x)
     if (x.note) s.notas.push({ date: x.date, note: x.note })
-    if (x.holiday) continue
+    if (x.holiday_id) continue
 
     for (const k of turnos) {
       const t = x.shifts[k]
@@ -299,8 +299,8 @@ function Listado({ d, onDia }) {
               <div className="tn-l-dias" title="Pincha un día para verlo o cambiarlo">
                 {s.dias.map((x) => (
                   <button key={x.date} onClick={() => onDia(x)}
-                    className={`tn-l-d ${x.today ? 'hoy' : ''} ${x.past ? 'pasado' : ''} ${x.holiday ? 'fest' : ''}`}
-                    title={[x.holiday && `Festivo: ${x.holiday}`, x.note].filter(Boolean).join(' · ') || undefined}>
+                    className={`tn-l-d ${x.today ? 'hoy' : ''} ${x.past ? 'pasado' : ''} ${x.holiday_id ? 'fest' : ''}`}
+                    title={[x.holiday_id && `Festivo${x.holiday ? ': ' + x.holiday : ''}`, x.note].filter(Boolean).join(' · ') || undefined}>
                     <i>{INIC[x.dow - 1]}</i><b>{x.day}</b>
                     <span className="tn-l-marcas">
                       {turnos.some((k) => x.shifts[k].substitute) && <em className="sust" />}
@@ -357,8 +357,12 @@ function PanelDia({ dia, d, puedeEditar, onClose, onRecargar, onVariosDias, toas
      un desplegable por titular diciendo «viene Juan» donde ya pone Juan no informa
      de nada. Se abre al pulsar, y hasta entonces la ficha solo se lee. */
   const [cambiando, setCambiando] = useState(null)
+  // Atajo de festivo: abrir el mini-formulario y su motivo (misma tabla que Horarios).
+  const [festOpen, setFestOpen] = useState(false)
+  const [festNombre, setFestNombre] = useState('')
 
   useEffect(() => { setNota(dia.note || '') }, [dia.date, dia.note])
+  useEffect(() => { setFestOpen(false); setFestNombre('') }, [dia.date])
 
   const fecha = new Date(dia.date + 'T00:00:00')
     .toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -397,6 +401,28 @@ function PanelDia({ dia, d, puedeEditar, onClose, onRecargar, onVariosDias, toas
     if (r.ok) { toast('Titulares de la semana actualizados'); onRecargar() } else toast(r.error || 'Error', 'err')
   }
 
+  /* Marcar/quitar festivo desde aquí es un atajo: escribe en la MISMA tabla que
+     Configuración → Horarios (holidays), así que el día pasa a contar como festivo
+     también para el SLA. Al terminar se recarga el mes y se cierra el panel, porque
+     un día festivo ya no tiene turnos que gestionar. */
+  const marcarFestivo = async () => {
+    setGuardando(true)
+    const r = await api.addHoliday(dia.date, festNombre.trim())
+    setGuardando(false)
+    if (!r.ok) { toast(r.error || 'No se pudo marcar el festivo', 'err'); return }
+    toast('Día marcado como festivo')
+    onRecargar(); onClose()
+  }
+  const quitarFestivo = async () => {
+    if (!dia.holiday_id) return
+    setGuardando(true)
+    const r = await api.delHoliday(dia.holiday_id)
+    setGuardando(false)
+    if (!r.ok) { toast(r.error || 'No se pudo quitar el festivo', 'err'); return }
+    toast('Festivo quitado')
+    onRecargar(); onClose()
+  }
+
   const sinCambios = nota === (dia.note || '')
 
   /* Guardar la nota CIERRA el panel: es una acción que termina, y dejarlo abierto
@@ -422,7 +448,33 @@ function PanelDia({ dia, d, puedeEditar, onClose, onRecargar, onVariosDias, toas
         </div>
 
         <div className="modal-body">
-          {dia.holiday && <p className="cal-panel-fest">Festivo: {dia.holiday}</p>}
+          {/* Festivo del día — atajo a la misma tabla que Configuración → Horarios.
+              Marcado: se ve el motivo y se puede quitar. Sin marcar: botón para marcarlo. */}
+          <div className="cal-fest-bar">
+            {dia.holiday_id ? (
+              <>
+                <span className="cal-fest-badge"><Icon.star /> Festivo{dia.holiday ? <> · {dia.holiday}</> : ''}</span>
+                <span className="spacer" />
+                {puedeEditar && (
+                  <button className="btn ghost sm" disabled={guardando} onClick={quitarFestivo}>Quitar festivo</button>
+                )}
+              </>
+            ) : puedeEditar ? (
+              festOpen ? (
+                <div className="cal-fest-new">
+                  <input autoFocus value={festNombre} placeholder="Motivo (opcional): Navidad, local…"
+                    onChange={(e) => setFestNombre(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') marcarFestivo(); if (e.key === 'Escape') setFestOpen(false) }} />
+                  <button className="btn sm" disabled={guardando} onClick={marcarFestivo}>Marcar festivo</button>
+                  <button className="btn ghost sm" onClick={() => setFestOpen(false)}>Cancelar</button>
+                </div>
+              ) : (
+                <button className="btn ghost sm cal-fest-add" onClick={() => setFestOpen(true)}>
+                  <Icon.star /> Marcar como festivo
+                </button>
+              )
+            ) : null}
+          </div>
 
           {Object.entries(d.shifts).map(([k, etiqueta]) => {
             const t = dia.shifts[k]

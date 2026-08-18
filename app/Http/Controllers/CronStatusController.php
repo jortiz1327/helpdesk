@@ -37,6 +37,8 @@ class CronStatusController extends Controller
                 ['name' => 'Envío de campañas',                   'schedule' => 'Cada minuto', 'last' => null],
                 ['name' => 'Cierre automático de tickets',        'schedule' => 'Cada día a las 03:30',
                  'last' => null, 'off' => (int) Setting::get('ticket_autoclose_days', '0') === 0],
+                ['name' => 'Avisos de SLA por correo',            'schedule' => 'Cada 5 minutos',
+                 'last' => null, 'off' => (string) Setting::get('sla_alerts_active', '1') !== '1'],
             ],
         ]);
     }

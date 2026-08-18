@@ -92,6 +92,9 @@ class TicketsController extends Controller
         $q = DB::table('tickets as t')
             ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
             ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
+            // Prioridad: trae su propio plazo de SLA (en minutos), que manda sobre el
+            // de la categoría. La clave es única, así que el join es 1:1 (no infla).
+            ->leftJoin('ticket_priorities as pri', 'pri.key', '=', 't.priority')
             ->leftJoin('users as u', 'u.id', '=', 't.assigned_to')
             // Los avisos de cron tienen su propio apartado: ni en la bandeja, ni en
             // los contadores, ni en las estadísticas de soporte.
@@ -332,6 +335,7 @@ class TicketsController extends Controller
                 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
                 'cat.name as category_name', 'cat.color as category_color',
                 'cat.sla_response_hours', 'cat.sla_resolve_hours', 't.sla_paused_minutes', 't.sla_paused_since',
+                'pri.sla_response_mins as pri_response_mins', 'pri.sla_resolve_mins as pri_resolve_mins',
                 'u.name as agent_name', 'u.email as agent_email',
                 't.last_direction',
             ]);
@@ -376,7 +380,7 @@ class TicketsController extends Controller
             }
             // Estado de los dos relojes del SLA (null si su categoría no tiene plazo).
             $t->sla = $sla->forTicket($t);
-            unset($t->first_response_at, $t->resolved_at, $t->opened_at, $t->sla_response_hours, $t->sla_resolve_hours, $t->sla_paused_minutes, $t->sla_paused_since);
+            unset($t->first_response_at, $t->resolved_at, $t->opened_at, $t->sla_response_hours, $t->sla_resolve_hours, $t->sla_paused_minutes, $t->sla_paused_since, $t->pri_response_mins, $t->pri_resolve_mins);
             return $t;
         });
 
@@ -593,6 +597,7 @@ class TicketsController extends Controller
             't.*', 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa', 'c.sede_id as contact_sede_id',
             'cat.name as category_name', 'cat.color as category_color',
             'cat.sla_response_hours', 'cat.sla_resolve_hours', 't.sla_paused_minutes', 't.sla_paused_since',
+            'pri.sla_response_mins as pri_response_mins', 'pri.sla_resolve_mins as pri_resolve_mins',
             'u.name as agent_name',
         ]);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
@@ -607,7 +612,7 @@ class TicketsController extends Controller
 
         // Estado del SLA (antes de ocultar los tiempos: se calcula a partir de ellos).
         $t->sla = app(SlaService::class)->forTicket($t);
-        unset($t->sla_response_hours, $t->sla_resolve_hours, $t->sla_paused_minutes, $t->sla_paused_since);
+        unset($t->sla_response_hours, $t->sla_resolve_hours, $t->sla_paused_minutes, $t->sla_paused_since, $t->pri_response_mins, $t->pri_resolve_mins);
 
         // Los tiempos no se envían a quien no puede verlos (ocultarlos en la UI no basta).
         if (!$me->can('tickets.view_times')) {
@@ -755,7 +760,7 @@ class TicketsController extends Controller
         // Canal WhatsApp: se responde por el número de SOPORTE (opción B). Va con
         // CANDADO por nivel: bloqueado hasta que haya número de soporte configurado.
         if ($t->channel === 'whatsapp') {
-            return $this->replyWhatsApp($t, $html, $me);
+            return $this->replyWhatsApp($t, $html, $me, $files);
         }
 
         // De momento el resto solo se responde por CORREO (los demás canales aún no envían).
@@ -845,7 +850,7 @@ class TicketsController extends Controller
      * pinta como candado / solo lectura). WhatsApp es texto plano; el HTML del editor
      * se aplana. El envío sale por `WhatsAppService::paraFuncion('soporte')`.
      */
-    protected function replyWhatsApp($t, string $html, $me)
+    protected function replyWhatsApp($t, string $html, $me, $files = [])
     {
         // Candado por nivel: necesita al menos el número de prueba de soporte.
         if ($g = \App\Services\GatingService::guard('wa_ticket_reply')) {
@@ -855,34 +860,116 @@ class TicketsController extends Controller
             return response()->json(['ok' => false, 'error' => 'El contacto no tiene número de WhatsApp'], 422);
         }
 
-        $texto = trim(HtmlSanitizer::toText($html));
-        if ($texto === '') {
+        // Se recopila el multimedia a enviar: adjuntos (clip) + imágenes EN LÍNEA del
+        // editor (botón imagen / pegar), que llegan dentro del HTML como <img src=".../inline/ID">.
+        $medios = $this->recopilarMediosWhatsapp($html, $files);
+        $texto  = trim(HtmlSanitizer::toText($html));
+
+        if (!$medios && $texto === '') {
             return response()->json(['ok' => false, 'error' => 'La respuesta está vacía'], 400);
         }
 
-        $wa = app(\App\Services\WhatsAppService::class)->paraFuncion('soporte');
-        [$code, $res] = $wa->sendText((string) $t->contact_wa, $texto);
-        if ($code < 200 || $code >= 300) {
-            // La ventana de 24 h de WhatsApp: fuera de ella Meta rechaza el texto libre
-            // (habría que enviar una plantilla). Se muestra el motivo real de Meta.
-            $err = $res['error']['message'] ?? 'No se pudo enviar por WhatsApp';
-            return response()->json(['ok' => false, 'error' => $err], 422);
-        }
-
-        // Se guarda como saliente del hilo (mismo ticket). storeMessage con autor humano
-        // marca la primera respuesta (pasa el ticket a «en progreso») igual que el correo.
-        $mid = \App\Services\ChatService::storeMessage($t->contact_id, (string) $t->contact_wa, 'out', 'text', nl2br(e($texto)), [
+        $wa   = app(\App\Services\WhatsAppService::class)->paraFuncion('soporte');
+        $to   = (string) $t->contact_wa;
+        $base = [
             'ticket_id'      => $t->id,
             'channel'        => 'whatsapp',
             'funcion'        => 'soporte',   // respuesta de soporte: va al Helpdesk, no a Campañas
             'status'         => 'sent',
-            'is_html'        => true,
-            'wamid'          => $res['messages'][0]['id'] ?? null,
             'author_user_id' => $me->id,
-        ]);
+        ];
+        $ultimoId = null;
+
+        if ($medios) {
+            // El texto acompaña a la PRIMERA imagen/vídeo como pie (comportamiento nativo
+            // de WhatsApp). El resto de medios van sueltos. Los documentos no llevan pie.
+            foreach ($medios as $i => $md) {
+                $type    = $this->tipoMediaPorMime($md['mime']);
+                $caption = ($i === 0 && $type !== 'document') ? $texto : '';
+
+                [$uc, $ur] = $wa->uploadMedia($md['path'], $md['mime'], $md['name']);
+                $mediaId   = $ur['id'] ?? null;
+                if (!$mediaId) {
+                    $err = $ur['error']['message'] ?? 'No se pudo subir el archivo a WhatsApp';
+                    return response()->json(['ok' => false, 'error' => $err], 422);
+                }
+
+                [$code, $res] = $wa->sendMedia($to, $type, $mediaId, $caption, $type === 'document' ? $md['name'] : null);
+                if ($code < 200 || $code >= 300) {
+                    $err = $res['error']['message'] ?? 'No se pudo enviar por WhatsApp';
+                    return response()->json(['ok' => false, 'error' => $err], 422);
+                }
+
+                $body = $caption !== '' ? nl2br(e($caption)) : ($type === 'document' ? e($md['name']) : '');
+                $ultimoId = \App\Services\ChatService::storeMessage($t->contact_id, $to, 'out', $type, $body, $base + [
+                    'is_html'    => $caption !== '',
+                    'wamid'      => $res['messages'][0]['id'] ?? null,
+                    'media_url'  => $mediaId,
+                    'media_mime' => $md['mime'],
+                ]);
+            }
+        } else {
+            // Solo texto (comportamiento clásico).
+            [$code, $res] = $wa->sendText($to, $texto);
+            if ($code < 200 || $code >= 300) {
+                // La ventana de 24 h de WhatsApp: fuera de ella Meta rechaza el texto libre.
+                $err = $res['error']['message'] ?? 'No se pudo enviar por WhatsApp';
+                return response()->json(['ok' => false, 'error' => $err], 422);
+            }
+            $ultimoId = \App\Services\ChatService::storeMessage($t->contact_id, $to, 'out', 'text', nl2br(e($texto)), $base + [
+                'is_html' => true,
+                'wamid'   => $res['messages'][0]['id'] ?? null,
+            ]);
+        }
+
         $this->tickets->broadcast('message', (int) $t->id);
 
-        return response()->json(['ok' => true, 'id' => $mid]);
+        return response()->json(['ok' => true, 'id' => $ultimoId]);
+    }
+
+    /**
+     * Reúne el multimedia de una respuesta de WhatsApp: los ficheros adjuntos (clip)
+     * y las imágenes EN LÍNEA del editor, que viajan en el HTML como <img src=".../inline/ID">
+     * apuntando a la tabla inline_uploads. Devuelve [['path','mime','name'], ...] en orden.
+     */
+    protected function recopilarMediosWhatsapp(string $html, $files): array
+    {
+        $medios = [];
+
+        foreach ((array) $files as $f) {
+            if ($f && $f->isValid()) {
+                $medios[] = [
+                    'path' => $f->getRealPath(),
+                    'mime' => $f->getClientMimeType() ?: 'application/octet-stream',
+                    'name' => $f->getClientOriginalName() ?: 'archivo',
+                ];
+            }
+        }
+
+        // Imágenes en línea del editor: /inline/ID (con o sin prefijo /api).
+        if (preg_match_all('#/inline/(\d+)#', $html, $mm)) {
+            foreach (array_unique($mm[1]) as $iid) {
+                $row = \Illuminate\Support\Facades\DB::table('inline_uploads')->find((int) $iid);
+                if ($row && \Illuminate\Support\Facades\Storage::disk('local')->exists($row->path)) {
+                    $medios[] = [
+                        'path' => \Illuminate\Support\Facades\Storage::disk('local')->path($row->path),
+                        'mime' => $row->mime ?: 'application/octet-stream',
+                        'name' => basename($row->path),
+                    ];
+                }
+            }
+        }
+
+        return $medios;
+    }
+
+    /** Traduce el MIME a uno de los tipos de mensaje de WhatsApp. */
+    protected function tipoMediaPorMime(string $mime): string
+    {
+        if (str_starts_with($mime, 'image/')) return 'image';
+        if (str_starts_with($mime, 'video/')) return 'video';
+        if (str_starts_with($mime, 'audio/')) return 'audio';
+        return 'document';
     }
 
     /**

@@ -11,11 +11,13 @@ use Illuminate\Support\Carbon;
  *                  Para el reloj en cuanto se responde, aunque el ticket siga vivo.
  *   · RESOLUCIÓN — desde que se abre hasta que queda resuelto o cerrado.
  *
- * Los plazos son por CATEGORÍA y se cuentan en horas laborables
- * (ver [[BusinessHoursService]]): un plazo de 4 h no vence de madrugada.
+ * El plazo de cada reloj sale de la PRIORIDAD (en minutos) y, si esa prioridad no
+ * tiene plazo propio, de la CATEGORÍA (en horas). Se cuentan en horas laborables
+ * (ver [[BusinessHoursService]]): un plazo de 4 h no vence de madrugada, y uno de
+ * 15 min de un caso grave se mide igual sobre el horario de atención.
  *
- * Un ticket sin categoría, o cuya categoría no tiene plazo, simplemente no tiene
- * SLA: no se inventa uno.
+ * Un ticket sin plazo por ninguna de las dos vías simplemente no tiene SLA: no se
+ * inventa uno.
  */
 class SlaService
 {
@@ -45,17 +47,30 @@ class SlaService
         return [
             'response' => $this->reloj(
                 $inicio,
-                $t->sla_response_hours ?? null,
+                $this->plazoMinutos($t->pri_response_mins ?? null, $t->sla_response_hours ?? null),
                 $this->aCarbon($t->first_response_at ?? null),
                 $pausado,
             ),
             'resolve' => $this->reloj(
                 $inicio,
-                $t->sla_resolve_hours ?? null,
+                $this->plazoMinutos($t->pri_resolve_mins ?? null, $t->sla_resolve_hours ?? null),
                 $this->aCarbon($t->resolved_at ?? null) ?: $this->aCarbon($t->closed_at ?? null),
                 $pausado,
             ),
         ];
+    }
+
+    /**
+     * Plazo efectivo de un reloj, en MINUTOS. La PRIORIDAD manda: si trae plazo propio
+     * (en minutos) se usa ese; si no, se cae al de la CATEGORÍA (que va en horas). Así
+     * un caso grave puede exigir respuesta en minutos y lo ya configurado por categoría
+     * sigue valiendo para el resto.
+     */
+    protected function plazoMinutos($prioMin, $catHoras): int
+    {
+        $p = (int) ($prioMin ?? 0);
+        if ($p > 0) return $p;
+        return (int) ($catHoras ?? 0) * 60;
     }
 
     /** ¿Está encendido el SLA? Se consulta mucho, así que se recuerda en la petición. */
@@ -87,17 +102,18 @@ class SlaService
      *   ok     → corriendo, con margen        warn   → corriendo, queda poco
      *   late   → corriendo y ya vencido
      */
-    protected function reloj(Carbon $inicio, $horas, ?Carbon $cumplido, int $pausado = 0): ?array
+    protected function reloj(Carbon $inicio, $minutos, ?Carbon $cumplido, int $pausado = 0): ?array
     {
-        $horas = (int) ($horas ?? 0);
-        if ($horas <= 0) return null;   // sin plazo configurado: no hay SLA
+        $minutos = (int) ($minutos ?? 0);
+        if ($minutos <= 0) return null;   // sin plazo configurado: no hay SLA
 
         /*
          * El vencimiento se corre hacia adelante tanto como haya estado el reloj
          * parado. Se suma en el propio cálculo de horario laborable —no como días
          * naturales— para que la noche y el fin de semana no se cuenten dos veces.
+         * El motor de horario razona en horas, así que los minutos se pasan a horas.
          */
-        $vence = $this->horario->limite($inicio->copy(), $horas + ($pausado / 60));
+        $vence = $this->horario->limite($inicio->copy(), ($minutos + $pausado) / 60);
 
         if ($cumplido) {
             return [
@@ -114,7 +130,7 @@ class SlaService
         $restan  = $vencido ? -$this->horario->minutosEntre($vence, $ahora)
                             :  $this->horario->minutosEntre($ahora, $vence);
 
-        $umbral = (int) round($horas * 60 * self::AVISO_DESDE);
+        $umbral = (int) round($minutos * self::AVISO_DESDE);
 
         return [
             'state' => $vencido ? 'late' : ($restan <= $umbral ? 'warn' : 'ok'),

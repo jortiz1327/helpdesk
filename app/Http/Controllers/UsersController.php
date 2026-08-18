@@ -27,18 +27,42 @@ class UsersController extends Controller
             $userCats = DB::table('user_ticket_categories')->get()
                 ->groupBy('user_id')->map(fn ($rows) => $rows->pluck('category_id')->map('intval')->all());
 
-            $users = User::with('roles')->orderBy('id')->get()->map(function ($u) use ($labels, $userCats) {
-                $role = $u->getRoleNames()->first();
-                return [
-                    'id'           => (int) $u->id,
-                    'name'         => $u->name,
-                    'email'        => $u->email,
-                    'role'         => $role,
-                    'role_label'   => $role ? ($labels[$role] ?: $role) : '—',
-                    'category_ids' => $userCats[$u->id] ?? [],
-                    'created_at'   => $u->created_at,
-                ];
-            });
+            // Estadísticas por agente, cada una en UNA consulta agrupada (no N+1).
+            $abiertos = \App\Services\TicketService::OPEN_STATUSES;
+            $asignados = DB::table('tickets')->whereIn('status', $abiertos)->where('channel', '!=', 'cron')
+                ->whereNotNull('assigned_to')->select('assigned_to', DB::raw('COUNT(*) n'))
+                ->groupBy('assigned_to')->pluck('n', 'assigned_to');
+            $resueltos = DB::table('tickets')->whereNotNull('resolved_at')->where('resolved_at', '>=', now()->subDays(7))
+                ->select('assigned_to', DB::raw('COUNT(*) n'))->groupBy('assigned_to')->pluck('n', 'assigned_to');
+            // SLA vencido de sus tickets abiertos (vencimiento pasado, respuesta aún sin dar o resolución fuera de plazo).
+            $vencidos = DB::table('tickets')->whereIn('status', $abiertos)->whereNotNull('assigned_to')
+                ->where(fn ($q) => $q->where('sla_resolve_due_at', '<', now())
+                    ->orWhere(fn ($w) => $w->whereNull('first_response_at')->where('sla_response_due_at', '<', now())))
+                ->select('assigned_to', DB::raw('COUNT(*) n'))->groupBy('assigned_to')->pluck('n', 'assigned_to');
+            // Última actividad registrada de cada usuario (para el estado «en línea»).
+            $ultima = DB::table('activity_log')->whereNotNull('user_id')
+                ->select('user_id', DB::raw('MAX(created_at) last'))->groupBy('user_id')->pluck('last', 'user_id');
+
+            $users = User::with('roles')->orderBy('id')->get()
+                ->map(function ($u) use ($labels, $userCats, $asignados, $resueltos, $vencidos, $ultima) {
+                    $role = $u->getRoleNames()->first();
+                    return [
+                        'id'           => (int) $u->id,
+                        'name'         => $u->name,
+                        'email'        => $u->email,
+                        'role'         => $role,
+                        'role_label'   => $role ? ($labels[$role] ?: $role) : '—',
+                        'category_ids' => $userCats[$u->id] ?? [],
+                        'view_all'     => $u->can('tickets.view_all'),
+                        'notify_sla'      => (bool) $u->notify_sla,
+                        'notify_assigned' => (bool) $u->notify_assigned,
+                        'assigned'     => (int) ($asignados[$u->id] ?? 0),
+                        'resolved_7d'  => (int) ($resueltos[$u->id] ?? 0),
+                        'sla_late'     => (int) ($vencidos[$u->id] ?? 0),
+                        'last_activity' => $ultima[$u->id] ?? null,
+                        'created_at'   => $u->created_at,
+                    ];
+                });
 
             return response()->json([
                 'ok'         => true,
@@ -83,6 +107,8 @@ class UsersController extends Controller
 
                 $target->name = $name ?: null;
                 $target->email = $email;
+                $target->notify_sla = $request->boolean('notify_sla', true);
+                $target->notify_assigned = $request->boolean('notify_assigned', true);
                 if ($pass !== '') $target->password = $pass; // el cast 'hashed' lo cifra
                 $target->save();
                 $target->syncRoles([$role]);
@@ -99,6 +125,8 @@ class UsersController extends Controller
                 'password' => Hash::make($pass),
                 'name'     => $name ?: null,
                 'email'    => $email,
+                'notify_sla'      => $request->boolean('notify_sla', true),
+                'notify_assigned' => $request->boolean('notify_assigned', true),
             ]);
             $new->syncRoles([$role]);
             $this->syncCategories($new->id, $request->input('category_ids', []));

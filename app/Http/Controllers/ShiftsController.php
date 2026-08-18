@@ -149,8 +149,12 @@ class ShiftsController extends Controller
         $notas = DB::table('shift_notes')->whereBetween('date', [$ini->format('Y-m-d'), $fin->format('Y-m-d')])
             ->pluck('note', 'date');
 
+        // Los festivos son la MISMA tabla que Configuración → Horarios (única fuente).
+        // Se trae también el id para poder quitarlos con el atajo desde esta pantalla,
+        // y se indexan por fecha. Un festivo puede no tener nombre: la bandera es el id.
         $festivos = DB::table('holidays')->whereBetween('date', [$ini->format('Y-m-d'), $fin->format('Y-m-d')])
-            ->pluck('name', 'date');
+            ->get(['id', 'date', 'name'])
+            ->keyBy(fn ($h) => substr((string) $h->date, 0, 10));
 
         $dias = [];
         for ($d = $ini->copy(); $d->lte($fin); $d->addDay()) {
@@ -219,7 +223,8 @@ class ShiftsController extends Controller
                 'week'    => $semana,
                 'today'   => $d->isToday(),
                 'past'    => $d->isBefore(Carbon::today()),
-                'holiday' => $festivos[$iso] ?? null,
+                'holiday'    => isset($festivos[$iso]) ? ($festivos[$iso]->name ?: '') : null,  // nombre; '' = festivo sin motivo
+                'holiday_id' => $festivos[$iso]->id ?? null,                                     // bandera + para borrarlo
                 'note'    => $notas[$iso] ?? null,
                 'shifts'  => $turnos,
             ];

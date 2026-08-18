@@ -52,12 +52,18 @@ class TicketPrioritiesController extends Controller
         $color  = (string) $request->input('color', '#64748b');
         if (!preg_match('/^#[0-9a-f]{6}$/i', $color)) $color = '#64748b';
 
+        // Plazos de SLA de la prioridad, en MINUTOS. 0 o vacío = sin plazo propio
+        // (ese reloj caerá al plazo de la categoría, si la tiene).
+        $min = fn ($v) => ($n = (int) $v) > 0 ? $n : null;
+
         $data = [
             'key'      => $key,
             'name'     => mb_substr($name, 0, 60),
             'color'    => $color,
             'position' => (int) $request->input('position', 0),
             'active'   => filter_var($request->input('active', true), FILTER_VALIDATE_BOOLEAN),
+            'sla_response_mins' => $min($request->input('sla_response_mins')),
+            'sla_resolve_mins'  => $min($request->input('sla_resolve_mins')),
         ];
 
         DB::transaction(function () use ($request, $cur, $data) {
