@@ -134,6 +134,9 @@ Route::middleware('token')->group(function () {
     // Preguntas frecuentes del portal (crear/editar/ordenar/publicar)
     Route::match(['get', 'post'], 'faqs.php', [FaqsController::class, 'handle'])
         ->middleware('can:support.config');
+    // Documentos de la base de conocimiento de la IA (internos; PDF/TXT/MD/CSV o texto pegado)
+    Route::match(['get', 'post'], 'knowledge.php', [\App\Http\Controllers\KnowledgeController::class, 'handle'])
+        ->middleware('can:support.config');
     // Ajustes del ticket (estado por defecto, bloqueo de agentes, auto-cierre, seguridad)
     Route::match(['get', 'post'], 'ticket_settings.php', [TicketSettingsController::class, 'handle'])
         ->middleware('can:support.config');
@@ -165,6 +168,9 @@ Route::middleware('token')->group(function () {
     Route::post('send_media.php', [SendMediaController::class, 'handle'])->middleware('can:tickets.reply');
     // Subir imagen en línea del editor (devuelve su URL firmada)
     Route::post('inline_media.php', [InlineImageController::class, 'upload'])->middleware('can:tickets.reply');
+    // Agente de IA: borrador de respuesta a demanda para un ticket (modo borrador).
+    Route::match(['get', 'post'], 'ai_draft.php', [\App\Http\Controllers\AiDraftController::class, 'handle'])
+        ->middleware('can:tickets.reply');
 
     // --- Contactos y etiquetas ---
     Route::match(['get', 'post'], 'contacts.php', [ContactsController::class, 'handle'])
@@ -209,6 +215,9 @@ Route::middleware('token')->group(function () {
         ->middleware('can:settings.manage');
     // Números de WhatsApp (opción B: enrutado por número). Solo superadmin.
     Route::match(['get', 'post'], 'whatsapp_numbers.php', [\App\Http\Controllers\WhatsAppNumbersController::class, 'handle'])
+        ->middleware('can:settings.manage');
+    // Agente de IA (Claude) del WhatsApp de soporte — Bloque 1: ajustes + candado.
+    Route::match(['get', 'post'], 'ai_settings.php', [\App\Http\Controllers\AiSettingsController::class, 'handle'])
         ->middleware('can:settings.manage');
     Route::match(['get', 'post', 'delete'], 'users.php', [UsersController::class, 'handle'])
         ->middleware('can:users.manage');

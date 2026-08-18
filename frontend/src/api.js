@@ -457,6 +457,27 @@ export const api = {
   testWaNumber: (id) => req('whatsapp_numbers.php?action=test', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
+  // Base de conocimiento de la IA (documentos internos).
+  listKnowledge: () => req('knowledge.php'),
+  getKnowledge: (id) => req('knowledge.php?action=get&id=' + id),
+  saveKnowledgeText: (payload) => req('knowledge.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
+  uploadKnowledge: (file, title = '') => {
+    const fd = new FormData(); fd.append('file', file); if (title) fd.append('title', title)
+    return req('knowledge.php?action=upload', { method: 'POST', body: fd })
+  },
+  deleteKnowledge: (id) => req('knowledge.php?action=delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+  // Agente de IA (Claude) del WhatsApp de soporte.
+  aiDraft: (ticketId) => req('ai_draft.php?action=suggest', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id: ticketId }),
+  }),
+  aiSettings: () => req('ai_settings.php'),
+  saveAiSettings: (payload) => req('ai_settings.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
 
   // Autenticación
   me: () => req('auth.php?action=me'),

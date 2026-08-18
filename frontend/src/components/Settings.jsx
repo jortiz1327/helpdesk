@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
 import WhatsAppNumbers from './WhatsAppNumbers.jsx'
+import AiSettings from './AiSettings.jsx'
 
 const FIELDS = ['business_name', 'wa_phone_number_id', 'wa_business_id', 'wa_app_id', 'wa_token', 'wa_app_secret', 'wa_verify_token', 'consent_message']
 
@@ -74,6 +75,9 @@ export default function Settings() {
               Aquí se configura TODO (token, App Secret, WABA…) por número; el viejo
               bloque global «Conexión con Meta» se retiró por redundante. */}
           <WhatsAppNumbers />
+
+          {/* Agente de IA (Claude) para el WhatsApp de soporte. */}
+          <AiSettings />
 
           <div className="card">
             <h2>Webhook</h2>

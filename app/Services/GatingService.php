@@ -79,7 +79,25 @@ class GatingService
             ]];
         }
 
+        /*
+         * CANDADO DEL AGENTE DE IA (Claude): sin clave de API el agente no puede
+         * pensar ni redactar. Se desbloquea solo al poner la clave en
+         * Configuración → Agente IA.
+         */
+        if (!self::iaConfigurada()) {
+            $f['ia_use'] = ['title' => 'Respuestas del agente de IA', 'reasons' => [
+                'El agente de IA todavía no tiene clave de API configurada.',
+                'Pega tu clave de Anthropic en Configuración → Agente IA para activarlo.',
+            ]];
+        }
+
         return $f;
+    }
+
+    /** ¿El agente de IA tiene clave de API? */
+    public static function iaConfigurada(): bool
+    {
+        return (string) Setting::get('ia_api_key', '') !== '';
     }
 
     /** El número de WhatsApp de SOPORTE con credenciales, o null. */
