@@ -39,7 +39,9 @@ class ClaudeBrain
         $ctx = $this->contexto($ticketId);
         if (!$ctx) return ['ok' => false, 'error' => 'No se encontró el ticket.'];
 
-        $foto     = $this->ultimaFotoEntrante($ticketId);
+        // El «lote» a contestar: los mensajes del cliente DESDE nuestra última respuesta
+        // (los que aún no hemos contestado), del mismo día, con su texto unido y su foto.
+        $lote     = $this->loteCliente($ticketId);
         $sqActivo = SoporteQaClient::activo();
 
         /*
@@ -47,8 +49,8 @@ class ClaudeBrain
          * Lee el código + responde. Independiente de la clave de Claude. Si no puede,
          * avisa y NO redacta.
          */
-        if ($foto && $sqActivo) {
-            return $this->viaSoporteQa($ctx, $foto);
+        if ($lote['tiene_foto'] && $sqActivo) {
+            return $this->viaSoporteQa($ctx, $lote);
         }
 
         $hayClave = GatingService::iaConfigurada();
@@ -65,7 +67,7 @@ class ClaudeBrain
          * vez del ejemplo «simulado». (Con clave de Claude, el texto lo redacta Claude.)
          */
         if (!$hayClave && $sqActivo) {
-            return $this->viaSoporteQa($ctx, null);
+            return $this->viaSoporteQa($ctx, $lote);
         }
 
         // SIN clave (ni soporteQA) → simulado (para probar el flujo sin gastar).
@@ -173,46 +175,76 @@ class ClaudeBrain
     // ------------------------------------------------------- cerebro para fotos
 
     /**
-     * La última FOTO entrante del cliente entre los mensajes recientes (para no coger
-     * una foto vieja cuando la consulta actual ya es de texto). null si no hay.
+     * El «lote» del cliente a contestar: sus mensajes DESDE nuestra última respuesta
+     * (los que siguen sin contestar) y, de esos, solo los del MISMO DÍA que el último
+     * (para no arrastrar una consulta vieja de otro día). Junta el texto en uno y
+     * localiza la foto. Como los flujos de campañas: distingue texto / foto / ambas.
+     *
+     * @return array{texto:string, foto:?object, tiene_texto:bool, tiene_foto:bool, n:int}
      */
-    private function ultimaFotoEntrante(int $ticketId): ?object
+    private function loteCliente(int $ticketId): array
     {
-        $recientes = DB::table('messages')
-            ->where('ticket_id', $ticketId)
-            ->orderByDesc('id')->limit(6)
-            ->get(['direction', 'media_mime', 'media_url', 'body']);
+        // ¿Cuál fue nuestra última respuesta? A partir de ahí cuenta lo del cliente.
+        $ultOut = DB::table('messages')->where('ticket_id', $ticketId)
+            ->where('direction', 'out')->max('id');
 
-        foreach ($recientes as $m) {
-            if ($m->direction === 'in' && $m->media_mime
-                && str_starts_with((string) $m->media_mime, 'image/') && $m->media_url) {
-                return $m;
-            }
+        $q = DB::table('messages')->where('ticket_id', $ticketId)
+            ->where('direction', 'in')->where('is_internal_note', 0);
+        if ($ultOut) $q->where('id', '>', $ultOut);
+
+        $entrantes = $q->orderBy('id')->get(['id', 'body', 'media_url', 'media_mime', 'created_at']);
+        if ($entrantes->isEmpty()) {
+            return ['texto' => '', 'foto' => null, 'tiene_texto' => false, 'tiene_foto' => false, 'n' => 0];
         }
-        return null;
+
+        // Solo los del MISMO DÍA que el último mensaje del cliente.
+        $dia   = substr((string) $entrantes->last()->created_at, 0, 10);
+        $batch = $entrantes->filter(fn ($m) => substr((string) $m->created_at, 0, 10) === $dia)->values();
+
+        $textos = [];
+        $foto   = null;
+        foreach ($batch as $m) {
+            if ($m->media_mime && str_starts_with((string) $m->media_mime, 'image/') && $m->media_url) {
+                $foto = $m;   // varias fotos → nos quedamos con la ÚLTIMA (la más reciente)
+            }
+            $t = $this->aTexto((string) $m->body);   // el pie de una foto también cuenta como texto
+            if ($t !== '') $textos[] = $t;
+        }
+        $texto = trim(implode("\n", $textos));
+
+        return [
+            'texto'       => $texto,
+            'foto'        => $foto,
+            'tiene_texto' => $texto !== '',
+            'tiene_foto'  => $foto !== null,
+            'n'           => count($batch),
+        ];
     }
 
     /**
-     * Genera el borrador delegando en soporteQA. Con foto ($foto != null): descarga la
-     * imagen y la manda junto a la pregunta (lee el código + responde). Sin foto: manda
-     * solo la pregunta (base44 responde FAQs por texto). La sede va como `hotel` y la
-     * categoría como `context`. Si soporteQA no responde, avisa (ok=false) y NO redacta.
+     * Genera el borrador delegando en soporteQA a partir del LOTE del cliente (texto
+     * unido + foto). Detecta el modo y usa la función de la API que toca:
+     *   · solo texto → question           · solo foto → image_base64
+     *   · ambas      → question + image_base64
+     * La sede va como `hotel` y la categoría como `context`. Si no responde, avisa
+     * (ok=false) y NO redacta. Nada de inventar.
      */
-    private function viaSoporteQa(array $ctx, ?object $foto): array
+    private function viaSoporteQa(array $ctx, array $lote): array
     {
-        // La pregunta: el pie de la foto, si no el último texto del cliente, si no el asunto.
-        $pregunta = $foto ? $this->aTexto((string) $foto->body) : '';
-        if ($pregunta === '') $pregunta = $this->ultimoCliente($ctx);
-        if ($pregunta === '') $pregunta = $ctx['subject'];
+        // El texto del lote es la pregunta. Si el lote es SOLO foto, no se inventa
+        // pregunta: se manda la imagen sola (base44 devuelve el código de la etiqueta).
+        $pregunta = $lote['texto'];
 
         // Bytes de la imagen, si hay foto. Por ahora solo WhatsApp (el canal del agente).
         // Si hay foto pero no se puede descargar, se sigue con solo texto (base44 responde igual).
         $b64 = null;
-        if ($foto && $ctx['channel'] === 'whatsapp') {
-            $bin = app(WhatsAppService::class)->mediaBinary((string) $foto->media_url);
+        if ($lote['foto'] && $ctx['channel'] === 'whatsapp') {
+            $bin = app(WhatsAppService::class)->mediaBinary((string) $lote['foto']->media_url);
             if ($bin && !empty($bin['binary'])) $b64 = base64_encode($bin['binary']);
         }
 
+        // Sin nada del cliente que mandar: cae al asunto como último recurso.
+        if ($pregunta === '' && !$b64) $pregunta = $ctx['subject'];
         if ($pregunta === '' && !$b64) {
             return ['ok' => false, 'error' => 'No hay ni pregunta ni foto legible que enviar a soporteQA. Escribe la respuesta a mano.'];
         }
