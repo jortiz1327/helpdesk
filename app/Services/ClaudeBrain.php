@@ -39,14 +39,15 @@ class ClaudeBrain
         $ctx = $this->contexto($ticketId);
         if (!$ctx) return ['ok' => false, 'error' => 'No se encontró el ticket.'];
 
+        $foto     = $this->ultimaFotoEntrante($ticketId);
+        $sqActivo = SoporteQaClient::activo();
+
         /*
-         * CEREBRO PARA FOTOS: si el cliente ha mandado una imagen recientemente y el
-         * lector soporteQA está activo, la respuesta la genera soporteQA (lee el código
-         * de la etiqueta + responde). Es independiente de la clave de Claude. Si falla o
-         * no puede leerla, se avisa y NO se redacta (decisión de negocio: nada de inventar).
+         * FOTO → siempre soporteQA (Claude no lee el código de barras de la etiqueta).
+         * Lee el código + responde. Independiente de la clave de Claude. Si no puede,
+         * avisa y NO redacta.
          */
-        $foto = $this->ultimaFotoEntrante($ticketId);
-        if ($foto && SoporteQaClient::activo()) {
+        if ($foto && $sqActivo) {
             return $this->viaSoporteQa($ctx, $foto);
         }
 
@@ -58,7 +59,16 @@ class ClaudeBrain
             return ['ok' => false, 'error' => 'El agente de IA está en pausa. Actívalo en Configuración → Agente de IA.'];
         }
 
-        // SIN clave → simulado (para probar el flujo sin gastar). CON clave → real.
+        /*
+         * TEXTO sin clave de Claude pero con soporteQA activo → lo responde soporteQA
+         * con su base de conocimiento (FAQs AEME). Así el botón da una respuesta REAL en
+         * vez del ejemplo «simulado». (Con clave de Claude, el texto lo redacta Claude.)
+         */
+        if (!$hayClave && $sqActivo) {
+            return $this->viaSoporteQa($ctx, null);
+        }
+
+        // SIN clave (ni soporteQA) → simulado (para probar el flujo sin gastar).
         if (!$hayClave) {
             $texto = $this->borradorSimulado($ctx);
             return ['ok' => true, 'modo' => 'simulado', 'texto' => $texto, 'avisos' => $this->avisos($texto)];
@@ -183,25 +193,28 @@ class ClaudeBrain
     }
 
     /**
-     * Genera el borrador delegando en soporteQA: descarga la foto, la manda con la
-     * pregunta del cliente y la sede como contexto, y usa su respuesta. Si no se puede
-     * leer o soporteQA no responde, devuelve un aviso (ok=false) y NO redacta.
+     * Genera el borrador delegando en soporteQA. Con foto ($foto != null): descarga la
+     * imagen y la manda junto a la pregunta (lee el código + responde). Sin foto: manda
+     * solo la pregunta (base44 responde FAQs por texto). La sede va como `hotel` y la
+     * categoría como `context`. Si soporteQA no responde, avisa (ok=false) y NO redacta.
      */
-    private function viaSoporteQa(array $ctx, object $foto): array
+    private function viaSoporteQa(array $ctx, ?object $foto): array
     {
         // La pregunta: el pie de la foto, si no el último texto del cliente, si no el asunto.
-        $pregunta = $this->aTexto((string) $foto->body);
+        $pregunta = $foto ? $this->aTexto((string) $foto->body) : '';
         if ($pregunta === '') $pregunta = $this->ultimoCliente($ctx);
         if ($pregunta === '') $pregunta = $ctx['subject'];
 
-        // Bytes de la imagen. Por ahora solo WhatsApp (el canal del agente).
+        // Bytes de la imagen, si hay foto. Por ahora solo WhatsApp (el canal del agente).
+        // Si hay foto pero no se puede descargar, se sigue con solo texto (base44 responde igual).
         $b64 = null;
-        if ($ctx['channel'] === 'whatsapp') {
+        if ($foto && $ctx['channel'] === 'whatsapp') {
             $bin = app(WhatsAppService::class)->mediaBinary((string) $foto->media_url);
             if ($bin && !empty($bin['binary'])) $b64 = base64_encode($bin['binary']);
         }
-        if (!$b64) {
-            return ['ok' => false, 'error' => 'No pude descargar la foto del cliente para leerla. Escribe la respuesta a mano.'];
+
+        if ($pregunta === '' && !$b64) {
+            return ['ok' => false, 'error' => 'No hay ni pregunta ni foto legible que enviar a soporteQA. Escribe la respuesta a mano.'];
         }
 
         $r = app(SoporteQaClient::class)->preguntar(
@@ -211,14 +224,14 @@ class ClaudeBrain
             $ctx['category'] ?: null,
         );
         if (!($r['ok'] ?? false)) {
-            return ['ok' => false, 'error' => ($r['error'] ?? 'soporteQA no pudo procesar la foto.') . ' Escribe la respuesta a mano.'];
+            return ['ok' => false, 'error' => ($r['error'] ?? 'soporteQA no pudo responder.') . ' Escribe la respuesta a mano.'];
         }
 
         $answer  = trim((string) ($r['answer'] ?? ''));
         $barcode = $r['barcode'] ?? null;
 
         if ($answer === '') {
-            $msg = 'soporteQA no generó una respuesta para la foto';
+            $msg = 'soporteQA no generó una respuesta';
             $msg .= $barcode ? " (código leído: {$barcode})." : '.';
             return ['ok' => false, 'error' => $msg . ' Escribe la respuesta a mano.'];
         }
@@ -228,6 +241,7 @@ class ClaudeBrain
             'modo'    => 'soporteqa',
             'texto'   => $answer,
             'barcode' => $barcode,
+            'foto'    => (bool) $b64,   // si de verdad se leyó una imagen
             'avisos'  => $this->avisos($answer),
         ];
     }
