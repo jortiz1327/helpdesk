@@ -480,6 +480,14 @@ export const api = {
   }),
   // Panel del webhook receptor del agente externo (URL + secreto + resultados).
   aiWebhook: () => req('ai_agent.php'),
+  // Memoria de respuestas efectivas: guardar ⭐ / sugerir parecidas / contar uso.
+  saveEffective: (ticket_id, message_id) => req('effective_responses.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id, message_id }),
+  }),
+  suggestEffective: (ticket_id) => req('effective_responses.php?action=suggest&ticket_id=' + ticket_id),
+  usedEffective: (id) => req('effective_responses.php?action=used', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
 
   // Autenticación
   me: () => req('auth.php?action=me'),

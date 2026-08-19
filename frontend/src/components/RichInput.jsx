@@ -95,6 +95,14 @@ const RichInput = forwardRef(function RichInput({
       onChange?.()
       area.current.focus()
     },
+    // Vuelca HTML tal cual (p. ej. una respuesta efectiva guardada, con su formato).
+    setHtml: (html) => {
+      if (!area.current) return
+      area.current.innerHTML = String(html || '')
+      setEmpty(!area.current.textContent.trim() && !area.current.querySelector('img'))
+      onChange?.()
+      area.current.focus()
+    },
   }))
 
   const exec = (cmd, arg) => { document.execCommand(cmd, false, arg ?? null); area.current?.focus(); setEmpty(!area.current?.textContent.trim()); onChange?.() }

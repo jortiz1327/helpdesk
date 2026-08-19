@@ -121,7 +121,7 @@ class ClaudeBrain
             ->leftJoin('sedes as s', 's.id', '=', 'c.sede_id')
             ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
             ->where('t.id', $ticketId)
-            ->first(['t.id', 't.subject', 't.channel', 'c.name as contact_name',
+            ->first(['t.id', 't.subject', 't.channel', 't.category_id', 'c.name as contact_name',
                      's.name as sede_name', 'cat.name as category_name']);
         if (!$t) return null;
 
@@ -149,6 +149,23 @@ class ClaudeBrain
             ->limit(30)->get(['title', 'content'])
             ->map(fn ($d) => ['t' => $d->title, 'c' => $this->aTexto((string) $d->content)])->all();
 
+        // MEMORIA DE RESPUESTAS EFECTIVAS: respuestas reales que funcionaron en casos
+        // parecidos (misma categoría + coincidencia de texto con el asunto/última consulta).
+        $ultCliente = '';
+        for ($i = count($hilo) - 1; $i >= 0; $i--) {
+            if ($hilo[$i]['dir'] === 'in') { $ultCliente = $hilo[$i]['texto']; break; }
+        }
+        $qEf = trim(((string) $t->subject) . ' ' . $ultCliente);
+        $efectivas = [];
+        if (mb_strlen($qEf) >= 3) {
+            $efectivas = DB::table('effective_responses')
+                ->whereRaw('MATCH(keywords) AGAINST(? IN NATURAL LANGUAGE MODE)', [$qEf])
+                ->when($t->category_id, fn ($qq) => $qq->orderByRaw('(category_id <=> ?) DESC', [$t->category_id]))
+                ->orderByDesc('uses')->limit(5)->get(['body'])
+                ->map(fn ($r) => $this->aTexto((string) $r->body))
+                ->filter(fn ($x) => $x !== '')->values()->all();
+        }
+
         return [
             'subject'      => (string) $t->subject,
             'channel'      => (string) $t->channel,
@@ -159,6 +176,7 @@ class ClaudeBrain
             'faqs'         => $faqs,
             'plantillas'   => $plantillas,
             'documentos'   => $docs,
+            'efectivas'    => $efectivas,   // respuestas reales que funcionaron en casos parecidos
             'personalidad' => (string) Setting::get('ia_personalidad', AiSettingsController::PERSONALIDAD_DEF),
         ];
     }
@@ -396,6 +414,14 @@ class ClaudeBrain
             $s .= "=== RESPUESTAS TIPO DEL EQUIPO (para inspirarte en el estilo) ===\n";
             foreach (array_slice($ctx['plantillas'], 0, 15) as $p) {
                 $s .= "· {$p['t']}: " . mb_substr($p['b'], 0, 300) . "\n";
+            }
+        }
+        if (!empty($ctx['efectivas'])) {
+            // Memoria aprendida: respuestas reales que YA funcionaron en casos parecidos.
+            // Son la mejor referencia; adáptalas al caso actual (sin copiar datos de otros clientes).
+            $s .= "\n=== RESPUESTAS QUE YA FUNCIONARON EN CASOS PARECIDOS (referencia fiable; adáptalas) ===\n";
+            foreach (array_slice($ctx['efectivas'], 0, 5) as $e) {
+                $s .= "· " . mb_substr($e, 0, 500) . "\n";
             }
         }
         return $s;

@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
+import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import RichInput from './RichInput.jsx'
 import LockTip from './LockTip.jsx'
@@ -11,13 +12,30 @@ const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
  * En los tickets de correo lleva además los DESTINATARIOS: quien venía en copia en
  * el hilo sigue en la conversación, así que se propone solo y el agente decide.
  */
-export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null }) {
+export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null, ticketId = null }) {
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
   const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
   const note = mode === 'note'
   const [sugiriendo, setSugiriendo] = useState(false)
   const [avisosIA, setAvisosIA] = useState([])   // guardarraíles: líneas rojas a revisar
+
+  /* Memoria de respuestas efectivas: las que funcionaron en casos PARECIDOS a este
+     ticket. Se cargan al abrir y el agente puede insertarlas con un clic. */
+  const [efectivas, setEfectivas] = useState([])
+  const [verEf, setVerEf] = useState(false)
+  useEffect(() => {
+    if (!ticketId) return
+    api.suggestEffective(ticketId).then((r) => setEfectivas(r?.items || [])).catch(() => setEfectivas([]))
+  }, [ticketId])
+  const insertarEfectiva = (e) => {
+    ed.current?.setHtml(e.body); setEmpty(false); setVerEf(false)
+    api.usedEffective(e.id).catch(() => {})
+  }
+  const tituloEf = (e) => {
+    const tmp = document.createElement('div'); tmp.innerHTML = e.body || ''
+    return (tmp.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90) || '(respuesta)'
+  }
 
   /* Pide a la IA un borrador y lo vuelca en el editor para que el agente lo revise.
      El padre (onAiSuggest) hace la llamada y avisa de errores; aquí solo insertamos. */
@@ -130,6 +148,26 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
             {sugiriendo ? <span className="cmp-ia-spin" /> : <span className="cmp-ia-star">✨</span>}
             {sugiriendo ? 'Pensando…' : 'Sugerir (IA)'}
           </button>
+        )}
+        {/* Respuestas efectivas parecidas: memoria de lo que funcionó en casos similares. */}
+        {!disabled && !bloqueoResp && !note && efectivas.length > 0 && (
+          <div className="cmp-ef">
+            <button type="button" className="cmp-ia" onClick={() => setVerEf((v) => !v)}
+              title="Respuestas que funcionaron en casos parecidos">
+              <Icon.bolt /> Parecidas ({efectivas.length})
+            </button>
+            {verEf && (
+              <div className="cmp-ef-menu">
+                <div className="cmp-ef-h">Respuestas que funcionaron en casos parecidos</div>
+                {efectivas.map((e) => (
+                  <button type="button" key={e.id} className="cmp-ef-item" onClick={() => insertarEfectiva(e)}>
+                    <span className="cmp-ef-tx">{tituloEf(e)}</span>
+                    {e.uses > 0 && <span className="cmp-ef-uses" title="veces reutilizada">{e.uses}×</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
         <span className="spacer" />
         <span className="cmp-hint">Ctrl + Enter</span>

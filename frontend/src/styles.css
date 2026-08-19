@@ -1435,6 +1435,22 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 
 /* Botón «Sugerir (IA)» del compositor */
 .cmp-ia { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); color: var(--ink-2); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: 0.14s; }
+.cmp-ia svg { width: 14px; height: 14px; fill: currentColor; }
+
+/* Estrella para guardar una respuesta enviada como «efectiva» */
+.tk-star { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 6px; border: 0; background: transparent; color: var(--ink-3); cursor: pointer; border-radius: 6px; vertical-align: middle; opacity: 0; transition: 0.14s; }
+.tk-bub:hover .tk-star { opacity: 1; }
+.tk-star:hover { background: rgba(244,183,64,0.18); color: var(--warn); }
+.tk-star svg { width: 14px; height: 14px; fill: currentColor; }
+
+/* Panel «respuestas parecidas que funcionaron» */
+.cmp-ef { position: relative; }
+.cmp-ef-menu { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 40; width: 340px; max-width: 78vw; max-height: 300px; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-lg, 0 12px 30px rgba(0,0,0,.18)); padding: 6px; }
+.cmp-ef-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); padding: 6px 8px 4px; }
+.cmp-ef-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 9px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--ink); }
+.cmp-ef-item:hover { background: var(--hover); }
+.cmp-ef-tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-ef-uses { flex: none; font-size: 11px; font-weight: 700; color: var(--primary); background: var(--primary-soft); padding: 1px 7px; border-radius: 999px; }
 .cmp-ia:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
 .cmp-ia:disabled { opacity: 0.6; cursor: default; }
 .cmp-ia-star { font-size: 13px; line-height: 1; }

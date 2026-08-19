@@ -174,6 +174,10 @@ Route::middleware('token')->group(function () {
     Route::post('send_media.php', [SendMediaController::class, 'handle'])->middleware('can:tickets.reply');
     // Subir imagen en línea del editor (devuelve su URL firmada)
     Route::post('inline_media.php', [InlineImageController::class, 'upload'])->middleware('can:tickets.reply');
+    // Memoria de respuestas efectivas: guardar ⭐ / sugerir parecidas / contar uso. Gestión
+    // (listar/borrar) la filtra el controlador con support.config.
+    Route::match(['get', 'post'], 'effective_responses.php', [\App\Http\Controllers\EffectiveResponsesController::class, 'handle'])
+        ->middleware('can:tickets.reply');
     // Agente de IA: borrador de respuesta a demanda para un ticket (modo borrador).
     Route::match(['get', 'post'], 'ai_draft.php', [\App\Http\Controllers\AiDraftController::class, 'handle'])
         ->middleware('can:tickets.reply');

@@ -975,6 +975,13 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
     return () => document.removeEventListener('keydown', h)
   }, [onClose])
 
+  // Guarda una respuesta SALIENTE como «respuesta efectiva» (memoria que se reutiliza).
+  const guardarEfectiva = async (messageId) => {
+    const r = await api.saveEffective(id, messageId)
+    if (r.ok) toast(r.dup ? 'Esa respuesta ya estaba guardada' : '⭐ Guardada como respuesta efectiva')
+    else toast(r.error || 'No se pudo guardar', 'err')
+  }
+
   const setStatus = async (status) => {
     // ¿Se cierra fuera de plazo? Hay que mirarlo ANTES: al resolver, el reloj para
     // y el estado pasa de «vencido» a «cumplido fuera de plazo».
@@ -1289,6 +1296,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                             : out
                               ? (m.author_name || 'Automático')
                               : (t.contact_name || 'Cliente')}
+                          {/* Guardar una respuesta buena en la memoria de respuestas efectivas. */}
+                          {out && !Number(m.is_internal_note) && (m.body || m.type === 'text') && (
+                            <button type="button" className="tk-star" title="Guardar como respuesta efectiva"
+                              onClick={() => guardarEfectiva(m.id)}><Icon.star /></button>
+                          )}
                         </div>
 
                         {/* Multimedia de WhatsApp (media_url = id de Meta; se baja por el proxy). */}
@@ -1402,6 +1414,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
               {/* El editor solo en la conversación (no en el historial). */}
               {view === 'chat' && !t.merged_into_id && (
                 <Composer
+                  ticketId={id}
                   // Destinatarios solo en correo: en WhatsApp no hay copias que valgan.
                   to={d.ticket.channel === 'email' ? d.ticket.contact_email : null}
                   ccSugerido={d.cc_sugerido || []}
