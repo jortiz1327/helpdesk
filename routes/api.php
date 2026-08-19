@@ -78,6 +78,12 @@ Route::get('inline/{id}', [InlineImageController::class, 'serve'])
 Route::get('attachment_inline/{id}', [AttachmentController::class, 'serveInline'])
     ->middleware('signed:relative')->name('attachment.inline')->whereNumber('id');
 
+// --- Webhook RECEPTOR de resultados de un agente externo (Workspace Agent, etc.) ---
+// PÚBLICO: lo llama el agente, sin token de agente; la auth es el secreto compartido
+// (?key= o cabecera X-Webhook-Secret), que valida el propio controlador. Con throttle.
+Route::post('ai_webhook.php', [\App\Http\Controllers\AiWebhookController::class, 'receive'])
+    ->middleware('throttle:300,1');
+
 /*
 | Rutas protegidas por token. Cada una declara el PERMISO que exige
 | (config/rbac.php). El superadministrador tiene bypass (Gate::before).
@@ -218,6 +224,9 @@ Route::middleware('token')->group(function () {
         ->middleware('can:settings.manage');
     // Agente de IA (Claude) del WhatsApp de soporte — Bloque 1: ajustes + candado.
     Route::match(['get', 'post'], 'ai_settings.php', [\App\Http\Controllers\AiSettingsController::class, 'handle'])
+        ->middleware('can:settings.manage');
+    // Panel del webhook receptor del agente externo: URL + secreto + últimos resultados.
+    Route::get('ai_agent.php', [\App\Http\Controllers\AiWebhookController::class, 'panel'])
         ->middleware('can:settings.manage');
     Route::match(['get', 'post', 'delete'], 'users.php', [UsersController::class, 'handle'])
         ->middleware('can:users.manage');
