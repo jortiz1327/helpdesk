@@ -478,6 +478,8 @@ export const api = {
   saveAiSettings: (payload) => req('ai_settings.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
+  // Panel del webhook receptor del agente externo (URL + secreto + resultados).
+  aiWebhook: () => req('ai_agent.php'),
 
   // Autenticación
   me: () => req('auth.php?action=me'),

@@ -4,6 +4,7 @@ import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
 import WhatsAppNumbers from './WhatsAppNumbers.jsx'
 import AiSettings from './AiSettings.jsx'
+import AiWebhookPanel from './AiWebhookPanel.jsx'
 
 const FIELDS = ['business_name', 'wa_phone_number_id', 'wa_business_id', 'wa_app_id', 'wa_token', 'wa_app_secret', 'wa_verify_token', 'consent_message']
 
@@ -78,6 +79,9 @@ export default function Settings() {
 
           {/* Agente de IA (Claude) para el WhatsApp de soporte. */}
           <AiSettings />
+
+          {/* Webhook receptor de resultados de un agente externo (asíncrono). */}
+          <AiWebhookPanel />
 
           <div className="card">
             <h2>Webhook</h2>
