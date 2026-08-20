@@ -309,6 +309,8 @@ class TicketService
         // $notify=false lo silencia: lo usa el cierre AUTOMÁTICO, que tiene su propio ajuste.
         if ($notify && in_array($status, ['resuelto', 'cerrado'], true)) {
             app(NotifyService::class)->ticket('ticket_closed', $ticketId);
+            // Encuesta de satisfacción por correo (si está activa y la plantilla también).
+            app(NotifyService::class)->csat($ticketId);
         }
 
         return true;

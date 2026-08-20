@@ -224,4 +224,69 @@ class PortalController extends Controller
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
+
+    /**
+     * Página de VALORACIÓN (CSAT) por URL FIRMADA, sin login. Se llega desde las estrellas
+     * del correo. `?score=N` (GET) guarda la nota; el `comment` (POST) guarda el comentario.
+     * Renderiza una página mínima de agradecimiento con las estrellas y una caja de comentario.
+     */
+    public function ratePage(Request $request, int $ticket)
+    {
+        $score   = (($s = (int) $request->query('score')) >= 1 && $s <= 5) ? $s : null;
+        $comment = $request->isMethod('post') ? (string) $request->input('comment', '') : null;
+
+        $aviso = null;
+        if ($score !== null || $comment !== null) {
+            [$ok, $err] = $this->portal->setRating($ticket, $score, $comment);
+            if (!$ok) $aviso = $err;
+        }
+
+        $r    = \Illuminate\Support\Facades\DB::table('ticket_ratings')->where('ticket_id', $ticket)->first(['score', 'comment']);
+        $code = (string) (\Illuminate\Support\Facades\DB::table('tickets')->where('id', $ticket)->value('code') ?? '');
+        $nota = (int) ($r->score ?? 0);
+
+        // Estrellas clicables (cada una re-valora con su nota) + acción firmada del comentario.
+        $exp = now()->addDays(30);
+        $estrellas = '';
+        for ($n = 1; $n <= 5; $n++) {
+            $url = e(\Illuminate\Support\Facades\URL::signedRoute('portal.rate', ['ticket' => $ticket, 'score' => $n], $exp, false));
+            $estrellas .= '<a href="' . $url . '" title="' . $n . '" style="text-decoration:none;font-size:36px;line-height:1;color:'
+                . ($n <= $nota ? '#e0a63a' : '#d5dae2') . ';">&#9733;</a>';
+        }
+        $accion = \Illuminate\Support\Facades\URL::signedRoute('portal.rate', ['ticket' => $ticket], $exp, false);
+
+        return response($this->csatHtml($code, $nota, (string) ($r->comment ?? ''), $comment !== null, $aviso, $estrellas, $accion))
+            ->header('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    /** Página HTML mínima y autocontenida de la valoración. */
+    private function csatHtml(string $code, int $nota, string $comment, bool $comentado, ?string $aviso, string $estrellas, string $accion): string
+    {
+        $c   = e($code);
+        $com = e($comment);
+        $act = e($accion);
+        $titulo   = $nota > 0 ? '¡Gracias por tu valoración!' : '¿Cómo valorarías nuestra atención?';
+        $avisoH   = $aviso ? '<p style="color:#c0392b;font-size:13px;margin:8px 0 0;">' . e($aviso) . '</p>' : '';
+        $graciasC = $comentado && $aviso === null ? '<p style="color:#0f9d6b;font-size:13px;margin:8px 0 0;">Comentario guardado, ¡gracias!</p>' : '';
+
+        return <<<HTML
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Valoración · $c</title></head>
+<body style="margin:0;background:#eef2f7;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#101a2c;">
+<div style="max-width:460px;margin:8vh auto;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(16,26,44,.1);padding:28px;text-align:center;">
+  <div style="font-size:13px;color:#8494a8;">Incidencia $c</div>
+  <h2 style="margin:6px 0 12px;font-size:20px;">$titulo</h2>
+  <div style="display:flex;justify-content:center;gap:6px;">$estrellas</div>
+  <div style="font-size:12px;color:#8494a8;margin-top:6px;">1 = muy insatisfecho · 5 = muy satisfecho</div>
+  $avisoH
+  $graciasC
+  <form method="post" action="$act" style="margin-top:16px;text-align:left;">
+    <label style="display:block;font-size:13px;color:#4a5a72;margin-bottom:6px;">¿Quieres añadir un comentario? (opcional)</label>
+    <textarea name="comment" rows="3" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #e3e8f0;border-radius:10px;font:inherit;font-size:14px;">$com</textarea>
+    <button type="submit" style="margin-top:10px;width:100%;padding:11px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Enviar comentario</button>
+  </form>
+  <div style="margin-top:16px;font-size:12px;color:#8494a8;">Atención al cliente · AEME Group</div>
+</div></body></html>
+HTML;
+    }
 }

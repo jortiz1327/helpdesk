@@ -517,6 +517,45 @@ class PortalService
     }
 
     /**
+     * Upsert de valoración POR TICKET, sin comprobar email/portal: lo usa el enlace
+     * FIRMADO del correo CSAT (la firma es la autorización). Guarda nota (1-5) y/o
+     * comentario. Respeta el interruptor CSAT y que el ticket esté resuelto/cerrado.
+     */
+    public function setRating(int $ticketId, ?int $score, ?string $comment): array
+    {
+        if (! self::csatActivo()) return [false, 'La encuesta no está disponible'];
+
+        $t = DB::table('tickets')->where('id', $ticketId)->first(['id', 'status']);
+        if (! $t) return [false, 'Incidencia no encontrada'];
+        if (! in_array($t->status, self::CSAT_STATUSES, true)) return [false, 'Esta incidencia todavía no admite valoración'];
+
+        $existe = DB::table('ticket_ratings')->where('ticket_id', $ticketId)->exists();
+
+        $fila = ['updated_at' => now()];
+        if ($score !== null) {
+            if ($score < 1 || $score > 5) return [false, 'Valoración fuera de rango'];
+            $fila['score'] = $score;
+        }
+        if ($comment !== null) {
+            $comment = trim($comment);
+            $fila['comment'] = $comment !== '' ? mb_substr($comment, 0, 2000) : null;
+        }
+        if (! $existe && $score === null) return [false, 'Primero elige una valoración'];
+        if (count($fila) === 1) return [true, null];   // nada que cambiar
+
+        if ($existe) {
+            DB::table('ticket_ratings')->where('ticket_id', $ticketId)->update($fila);
+        } else {
+            DB::table('ticket_ratings')->insert($fila + [
+                'ticket_id'  => $ticketId,
+                'comment'    => $fila['comment'] ?? null,
+                'created_at' => now(),
+            ]);
+        }
+        return [true, null];
+    }
+
+    /**
      * ESTADO por número (público, solo lectura). Se puede consultar sabiendo solo el
      * código —sin correo ni pase—, por eso NO devuelve nada sensible: ni asunto, ni
      * mensajes, ni el correo. Solo la fase (recibida/en proceso/resuelta) y las

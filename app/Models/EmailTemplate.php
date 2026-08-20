@@ -26,6 +26,7 @@ class EmailTemplate extends Model
         'ticket_assigned' => ['Ticket asignado', 'Aviso al AGENTE cuando se le asigna un ticket.'],
         'sla_warning'     => ['SLA por vencer',  'Aviso al AGENTE cuando un ticket suyo está a punto de incumplir el SLA.'],
         'sla_breach'      => ['SLA vencido',     'Aviso al AGENTE (y a los administradores) cuando un ticket incumple el SLA.'],
+        'csat_survey'     => ['Encuesta de satisfacción', 'Encuesta al CLIENTE al resolver su ticket. Usa {{valoracion}} para las estrellas clicables.'],
     ];
 
     /** Variables que se pueden usar en el asunto y el contenido. */
@@ -33,4 +34,7 @@ class EmailTemplate extends Model
 
     /** Variables extra disponibles SOLO en las plantillas de SLA. */
     public const VARS_SLA = ['{{reloj}}', '{{vence}}', '{{retraso}}'];
+
+    /** Variable extra SOLO en la plantilla de CSAT (las 5 estrellas clicables). */
+    public const VARS_CSAT = ['{{valoracion}}'];
 }

@@ -70,6 +70,10 @@ Route::match(['get', 'post'], 'portal.php', [\App\Http\Controllers\PortalControl
 Route::get('portal_file/{id}', [\App\Http\Controllers\PortalController::class, 'file'])
     ->middleware('signed:relative')->name('portal.file')->whereNumber('id');
 
+// Valoración (CSAT) por URL FIRMADA (desde las estrellas del correo, sin login).
+Route::match(['get', 'post'], 'portal_rate/{ticket}', [\App\Http\Controllers\PortalController::class, 'ratePage'])
+    ->middleware('signed:relative')->name('portal.rate')->whereNumber('ticket');
+
 // --- Imágenes en línea del editor: servir por URL FIRMADA (sin token, la firma es la auth) ---
 Route::get('inline/{id}', [InlineImageController::class, 'serve'])
     ->middleware('signed:relative')->name('inline.image')->whereNumber('id');

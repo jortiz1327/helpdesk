@@ -150,6 +150,69 @@ class NotifyService
     }
 
     /**
+     * Encuesta de satisfacción (CSAT) por correo al resolver/cerrar un ticket. Manda un
+     * correo al cliente con 5 estrellas clicables (enlace FIRMADO, 1-clic, sin login).
+     * Solo si: plantilla csat_survey activa + csat_active + el cliente tiene correo + el
+     * ticket está resuelto/cerrado + aún NO se ha valorado. Devuelve true si se envió.
+     */
+    public function csat(int $ticketId): bool
+    {
+        try {
+            if ((string) \App\Models\Setting::get('csat_active', '1') !== '1') return false;
+
+            $tpl = EmailTemplate::where('key', 'csat_survey')->where('active', true)->first();
+            if (!$tpl) return false;
+
+            $t = DB::table('tickets as t')
+                ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+                ->where('t.id', $ticketId)
+                ->first(['t.code', 't.subject', 't.status', 'c.name as contact_name', 'c.email as contact_email']);
+            if (!$t || !$t->contact_email) return false;
+            if (!in_array($t->status, ['resuelto', 'cerrado'], true)) return false;
+
+            // No repetir si ya valoró.
+            if (DB::table('ticket_ratings')->where('ticket_id', $ticketId)->exists()) return false;
+
+            $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
+            if (!$acc) return false;
+
+            $vars = [
+                '{{codigo}}'     => (string) $t->code,
+                '{{asunto}}'     => (string) $t->subject,
+                '{{cliente}}'    => (string) ($t->contact_name ?: 'cliente'),
+                '{{soporte}}'    => (string) ($acc->from_name ?: $acc->email),
+                '{{valoracion}}' => $this->estrellasCsat($ticketId),
+            ];
+            $subject = strtr($tpl->subject, $vars);
+            $body    = strtr($tpl->body, $vars);
+
+            $this->mail->sendMail($acc, mb_strtolower($t->contact_email), $t->contact_name, $subject, $body);
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('NotifyService CSAT: no se pudo enviar', ['ticket' => $ticketId, 'error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    /** HTML de las 5 estrellas clicables (cada una un enlace firmado a su nota). */
+    private function estrellasCsat(int $ticketId): string
+    {
+        $base = rtrim((string) config('app.url'), '/');
+        $exp  = now()->addDays(30);
+
+        $stars = '<table role="presentation" cellpadding="0" cellspacing="0"><tr>';
+        for ($n = 1; $n <= 5; $n++) {
+            $url = $base . \Illuminate\Support\Facades\URL::signedRoute('portal.rate', ['ticket' => $ticketId, 'score' => $n], $exp, false);
+            $stars .= '<td style="padding:0 4px;"><a href="' . e($url) . '" '
+                . 'style="display:inline-block;text-decoration:none;font-size:26px;line-height:1;color:#e0a63a;" '
+                . 'title="' . $n . ' de 5">&#9733;</a></td>';
+        }
+        $stars .= '</tr></table>';
+        $stars .= '<div style="font-size:12px;color:#888;margin-top:4px;">1 = muy insatisfecho · 5 = muy satisfecho</div>';
+        return $stars;
+    }
+
+    /**
      * Envía el aviso de un evento sobre un ticket. Devuelve true si se llegó a enviar.
      * $key: ticket_created | ticket_closed | ticket_assigned
      */
