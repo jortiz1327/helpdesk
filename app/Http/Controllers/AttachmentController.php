@@ -30,10 +30,18 @@ class AttachmentController extends Controller
         }
         [$path, $row] = $found;
 
-        // ¿Puede este usuario ver el ticket del adjunto?
+        // ¿Puede este usuario ver el ticket del adjunto? MISMO criterio que la bandeja
+        // (scope): con view_all, todos; si no, los de SUS categorías o los asignados a él.
+        // Antes solo miraba `assigned_to`, así que un agente recibía 403 al abrir los
+        // adjuntos de un ticket de su área que no tuviera asignado (imágenes rotas).
         if (!$me->can('tickets.view_all')) {
-            $assigned = DB::table('tickets')->where('id', $row->ticket_id)->value('assigned_to');
-            if ((int) $assigned !== (int) $me->id) {
+            $t = DB::table('tickets')->where('id', $row->ticket_id)->first(['assigned_to', 'category_id']);
+            $cats = array_map('intval', $me->categoryIds());
+            $puede = $t && (
+                (int) $t->assigned_to === (int) $me->id
+                || ($t->category_id && in_array((int) $t->category_id, $cats, true))
+            );
+            if (!$puede) {
                 return response()->json(['error' => 'Sin acceso a este adjunto'], 403);
             }
         }

@@ -217,6 +217,74 @@ function TicketLabels({ ticketId, initial }) {
 }
 
 /*
+ * Campos personalizados (globales) del ticket. Se definen en Configuración →
+ * Campos personalizados; aquí el agente rellena el valor de cada uno. Un solo
+ * botón «Guardar» manda todos. Si no hay campos activos, no se pinta nada.
+ */
+function TicketCustomFields({ ticketId, initial }) {
+  const toast = useToast()
+  const campos = initial || []
+  const inicial = () => Object.fromEntries(campos.map((c) => [c.id, c.value ?? '']))
+  const [vals, setVals] = useState(inicial)
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Al cambiar de ticket, recargar los valores de este.
+  useEffect(() => { setVals(inicial()); setDirty(false) }, [ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (campos.length === 0) return null
+
+  const set = (id, v) => { setVals((s) => ({ ...s, [id]: v })); setDirty(true) }
+
+  const guardar = async () => {
+    // Validación de obligatorios (los que no son sí/no).
+    const falta = campos.find((c) => c.required && c.type !== 'checkbox'
+      && (vals[c.id] === '' || vals[c.id] == null))
+    if (falta) { toast(`«${falta.label}» es obligatorio`, 'err'); return }
+    setSaving(true)
+    const r = await api.saveTicketFields(ticketId, vals)
+    setSaving(false)
+    if (r.ok) { toast('Campos guardados'); setDirty(false) } else toast(r.error || 'Error', 'err')
+  }
+
+  return (
+    <div className="tkm-block">
+      <div className="tkm-sec">Campos personalizados</div>
+      <div className="tk-cf">
+        {campos.map((c) => (
+          <label key={c.id} className="tk-cf-row">
+            <span className="tk-cf-lbl">{c.label}{c.required && <em> *</em>}</span>
+            {c.type === 'textarea' ? (
+              <textarea className="tk-cf-in" rows={2} value={vals[c.id] || ''} onChange={(e) => set(c.id, e.target.value)} />
+            ) : c.type === 'number' ? (
+              <input className="tk-cf-in" type="number" value={vals[c.id] || ''} onChange={(e) => set(c.id, e.target.value)} />
+            ) : c.type === 'date' ? (
+              <input className="tk-cf-in" type="date" value={vals[c.id] || ''} onChange={(e) => set(c.id, e.target.value)} />
+            ) : c.type === 'select' ? (
+              <Select value={vals[c.id] || ''} onChange={(v) => set(c.id, v)}
+                options={[{ value: '', label: '—' }, ...(c.options || []).map((o) => ({ value: o, label: o }))]} />
+            ) : c.type === 'checkbox' ? (
+              <span className="fb-switch">
+                <input type="checkbox" checked={String(vals[c.id]) === '1' || vals[c.id] === true}
+                  onChange={(e) => set(c.id, e.target.checked ? '1' : '0')} />
+                <span className={`fb-toggle ${String(vals[c.id]) === '1' || vals[c.id] === true ? 'on' : ''}`} />
+              </span>
+            ) : (
+              <input className="tk-cf-in" value={vals[c.id] || ''} onChange={(e) => set(c.id, e.target.value)} />
+            )}
+          </label>
+        ))}
+      </div>
+      {dirty && (
+        <button className="btn sm tk-cf-save" onClick={guardar} disabled={saving}>
+          {saving ? 'Guardando…' : 'Guardar campos'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/*
  * `initialTicket`: al llegar desde otra pantalla (p. ej. pinchando uno de los
  * «tickets recientes» del Centro de Soporte) se abre ESE ticket directamente, en
  * vez de dejar al usuario delante de la lista buscándolo otra vez.
@@ -635,9 +703,14 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         {/* Categoría editable en la propia tabla (como el asignar).
                             stopPropagation para que abrir el desplegable no abra el modal. */}
                         <td onClick={(e) => e.stopPropagation()}>
-                          <Select sm block value={t.category_id ? String(t.category_id) : ''}
-                            onChange={(v) => quickCategory(t.id, v)}
-                            options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
+                          {can('tickets.categorize') ? (
+                            <Select sm block value={t.category_id ? String(t.category_id) : ''}
+                              onChange={(v) => quickCategory(t.id, v)}
+                              options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
+                          ) : (
+                            (meta?.categories || []).find((c) => String(c.id) === String(t.category_id))?.name
+                              || <span className="tk-time">Sin categoría</span>
+                          )}
                         </td>
 
                         {/* Asignar sin abrir el ticket: un encargado reparte la cola de un vistazo.
@@ -1089,8 +1162,12 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                 <div className="tkm-row"><span>Referencia</span><b className="tk-code">{t.code}</b></div>
                 <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} /></div>
                 <div className="tkm-row"><span>Categoría</span>
-                  <Select value={t.category_id ? String(t.category_id) : ''} onChange={(v) => cambiarCategoria(v || null)}
-                    options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
+                  {can('tickets.categorize') ? (
+                    <Select value={t.category_id ? String(t.category_id) : ''} onChange={(v) => cambiarCategoria(v || null)}
+                      options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
+                  ) : (
+                    <b>{(meta?.categories || []).find((c) => String(c.id) === String(t.category_id))?.name || 'Sin categoría'}</b>
+                  )}
                 </div>
                 <div className="tkm-row"><span>Prioridad</span>
                   {prChip(t.priority, meta)}
@@ -1100,6 +1177,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
 
               {/* Etiquetas: cualquier agente puede ponerlas/quitarlas del catálogo. */}
               <TicketLabels ticketId={t.id} initial={t.labels} />
+
+              {/* Campos personalizados (globales), si hay definidos. */}
+              <TicketCustomFields ticketId={t.id} initial={t.custom_fields} />
 
               {/* Valoración del cliente (CSAT), si la dejó desde el portal. */}
               {t.rating && (

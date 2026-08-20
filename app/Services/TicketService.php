@@ -77,6 +77,31 @@ class TicketService
     }
 
     /**
+     * Inserta el ticket reservando su `code` de forma ATÓMICA. Dos altas a la vez
+     * (portal + correo) calcularían el mismo secuencial y una chocaría con el
+     * unique(code), perdiéndose. Se cubren los DOS modos de fallo de la concurrencia:
+     *   1) TRANSACCIÓN con reintentos (2º arg de DB::transaction): dentro de ella el
+     *      lockForUpdate de nextCode() serializa, y si el bloqueo de rango provoca un
+     *      DEADLOCK de InnoDB (SQLSTATE 40001), Laravel reintenta la transacción sola.
+     *   2) REINTENTO propio ante COLISIÓN de code (SQLSTATE 23000 = unique): recalcula
+     *      el número y vuelve a intentar. Red de seguridad final.
+     * Solo cubre la reserva del código + el INSERT: los correos y avisos quedan FUERA
+     * a propósito (nunca se envía nada dentro de una transacción).
+     */
+    protected function insertarConCodigo(array $fila): int
+    {
+        for ($intento = 1; ; $intento++) {
+            try {
+                return DB::transaction(fn () => DB::table('tickets')
+                    ->insertGetId(['code' => $this->nextCode()] + $fila), 5);
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($intento >= 3 || $e->getCode() !== '23000') throw $e;
+                usleep(50_000 * $intento);   // pequeña espera creciente antes de reintentar
+            }
+        }
+    }
+
+    /**
      * EL ROUTER (decisión núcleo del sistema).
      *
      * Llega un mensaje de un contacto por un canal:
@@ -196,8 +221,7 @@ class TicketService
     /** Crea un ticket y deja constancia en el historial. */
     public function create(array $data): int
     {
-        $id = DB::table('tickets')->insertGetId([
-            'code'            => $this->nextCode(),
+        $id = $this->insertarConCodigo([
             'subject'         => mb_substr(trim($data['subject'] ?? '') ?: 'Sin asunto', 0, 200),
             'category_id'     => $data['category_id'] ?? null,
             'status'          => $data['status'] ?? self::defaultStatus(),
@@ -513,8 +537,37 @@ class TicketService
         if ($a->channel === 'cron' || $b->channel === 'cron') return [false, 'Los avisos de crones no se fusionan'];
 
         DB::transaction(function () use ($a, $b, $userId, $motivo) {
+            // Tablas 1-a-N sin clave única por ticket: se re-apuntan en bloque.
             foreach (['messages', 'attachments', 'ticket_events', 'cron_alerts'] as $tabla) {
                 DB::table($tabla)->where('ticket_id', $b->id)->update(['ticket_id' => $a->id]);
+            }
+
+            /*
+             * Tablas con clave ÚNICA por ticket (etiquetas, campos personalizados,
+             * valoración): un UPDATE a secas chocaría si el principal ya tiene ese
+             * mismo registro. Se trasladan solo los que el principal NO tenga; en caso
+             * de conflicto, manda lo del principal y se descarta el duplicado del
+             * absorbido. Sin esto, esos datos quedaban huérfanos tras la fusión.
+             */
+            // Etiquetas (pivote ticket_id+label_id).
+            $labelsA = DB::table('ticket_label_ticket')->where('ticket_id', $a->id)->pluck('label_id')->all();
+            DB::table('ticket_label_ticket')->where('ticket_id', $b->id)
+                ->when($labelsA, fn ($q) => $q->whereNotIn('label_id', $labelsA))
+                ->update(['ticket_id' => $a->id]);
+            DB::table('ticket_label_ticket')->where('ticket_id', $b->id)->delete();
+
+            // Campos personalizados (unique ticket_id+field_id).
+            $camposA = DB::table('ticket_field_values')->where('ticket_id', $a->id)->pluck('field_id')->all();
+            DB::table('ticket_field_values')->where('ticket_id', $b->id)
+                ->when($camposA, fn ($q) => $q->whereNotIn('field_id', $camposA))
+                ->update(['ticket_id' => $a->id]);
+            DB::table('ticket_field_values')->where('ticket_id', $b->id)->delete();
+
+            // Valoración CSAT (una por ticket): solo se trae si el principal no tiene.
+            if (DB::table('ticket_ratings')->where('ticket_id', $a->id)->exists()) {
+                DB::table('ticket_ratings')->where('ticket_id', $b->id)->delete();
+            } else {
+                DB::table('ticket_ratings')->where('ticket_id', $b->id)->update(['ticket_id' => $a->id]);
             }
 
             /*

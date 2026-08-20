@@ -626,6 +626,19 @@ class TicketsController extends Controller
         // Etiquetas puestas a este ticket.
         $t->labels = $this->labelsFor([$id])[$id] ?? [];
 
+        // Campos personalizados (globales) + el valor que tenga este ticket en cada uno.
+        $defsCampos = DB::table('ticket_custom_fields')->where('active', 1)
+            ->orderBy('position')->orderBy('id')->get(['id', 'key', 'label', 'type', 'options', 'required']);
+        $valsCampos = DB::table('ticket_field_values')->where('ticket_id', $id)->pluck('value', 'field_id');
+        $t->custom_fields = $defsCampos->map(fn ($d) => [
+            'id'       => (int) $d->id,
+            'label'    => $d->label,
+            'type'     => $d->type,
+            'options'  => $d->options ? json_decode($d->options, true) : [],
+            'required' => (bool) $d->required,
+            'value'    => $valsCampos[$d->id] ?? null,
+        ])->values();
+
         // Se une con users para saber QUIÉN escribió cada respuesta. Importa: en un
         // ticket pueden contestar varios agentes, y hay que ver quién dijo qué.
         $messages = DB::table('messages as m')
@@ -1220,6 +1233,9 @@ class TicketsController extends Controller
     protected function setCategory(Request $request)
     {
         $me = $request->user();
+        if (!$me->can('tickets.categorize')) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para cambiar la categoría'], 403);
+        }
         $id = (int) $request->input('id');
         if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el ticket'], 400);
 
@@ -1335,9 +1351,14 @@ class TicketsController extends Controller
             $assignee = (int) $request->input('assigned_to');
         }
 
+        // Canal según el dato de contacto: si hay CORREO, el ticket es de canal 'email'
+        // y el agente puede responderle por SMTP (reply() envía a contact_email). Si solo
+        // hay teléfono, queda 'web' (interno, sin salida por correo).
+        $channel = $email !== '' ? 'email' : 'web';
+
         $ticketId = $this->tickets->create([
             'contact_id'  => $contactId,
-            'channel'     => 'web',   // creado desde la app (canal interno/web)
+            'channel'     => $channel,
             'subject'     => $subject,
             'category_id' => $request->input('category_id') ?: null,
             'priority'    => in_array($request->input('priority'), array_keys(TicketService::priorities()), true)
@@ -1355,7 +1376,7 @@ class TicketsController extends Controller
             'ticket_id'  => $ticketId,
             'wa_id'      => $phone ?: null,
             'direction'  => 'in',
-            'channel'    => 'web',
+            'channel'    => $channel,
             'type'       => 'text',
             'body'       => $body,
             'is_html'    => true,      // ya saneado arriba

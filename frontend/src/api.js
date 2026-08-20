@@ -207,6 +207,17 @@ export const api = {
   setTicketLabels: (id, labelIds) => req('tickets.php?action=labels', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, label_ids: labelIds }),
   }),
+  // Campos personalizados de ticket (globales): definiciones + valores por ticket.
+  listFieldDefs: () => req('ticket_fields.php?action=defs'),
+  saveFieldDef: (payload) => req('ticket_fields.php?action=save_def', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
+  deleteFieldDef: (id) => req('ticket_fields.php?action=delete_def', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+  saveTicketFields: (ticketId, values) => req('ticket_fields.php?action=save_values', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id: ticketId, values }),
+  }),
   // Exportar la bandeja a Excel: descarga BINARIA (no JSON), con el token en cabecera.
   // Devuelve { ok, blob, filename } o { ok:false, error }.
   exportTickets: async (f = {}) => {

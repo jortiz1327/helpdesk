@@ -35,6 +35,7 @@ return [
         'tickets.view_all'   => ['Ver TODOS los tickets (no solo los propios)', 'helpdesk'],
         'tickets.reply'      => ['Responder tickets',                          'helpdesk'],
         'tickets.assign'     => ['Asignar tickets a agentes',                  'helpdesk'],
+        'tickets.categorize' => ['Cambiar la categoría de tickets',            'helpdesk'],
         'tickets.close'      => ['Resolver y cerrar tickets',                  'helpdesk'],
         'tickets.delete'     => ['Eliminar tickets',                           'helpdesk'],
         // Métricas de rendimiento: un agente NO ve sus tiempos ni los de sus compañeros.
@@ -90,7 +91,7 @@ return [
             'description' => 'Ve todos los tickets, reparte el trabajo, mide tiempos y gestiona los turnos.',
             'permissions' => [
                 'helpdesk.access', 'tickets.create', 'tickets.view_all', 'tickets.reply', 'tickets.assign',
-                'tickets.close', 'tickets.delete',
+                'tickets.categorize', 'tickets.close', 'tickets.delete',
                 'tickets.view_times', 'agents.view', 'tickets.export', 'support.config',
                 'contacts.access', 'contacts.edit',
                 'automations.access',
@@ -108,7 +109,7 @@ return [
             'label'       => 'Agente de soporte',
             'description' => 'Atiende los tickets de sus categorías asignadas. No ve los de otras áreas.',
             'permissions' => [
-                'helpdesk.access', 'tickets.create', 'tickets.reply', 'tickets.close',
+                'helpdesk.access', 'tickets.create', 'tickets.reply', 'tickets.categorize', 'tickets.close',
                 'contacts.access',
                 'shifts.access',
             ],

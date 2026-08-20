@@ -48,7 +48,18 @@ class WebhookController extends Controller
          * (se indica en Ajustes). Configura wa_app_secret antes de producción.
          */
         $appSecret = $this->appSecretDelEvento($raw);
-        if ($appSecret !== '') {
+        if ($appSecret === '') {
+            /*
+             * Sin App Secret no se puede verificar la firma. En LOCAL se permite (pruebas
+             * con curl). En PRODUCCIÓN se RECHAZA: procesar un webhook sin firmar es una
+             * puerta abierta a inyectar mensajes/tickets falsos y disparar el bot (envíos
+             * de pago). Configura wa_app_secret antes de producción.
+             */
+            if (app()->environment('production')) {
+                Log::warning('Webhook rechazado: sin wa_app_secret en producción, no se puede verificar la firma.');
+                return response('Webhook signature not configured', 403);
+            }
+        } else {
             $sig = (string) $request->header('X-Hub-Signature-256', '');
             $expected = 'sha256=' . hash_hmac('sha256', $raw, $appSecret);
             if ($sig === '' || !hash_equals($expected, $sig)) {
@@ -168,6 +179,23 @@ class WebhookController extends Controller
         // la vez) o para tipos que la API no soporta. Las fotos llegan luego sueltas, así
         // que ese contenedor es ruido: no se guarda ni crea nada.
         if ($type === 'unsupported') {
+            return;
+        }
+
+        // Valoración CSAT por WhatsApp: el cliente tocó una estrella de la lista que le
+        // mandamos al resolver. El id es «csat:{ticket}:{nota}». Se guarda la nota y se
+        // dan las gracias, SIN crear mensaje ni reabrir el ticket.
+        if ($replyId && str_starts_with($replyId, 'csat:')) {
+            $p = explode(':', $replyId);
+            $tid = (int) ($p[1] ?? 0);
+            $score = (int) ($p[2] ?? 0);
+            if ($tid && $score >= 1 && $score <= 5) {
+                [$ok] = app(\App\Services\PortalService::class)->setRating($tid, $score, null);
+                $this->wa->paraFuncion('soporte')->sendText($from, $ok
+                    ? '¡Gracias por tu valoración! 🙏 Nos ayuda a mejorar.'
+                    : 'Gracias por responder 🙌');
+                if ($ok) $this->tickets->broadcast('message', $tid);   // refresca la ficha
+            }
             return;
         }
 

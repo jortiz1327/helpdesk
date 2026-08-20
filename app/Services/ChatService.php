@@ -28,12 +28,14 @@ class ChatService
      * Busca o crea un contacto por su EMAIL (canal correo). Devuelve su id.
      * Los contactos de correo no tienen wa_id (teléfono); se identifican por email.
      */
-    public static function upsertContactByEmail(string $email, ?string $name = null): int
+    public static function upsertContactByEmail(string $email, ?string $name = null, bool $updateName = true): int
     {
         $email = mb_strtolower(trim($email));
         $c = Contact::where('email', $email)->first();
         if ($c) {
-            if ($name && $name !== $c->name) {
+            // $updateName = false para orígenes NO fiables (portal público): así un
+            // anónimo no puede reescribir el nombre de un contacto ya existente.
+            if ($updateName && $name && $name !== $c->name) {
                 $c->name = $name;
                 $c->save();
             }

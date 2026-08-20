@@ -339,7 +339,9 @@ class PortalService
         if ($subject === '') return [false, 'Ponle un asunto', null];
         if (mb_strlen($cuerpo) < 5) return [false, 'Cuéntanos un poco más qué ocurre', null];
 
-        $contactId = ChatService::upsertContactByEmail($email, $data['name'] ?? null);
+        // Portal PÚBLICO (sin autenticar): si el contacto ya existe, NO se le pisa el
+        // nombre con lo que escriba un anónimo. Solo se usa el nombre para crearlo nuevo.
+        $contactId = ChatService::upsertContactByEmail($email, $data['name'] ?? null, false);
 
         // Categoría: solo se acepta si existe y está activa; si no, sin categoría.
         $catId = null;

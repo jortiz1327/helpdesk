@@ -120,6 +120,10 @@ class AuthController extends Controller
                 return response()->json(['ok' => false, 'error' => 'La nueva contraseña debe tener al menos 8 caracteres'], 400);
             }
             $me->password = Hash::make($newPass);
+            // Revoca todos los tokens anteriores: subir la versión los invalida. El token
+            // que devolvemos abajo se emite ya con la versión nueva, así que esta sesión
+            // sigue; cualquier otra (o un token robado) queda fuera.
+            $me->token_version = (int) ($me->token_version ?? 1) + 1;
         }
         $me->save();
 

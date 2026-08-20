@@ -150,12 +150,71 @@ class NotifyService
     }
 
     /**
-     * Encuesta de satisfacción (CSAT) por correo al resolver/cerrar un ticket. Manda un
-     * correo al cliente con 5 estrellas clicables (enlace FIRMADO, 1-clic, sin login).
-     * Solo si: plantilla csat_survey activa + csat_active + el cliente tiene correo + el
-     * ticket está resuelto/cerrado + aún NO se ha valorado. Devuelve true si se envió.
+     * Encuesta de satisfacción (CSAT) al resolver/cerrar un ticket. Reparte por canal:
+     * WhatsApp → lista interactiva de estrellas dentro de la app; el resto → correo con
+     * estrellas clicables. Mismo almacén de valoración (ticket_ratings), así que sale
+     * igual en la ficha y en Informes venga por donde venga.
      */
     public function csat(int $ticketId): bool
+    {
+        $canal = DB::table('tickets')->where('id', $ticketId)->value('channel');
+        return $canal === 'whatsapp' ? $this->csatWhatsapp($ticketId) : $this->csatEmail($ticketId);
+    }
+
+    /**
+     * CSAT por WhatsApp: manda una LISTA interactiva con 5 filas (⭐…⭐⭐⭐⭐⭐). El
+     * cliente toca una y el webhook guarda la nota (id = «csat:{ticket}:{nota}»). Los
+     * mensajes libres solo se entregan dentro de la ventana de 24h; fuera de ella la API
+     * lo rechaza y aquí simplemente devolvemos false (se registra el aviso).
+     */
+    public function csatWhatsapp(int $ticketId): bool
+    {
+        try {
+            if ((string) \App\Models\Setting::get('csat_active', '1') !== '1') return false;
+
+            $t = DB::table('tickets as t')
+                ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+                ->where('t.id', $ticketId)
+                ->first(['t.code', 't.status', 'c.wa_id']);
+            if (!$t || !$t->wa_id) return false;
+            if (!in_array($t->status, ['resuelto', 'cerrado'], true)) return false;
+            if (DB::table('ticket_ratings')->where('ticket_id', $ticketId)->exists()) return false;
+
+            $wa = app(\App\Services\WhatsAppService::class)->paraFuncion('soporte');
+            if (!$wa->configured()) return false;
+
+            $filas = [
+                ['id' => "csat:{$ticketId}:5", 'title' => '⭐⭐⭐⭐⭐', 'description' => 'Muy satisfecho'],
+                ['id' => "csat:{$ticketId}:4", 'title' => '⭐⭐⭐⭐',   'description' => 'Satisfecho'],
+                ['id' => "csat:{$ticketId}:3", 'title' => '⭐⭐⭐',     'description' => 'Normal'],
+                ['id' => "csat:{$ticketId}:2", 'title' => '⭐⭐',       'description' => 'Insatisfecho'],
+                ['id' => "csat:{$ticketId}:1", 'title' => '⭐',         'description' => 'Muy insatisfecho'],
+            ];
+            $interactive = [
+                'type'   => 'list',
+                'body'   => ['text' => "¿Qué tal fue nuestra atención con tu incidencia {$t->code}? Tu opinión nos ayuda a mejorar 🙌"],
+                'footer' => ['text' => 'Toca «Valorar» y elige'],
+                'action' => [
+                    'button'   => 'Valorar',
+                    'sections' => [['title' => 'Tu valoración', 'rows' => $filas]],
+                ],
+            ];
+
+            [$rc] = $wa->sendInteractive((string) $t->wa_id, $interactive);
+            return $rc >= 200 && $rc < 300;
+        } catch (\Throwable $e) {
+            Log::warning('NotifyService CSAT WhatsApp: no se pudo enviar', ['ticket' => $ticketId, 'error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    /**
+     * CSAT por correo: manda un correo al cliente con 5 estrellas clicables (enlace
+     * FIRMADO, 1-clic, sin login). Solo si: plantilla csat_survey activa + csat_active +
+     * el cliente tiene correo + el ticket está resuelto/cerrado + aún NO se ha valorado.
+     * Devuelve true si se envió.
+     */
+    private function csatEmail(int $ticketId): bool
     {
         try {
             if ((string) \App\Models\Setting::get('csat_active', '1') !== '1') return false;

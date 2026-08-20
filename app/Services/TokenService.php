@@ -40,6 +40,7 @@ class TokenService
             'uid'   => (int) $u->id,
             'email' => $u->email,
             'name'  => $u->name ?? '',
+            'tv'    => (int) ($u->token_version ?? 1),   // versión: si sube, este token caduca
             'exp'   => time() + 60 * 60 * 24 * 30,
         ]));
         $sig = self::b64url(hash_hmac('sha256', $payload, self::secret(), true));
@@ -62,6 +63,16 @@ class TokenService
         if (!is_array($data) || (int) ($data['exp'] ?? 0) <= time()) {
             return null;
         }
-        return User::find((int) ($data['uid'] ?? 0));
+        $u = User::find((int) ($data['uid'] ?? 0));
+        if (!$u) {
+            return null;
+        }
+        // Revocación: el token debe llevar la versión ACTUAL del usuario. Al cambiar la
+        // contraseña se sube token_version y los tokens anteriores (con la versión vieja,
+        // o sin ella) dejan de valer.
+        if ((int) ($data['tv'] ?? 0) !== (int) ($u->token_version ?? 1)) {
+            return null;
+        }
+        return $u;
     }
 }

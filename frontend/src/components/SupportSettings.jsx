@@ -27,6 +27,7 @@ const SECCIONES = [
     { key: 'categories', label: 'Categorías',            icon: Icon.tag,      desc: 'Áreas de soporte, su color y su SLA.' },
     { key: 'prio',       label: 'Prioridades',           icon: Icon.warn,     desc: 'Niveles de urgencia y sus colores.' },
     { key: 'labels',     label: 'Etiquetas',             icon: Icon.tag,      desc: 'Post-its de color para agrupar y filtrar tickets.' },
+    { key: 'fields',     label: 'Campos personalizados', icon: Icon.note,     desc: 'Datos extra que se rellenan en cada ticket (nº de serie, urgencia…).' },
     { key: 'canned',     label: 'Respuestas predefinidas', icon: Icon.note,   desc: 'Textos que se insertan con «/» al responder.' },
     { key: 'faqs',       label: 'Base de conocimiento',  icon: Icon.search,   desc: 'Lo que ve el cliente en el portal: Centro de atención y Preguntas frecuentes.' },
     { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo.' },
@@ -83,6 +84,7 @@ export default function SupportSettings() {
           {tab === 'tpl' && <EmailTemplates />}
           {tab === 'prio' && <Priorities />}
           {tab === 'labels' && <Labels />}
+          {tab === 'fields' && <CustomFields />}
           {tab === 'behavior' && <TicketBehavior />}
           {tab === 'hours' && <BusinessHours />}
           {tab === 'security' && <SecuritySettings />}
@@ -1268,6 +1270,155 @@ function Labels() {
         </Modal>
       )}
     </>
+  )
+}
+
+/* ---------------------- Campos personalizados de ticket ------------------
+ * Datos extra GLOBALES (los mismos para todos los tickets) que el agente rellena
+ * en la ficha: nº de serie, urgencia in situ, ¿requiere visita?… Aquí se define
+ * el catálogo; los valores se rellenan luego dentro de cada ticket.
+ * ------------------------------------------------------------------------- */
+const TIPO_CAMPO = {
+  text:     'Texto',
+  textarea: 'Texto largo',
+  number:   'Número',
+  select:   'Desplegable',
+  checkbox: 'Sí / No',
+  date:     'Fecha',
+}
+
+function CustomFields() {
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [rows, setRows] = useState(null)
+  const [form, setForm] = useState(null)
+
+  const load = useCallback(() => { api.listFieldDefs().then((d) => setRows(d.fields || [])) }, [])
+  useEffect(() => { load() }, [load])
+
+  const blank = { id: 0, label: '', type: 'text', options: [], required: false, position: (rows?.length || 0) + 1, active: true }
+
+  const save = async () => {
+    if (!form.label.trim()) { toast('La etiqueta es obligatoria', 'err'); return }
+    if (form.type === 'select' && form.options.filter((o) => o.trim()).length === 0) {
+      toast('Un desplegable necesita al menos una opción', 'err'); return
+    }
+    const r = await api.saveFieldDef(form)
+    if (r.ok) { toast(form.id ? 'Campo actualizado' : 'Campo creado'); setForm(null); load() }
+    else toast(r.error || 'Error', 'err')
+  }
+  const del = async (c) => {
+    if (!(await confirm({ title: 'Eliminar campo', message: c.used
+      ? `«${c.label}» tiene valor en ${c.used} ticket${c.used === 1 ? '' : 's'}. Al borrarlo se pierden esos datos. ¿Seguro?`
+      : `¿Eliminar «${c.label}»?`, danger: true, confirmText: 'Eliminar' }))) return
+    const r = await api.deleteFieldDef(c.id)
+    if (r.ok) { toast('Campo eliminado'); load() } else toast(r.error || 'Error', 'err')
+  }
+
+  return (
+    <>
+      <div className="cfg-head">
+        <h2>Campos personalizados</h2>
+        <button className="btn" onClick={() => setForm({ ...blank })}><Icon.plus /> Nuevo campo</button>
+      </div>
+      <p className="cfg-hint" style={{ margin: '0 0 14px', color: 'var(--ink-2)', fontSize: 13 }}>
+        Datos extra que se rellenan en cada ticket (nº de serie, urgencia in situ, ¿requiere visita?…).
+        Son los mismos para todos los tickets. Desactiva un campo para dejar de pedirlo sin borrar lo ya guardado.
+      </p>
+
+      {rows === null ? <div className="center-load"><div className="spinner" /></div> : (
+        rows.length === 0 ? (
+          <div className="rep-empty">Aún no hay campos. Crea el primero con «Nuevo campo».</div>
+        ) : (
+        <div className="cfg-grid">
+          {rows.map((c) => (
+            <div key={c.id} className="card cfg-card">
+              <div className="cfg-card-h">
+                <span className="chip sm">{TIPO_CAMPO[c.type] || c.type}</span>
+                {c.required && <span className="pill sm">Obligatorio</span>}
+                <span className={`chip ${c.active ? 'abierto' : 'cerrado'} sm`}>{c.active ? 'Activo' : 'Inactivo'}</span>
+              </div>
+              <p className="cfg-desc" style={{ fontWeight: 600, color: 'var(--ink-1)' }}>{c.label}</p>
+              <p className="cfg-desc">
+                {c.type === 'select' && (c.options || []).length > 0
+                  ? (c.options || []).join(' · ')
+                  : `${c.used} ticket${c.used === 1 ? '' : 's'} con valor`}
+                <span className="muted" style={{ marginLeft: 8, fontFamily: 'var(--mono, monospace)', fontSize: 11.5 }}>{c.key}</span>
+              </p>
+              <div className="cfg-actions">
+                <span className="muted" style={{ fontSize: 12, marginRight: 'auto' }}>#{c.position}</span>
+                <button className="icon-btn" title="Editar" onClick={() => setForm({
+                  id: c.id, label: c.label, type: c.type, options: c.options || [],
+                  required: !!c.required, position: c.position, active: !!c.active,
+                })}><Icon.pencil /></button>
+                <button className="icon-btn" title="Eliminar"
+                  style={{ color: 'var(--danger)' }} onClick={() => del(c)}><Icon.trash /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+        )
+      )}
+
+      {form && (
+        <Modal title={form.id ? 'Editar campo' : 'Nuevo campo'} onClose={() => setForm(null)} onSave={save} saveLabel={form.id ? 'Actualizar' : 'Crear'}>
+          <div className="grid2">
+            <label className="field"><span className="lbl">Etiqueta <em>*</em></span>
+              <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="p. ej. Nº de serie" autoFocus /></label>
+            <label className="field" style={{ maxWidth: 120 }}><span className="lbl">Orden</span>
+              <input type="number" min="0" value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} /></label>
+          </div>
+          <div className="field"><span className="lbl">Tipo</span>
+            <Select block value={form.type} onChange={(type) => setForm((f) => ({ ...f, type }))}
+              options={Object.entries(TIPO_CAMPO).map(([value, label]) => ({ value, label }))} /></div>
+
+          {form.type === 'select' && (
+            <div className="field"><span className="lbl">Opciones <em>*</em></span>
+              <OptionsEditor value={form.options} onChange={(options) => setForm((f) => ({ ...f, options }))} />
+              <span className="hint" style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)', fontSize: 12 }}>
+                Escribe una opción y pulsa Enter. Estas son las que podrá elegir el agente.
+              </span>
+            </div>
+          )}
+
+          <label className="fb-req-row">
+            <span className="fb-switch"><input type="checkbox" checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} /><span className={`fb-toggle ${form.required ? 'on' : ''}`} /></span>
+            <span className="fb-req-label">Obligatorio <span className="hint">· hay que rellenarlo para guardar</span></span>
+          </label>
+          <label className="fb-req-row">
+            <span className="fb-switch"><input type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} /><span className={`fb-toggle ${form.active ? 'on' : ''}`} /></span>
+            <span className="fb-req-label">Activo <span className="hint">· si no, deja de pedirse en los tickets</span></span>
+          </label>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+/* Editor de opciones de un desplegable: chips que respetan mayúsculas (a diferencia
+   de KeywordsInput, que las pasa a minúscula). Trabaja con un array de textos. */
+function OptionsEditor({ value, onChange }) {
+  const [txt, setTxt] = useState('')
+  const opts = value || []
+  const add = () => {
+    const t = txt.trim()
+    if (t && !opts.includes(t)) onChange([...opts, t])
+    setTxt('')
+  }
+  const remove = (t) => onChange(opts.filter((x) => x !== t))
+  return (
+    <div className="kw-input" onClick={(e) => e.currentTarget.querySelector('input')?.focus()}>
+      {opts.map((t) => (
+        <span key={t} className="kw-chip">{t}<button type="button" onClick={() => remove(t)} aria-label={`Quitar ${t}`}>✕</button></span>
+      ))}
+      <input value={txt} placeholder={opts.length ? '' : 'Baja, Media, Alta…'}
+        onChange={(e) => setTxt(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add() }
+          else if (e.key === 'Backspace' && !txt && opts.length) remove(opts[opts.length - 1])
+        }}
+        onBlur={add} />
+    </div>
   )
 }
 

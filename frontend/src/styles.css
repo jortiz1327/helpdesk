@@ -2091,6 +2091,17 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tkm-time { padding: 12px 13px; border-radius: 11px; margin-bottom: 9px; font-size: 12px; }
 .tkm-time:last-child { margin-bottom: 0; }
 
+/* Campos personalizados en la ficha: etiqueta arriba, control debajo. */
+.tk-cf { display: flex; flex-direction: column; gap: 11px; }
+.tk-cf-row { display: flex; flex-direction: column; gap: 5px; }
+.tk-cf-lbl { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.tk-cf-lbl em { color: var(--danger); font-style: normal; }
+.tk-cf-in { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--surface); color: var(--ink-1); font-size: 13px; font-family: inherit; }
+.tk-cf-in:focus { outline: none; border-color: var(--primary); }
+.tk-cf textarea.tk-cf-in { resize: vertical; }
+.tk-cf-save { margin-top: 12px; }
+
 /* ==========================================================================
    COMPOSER — editor de respuestas con formato, adjuntos y pegado de imágenes
    ========================================================================== */
