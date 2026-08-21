@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\SlaService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,7 +17,21 @@ class TicketReportsController extends Controller
 {
     public function handle(Request $request)
     {
-        $since = match ($request->query('period', '30d')) {
+        $period = $request->query('period', '30d');
+        if (!in_array($period, ['today', '7d', '30d', 'all'], true)) $period = '30d';
+
+        // Son datos de GESTIÓN, no transaccionales: se cachean unos minutos por periodo.
+        // Así el panel no relanza 8 agregaciones sobre 50k en cada carga/recarga. El
+        // desfase máximo (p. ej. un «vencido» que acaba de saltar) es de minutos, asumible.
+        $payload = Cache::remember("reports.$period", now()->addMinutes(10), fn () => $this->build($period));
+
+        return response()->json($payload);
+    }
+
+    /** Calcula el panel completo para un periodo (lo que se cachea). */
+    protected function build(string $period): array
+    {
+        $since = match ($period) {
             'today' => now()->startOfDay(),
             '7d'    => now()->subDays(7),
             '30d'   => now()->subDays(30),
@@ -61,16 +76,16 @@ class TicketReportsController extends Controller
         $byChannel = (clone $base())->selectRaw('t.channel, COUNT(*) AS n')
             ->groupBy('t.channel')->orderByDesc('n')->pluck('n', 'channel');
 
-        return response()->json([
+        return [
             'ok'         => true,
             'sla_activo' => SlaService::activo(),
             'kpis'       => $this->fila($k),
             'by_agent'   => $byAgent->map(fn ($r) => $this->fila($r, ['id' => (int) $r->id, 'name' => $r->name]))->all(),
             'by_category' => $byCat->map(fn ($r) => $this->fila($r, ['name' => $r->name, 'color' => $r->color]))->all(),
             'by_channel' => $byChannel,
-            'daily'      => $this->daily($request->query('period', '30d')),
+            'daily'      => $this->daily($period),
             'csat'       => $this->csat($since),
-        ]);
+        ];
     }
 
     /**
