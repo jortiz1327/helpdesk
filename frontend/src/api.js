@@ -145,6 +145,9 @@ export const api = {
   toggleSla: (active) => req('business_hours.php?action=toggle_sla', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }),
   }),
+  saveSlaEscalate: (active, priority) => req('business_hours.php?action=save_escalate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active, priority }),
+  }),
   toggleSlaAlerts: (active) => req('business_hours.php?action=toggle_alerts', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }),
   }),

@@ -72,8 +72,12 @@ class SlaCheck extends Command
             if ($late && !$t->sla_breached_at) {
                 [$reloj, $info] = $late;
                 if (!$dry) {
+                    // Escalado ANTES del correo: así el aviso ya sale con la prioridad y
+                    // el asignado nuevos, y el nuevo responsable entra en los destinatarios.
+                    $cambios = app(TicketService::class)->escalarPorSla((int) $t->id, $reloj);
                     $notify->slaAlert('sla_breach', (int) $t->id, $this->vars($reloj, $info, true));
                     DB::table('tickets')->where('id', $t->id)->update(['sla_breached_at' => now()]);
+                    if ($cambios) $this->line("  ↳ escalado: " . implode(', ', array_map(fn ($k, $v) => "$k=$v", array_keys($cambios), $cambios)));
                 }
                 $vencidos++;
                 $this->line(($dry ? '[dry] ' : '') . "Ticket #{$t->id}: VENCIDO ({$reloj})");

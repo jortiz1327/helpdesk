@@ -26,6 +26,7 @@ class BusinessHoursController extends Controller
             'del_holiday'   => $this->delHoliday($request),
             'toggle_sla'    => $this->toggleSla($request),
             'toggle_alerts' => $this->toggleAlerts($request),
+            'save_escalate' => $this->saveEscalate($request),
             default         => $this->get(),
         };
     }
@@ -66,6 +67,10 @@ class BusinessHoursController extends Controller
             'sla_prios'  => DB::table('ticket_priorities')
                 ->where(fn ($q) => $q->whereNotNull('sla_response_mins')->orWhereNotNull('sla_resolve_mins'))
                 ->pluck('name'),
+            // Escalado accionable al vencer: subir prioridad + reasignar al agente de guardia.
+            'sla_escalate_active'   => (string) \App\Models\Setting::get('sla_escalate_active', '0') === '1',
+            'sla_escalate_priority' => (string) \App\Models\Setting::get('sla_escalate_priority', ''),
+            'priorities' => DB::table('ticket_priorities')->where('active', 1)->orderBy('position')->get(['key', 'name']),
         ]);
     }
 
@@ -86,6 +91,21 @@ class BusinessHoursController extends Controller
         \App\Models\Setting::put('sla_alerts_active', $request->boolean('active') ? '1' : '0');
 
         return response()->json(['ok' => true, 'active' => $request->boolean('active')]);
+    }
+
+    /**
+     * Guarda el ESCALADO accionable: al vencer el SLA, subir prioridad + reasignar al
+     * agente de guardia + nota de auditoría. `priority` vacío = «la más alta».
+     */
+    protected function saveEscalate(Request $request)
+    {
+        \App\Models\Setting::put('sla_escalate_active', $request->boolean('active') ? '1' : '0');
+
+        $prio = trim((string) $request->input('priority', ''));
+        if ($prio !== '' && !DB::table('ticket_priorities')->where('key', $prio)->exists()) $prio = '';
+        \App\Models\Setting::put('sla_escalate_priority', $prio);
+
+        return response()->json(['ok' => true]);
     }
 
     /** Reemplaza TODO el horario semanal de una vez (es como se edita en pantalla). */

@@ -270,7 +270,11 @@ function Canned() {
               <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Saludo inicial" /></label>
           </div>
           <label className="field"><span className="lbl">Texto <em>*</em></span>
-            <textarea rows={5} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="El texto que se insertará en la respuesta…" /></label>
+            <textarea rows={5} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="El texto que se insertará en la respuesta…" />
+            <span className="hint" style={{ display: 'block', marginTop: 6 }}>
+              Variables (se rellenan al insertar según el ticket): <b>{'{{cliente}}'}</b>, <b>{'{{codigo}}'}</b>, <b>{'{{agente}}'}</b>, <b>{'{{sede}}'}</b>
+            </span>
+          </label>
         </Modal>
       )}
     </>
@@ -874,6 +878,34 @@ function BusinessHours() {
             </small>
           </span>
         </label>
+
+        {/* Escalado ACCIONABLE al vencer: sube prioridad + reasigna al agente de guardia. */}
+        <label className="fb-req-row" style={{ marginTop: 14, opacity: d.sla_active ? 1 : 0.5 }}>
+          <span className="fb-switch">
+            <input type="checkbox" checked={!!d.sla_escalate_active} disabled={!d.sla_active} onChange={async (e) => {
+              const r = await api.saveSlaEscalate(e.target.checked, d.sla_escalate_priority || '')
+              if (r.ok) { toast(e.target.checked ? 'Escalado activado' : 'Escalado desactivado'); load() }
+              else toast(r.error || 'Error', 'err')
+            }} />
+            <span className={`fb-toggle ${d.sla_escalate_active ? 'on' : ''}`} />
+          </span>
+          <span className="fb-req-label">
+            <b>{d.sla_escalate_active ? 'Escalado automático activado' : 'Escalado automático desactivado'}</b>
+            <small>
+              Cuando un ticket <b>vence</b>: sube su <b>prioridad</b>, lo <b>reasigna al agente de guardia</b> del turno y deja una <b>nota de auditoría</b>. Se hace una sola vez por ticket.
+            </small>
+          </span>
+        </label>
+        {d.sla_escalate_active && (
+          <label className="field" style={{ marginTop: 10, maxWidth: 300 }}>
+            <span className="lbl">Prioridad al escalar</span>
+            <Select block value={d.sla_escalate_priority || ''} onChange={async (v) => {
+              const r = await api.saveSlaEscalate(true, v)
+              if (r.ok) { toast('Guardado'); load() } else toast(r.error || 'Error', 'err')
+            }} options={[{ value: '', label: 'La más alta' }, ...((d.priorities || []).map((p) => ({ value: p.key, label: p.name })))]} />
+            <span className="hint" style={{ display: 'block', marginTop: 6 }}>Si el ticket ya está por encima, no se toca.</span>
+          </label>
+        )}
       </div>
 
       {/* El reloj se para cuando la pelota no está en nuestro tejado. */}

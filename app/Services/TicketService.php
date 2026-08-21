@@ -422,6 +422,72 @@ class TicketService
         if ($assignee) app(NotifyService::class)->ticket('ticket_assigned', $ticketId);
     }
 
+    /**
+     * ESCALADO al vencer el SLA. Lo llama el cron `sla:check` UNA sola vez por ticket
+     * (protegido por `sla_breached_at`). Si el escalado está activo:
+     *   1) sube la prioridad a la de escalado (por defecto la ACTIVA más alta),
+     *   2) reasigna al agente de GUARDIA del turno,
+     *   3) deja una nota interna de auditoría.
+     * Devuelve un resumen de lo que cambió (para registro). Nunca lanza: un fallo aquí
+     * no debe cortar el barrido del cron ni el aviso por correo.
+     */
+    public function escalarPorSla(int $ticketId, string $reloj): array
+    {
+        try {
+            if ((string) Setting::get('sla_escalate_active', '0') !== '1') return [];
+
+            $t = DB::table('tickets')->where('id', $ticketId)->first(['priority', 'assigned_to']);
+            if (!$t) return [];
+
+            $cambios = [];
+
+            // 1) Subir prioridad, solo si el destino es MÁS urgente que la actual.
+            if ($destino = $this->prioridadEscalado()) {
+                $posActual = (int) DB::table('ticket_priorities')->where('key', $t->priority)->value('position');
+                if ($destino['position'] > $posActual) {
+                    DB::table('tickets')->where('id', $ticketId)->update(['priority' => $destino['key']]);
+                    $this->event($ticketId, 'priority', (string) $t->priority, (string) $destino['key'], null, 'Escalado automático por SLA vencido');
+                    $cambios['prioridad'] = $destino['name'];
+                }
+            }
+
+            // 2) Reasignar al agente de guardia (si hay turno cubierto y no es ya el asignado).
+            $guardia = app(ShiftService::class)->deGuardia();
+            if ($guardia && (int) $guardia['user_id'] !== (int) $t->assigned_to) {
+                $this->assign($ticketId, (int) $guardia['user_id']);   // registra evento + aviso al nuevo
+                $cambios['asignado'] = $guardia['name'];
+            }
+
+            // 3) Nota interna de auditoría (y refresco en la ficha).
+            if ($cambios) {
+                $partes = [];
+                if (isset($cambios['prioridad'])) $partes[] = 'prioridad → <b>' . e($cambios['prioridad']) . '</b>';
+                if (isset($cambios['asignado']))  $partes[] = 'reasignado a <b>' . e($cambios['asignado']) . '</b>';
+                $this->nota($ticketId, null, '⏱️ <b>Escalado automático por SLA vencido</b> (' . e($reloj) . '): ' . implode(', ', $partes) . '.');
+                $this->broadcast('message', $ticketId);
+            }
+
+            return $cambios;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Escalado SLA falló', ['ticket' => $ticketId, 'error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    /**
+     * Prioridad de destino del escalado: la configurada en `sla_escalate_priority` o,
+     * si no hay o no vale, la ACTIVA más alta (mayor `position`). Devuelve
+     * ['key','name','position'] o null si no hay prioridades.
+     */
+    protected function prioridadEscalado(): ?array
+    {
+        $key  = trim((string) Setting::get('sla_escalate_priority', ''));
+        $base = DB::table('ticket_priorities')->where('active', 1);
+        $p = $key ? (clone $base)->where('key', $key)->first(['key', 'name', 'position']) : null;
+        $p ??= $base->orderByDesc('position')->first(['key', 'name', 'position']);
+        return $p ? (array) $p : null;
+    }
+
     /** Cuánto se deja de intentar el aviso tras un fallo (segundos). */
     protected const SOCKET_PAUSA = 60;
 
