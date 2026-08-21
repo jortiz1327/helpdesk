@@ -215,12 +215,36 @@ class TicketsController extends Controller
         $donde = $request->query('search_in') === 'messages' ? 'messages' : 'ficha';
 
         if ($s !== '' && $donde === 'ficha') {
-            $q->where(function ($w) use ($s) {
-                $w->where('t.code', 'like', "%$s%")
-                  ->orWhere('t.subject', 'like', "%$s%")
-                  ->orWhere('c.name', 'like', "%$s%")
-                  ->orWhere('c.email', 'like', "%$s%")
-                  ->orWhere('c.wa_id', 'like', "%$s%");
+            [$termino] = $this->terminoTextoCompleto($s);
+            $like = "%$s%";
+            $q->where(function ($w) use ($s, $termino, $like) {
+                // Código: subcadena sobre una columna corta (barato, aunque no use índice).
+                $w->orWhere('t.code', 'like', $like);
+
+                // Asunto: por FULLTEXT si el término es aprovechable (≥3 letras). Va en
+                // subconsulta NO correlacionada para que el índice sí se use (un MATCH
+                // OR-eado con otros LIKE no lo aprovecharía). Si el término es corto, LIKE.
+                if ($termino) {
+                    $w->orWhereIn('t.id', function ($sub) use ($termino) {
+                        $sub->select('id')->from('tickets')
+                            ->whereRaw('MATCH(subject) AGAINST (? IN BOOLEAN MODE)', [$termino]);
+                    });
+                } else {
+                    $w->orWhere('t.subject', 'like', $like);
+                }
+
+                // Datos del contacto: subconsulta sobre `contacts` (tabla pequeña, no el
+                // join de 50k). Nombre/correo por FULLTEXT cuando aplica; teléfono y correo
+                // por subcadena (un número parcial o un dominio no son «palabras»).
+                $w->orWhereIn('t.contact_id', function ($sub) use ($s, $termino, $like) {
+                    $sub->select('id')->from('contacts')->where(function ($cc) use ($s, $termino, $like) {
+                        $termino
+                            ? $cc->whereRaw('MATCH(name, email) AGAINST (? IN BOOLEAN MODE)', [$termino])
+                            : $cc->where('name', 'like', $like);
+                        $cc->orWhere('wa_id', 'like', $like)
+                           ->orWhere('email', 'like', $like);
+                    });
+                });
             });
         } elseif ($s !== '') {
             $q->whereExists(function ($w) use ($s) {
