@@ -1509,6 +1509,13 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
               {view === 'chat' && !t.merged_into_id && (
                 <Composer
                   ticketId={id}
+                  // Variables de las respuestas predefinidas: se sustituyen al insertar.
+                  cannedVars={{
+                    cliente: t.contact_name || 'cliente',
+                    codigo:  t.code || '',
+                    agente:  user?.name || '',
+                    sede:    t.contact_sede_name || '',
+                  }}
                   // Destinatarios solo en correo: en WhatsApp no hay copias que valgan.
                   to={d.ticket.channel === 'email' ? d.ticket.contact_email : null}
                   ccSugerido={d.cc_sugerido || []}

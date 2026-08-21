@@ -617,13 +617,16 @@ class TicketsController extends Controller
         $me = $request->user();
         $id = (int) $request->query('id');
 
-        $t = (clone $this->baseQuery($me))->where('t.id', $id)->first([
-            't.*', 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa', 'c.sede_id as contact_sede_id',
-            'cat.name as category_name', 'cat.color as category_color',
-            'cat.sla_response_hours', 'cat.sla_resolve_hours', 't.sla_paused_minutes', 't.sla_paused_since',
-            'pri.sla_response_mins as pri_response_mins', 'pri.sla_resolve_mins as pri_resolve_mins',
-            'u.name as agent_name',
-        ]);
+        $t = (clone $this->baseQuery($me))
+            ->leftJoin('sedes as sede', 'sede.id', '=', 'c.sede_id')   // nombre de la sede para {{sede}}
+            ->where('t.id', $id)->first([
+                't.*', 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa', 'c.sede_id as contact_sede_id',
+                'sede.name as contact_sede_name',
+                'cat.name as category_name', 'cat.color as category_color',
+                'cat.sla_response_hours', 'cat.sla_resolve_hours', 't.sla_paused_minutes', 't.sla_paused_since',
+                'pri.sla_response_mins as pri_response_mins', 'pri.sla_resolve_mins as pri_resolve_mins',
+                'u.name as agent_name',
+            ]);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
         /*

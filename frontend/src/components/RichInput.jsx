@@ -14,6 +14,14 @@ import { api } from '../api.js'
 const escaparHtml = (s) => String(s).replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
+/* Sustituye {{cliente}}, {{codigo}}, {{agente}}, {{sede}} por los datos del ticket
+   al insertar una respuesta predefinida. Una variable sin dato se queda vacía. */
+const sustituirVars = (texto, vars) => {
+  if (!vars) return texto
+  return String(texto || '').replace(/\{\{\s*(cliente|codigo|agente|sede)\s*\}\}/gi,
+    (_, k) => vars[k.toLowerCase()] ?? '')
+}
+
 /**
  * Deja la dirección lista para usarse, o null si no vale.
  *
@@ -62,6 +70,7 @@ const RichInput = forwardRef(function RichInput({
   minHeight = 110,
   disabled = false,
   canned = false,          // habilita el menú «/» de respuestas predefinidas
+  cannedVars = null,       // { cliente, codigo, agente, sede } para sustituir {{...}} al insertar
   onChange,
 }, ref) {
   const area = useRef(null)
@@ -225,7 +234,7 @@ const RichInput = forwardRef(function RichInput({
         range.setStart(node, range.startOffset - cut[0].length)
         range.deleteContents()
       }
-      document.execCommand('insertText', false, c.body)
+      document.execCommand('insertText', false, sustituirVars(c.body, cannedVars))
     }
     setSlash(null)
     setEmpty(false)

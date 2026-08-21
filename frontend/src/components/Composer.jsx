@@ -12,7 +12,7 @@ const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
  * En los tickets de correo lleva además los DESTINATARIOS: quien venía en copia en
  * el hilo sigue en la conversación, así que se propone solo y el agente decide.
  */
-export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null, ticketId = null }) {
+export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null, ticketId = null, cannedVars = null }) {
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
   const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
@@ -113,6 +113,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
         ref={ed}
         disabled={off}
         canned
+        cannedVars={cannedVars}
         minHeight={84}
         placeholder={disabled ? (disabledHint || 'No disponible')
           : bloqueoResp ? 'Envío al cliente bloqueado — puedes cambiar a «Nota interna»'
