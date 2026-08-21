@@ -47,10 +47,15 @@ const ToastCtx = createContext(() => {});
 export const useToast = () => useContext(ToastCtx);
 
 function ToastHost({ toasts }) {
+    // Accesibilidad: cada aviso es una live-region para que el lector de pantalla lo
+    // anuncie. Los errores interrumpen (alert/assertive); el resto espera un hueco
+    // (status/polite). Sin esto, «Respuesta enviada» / «No se pudo enviar» pasaban mudos.
     return (
-        <div className="toasts">
+        <div className="toasts" role="region" aria-label="Notificaciones">
             {toasts.map((t) => (
-                <div key={t.id} className={`toast ${t.kind}`}>
+                <div key={t.id} className={`toast ${t.kind}`}
+                    role={t.kind === 'err' ? 'alert' : 'status'}
+                    aria-live={t.kind === 'err' ? 'assertive' : 'polite'}>
                     {t.msg}
                 </div>
             ))}

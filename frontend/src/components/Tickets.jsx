@@ -12,6 +12,16 @@ import Agents from './Agents.jsx'
 import CronAlerts from './CronAlerts.jsx'
 import { onTicketActivity } from '../realtime.js'
 
+/* Enter/Espacio activan una fila clicable con el teclado (Espacio sin hacer scroll
+   de la página). Accesibilidad: las filas son enfocables (tabIndex) y así se abren
+   sin ratón; se apoya en el anillo de :focus-visible para verse. */
+const teclaAbrir = (fn) => (e) => {
+  // Solo si la tecla es sobre la propia fila, no burbujeada desde un control hijo
+  // (checkbox, Selects): si no, marcar el checkbox con Espacio abriría el ticket.
+  if (e.target !== e.currentTarget) return
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() }
+}
+
 /* ---------------------------------------------------------------------------
  * GESTIÓN DE TICKETS
  *
@@ -670,7 +680,9 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                   {rows.map((t) => {
                     const waiting = t.last_direction === 'in'   // habló el cliente: nos toca
                     return (
-                      <tr key={t.id} className={`${waiting ? 'wait' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}>
+                      <tr key={t.id} className={`${waiting ? 'wait' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
+                        tabIndex={0} onKeyDown={teclaAbrir(() => setOpen(t.id))}
+                        aria-label={`Ticket ${t.code}, ${t.contact_name || 'sin nombre'}: ${t.subject || 'sin asunto'}. Pulsa Intro para abrir.`}>
                         <td className="tk-chk" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={sel.has(t.id)} onChange={() => toggleSel(t.id)} />
                         </td>
@@ -1297,7 +1309,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                           <thead><tr><th>Referencia</th><th>Asunto</th><th>Estado</th><th>Prioridad</th><th>Última actividad</th><th></th></tr></thead>
                           <tbody>
                             {clientTickets.map((x) => (
-                              <tr key={x.id} onClick={() => onOpenTicket?.(x.id)} title="Abrir este ticket">
+                              <tr key={x.id} onClick={() => onOpenTicket?.(x.id)} title="Abrir este ticket"
+                                tabIndex={0} onKeyDown={teclaAbrir(() => onOpenTicket?.(x.id))}
+                                aria-label={`Ticket ${x.code}: ${x.subject || 'sin asunto'}. Pulsa Intro para abrir.`}>
                                 <td><b className="mono">{x.code}</b></td>
                                 <td>{x.subject}</td>
                                 <td><span className={`chip ${x.status} sm`}>{meta?.statuses?.[x.status] || x.status}</span></td>
