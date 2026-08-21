@@ -136,7 +136,7 @@ class TicketsController extends Controller
 
         $cap   = 5000;
         $total = (clone $q)->count('t.id');
-        $rows  = $q->orderByDesc(DB::raw('COALESCE(t.last_message_at, t.created_at)'))->orderByDesc('t.id')
+        $rows  = $q->orderByDesc('t.last_message_at')->orderByDesc('t.id')
             ->limit($cap)
             ->get([
                 't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel',
@@ -344,7 +344,7 @@ class TicketsController extends Controller
         $rows = $q
             // ORDEN: por ÚLTIMA ACTIVIDAD, no por fecha de creación. Un ticket de hace un
             // mes con una respuesta de hace un minuto tiene que salir el primero.
-            ->orderByDesc(DB::raw('COALESCE(t.last_message_at, t.created_at)'))
+            ->orderByDesc('t.last_message_at')
             ->orderByDesc('t.id')   // desempate estable: sin él, dos tickets con la misma
                                     // hora pueden bailar entre páginas y salir repetidos
             ->forPage($pagina, $porPagina)
@@ -530,7 +530,7 @@ class TicketsController extends Controller
 
         // Últimos tickets (panel «Tickets recientes» del Centro de Soporte)
         $recent = (clone $this->baseQuery($me))
-            ->orderByDesc(DB::raw('COALESCE(t.last_message_at, t.created_at)'))
+            ->orderByDesc('t.last_message_at')
             ->limit(5)
             ->get([
                 't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel',

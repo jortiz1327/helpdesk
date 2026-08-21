@@ -208,7 +208,7 @@ class PortalService
             ->whereRaw('LOWER(c.email) = ?', [mb_strtolower($email)])
             ->where('t.channel', '!=', 'cron')
             ->whereNull('t.merged_into_id')       // los fusionados viven en su destino
-            ->orderByDesc(DB::raw('COALESCE(t.last_message_at, t.created_at)'))
+            ->orderByDesc('t.last_message_at')
             ->limit(100)
             ->get(['t.id', 't.code', 't.subject', 't.status', 't.created_at', 't.last_message_at', 't.last_direction']);
 
