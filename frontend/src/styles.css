@@ -3262,3 +3262,21 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tkv-save input { border: 0; outline: none; background: none; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink); width: 160px; }
 .tkv-save-ok { border: 0; background: var(--primary); color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
 .tkv-save-no { border: 0; background: var(--hover); color: var(--ink-3); font-size: 12px; width: 26px; height: 26px; border-radius: 8px; cursor: pointer; }
+
+/* ==========================================================================
+ * FOCO DE TECLADO (accesibilidad)
+ * Un único anillo, consistente en TODO lo interactivo, SOLO al navegar con
+ * teclado (:focus-visible) — nunca al hacer clic con el ratón. Antes botones,
+ * navegación, pestañas y chips no mostraban dónde estaba el foco al tabular:
+ * era el fallo de accesibilidad más grave. El outline moderno sigue el
+ * border-radius del elemento, así que el anillo se adapta a su forma.
+ *
+ * Va al FINAL del fichero a propósito: así gana por orden de cascada a los
+ * `outline: none` sueltos de algunos elementos (misma especificidad). Los
+ * campos de formulario que ya destacan con su borde/halo al enfocar tienen
+ * reglas de más especificidad, así que conservan su tratamiento sin doble anillo.
+ * ========================================================================== */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
