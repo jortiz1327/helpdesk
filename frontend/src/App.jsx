@@ -732,6 +732,11 @@ export default function App() {
                             setTicketAbierto(id);
                             setView("tickets");
                         }}
+                        onGoInbox={() => {
+                            setTicketAbierto(null);
+                            setTicketsTab("tickets");
+                            setView("tickets");
+                        }}
                     />
                     <nav className={`rail ${expanded ? "expanded" : ""}`}>
                         {/*

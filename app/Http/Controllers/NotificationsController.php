@@ -22,6 +22,7 @@ class NotificationsController extends Controller
             'unread'        => $this->unread($request),
             'read'          => $this->read($request),
             'read_all'      => $this->readAll($request),
+            'read_ticket'   => $this->readTicket($request),
             'briefing'      => $this->briefing($request),
             'briefing_seen' => $this->briefingSeen($request),
             default         => $this->list($request),
@@ -115,5 +116,23 @@ class NotificationsController extends Controller
             ->update(['read_at' => now()]);
 
         return response()->json(['ok' => true, 'unread' => 0]);
+    }
+
+    /**
+     * Marca leídos los avisos de un ticket concreto (opcionalmente de un tipo). Lo usa
+     * el recibimiento matutino: al abrir un ticket desde la tarjeta, su aviso de la
+     * campana queda leído — así no queda como pendiente algo que ya atendiste.
+     */
+    protected function readTicket(Request $request)
+    {
+        $me  = $request->user();
+        $tid = (int) $request->input('ticket_id');
+        if (!$tid) return response()->json(['ok' => false, 'error' => 'Falta el ticket'], 400);
+
+        $q = DB::table('notifications')->where('user_id', $me->id)->where('ticket_id', $tid)->whereNull('read_at');
+        if (($type = (string) $request->input('type', '')) !== '') $q->where('type', $type);
+        $q->update(['read_at' => now()]);
+
+        return response()->json(['ok' => true, 'unread' => $this->notifs->unread((int) $me->id)]);
     }
 }

@@ -670,7 +670,8 @@ input, textarea, select { font-family: inherit; }
   font-weight: 700; color: var(--primary); background: var(--primary-soft); padding: 1px 7px; border-radius: 6px; }
 .mb-why.reply { color: var(--secondary); background: var(--secondary-soft, #e7f7ef); }
 .mb-go { color: var(--primary); font-weight: 600; font-size: 12.5px; flex: 0 0 auto; }
-.mb-foot { padding: 6px 20px 20px; }
+.mb-foot { padding: 6px 20px 12px; }
+.mb-note { margin: 0 0 16px; padding: 0 20px; text-align: center; font-size: 12px; color: var(--ink-3); }
 
 .boot { height: 100vh; display: grid; place-items: center; background: var(--bg); }
 

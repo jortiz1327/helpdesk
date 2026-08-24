@@ -19,7 +19,7 @@ function saludo() {
   return { hi: 'Buenas noches', emoji: '🌙' }
 }
 
-export default function MorningBriefing({ user, onOpen }) {
+export default function MorningBriefing({ user, onOpen, onGoInbox }) {
   const [items, setItems] = useState(null)   // null = aún no cargado / no mostrar
   const [closing, setClosing] = useState(false)
 
@@ -39,7 +39,10 @@ export default function MorningBriefing({ user, onOpen }) {
     api.snoozeBriefingSeen().catch(() => {})
     setTimeout(() => setItems(null), 180)
   }
-  const abrir = (id) => { onOpen?.(id); cerrar() }
+  // Abrir un ticket marca SU aviso de la campana como leído (ya lo atiendes); los demás
+  // siguen ahí sin leer, así no se pierde ningún recordatorio al abrir solo uno.
+  const abrir = (id) => { api.readTicketNotifications(id, 'snooze_wake').catch(() => {}); onOpen?.(id); cerrar() }
+  const empezar = () => { onGoInbox?.(); cerrar() }
 
   const { hi, emoji } = saludo()
   const nombre = (user?.name || '').split(' ')[0] || ''
@@ -74,8 +77,9 @@ export default function MorningBriefing({ user, onOpen }) {
         </div>
 
         <div className="mb-foot">
-          <button className="btn primary block" onClick={cerrar}>Empezar el día</button>
+          <button className="btn primary block" onClick={empezar}>Empezar el día</button>
         </div>
+        {n > 1 && <p className="mb-note">Abre los que quieras ahora; el resto te espera en la campana 🔔</p>}
       </div>
     </div>
   )

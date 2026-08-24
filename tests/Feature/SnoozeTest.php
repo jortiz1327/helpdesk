@@ -65,6 +65,10 @@ class SnoozeTest extends TestCase
         $this->assertNull($t->snoozed_at);   // despertó, aunque la fecha no había llegado
         $this->assertSame(1, DB::table('ticket_events')->where('ticket_id', $id)
             ->where('type', 'snooze_wake')->where('to_value', 'reply')->count());
+
+        // Y deja un aviso en la campana para quien lo pospuso (así no se pierde).
+        $this->assertSame(1, DB::table('notifications')->where('user_id', $this->agente)
+            ->where('type', 'snooze_wake')->where('ticket_id', $id)->count());
     }
 
     public function test_una_nota_interna_no_despierta(): void
@@ -78,6 +82,18 @@ class SnoozeTest extends TestCase
             ['ticket_id' => $id, 'channel' => 'email', 'is_internal_note' => true]);
 
         $this->assertNotNull(DB::table('tickets')->where('id', $id)->value('snoozed_at'));
+        // Y no avisa a nadie (no ha despertado).
+        $this->assertSame(0, DB::table('notifications')->where('type', 'snooze_wake')->count());
+    }
+
+    public function test_reactivar_a_mano_no_deja_aviso_en_la_campana(): void
+    {
+        $id = $this->ticket();
+        app(TicketService::class)->snooze($id, now()->addWeek(), false, $this->agente, null);
+        app(TicketService::class)->wake($id, 'manual');   // lo reactiva el propio agente
+
+        $this->assertNull(DB::table('tickets')->where('id', $id)->value('snoozed_at'));
+        $this->assertSame(0, DB::table('notifications')->where('type', 'snooze_wake')->count());
     }
 
     public function test_el_cron_despierta_los_vencidos_pero_no_los_de_hasta_que_responda(): void
@@ -96,5 +112,9 @@ class SnoozeTest extends TestCase
         $this->assertNotNull(DB::table('tickets')->where('id', $porRespuesta)->value('snoozed_at')); // sigue dormido
         $this->assertSame(1, DB::table('ticket_events')->where('ticket_id', $vencido)
             ->where('type', 'snooze_wake')->where('to_value', 'due')->count());
+
+        // El vencido deja aviso en la campana; el que sigue dormido, no.
+        $this->assertSame(1, DB::table('notifications')->where('type', 'snooze_wake')->where('ticket_id', $vencido)->count());
+        $this->assertSame(0, DB::table('notifications')->where('type', 'snooze_wake')->where('ticket_id', $porRespuesta)->count());
     }
 }

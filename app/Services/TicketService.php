@@ -486,7 +486,7 @@ class TicketService
      */
     public function wake(int $ticketId, string $motivo = 'manual'): void
     {
-        $t = DB::table('tickets')->where('id', $ticketId)->first(['snoozed_at', 'snoozed_by']);
+        $t = DB::table('tickets')->where('id', $ticketId)->first(['snoozed_at', 'snoozed_by', 'code', 'subject']);
         if (!$t || !$t->snoozed_at) return;   // no estaba dormido
 
         DB::table('tickets')->where('id', $ticketId)->update([
@@ -497,8 +497,21 @@ class TicketService
             'snooze_reason'        => null,
         ]);
 
-        $this->event($ticketId, 'snooze_wake', null, $motivo, $t->snoozed_by ? (int) $t->snoozed_by : null);
+        $by = $t->snoozed_by ? (int) $t->snoozed_by : null;
+        $this->event($ticketId, 'snooze_wake', null, $motivo, $by);
         $this->broadcast('snoozed', $ticketId);
+
+        /*
+         * Aviso INDIVIDUAL en la campana para quien lo pospuso. Así, si despiertan
+         * varios, no se pierden en la tarjeta de la mañana: cada uno queda como aviso
+         * propio (sin leer) y se puede revisitar. La reactivación a mano no avisa (la
+         * hizo el propio agente hace un segundo).
+         */
+        if ($by && $motivo !== 'manual') {
+            $porque = $motivo === 'reply' ? 'el cliente respondió' : 'lo pediste para hoy';
+            $cuerpo = "Retoma {$t->code}" . ($t->subject ? ": «" . mb_substr($t->subject, 0, 100) . '»' : '') . " · {$porque}";
+            app(NotificationService::class)->push($by, 'snooze_wake', $cuerpo, $ticketId, null);
+        }
     }
 
     /**
