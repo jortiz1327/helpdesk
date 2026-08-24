@@ -31,6 +31,7 @@ function Tabla({ rows, primeraCol, colorDot }) {
           <th>{primeraCol}</th><th>Tickets</th><th>Resueltos</th>
           <th title="Tiempo medio hasta la primera respuesta">T. 1ª resp.</th>
           <th title="Tiempo medio hasta resolver">T. resolución</th>
+          <th title="Nota media de satisfacción (1-5★) y nº de valoraciones del portal">CSAT</th>
         </tr></thead>
         <tbody>
           {rows.map((r, i) => (
@@ -43,6 +44,9 @@ function Tabla({ rows, primeraCol, colorDot }) {
               <td>{r.resueltos}</td>
               <td>{fmtH(r.resp_h)}</td>
               <td>{fmtH(r.resol_h)}</td>
+              <td>{r.csat_n > 0
+                ? <span className="rep-csat" title={`${r.csat_n} valoración(es)`}>{r.csat}<span className="rep-star">★</span> <small className="muted">· {r.csat_n}</small></span>
+                : <span className="muted">—</span>}</td>
             </tr>
           ))}
         </tbody>

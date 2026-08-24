@@ -566,6 +566,10 @@ input, textarea, select { font-family: inherit; }
 .load-err svg { width: 30px; height: 30px; fill: var(--warn); }
 .load-err p { margin: 0; font-size: 14px; }
 
+/* CSAT en las tablas de Informes (por agente / por categoría). */
+.rep-csat { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rep-star { color: #e0a63a; }
+
 /* --- @menciones + centro de notificaciones -------------------------------- */
 .mention { padding: 1px 5px; border-radius: 6px; background: var(--primary-soft); color: var(--primary); font-weight: 600; white-space: nowrap; }
 

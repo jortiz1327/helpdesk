@@ -69,22 +69,51 @@ class TicketReportsController extends Controller
 
         // Por categoría
         $byCat = (clone $base())->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
-            ->selectRaw("COALESCE(cat.name, 'Sin categoría') AS name, cat.color, $metricas")
+            ->selectRaw("t.category_id AS cat_id, COALESCE(cat.name, 'Sin categoría') AS name, cat.color, $metricas")
             ->groupByRaw('t.category_id, cat.name, cat.color')->orderByDesc('total')->get();
 
         // Por canal
         $byChannel = (clone $base())->selectRaw('t.channel, COUNT(*) AS n')
             ->groupBy('t.channel')->orderByDesc('n')->pluck('n', 'channel');
 
+        // CSAT por agente y por categoría (mismo filtro que la tarjeta global: portal).
+        $csatAg  = $this->csatPor('assigned_to', $since);
+        $csatCat = $this->csatPor('category_id', $since);
+
         return [
             'ok'         => true,
             'sla_activo' => SlaService::activo(),
             'kpis'       => $this->fila($k),
-            'by_agent'   => $byAgent->map(fn ($r) => $this->fila($r, ['id' => (int) $r->id, 'name' => $r->name]))->all(),
-            'by_category' => $byCat->map(fn ($r) => $this->fila($r, ['name' => $r->name, 'color' => $r->color]))->all(),
+            'by_agent'   => $byAgent->map(fn ($r) => $this->fila($r, [
+                'id' => (int) $r->id, 'name' => $r->name,
+            ] + $this->csatFila($csatAg->get($r->id))))->all(),
+            'by_category' => $byCat->map(fn ($r) => $this->fila($r, [
+                'name' => $r->name, 'color' => $r->color,
+            ] + $this->csatFila($csatCat->get($r->cat_id))))->all(),
             'by_channel' => $byChannel,
             'daily'      => $this->daily($period),
             'csat'       => $this->csat($since),
+        ];
+    }
+
+    /** CSAT (media + nº de valoraciones) agrupado por una columna del ticket. */
+    protected function csatPor(string $col, $since): \Illuminate\Support\Collection
+    {
+        return DB::table('ticket_ratings as r')
+            ->join('tickets as t', 't.id', '=', 'r.ticket_id')
+            ->where('t.source', 'portal')->whereNull('t.merged_into_id')
+            ->when($since, fn ($q) => $q->where('t.created_at', '>=', $since))
+            ->groupBy("t.$col")
+            ->get(["t.$col as k", DB::raw('AVG(r.score) media'), DB::raw('COUNT(*) n')])
+            ->keyBy('k');
+    }
+
+    /** Normaliza una fila de CSAT: nota media (1 decimal) + nº, o nulos si no hay. */
+    protected function csatFila($row): array
+    {
+        return [
+            'csat'   => $row ? round((float) $row->media, 1) : null,
+            'csat_n' => $row ? (int) $row->n : 0,
         ];
     }
 
