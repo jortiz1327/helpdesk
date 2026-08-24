@@ -1596,6 +1596,32 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .kb-sub { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Separador «conversación más reciente» dentro del hilo del ticket */
+/* Respuesta PROGRAMADA en el hilo: aún no enviada, ámbar, con editar/cancelar. */
+.tk-sched { align-self: flex-end; max-width: 82%; margin: 4px 0 2px; border: 1px dashed var(--warn, #d99024);
+  background: color-mix(in srgb, var(--warn, #d99024) 9%, var(--panel)); border-radius: 14px; padding: 10px 13px; }
+.tk-sched-h { display: flex; align-items: center; gap: 6px; color: var(--warn, #b9760a); font-weight: 700; font-size: 12px; }
+.tk-sched-h svg { width: 15px; height: 15px; fill: currentColor; }
+.tk-sched-body { color: var(--ink-2); font-size: 13px; margin: 6px 0 9px; overflow-wrap: anywhere; }
+.tk-sched-body p { margin: 0 0 4px; }
+.tk-sched-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.tk-sched-when { color: var(--ink); font-size: 12px; flex: 1; min-width: 140px; }
+.tk-sched-act { color: var(--warn, #b9760a); font-size: 12px; font-weight: 600; background: none; border: 0; cursor: pointer; }
+.tk-sched-act:hover { text-decoration: underline; }
+
+/* Botón partido «Enviar respuesta ▾» + menú de programación. */
+.cmp-split { position: relative; display: inline-flex; }
+.cmp-split-go { border-radius: 10px 0 0 10px; }
+.cmp-split-caret { border-radius: 0 10px 10px 0; padding: 0 10px; border-left: 1px solid rgba(255,255,255,.25); font-size: 12px; }
+.cmp-sched { position: absolute; bottom: calc(100% + 8px); right: 0; width: 260px; z-index: 30;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); overflow: hidden; }
+.cmp-sched-h { padding: 10px 13px 8px; border-bottom: 1px solid var(--line); }
+.cmp-sched-h b { font-size: 13px; } .cmp-sched-h small { display: block; color: var(--ink-3); font-size: 11px; margin-top: 2px; }
+.cmp-sched-opt { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 10px 13px;
+  font-size: 13px; font-weight: 500; color: var(--ink); border-bottom: 1px solid var(--line); }
+.cmp-sched-opt:last-child { border-bottom: 0; } .cmp-sched-opt:hover { background: var(--primary-soft); }
+.cmp-sched-custom { display: flex; gap: 6px; padding: 10px 13px; }
+.cmp-sched-custom input { flex: 1; min-width: 0; height: 32px; border: 1px solid var(--line-2); border-radius: 8px; padding: 0 8px; font-size: 12px; background: var(--panel); color: var(--ink); }
+
 .tk-conv-sep { display: flex; align-items: center; gap: 10px; margin: 18px 4px 10px; color: var(--primary); }
 .tk-conv-sep::before, .tk-conv-sep::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--primary) 40%, var(--primary) 60%, transparent); opacity: 0.4; }
 .tk-conv-sep span { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 3px 12px; border: 1px solid var(--primary); border-radius: 20px; background: var(--primary-soft); white-space: nowrap; }

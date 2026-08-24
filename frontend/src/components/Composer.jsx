@@ -12,13 +12,24 @@ const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
  * En los tickets de correo lleva además los DESTINATARIOS: quien venía en copia en
  * el hilo sigue en la conversación, así que se propone solo y el agente decide.
  */
-export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null, ticketId = null, cannedVars = null, mentionUsers = null }) {
+export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null, ticketId = null, cannedVars = null, mentionUsers = null, canSchedule = false }) {
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
   const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
   const note = mode === 'note'
   const [sugiriendo, setSugiriendo] = useState(false)
   const [avisosIA, setAvisosIA] = useState([])   // guardarraíles: líneas rojas a revisar
+  // Programar envío (solo respuesta por correo): menú del botón partido.
+  const [schedOpen, setSchedOpen] = useState(false)
+  const [schedCustom, setSchedCustom] = useState(false)
+  const [schedWhen, setSchedWhen] = useState('')
+  const schedRef = useRef(null)
+  useEffect(() => {
+    if (!schedOpen) return
+    const h = (e) => { if (schedRef.current && !schedRef.current.contains(e.target)) { setSchedOpen(false); setSchedCustom(false) } }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [schedOpen])
 
   /* Memoria de respuestas efectivas: las que funcionaron en casos PARECIDOS a este
      ticket. Se cargan al abrir y el agente puede insertarlas con un clic. */
@@ -64,15 +75,17 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
     if (ccSugerido.length) setVerCopias(true)
   }, [ccSugerido.join(',')])
 
-  const send = () => {
+  const send = (schedule = '', sendAt = '') => {
     onSend?.({
       html: ed.current.getHtml(), files: ed.current.getFiles(), internal: note, cc, bcc,
       mentions: note ? (ed.current.getMentions?.() || []) : [],   // @menciones solo en nota interna
+      schedule, send_at: sendAt,   // programar el envío (solo respuesta, no nota)
     })
     ed.current.reset()
     setEmpty(true)
     setAvisosIA([])   // al enviar se limpian los avisos de la IA
     setBcc([])   // el Cco no se arrastra al siguiente mensaje; el Cc sí (sigue el hilo)
+    setSchedOpen(false); setSchedCustom(false); setSchedWhen('')
     if (draftKey) localStorage.removeItem(draftKey)   // enviado: fuera el borrador
   }
 
@@ -206,9 +219,38 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
         )}
         <span className="spacer" />
         <span className="cmp-hint">Ctrl + Enter</span>
-        <button className={`btn ${note ? 'note-btn' : ''}`} disabled={off || empty} onClick={send}>
-          {note ? <><Icon.note /> Guardar nota</> : <><Icon.send /> Enviar respuesta</>}
-        </button>
+        {note || !canSchedule ? (
+          <button className={`btn ${note ? 'note-btn' : ''}`} disabled={off || empty} onClick={() => send()}>
+            {note ? <><Icon.note /> Guardar nota</> : <><Icon.send /> Enviar respuesta</>}
+          </button>
+        ) : (
+          <span className="cmp-split" ref={schedRef}>
+            <button className="btn cmp-split-go" disabled={off || empty} onClick={() => send()}>
+              <Icon.send /> Enviar respuesta
+            </button>
+            <button className="btn cmp-split-caret" disabled={off || empty}
+              onClick={() => setSchedOpen((v) => !v)} title="Programar el envío">▾</button>
+            {schedOpen && (
+              <div className="cmp-sched">
+                <div className="cmp-sched-h"><b>¿Cuándo sale?</b><small>Se guarda y se envía sola.</small></div>
+                <button type="button" className="cmp-sched-opt" onClick={() => send('business')}>
+                  <span>🌅</span> Al abrir el horario</button>
+                <button type="button" className="cmp-sched-opt" onClick={() => send('tomorrow')}>
+                  <span>☀️</span> Mañana a primera hora</button>
+                {schedCustom ? (
+                  <div className="cmp-sched-custom">
+                    <input type="datetime-local" value={schedWhen} onChange={(e) => setSchedWhen(e.target.value)} />
+                    <button type="button" className="btn sm" disabled={!schedWhen}
+                      onClick={() => schedWhen && send('custom', schedWhen)}>Programar</button>
+                  </div>
+                ) : (
+                  <button type="button" className="cmp-sched-opt" onClick={() => setSchedCustom(true)}>
+                    <span>🗓️</span> Fecha y hora…</button>
+                )}
+              </div>
+            )}
+          </span>
+        )}
       </div>
     </div>
   )

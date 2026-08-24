@@ -28,7 +28,12 @@ class TicketReplyService
      * Responde por CORREO. `$t` es la fila del ticket (con contact_email/name, code,
      * subject, cat_signature, category_name). `$cc`/`$bcc` ya vienen depurados.
      */
-    public function porCorreo(object $t, string $html, array $files, array $cc, array $bcc, $me): array
+    /**
+     * @param ?array $preAttachIds  Adjuntos YA guardados en disco (attachments.id), para
+     *   la respuesta programada: el cron no tiene UploadedFiles, sino ficheros ya subidos.
+     *   Si se pasa, no se guarda nada nuevo y no se borran al fallar (habrá reintento).
+     */
+    public function porCorreo(object $t, string $html, array $files, array $cc, array $bcc, $me, ?array $preAttachIds = null, bool $deleteAttachOnFail = true): array
     {
         if (!$t->contact_email) {
             return ['ok' => false, 'error' => 'El contacto no tiene dirección de correo', '_status' => 422];
@@ -43,7 +48,16 @@ class TicketReplyService
         $savedIds = [];
         $warnings = [];
         $forMail  = [];
-        if ($files) {
+        if ($preAttachIds !== null) {
+            // Respuesta programada: los adjuntos ya estaban subidos, solo se referencian.
+            $savedIds = array_map('intval', $preAttachIds);
+            foreach ($savedIds as $aid) {
+                if ($f = $this->attachments->find($aid)) {
+                    [$path, $row] = $f;
+                    $forMail[] = ['path' => $path, 'name' => $row->name, 'mime' => $row->mime];
+                }
+            }
+        } elseif ($files) {
             [$savedIds, $warnings] = $this->attachments->store($files, (int) $t->id, null, (int) $me->id);
             foreach ($savedIds as $aid) {
                 if ($f = $this->attachments->find($aid)) {
@@ -78,11 +92,14 @@ class TicketReplyService
                 $subject, $this->absolutizeInline($html), $forMail, $inReplyTo, $refs, $cc, $bcc, $firma
             );
         } catch (\Throwable $e) {
-            // Deshacer adjuntos guardados (ficheros + filas) para no dejar basura.
-            foreach ($savedIds as $aid) {
-                if ($f = $this->attachments->find($aid)) { try { Storage::disk('local')->delete($f[1]->path); } catch (\Throwable $x) {} }
+            // Deshacer adjuntos guardados (ficheros + filas) para no dejar basura. En la
+            // respuesta programada NO se borran: el cron reintentará y los necesita.
+            if ($deleteAttachOnFail) {
+                foreach ($savedIds as $aid) {
+                    if ($f = $this->attachments->find($aid)) { try { Storage::disk('local')->delete($f[1]->path); } catch (\Throwable $x) {} }
+                }
+                if ($savedIds) DB::table('attachments')->whereIn('id', $savedIds)->delete();
             }
-            if ($savedIds) DB::table('attachments')->whereIn('id', $savedIds)->delete();
 
             return ['ok' => false, 'error' => 'No se pudo enviar el correo: ' . mb_substr($e->getMessage(), 0, 160), '_status' => 502];
         }

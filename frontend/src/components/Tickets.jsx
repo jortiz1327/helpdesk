@@ -1236,6 +1236,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const endRef = useRef(null)
   const msgCountRef = useRef(0)
   const lastTicketRef = useRef(null)
+  const [composerKey, setComposerKey] = useState(0)   // fuerza recargar el compositor al «Editar» una programada
 
   const can = (p) => (user?.permissions || []).includes(p)
 
@@ -1335,6 +1336,17 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const reactivar = async () => {
     const r = await api.unsnoozeTicket(id)
     if (r.ok) { toast('Ticket reactivado'); load(); onChange?.() } else toast(r.error || 'Error', 'err')
+  }
+  const cancelarProgramada = async (sid) => {
+    const r = await api.cancelScheduled(sid)
+    if (r?.ok) { toast('Programación cancelada'); load() } else toast('No se pudo cancelar', 'err')
+  }
+  const editarProgramada = async (s) => {
+    // Devuelve el texto al compositor (vía su borrador) y cancela la programación.
+    try { localStorage.setItem(`tk_draft_${id}`, JSON.stringify({ html: s.body, note: false })) } catch { /* sin storage */ }
+    const r = await api.cancelScheduled(s.id)
+    if (r?.ok) { setComposerKey((k) => k + 1); toast('Cargada en el compositor para editar'); load() }
+    else toast('No se pudo editar', 'err')
   }
   const del = async () => {
     const ok = await confirm({
@@ -1726,6 +1738,23 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                   )
                   })
                 })()}
+
+                {/* Respuestas PROGRAMADAS pendientes: aún no se han enviado (el cliente no
+                    las ve). Se pueden editar (vuelven al compositor) o cancelar. */}
+                {(t.scheduled || []).map((s) => (
+                  <div key={s.id} className="tk-sched">
+                    <div className="tk-sched-h"><Icon.clock /> Respuesta programada</div>
+                    <div className="tk-sched-body" dangerouslySetInnerHTML={{ __html: s.body }} />
+                    <div className="tk-sched-foot">
+                      <span className="tk-sched-when">📤 Saldrá el <b>{fmtDate(s.send_at)}</b>{s.author_name ? ` · ${s.author_name}` : ''}</span>
+                      {can('tickets.reply') && <>
+                        <button className="tk-sched-act" onClick={() => editarProgramada(s)}>Editar</button>
+                        <button className="tk-sched-act" onClick={() => cancelarProgramada(s.id)}>Cancelar</button>
+                      </>}
+                    </div>
+                  </div>
+                ))}
+
                 <div ref={endRef} />
               </div>
               )}
@@ -1757,6 +1786,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
               {/* El editor solo en la conversación (no en el historial). */}
               {view === 'chat' && !t.merged_into_id && (
                 <Composer
+                  key={composerKey}
                   ticketId={id}
                   // Variables de las respuestas predefinidas: se sustituyen al insertar.
                   cannedVars={{
@@ -1769,6 +1799,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                   mentionUsers={(meta?.users || []).filter((u) => u.id !== user?.id)}
                   // Destinatarios solo en correo: en WhatsApp no hay copias que valgan.
                   to={d.ticket.channel === 'email' ? d.ticket.contact_email : null}
+                  // Programar el envío: solo por correo (WhatsApp tiene ventana de 24h).
+                  canSchedule={d.ticket.channel === 'email'}
                   ccSugerido={d.cc_sugerido || []}
                   disabled={!can('tickets.reply') || (d.lock && !d.lock.mine)}
                   disabledHint={!can('tickets.reply')
@@ -1795,7 +1827,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                         : '✨ Borrador de la IA cargado — revísalo antes de enviar')
                     return r
                   }}
-                  onSend={async ({ html, files, internal, cc, bcc, mentions }) => {
+                  onSend={async ({ html, files, internal, cc, bcc, mentions, schedule, send_at }) => {
                     if (internal) {
                       const r = await api.ticketNote(id, html, false, mentions)
                       if (r.ok) {
@@ -1804,9 +1836,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                       }
                       else toast(r.error || 'No se pudo guardar la nota', 'err')
                     } else {
-                      const r = await api.ticketReply(id, html, files, cc, bcc)
+                      const r = await api.ticketReply(id, html, files, cc, bcc, schedule, send_at)
                       if (r.ok) {
-                        toast(d.ticket.channel === 'whatsapp' ? '💬 Respuesta enviada por WhatsApp' : '✉️ Respuesta enviada por correo')
+                        if (r.scheduled) toast(`⏱ Respuesta programada para ${fmtDate(r.send_at)}`)
+                        else toast(d.ticket.channel === 'whatsapp' ? '💬 Respuesta enviada por WhatsApp' : '✉️ Respuesta enviada por correo')
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()
                       } else toast(r.error || 'No se pudo enviar la respuesta', 'err')

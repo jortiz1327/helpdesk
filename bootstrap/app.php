@@ -33,6 +33,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('sla:check')->everyFiveMinutes()->withoutOverlapping();
         // Despierta los tickets pospuestos cuya fecha venció (limpia el chip + recibimiento)
         $schedule->command('tickets:wake')->everyFiveMinutes()->withoutOverlapping();
+        // Envía las respuestas programadas que ya toca mandar
+        $schedule->command('replies:send')->everyMinute()->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         /*

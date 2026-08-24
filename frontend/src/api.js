@@ -327,7 +327,8 @@ export const api = {
   snoozeBriefing: () => req('notifications.php?action=briefing'),
   snoozeBriefingSeen: () => req('notifications.php?action=briefing_seen', { method: 'POST' }),
   // Responder al cliente (canal correo → SMTP). Multipart: HTML + adjuntos.
-  ticketReply: (id, body, files = [], cc = [], bcc = []) => {
+  // schedule: '' (enviar ya) | 'business' | 'tomorrow' | 'custom' (+ send_at ISO).
+  ticketReply: (id, body, files = [], cc = [], bcc = [], schedule = '', send_at = '') => {
     const fd = new FormData()
     fd.append('id', id)
     fd.append('body', body)
@@ -335,8 +336,12 @@ export const api = {
     // Copias: quien venía en el hilo sigue en la conversación.
     cc.forEach((d) => fd.append('cc[]', d))
     bcc.forEach((d) => fd.append('bcc[]', d))
+    if (schedule) { fd.append('schedule', schedule); if (send_at) fd.append('send_at', send_at) }
     return req('tickets.php?action=reply', { method: 'POST', body: fd })
   },
+  cancelScheduled: (sched_id) => req('tickets.php?action=sched_cancel', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sched_id }),
+  }),
   // Borrar ticket entero (requiere tickets.delete)
   deleteTicket: (id) => req('tickets.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),

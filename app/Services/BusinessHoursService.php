@@ -102,6 +102,26 @@ class BusinessHoursService
     }
 
     /**
+     * PRÓXIMA APERTURA a partir de $desde: si ya está abierto, devuelve $desde tal cual;
+     * si no, el inicio del siguiente tramo de horario. Lo usa la respuesta programada
+     * («al abrir el horario»). Sin horario configurado, no hay que esperar: $desde.
+     */
+    public function proximaApertura(?Carbon $desde = null): Carbon
+    {
+        $cursor = ($desde ?? now())->copy();
+        if (!$this->configurado()) return $cursor;
+
+        for ($i = 0; $i < self::MAX_DIAS; $i++) {
+            foreach ($this->tramosDelDia($cursor) as [$ini, $fin]) {
+                if ($cursor->lessThan($ini)) return $ini->copy();      // aún no abre → abre en $ini
+                if ($cursor->lessThan($fin)) return $cursor->copy();   // dentro de un tramo → ya
+            }
+            $cursor = $cursor->copy()->addDay()->startOfDay();          // agotado el día → al siguiente
+        }
+        return ($desde ?? now())->copy();   // horario vacío: se devuelve el punto de partida
+    }
+
+    /**
      * Fecha límite tras sumar $horas LABORABLES a partir de $desde.
      * Si $desde cae fuera de horario, el reloj empieza en la siguiente apertura.
      */

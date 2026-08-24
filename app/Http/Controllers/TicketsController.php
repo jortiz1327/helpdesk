@@ -47,6 +47,7 @@ class TicketsController extends Controller
             'snooze'   => $this->snoozeTicket($request),
             'unsnooze' => $this->unsnoozeTicket($request),
             'contact_open' => $this->contactOpen($request),
+            'sched_cancel' => $this->cancelScheduled($request),
             'category' => $this->setCategory($request),
             'bulk'   => $this->bulk($request),
             'create' => $this->create($request),
@@ -698,6 +699,9 @@ class TicketsController extends Controller
         // Etiquetas puestas a este ticket.
         $t->labels = $this->labelsFor([$id])[$id] ?? [];
 
+        // Respuestas PROGRAMADAS pendientes (para el bloque «saldrá a las…» del hilo).
+        $t->scheduled = app(\App\Services\ScheduledReplyService::class)->pendingFor($id);
+
         // Campos personalizados (globales) + el valor que tenga este ticket en cada uno.
         $defsCampos = DB::table('ticket_custom_fields')->where('active', 1)
             ->orderBy('position')->orderBy('id')->get(['id', 'key', 'label', 'type', 'options', 'required']);
@@ -876,7 +880,45 @@ class TicketsController extends Controller
         $cc  = $this->direcciones($request->input('cc'));
         $bcc = $this->direcciones($request->input('bcc'));
 
+        // PROGRAMAR el envío (redactar ahora, salir en horario laboral o a una fecha).
+        // Solo correo. Si no viene `schedule`, se envía al momento como siempre.
+        if (($schedule = (string) $request->input('schedule', '')) !== '') {
+            $sendAt = $this->resolverProgramacion($schedule, $request->input('send_at'));
+            if (!$sendAt) return response()->json(['ok' => false, 'error' => 'Elige cuándo enviarla'], 400);
+
+            $sid = app(\App\Services\ScheduledReplyService::class)
+                ->schedule($id, $html, (array) $files, $cc, $bcc, $sendAt, (int) $me->id);
+            return response()->json(['ok' => true, 'scheduled' => true, 'id' => $sid, 'send_at' => $sendAt->toIso8601String()]);
+        }
+
         return $this->respuesta($svc->porCorreo($t, $html, (array) $files, $cc, $bcc, $me));
+    }
+
+    /** Traduce el preset de programación a una fecha/hora concreta (o null si no vale). */
+    protected function resolverProgramacion(string $preset, $custom): ?\Illuminate\Support\Carbon
+    {
+        $bh = app(\App\Services\BusinessHoursService::class);
+        return match ($preset) {
+            'business' => $bh->proximaApertura(now()),                          // próxima apertura
+            'tomorrow' => $bh->proximaApertura(now()->addDay()->startOfDay()),  // mañana, al abrir
+            'custom'   => (function () use ($custom) {
+                try { $d = \Illuminate\Support\Carbon::parse((string) $custom); } catch (\Throwable $e) { return null; }
+                return $d->isFuture() ? $d : null;
+            })(),
+            default => null,
+        };
+    }
+
+    /** Cancela una respuesta programada (pendiente) del ticket. */
+    protected function cancelScheduled(Request $request)
+    {
+        $me = $request->user();
+        if (!$me->can('tickets.reply')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
+
+        $sid = (int) $request->input('sched_id');
+        if (!$sid) return response()->json(['ok' => false, 'error' => 'Falta la programación'], 400);
+
+        return response()->json(['ok' => app(\App\Services\ScheduledReplyService::class)->cancel($sid)]);
     }
 
     /** Traduce el resultado de TicketReplyService (array, con opcional _status) a JSON. */
