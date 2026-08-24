@@ -10,7 +10,26 @@ export default function NotificationBell({ onOpenTicket, expanded }) {
   const [unread, setUnread] = useState(0)
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState(null)
+  const [pos, setPos] = useState(null)       // posición fija del panel (ver colocar())
   const ref = useRef(null)
+  const btnRef = useRef(null)
+
+  /*
+   * El panel se posiciona en FIJO (relativo a la pantalla), no dentro de la barra.
+   * La barra lateral tiene overflow:hidden, así que un panel «absolute» dentro de
+   * ella se recortaba y no se veía (parecía que no abría). Se ancla al botón: en
+   * escritorio a su derecha; en móvil, encima y a lo ancho.
+   */
+  const colocar = useCallback(() => {
+    const el = btnRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    if (window.innerWidth <= 640) {
+      setPos({ left: 8, right: 8, bottom: window.innerHeight - r.top + 8 })
+    } else {
+      setPos({ left: r.right + 10, bottom: window.innerHeight - r.bottom })
+    }
+  }, [])
 
   // Contador: al montar y cada 45s (no hay websocket por usuario en este bloque).
   const poll = useCallback(() => {
@@ -18,16 +37,18 @@ export default function NotificationBell({ onOpenTicket, expanded }) {
   }, [])
   useEffect(() => { poll(); const t = setInterval(poll, 45000); return () => clearInterval(t) }, [poll])
 
-  // Cerrar el panel al clicar fuera.
+  // Cerrar al clicar fuera; recolocar el panel si cambia el tamaño de la ventana.
   useEffect(() => {
     if (!open) return
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [open])
+    window.addEventListener('resize', colocar)
+    return () => { document.removeEventListener('mousedown', h); window.removeEventListener('resize', colocar) }
+  }, [open, colocar])
 
   const toggle = () => {
     const abriendo = !open
+    if (abriendo) colocar()
     setOpen(abriendo)
     if (abriendo) {
       setItems(null)
@@ -50,7 +71,7 @@ export default function NotificationBell({ onOpenTicket, expanded }) {
 
   return (
     <div className="notif" ref={ref}>
-      <button className={`notif-bell ${expanded ? 'wide' : ''}`} onClick={toggle}
+      <button ref={btnRef} className={`notif-bell ${expanded ? 'wide' : ''}`} onClick={toggle}
         title="Notificaciones" aria-label={`Notificaciones${unread ? `, ${unread} sin leer` : ''}`}>
         <Icon.bell />
         {unread > 0 && <span className="notif-badge">{unread > 9 ? '9+' : unread}</span>}
@@ -58,7 +79,8 @@ export default function NotificationBell({ onOpenTicket, expanded }) {
       </button>
 
       {open && (
-        <div className="notif-panel" role="dialog" aria-label="Notificaciones">
+        <div className="notif-panel" role="dialog" aria-label="Notificaciones"
+          style={pos ? { position: 'fixed', top: 'auto', ...pos } : undefined}>
           <div className="notif-h">
             <b>Notificaciones</b>
             {unread > 0 && <button className="link-btn" onClick={marcarTodas}>Marcar todas</button>}
