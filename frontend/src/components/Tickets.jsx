@@ -356,12 +356,16 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   const [perPage, setPerPage] = useState(() => Number(localStorage.getItem('tk_per_page')) || 25)
   const [pag, setPag] = useState({ total: 0, pages: 1 })
 
-  // Vistas guardadas (personales): combinaciones de filtros con nombre.
+  // Vistas guardadas: personales de cada agente + COMPARTIDAS del equipo.
   const [savedViews, setSavedViews] = useState([])
+  const [canShare, setCanShare] = useState(false)  // puede crear/editar vistas de equipo (encargado)
   const [naming, setNaming] = useState(false)      // mostrando el input de «guardar vista»
   const [newName, setNewName] = useState('')
+  const [shareNew, setShareNew] = useState(false)  // la vista que se está guardando, ¿compartida?
   const [exporting, setExporting] = useState(false)
-  const cargarVistas = useCallback(() => { api.listTicketViews().then((d) => setSavedViews(d.views || [])) }, [])
+  const cargarVistas = useCallback(() => {
+    api.listTicketViews().then((d) => { setSavedViews(d.views || []); setCanShare(!!d.can_share) })
+  }, [])
   useEffect(() => { cargarVistas() }, [cargarVistas])
 
   const can = (p) => (user?.permissions || []).includes(p)
@@ -420,9 +424,12 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
     const nombre = newName.trim()
     if (!nombre) return
     // Se guarda la foto de los filtros finos + la vista base (estado/asignado/respuesta).
-    const r = await api.saveTicketView({ name: nombre, filters: f })
-    if (r.ok) { toast('Vista guardada'); setNewName(''); setNaming(false); cargarVistas() }
-    else toast(r.error || 'No se pudo guardar', 'err')
+    const shared = canShare && shareNew
+    const r = await api.saveTicketView({ name: nombre, filters: f, shared })
+    if (r.ok) {
+      toast(shared ? 'Vista de equipo guardada' : 'Vista guardada')
+      setNewName(''); setNaming(false); setShareNew(false); cargarVistas()
+    } else toast(r.error || 'No se pudo guardar', 'err')
   }
   const borrarVista = async (v, e) => {
     e?.stopPropagation()
@@ -538,13 +545,15 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
               </button>
             ))}
 
-            {/* Mis vistas guardadas (personales): combinaciones de filtros con nombre. */}
+            {/* Vistas guardadas: personales + COMPARTIDAS del equipo (marcadas con 👥). */}
             {savedViews.map((v) => (
-              <button key={`sv${v.id}`} className={`tkv sv ${vistaGuardadaOn(v) ? 'on' : ''}`} style={{ '--sv': v.color }}
-                onClick={() => aplicarVista(v)} title="Vista guardada">
-                <span className="tkv-dot" />
+              <button key={`sv${v.id}`} className={`tkv sv ${v.shared ? 'team' : ''} ${vistaGuardadaOn(v) ? 'on' : ''}`} style={{ '--sv': v.color }}
+                onClick={() => aplicarVista(v)} title={v.shared ? 'Vista del equipo' : 'Vista guardada'}>
+                {v.shared ? <span className="tkv-team" aria-label="Vista del equipo">👥</span> : <span className="tkv-dot" />}
                 {v.name}
-                <span className="tkv-x" title="Borrar vista" onClick={(e) => borrarVista(v, e)}>×</span>
+                {(!v.shared || canShare) && (
+                  <span className="tkv-x" title="Borrar vista" onClick={(e) => borrarVista(v, e)}>×</span>
+                )}
               </button>
             ))}
 
@@ -553,10 +562,16 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             {naming ? (
               <span className="tkv-save">
                 <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80}
-                  onKeyDown={(e) => { if (e.key === 'Enter') guardarVista(); if (e.key === 'Escape') { setNaming(false); setNewName('') } }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') guardarVista(); if (e.key === 'Escape') { setNaming(false); setNewName(''); setShareNew(false) } }}
                   placeholder="Nombre de la vista…" />
+                {/* Compartir con el equipo: solo los encargados lo ven. */}
+                {canShare && (
+                  <label className="tkv-share" title="Que la vean todos los agentes">
+                    <input type="checkbox" checked={shareNew} onChange={(e) => setShareNew(e.target.checked)} /> 👥 Equipo
+                  </label>
+                )}
                 <button className="tkv-save-ok" onClick={guardarVista}>Guardar</button>
-                <button className="tkv-save-no" onClick={() => { setNaming(false); setNewName('') }}>✕</button>
+                <button className="tkv-save-no" onClick={() => { setNaming(false); setNewName(''); setShareNew(false) }}>✕</button>
               </span>
             ) : refined ? (
               <button className="tkv add" onClick={() => setNaming(true)} title="Guardar los filtros actuales como una vista rápida">

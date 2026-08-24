@@ -570,6 +570,12 @@ input, textarea, select { font-family: inherit; }
 .rep-csat { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rep-star { color: #e0a63a; }
 
+/* Vistas guardadas COMPARTIDAS (de equipo): se distinguen de las personales. */
+.tkv-team { font-size: 12px; line-height: 1; margin-right: 1px; }
+.tkv.team { border-style: dashed; }
+.tkv-share { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-2); white-space: nowrap; cursor: pointer; }
+.tkv-share input { margin: 0; }
+
 /* --- @menciones + centro de notificaciones -------------------------------- */
 .mention { padding: 1px 5px; border-radius: 6px; background: var(--primary-soft); color: var(--primary); font-weight: 600; white-space: nowrap; }
 
