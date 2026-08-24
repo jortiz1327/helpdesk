@@ -3301,3 +3301,41 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+/* ==========================================================================
+ * RESPONSIVE — la app es de escritorio, pero se consulta desde el móvil (turnos,
+ * guardias, mirar un ticket). Evita que el shell y los modales se rompan por debajo
+ * de ~640px. Va al FINAL del fichero a propósito: así gana por orden de cascada a
+ * las reglas de escritorio (p. ej. .tk-modal / .tkm-side, que fijan 272px).
+ * ========================================================================== */
+@media (max-width: 640px) {
+  /* Rail: siempre tira de iconos, nunca los 230px expandidos que se comen la pantalla. */
+  .rail, .rail.expanded { width: 56px; flex: 0 0 56px; align-items: center; }
+  .rail.expanded .rail-nav { align-items: center; }
+  .rail.expanded .rail-btn { width: 42px; height: 42px; justify-content: center; gap: 0; padding: 0; }
+  .rail-btn { width: 42px; height: 42px; }
+  .rail-text, .rail-logo { display: none; }
+
+  /* Contenido a ancho completo, con menos aire lateral. */
+  .page { padding-left: 12px; padding-right: 12px; }
+  .page-head { padding-left: 14px; padding-right: 14px; flex-wrap: wrap; }
+  .page-head .sub { display: none; }        /* el subtítulo largo no cabe */
+
+  /* Modales genéricos: casi pantalla completa, sin margen que los estruje. */
+  .modal-bg { padding: 0; }
+  .modal { width: 100vw; max-width: 100vw; max-height: 100dvh; border-radius: 0; }
+
+  /* Ficha del ticket: pantalla completa y en COLUMNA. La conversación va primero
+     (order 0) y la barra de datos —272px fija en escritorio— pasa a ancho completo
+     debajo, con altura acotada y su propio scroll. */
+  .tk-modal {
+    width: 100vw; max-width: 100vw;
+    height: 100vh; height: 100dvh; max-height: 100dvh;
+    border-radius: 0; flex-direction: column;
+  }
+  .tkm-side {
+    order: 1; width: 100%; flex: 0 0 auto; max-height: 42vh;
+    border-right: 0; border-top: 1px solid var(--line);
+  }
+  .tkm-main { order: 0; flex: 1 1 auto; min-height: 0; }
+}
