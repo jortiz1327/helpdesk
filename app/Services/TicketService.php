@@ -23,6 +23,31 @@ class TicketService
         'cerrado'             => 'Cerrado',
     ];
 
+    /**
+     * Color de cada estado (fuente ÚNICA). El chip lo pinta en línea desde aquí, en vez
+     * de depender del nombre de clase CSS —así un estado sin `.chip.clave` no se queda
+     * sin color, igual que ya hacen las prioridades—. El día que los estados sean una
+     * tabla configurable, esto pasa a la BD sin tocar el frontend.
+     */
+    public const STATUS_COLORS = [
+        'nuevo'               => '#2563eb',
+        'abierto'             => '#10b981',
+        'en_progreso'         => '#f59e0b',
+        'esperando_respuesta' => '#f97316',
+        'resuelto'            => '#8b5cf6',
+        'cerrado'             => '#94a3b8',
+    ];
+
+    /** Estados con etiqueta + color, para el frontend (como priority_meta). */
+    public static function statusMeta(): array
+    {
+        $out = [];
+        foreach (self::STATUSES as $key => $name) {
+            $out[$key] = ['name' => $name, 'color' => self::STATUS_COLORS[$key] ?? '#64748b'];
+        }
+        return $out;
+    }
+
     /** Estados en los que un ticket sigue VIVO (y por tanto admite mensajes nuevos). */
     public const OPEN_STATUSES = ['nuevo', 'abierto', 'en_progreso', 'esperando_respuesta'];
 

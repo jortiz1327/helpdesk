@@ -135,6 +135,15 @@ function prChip(v, meta, small = false) {
   return <span className={cls} style={style}>{p?.name || meta?.priorities?.[v] || v}</span>
 }
 
+/* Chip de ESTADO con color desde meta.status_meta (misma idea que prChip): así no
+   depende del nombre de clase CSS. Si falta meta, cae a la clase `.chip.{estado}`. */
+export function stChip(v, meta, small = false) {
+  const s = meta?.status_meta?.[v]
+  const cls = `chip ${s ? '' : v} ${small ? 'sm' : ''}`.trim()
+  const style = s ? { background: s.color + '22', color: s.color } : undefined
+  return <span className={cls} style={style}>{s?.name || meta?.statuses?.[v] || v}</span>
+}
+
 // Historial de movimientos: icono + frase legible por tipo de evento.
 const EV_ICON = { created: '🎫', status: '🔄', assign: '👤', category: '🏷️', priority: '⚑', merge_in: '🔗', merge_out: '🔗' }
 function describeEvent(e, meta) {
@@ -767,7 +776,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         </td>
                         <td>{prChip(t.priority, meta)}</td>
                         <td>
-                          <span className={`chip ${t.status}`}>{meta?.statuses?.[t.status] || t.status}</span>
+                          {stChip(t.status, meta)}
                           {!waiting && t.last_direction === 'out' && <span className="chip answered" title="Ya hemos respondido">✓</span>}
                         </td>
                         {canTimes && <>
@@ -944,7 +953,7 @@ function ModalFusion({ id, preselect = null, meta, onClose, onDone }) {
                         <span className="fus-op-tx">
                           <span className="fus-op-h">
                             <b className="mono">{o.code}</b>
-                            <span className={`chip ${o.status} sm`}>{meta?.statuses?.[o.status] || o.status}</span>
+                            {stChip(o.status, meta, true)}
                             <small>{o.messages} {o.messages === 1 ? 'mensaje' : 'mensajes'} · {fmtDate(o.created_at)}</small>
                           </span>
                           <span className="fus-asunto">{o.subject}</span>
@@ -1266,7 +1275,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                       options={Object.entries(meta?.statuses || {}).map(([value, label]) => ({ value, label }))} />
                   </div>
                 ) : (
-                  <div className="tkm-row"><span>Estado</span><span className={`chip ${t.status}`}>{meta?.statuses?.[t.status] || t.status}</span></div>
+                  <div className="tkm-row"><span>Estado</span>{stChip(t.status, meta)}</div>
                 )}
 
                 {can('tickets.assign') ? (
@@ -1345,7 +1354,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                                 aria-label={`Ticket ${x.code}: ${x.subject || 'sin asunto'}. Pulsa Intro para abrir.`}>
                                 <td><b className="mono">{x.code}</b></td>
                                 <td>{x.subject}</td>
-                                <td><span className={`chip ${x.status} sm`}>{meta?.statuses?.[x.status] || x.status}</span></td>
+                                <td>{stChip(x.status, meta, true)}</td>
                                 <td>{prChip(x.priority, meta, true)}</td>
                                 <td>{fmtDate(x.last_message_at || x.created_at)}</td>
                                 {/* Aquí es donde se ve que dos son lo mismo, así que aquí

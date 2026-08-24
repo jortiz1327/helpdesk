@@ -560,6 +560,7 @@ class TicketsController extends Controller
         return response()->json([
             'ok'         => true,
             'statuses'   => TicketService::STATUSES,
+            'status_meta' => TicketService::statusMeta(),   // etiqueta + color por estado
             'priorities' => TicketService::priorities(),
             // Con su color, para pintar las etiquetas sin quemarlos en el CSS.
             'priority_meta' => TicketService::prioritiesMeta(),

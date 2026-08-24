@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import ChannelBadge from './ChannelBadge.jsx'
+import { stChip } from './Tickets.jsx'
 import { onTicketActivity } from '../realtime.js'
 
 /* ---------------------------------------------------------------------------
@@ -131,7 +132,7 @@ export default function SupportCenter({ onGo, user }) {
                       <span className="chip" style={meta?.priority_meta?.[t.priority]
                         ? { background: meta.priority_meta[t.priority].color + '22', color: meta.priority_meta[t.priority].color }
                         : undefined}>{meta?.priorities?.[t.priority] || t.priority}</span>
-                      <span className={`chip ${t.status}`}>{meta?.statuses?.[t.status] || t.status}</span>
+                      {stChip(t.status, meta)}
                     </button>
                   ))}
                 </div>
