@@ -12,7 +12,7 @@ const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
  * En los tickets de correo lleva además los DESTINATARIOS: quien venía en copia en
  * el hilo sigue en la conversación, así que se propone solo y el agente decide.
  */
-export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null, ticketId = null, cannedVars = null }) {
+export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', onAiSuggest = null, ticketId = null, cannedVars = null, mentionUsers = null }) {
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
   const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
@@ -65,7 +65,10 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
   }, [ccSugerido.join(',')])
 
   const send = () => {
-    onSend?.({ html: ed.current.getHtml(), files: ed.current.getFiles(), internal: note, cc, bcc })
+    onSend?.({
+      html: ed.current.getHtml(), files: ed.current.getFiles(), internal: note, cc, bcc,
+      mentions: note ? (ed.current.getMentions?.() || []) : [],   // @menciones solo en nota interna
+    })
     ed.current.reset()
     setEmpty(true)
     setAvisosIA([])   // al enviar se limpian los avisos de la IA
@@ -114,6 +117,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
         disabled={off}
         canned
         cannedVars={cannedVars}
+        mentionUsers={note ? mentionUsers : null}
         minHeight={84}
         placeholder={disabled ? (disabledHint || 'No disponible')
           : bloqueoResp ? 'Envío al cliente bloqueado — puedes cambiar a «Nota interna»'

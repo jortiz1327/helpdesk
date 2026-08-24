@@ -736,7 +736,7 @@ class TicketsController extends Controller
 
         $id = (int) $request->input('id');
         // Solo se puede anotar en un ticket que el usuario VE (mismo alcance que el detalle).
-        $t = (clone $this->baseQuery($me))->where('t.id', $id)->first(['t.id', 't.contact_id', 'c.wa_id as contact_wa']);
+        $t = (clone $this->baseQuery($me))->where('t.id', $id)->first(['t.id', 't.code', 't.contact_id', 'c.wa_id as contact_wa']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
         // Bloqueo: si lo está atendiendo otro agente, no se escribe encima.
@@ -764,6 +764,19 @@ class TicketsController extends Controller
              */
             'status'           => $request->boolean('sla') ? 'sla_justificacion' : 'note',
         ]);
+
+        // @menciones: avisa a los agentes citados en la nota (centro de notificaciones).
+        // El frontend manda los ids elegidos en el selector; aquí solo se validan como
+        // usuarios reales. push() se salta la autonotificación (mencionarte a ti mismo).
+        $mentions = array_values(array_unique(array_filter(array_map('intval', (array) $request->input('mentions', [])))));
+        if ($mentions) {
+            $validos  = DB::table('users')->whereIn('id', $mentions)->pluck('id');
+            $extracto = mb_substr(trim(HtmlSanitizer::toText($html)), 0, 140);
+            $cuerpo   = "{$me->name} te mencionó en {$t->code}" . ($extracto !== '' ? ": «{$extracto}»" : '');
+            foreach ($validos as $uid) {
+                app(\App\Services\NotificationService::class)->push((int) $uid, 'mention', $cuerpo, (int) $t->id, (int) $me->id);
+            }
+        }
 
         return response()->json(['ok' => true, 'id' => $mid]);
     }

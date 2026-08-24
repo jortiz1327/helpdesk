@@ -71,6 +71,7 @@ const RichInput = forwardRef(function RichInput({
   disabled = false,
   canned = false,          // habilita el menú «/» de respuestas predefinidas
   cannedVars = null,       // { cliente, codigo, agente, sede } para sustituir {{...}} al insertar
+  mentionUsers = null,     // [{id,name}] → habilita el menú «@» de menciones (notas internas)
   onChange,
 }, ref) {
   const area = useRef(null)
@@ -83,6 +84,7 @@ const RichInput = forwardRef(function RichInput({
   // Menú «/» de respuestas predefinidas
   const [cannedList, setCannedList] = useState([])
   const [slash, setSlash] = useState(null)   // { query, index } o null
+  const [at, setAt] = useState(null)         // menú de menciones «@»: { query, index } o null
   const [enlace, setEnlace] = useState(null) // diálogo de enlace (ver abrirEnlace)
 
   useEffect(() => { if (canned) api.cannedForComposer().then((d) => setCannedList(d.canned || [])) }, [canned])
@@ -90,6 +92,10 @@ const RichInput = forwardRef(function RichInput({
   useImperativeHandle(ref, () => ({
     getHtml: () => area.current?.innerHTML || '',
     getFiles: () => files.map((f) => f.file),
+    // Ids mencionados: se leen del DOM (los chips @Nombre con data-uid), así que si el
+    // agente borra una mención, deja de contar. Frescos y exactos al enviar.
+    getMentions: () => [...(area.current?.querySelectorAll('.mention[data-uid]') || [])]
+      .map((el) => Number(el.dataset.uid)).filter(Boolean),
     // Se lee del DOM (fresco): cuenta el texto Y las imágenes en línea, sin depender del estado.
     isEmpty: () => !area.current?.textContent.trim() && !area.current?.querySelector('img') && files.length === 0,
     reset: () => { if (area.current) area.current.innerHTML = ''; setFiles([]); setEmpty(true) },
@@ -203,6 +209,17 @@ const RichInput = forwardRef(function RichInput({
     setImgTool(null) // al escribir se cierra el popover de imagen
     onChange?.()
     if (canned) detectSlash()
+    if (mentionUsers?.length) detectAt()
+  }
+
+  /* Detecta un «@nombre» a medio escribir para abrir el selector de agentes. */
+  const detectAt = () => {
+    const sel = window.getSelection()
+    if (!sel?.rangeCount) return setAt(null)
+    const node = sel.anchorNode
+    const text = (node?.textContent || '').slice(0, sel.anchorOffset)
+    const m = text.match(/(?:^|\s)@([\p{L}0-9_]*)$/u)
+    setAt(m ? { query: m[1].toLowerCase(), index: 0 } : null)
   }
 
   /*
@@ -221,6 +238,36 @@ const RichInput = forwardRef(function RichInput({
   const matches = slash
     ? cannedList.filter((c) => c.shortcut.includes(slash.query) || c.title.toLowerCase().includes(slash.query))
     : []
+
+  const mentionMatches = at
+    ? (mentionUsers || []).filter((u) => (u.name || '').toLowerCase().includes(at.query)).slice(0, 8)
+    : []
+
+  /** Inserta un chip de mención (@Nombre) no editable, con el id del agente. */
+  const pickMention = (u) => {
+    const sel = window.getSelection()
+    if (sel?.rangeCount) {
+      const range = sel.getRangeAt(0)
+      const node = range.startContainer
+      const before = (node.textContent || '').slice(0, range.startOffset)
+      const cut = before.match(/@[\p{L}0-9_]*$/u)   // el «@parcial» tecleado
+      if (cut && node.nodeType === Node.TEXT_NODE) {
+        range.setStart(node, range.startOffset - cut[0].length)
+        range.deleteContents()
+      }
+      const chip = document.createElement('span')
+      chip.className = 'mention'
+      chip.dataset.uid = String(u.id)
+      chip.contentEditable = 'false'
+      chip.textContent = '@' + u.name
+      range.insertNode(chip)
+      const space = document.createTextNode(' ')   // espacio tras el chip
+      chip.after(space)
+      range.setStartAfter(space); range.collapse(true)
+      sel.removeAllRanges(); sel.addRange(range)
+    }
+    setAt(null); setEmpty(false); onChange?.(); area.current?.focus()
+  }
 
   /** Sustituye el «/atajo» a medio escribir por el texto de la respuesta. */
   const pickCanned = (c) => {
@@ -243,6 +290,13 @@ const RichInput = forwardRef(function RichInput({
   }
 
   const kb = (e) => {
+    // Menú de menciones «@» (tiene prioridad si está abierto).
+    if (at && mentionMatches.length) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setAt((s) => ({ ...s, index: (s.index + 1) % mentionMatches.length })); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setAt((s) => ({ ...s, index: (s.index - 1 + mentionMatches.length) % mentionMatches.length })); return }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pickMention(mentionMatches[at.index]); return }
+      if (e.key === 'Escape') { e.preventDefault(); setAt(null); return }
+    }
     if (!slash || !matches.length) return
     if (e.key === 'ArrowDown') { e.preventDefault(); setSlash((s) => ({ ...s, index: (s.index + 1) % matches.length })) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSlash((s) => ({ ...s, index: (s.index - 1 + matches.length) % matches.length })) }
@@ -291,7 +345,7 @@ const RichInput = forwardRef(function RichInput({
         <div ref={area} className="cmp-area" style={{ minHeight }}
           contentEditable={!disabled} suppressContentEditableWarning
           data-ph={placeholder} onInput={touch} onPaste={onPaste} onClick={onAreaClick}
-          onKeyDown={kb} onBlur={() => setTimeout(() => { setSlash(null); setImgTool(null) }, 150)} />
+          onKeyDown={kb} onBlur={() => setTimeout(() => { setSlash(null); setAt(null); setImgTool(null) }, 150)} />
 
         {/* Menú de respuestas predefinidas al escribir «/» */}
         {slash && canned && (
@@ -303,6 +357,21 @@ const RichInput = forwardRef(function RichInput({
                   onMouseDown={(e) => { e.preventDefault(); pickCanned(c) }}>
                   <span className="s">/{c.shortcut}</span>
                   <span className="t"><b>{c.title}</b><small>{c.body}</small></span>
+                </button>
+              ))}
+          </div>
+        )}
+
+        {/* Menú de menciones al escribir «@» (solo en notas internas) */}
+        {at && mentionUsers?.length > 0 && (
+          <div className="cmp-slash" style={{ bottom: '100%', left: 12, marginBottom: 6 }}>
+            {mentionMatches.length === 0
+              ? <div className="cmp-slash-empty">Sin agentes para «@{at.query}»</div>
+              : mentionMatches.map((u, i) => (
+                <button key={u.id} type="button" className={`cmp-slash-i ${i === at.index ? 'on' : ''}`}
+                  onMouseDown={(e) => { e.preventDefault(); pickMention(u) }}>
+                  <span className="s">@</span>
+                  <span className="t"><b>{u.name}</b></span>
                 </button>
               ))}
           </div>

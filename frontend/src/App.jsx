@@ -30,6 +30,7 @@ import Activity from "./components/Activity.jsx";
 import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
+import NotificationBell from "./components/NotificationBell.jsx";
 import AreaChooser from "./components/AreaChooser.jsx";
 import Users from "./components/Users.jsx";
 import Analytics from "./components/Analytics.jsx";
@@ -830,6 +831,18 @@ export default function App() {
                             ))}
                         </div>
                         <div className="spacer" />
+
+                        {/* Campana de notificaciones (menciones, y a futuro asignaciones/SLA) */}
+                        {can("helpdesk.access") && (
+                            <NotificationBell
+                                expanded={expanded}
+                                onOpenTicket={(id) => {
+                                    setTicketsTab("tickets");
+                                    setTicketAbierto(id);
+                                    setView("tickets");
+                                }}
+                            />
+                        )}
 
                         {/* --- Cuenta: al pie del sidebar (ya no hay barra superior) --- */}
                         <div className="rail-user">

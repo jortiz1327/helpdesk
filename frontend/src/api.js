@@ -300,9 +300,16 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, category_id }),
   }),
   // Nota interna (no se envía al cliente): body en HTML
-  ticketNote: (id, body, sla = false) => req('tickets.php?action=note', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, body, sla }),
+  ticketNote: (id, body, sla = false, mentions = []) => req('tickets.php?action=note', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, body, sla, mentions }),
   }),
+  // Centro de notificaciones (campana).
+  listNotifications: () => req('notifications.php?action=list'),
+  unreadNotifications: () => req('notifications.php?action=unread'),
+  readNotification: (id) => req('notifications.php?action=read', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+  readAllNotifications: () => req('notifications.php?action=read_all', { method: 'POST' }),
   // Responder al cliente (canal correo → SMTP). Multipart: HTML + adjuntos.
   ticketReply: (id, body, files = [], cc = [], bcc = []) => {
     const fd = new FormData()

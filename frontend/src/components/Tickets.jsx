@@ -1547,6 +1547,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                     agente:  user?.name || '',
                     sede:    t.contact_sede_name || '',
                   }}
+                  // Agentes mencionables con «@» en la nota interna (excluye al propio).
+                  mentionUsers={(meta?.users || []).filter((u) => u.id !== user?.id)}
                   // Destinatarios solo en correo: en WhatsApp no hay copias que valgan.
                   to={d.ticket.channel === 'email' ? d.ticket.contact_email : null}
                   ccSugerido={d.cc_sugerido || []}
@@ -1575,10 +1577,13 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                         : '✨ Borrador de la IA cargado — revísalo antes de enviar')
                     return r
                   }}
-                  onSend={async ({ html, files, internal, cc, bcc }) => {
+                  onSend={async ({ html, files, internal, cc, bcc, mentions }) => {
                     if (internal) {
-                      const r = await api.ticketNote(id, html)
-                      if (r.ok) { toast('📝 Nota interna guardada'); load(); onChange?.() }
+                      const r = await api.ticketNote(id, html, false, mentions)
+                      if (r.ok) {
+                        toast(mentions?.length ? `📝 Nota guardada · avisados ${mentions.length}` : '📝 Nota interna guardada')
+                        load(); onChange?.()
+                      }
                       else toast(r.error || 'No se pudo guardar la nota', 'err')
                     } else {
                       const r = await api.ticketReply(id, html, files, cc, bcc)
