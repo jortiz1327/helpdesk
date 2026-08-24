@@ -424,6 +424,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   const [open, setOpen] = useState(initialTicket)   // id del ticket abierto en el modal
   // Fusión lanzada DESDE LA LISTA (sin abrir ningún ticket): { id, preselect }
   const [openFusion, setOpenFusion] = useState(null)
+  const [bulkMerge, setBulkMerge] = useState(null)   // null | { n } — motivo para fusión en lote (3+)
   const [f, setF] = useState(initialOrg ? { ...BASE_F, org: initialOrg, status: 'all' } : BASE_F)
   const [sel, setSel] = useState(new Set())   // ids seleccionados (acciones en lote)
   // Al llegar desde la pantalla de Organización con un filtro, se aplica (y se ve todo).
@@ -736,18 +737,20 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                   al agente sin saber que esto se puede hacer. */}
               {can('tickets.reply') && (() => {
                 const marcados = (rows || []).filter((x) => sel.has(x.id))
-                const dos = marcados.length === 2
-                const mismo = dos && Number(marcados[0].contact_id) === Number(marcados[1].contact_id)
+                const suf = marcados.length >= 2
+                const mismo = suf && marcados.every((x) => Number(x.contact_id) === Number(marcados[0].contact_id))
                 const libres = marcados.every((x) => !x.merged_into_id)
-                const vale = dos && mismo && libres && marcados[0].contact_id
+                const vale = suf && mismo && libres && marcados[0].contact_id
                 return (
                   <button className="btn ghost sm" disabled={!vale}
-                    title={vale ? 'Juntar los dos en una sola conversación'
-                      : !dos ? 'Marca exactamente dos tickets para fusionarlos'
-                        : !libres ? 'Uno de los dos ya está fusionado'
+                    title={vale ? 'Juntar los seleccionados en una sola conversación'
+                      : !suf ? 'Marca dos o más tickets para fusionarlos'
+                        : !libres ? 'Alguno ya está fusionado en otro'
                           : 'Solo se pueden fusionar tickets del mismo cliente'}
-                    onClick={() => { setOpenFusion({ id: marcados[0].id, preselect: marcados[1].id }) }}>
-                    <Icon.merge /> Fusionar
+                    onClick={() => marcados.length === 2
+                      ? setOpenFusion({ id: marcados[0].id, preselect: marcados[1].id })
+                      : setBulkMerge({ n: marcados.length })}>
+                    <Icon.merge /> Fusionar{marcados.length > 2 ? ` (${marcados.length})` : ''}
                   </button>
                 )
               })()}
@@ -780,6 +783,21 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                     onChange={(lid) => lid && bulk({ op: 'label', label_id: lid, mode: 'add' }, 'Etiquetados')}
                     options={meta.labels.map((l) => ({ value: String(l.id), label: l.name }))} />
                 </div>
+              )}
+              {/* Prioridad y categoría en lote (misma gestión que en la ficha). */}
+              {can('tickets.categorize') && (
+                <>
+                  <div style={{ minWidth: 140 }}>
+                    <Select sm block value="" placeholder="Prioridad…"
+                      onChange={(pr) => pr && bulk({ op: 'priority', priority: pr }, 'Prioridad cambiada')}
+                      options={Object.entries(meta?.priorities || {}).map(([value, label]) => ({ value, label }))} />
+                  </div>
+                  <div style={{ minWidth: 160 }}>
+                    <Select sm block value="" placeholder="Categoría…"
+                      onChange={(cid) => bulk({ op: 'category', category_id: cid || null }, 'Categoría cambiada')}
+                      options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
+                  </div>
+                </>
               )}
               <span className="spacer" />
               <button className="btn ghost sm" onClick={clearSel}>Cancelar</button>
@@ -922,6 +940,14 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             toast(`Tickets fusionados en ${jefeCode}`)
           }} />
       )}
+
+      {bulkMerge && (
+        <BulkMergeDialog n={bulkMerge.n} onCancel={() => setBulkMerge(null)}
+          onConfirm={async (motivo) => {
+            setBulkMerge(null)
+            await bulk({ op: 'merge', reason: motivo }, 'Tickets fusionados')
+          }} />
+      )}
     </>
   )
 }
@@ -986,6 +1012,48 @@ const MOTIVOS_FUSION = ['Duplicado', 'Mismo asunto', 'Abierto por error', 'Conti
 /* El principal por defecto es el MÁS ANTIGUO: es el que el cliente conoce y el que
    suele traer el contexto original. Se puede cambiar en el diálogo. */
 const masAntiguo = (a, b) => (new Date(a.created_at) <= new Date(b.created_at) ? a : b)
+
+/*
+ * Diálogo de MOTIVO para la fusión en lote (3+ tickets del mismo cliente). Para dos, se
+ * usa ModalFusion (permite elegir principal); para 3+, el principal es el más antiguo y
+ * aquí solo se pide el motivo obligatorio.
+ */
+function BulkMergeDialog({ n, onCancel, onConfirm }) {
+  const [motivo, setMotivo] = useState('')
+  const [yendo, setYendo] = useState(false)
+
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && !yendo && onCancel()
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [onCancel, yendo])
+
+  const go = async () => { if (!motivo.trim() || yendo) return; setYendo(true); await onConfirm(motivo.trim()) }
+
+  return (
+    <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && !yendo && onCancel()}>
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <div className="modal-h"><h3>Fusionar {n} tickets</h3>
+          <button className="icon-btn" onClick={onCancel}>✕</button></div>
+        <div className="modal-body">
+          <p className="cfg-hint">Los {n} tickets (del mismo cliente) pasan a ser <b>una sola conversación</b>,
+            ordenada por fecha. El más antiguo se queda como principal.</p>
+          <div className="field">
+            <span className="lbl">Motivo de la fusión</span>
+            <textarea rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ej: el cliente abrió varias incidencias por el mismo problema" autoFocus />
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={onCancel} disabled={yendo}>Cancelar</button>
+          <button className="btn primary" onClick={go} disabled={!motivo.trim() || yendo}>
+            {yendo ? 'Fusionando…' : 'Fusionar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function ModalFusion({ id, preselect = null, meta, onClose, onDone }) {
   const toast = useToast()

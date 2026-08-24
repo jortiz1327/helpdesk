@@ -317,6 +317,22 @@ class TicketService
     }
 
     /**
+     * Cambia la prioridad y lo registra. La prioridad puede traer su propio plazo de
+     * SLA (manda sobre la categoría), así que se recalcula. Devuelve false si no cambia.
+     */
+    public function setPriority(int $ticketId, string $priority, ?int $userId = null): bool
+    {
+        $cur = (string) DB::table('tickets')->where('id', $ticketId)->value('priority');
+        if ($cur === $priority) return false;
+
+        DB::table('tickets')->where('id', $ticketId)->update(['priority' => $priority]);
+        $this->recalcularSla($ticketId);
+        $this->event($ticketId, 'priority', $cur, $priority, $userId);
+        $this->broadcast('priority', $ticketId);
+        return true;
+    }
+
+    /**
      * Cambia el estado y lo registra. Rellena resolved_at / closed_at.
      * Devuelve false si no había cambio real.
      */

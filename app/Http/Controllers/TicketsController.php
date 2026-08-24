@@ -1247,6 +1247,47 @@ class TicketsController extends Controller
                 $n++;
             }
 
+        } elseif ($op === 'priority') {
+            if (!$me->can('tickets.categorize')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
+            $pr = (string) $request->input('priority');
+            if (!array_key_exists($pr, TicketService::priorities())) {
+                return response()->json(['ok' => false, 'error' => 'Prioridad no válida'], 400);
+            }
+            foreach ($visible as $tid) { if ($this->tickets->setPriority($tid, $pr, (int) $me->id)) $n++; }
+
+        } elseif ($op === 'category') {
+            if (!$me->can('tickets.categorize')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
+            $catId = $request->input('category_id');
+            $catId = $catId ? (int) $catId : null;
+            if ($catId && !DB::table('ticket_categories')->where('id', $catId)->exists()) {
+                return response()->json(['ok' => false, 'error' => 'Categoría no válida'], 400);
+            }
+            foreach ($visible as $tid) { $this->tickets->setCategory($tid, $catId, (int) $me->id); $n++; }
+
+        } elseif ($op === 'merge') {
+            // Fusión en lote: todos los seleccionados en UNO. Deben ser del MISMO cliente
+            // (como la fusión individual) y el principal es el más antiguo (id menor).
+            if (!$me->can('tickets.reply')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
+            if (count($visible) < 2) return response()->json(['ok' => false, 'error' => 'Selecciona al menos dos tickets'], 400);
+
+            $motivo = trim((string) $request->input('reason', ''));
+            if ($motivo === '') return response()->json(['ok' => false, 'error' => 'Escribe el motivo de la fusión'], 400);
+
+            $contactos = DB::table('tickets')->whereIn('id', $visible)->distinct()->pluck('contact_id');
+            if ($contactos->count() > 1) {
+                return response()->json(['ok' => false, 'error' => 'Solo se pueden fusionar tickets del mismo cliente'], 400);
+            }
+
+            sort($visible);                          // el principal = el más antiguo
+            $principal = array_shift($visible);
+            $errores = [];
+            foreach ($visible as $tid) {
+                [$ok, $err] = $this->tickets->merge($principal, $tid, (int) $me->id, $motivo);
+                if ($ok) $n++; else $errores[] = $err;
+            }
+            if ($n === 0) return response()->json(['ok' => false, 'error' => $errores[0] ?? 'No se pudo fusionar'], 400);
+            return response()->json(['ok' => true, 'affected' => $n, 'principal' => $principal, 'warnings' => $errores]);
+
         } else {
             return response()->json(['ok' => false, 'error' => 'Operación no válida'], 400);
         }
