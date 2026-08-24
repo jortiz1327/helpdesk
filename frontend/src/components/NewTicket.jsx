@@ -18,14 +18,28 @@ const blank = {
   assigned_to: '',
 }
 
-export default function NewTicket({ user, onCreated, onCancel }) {
+export default function NewTicket({ user, onCreated, onCancel, onOpenTicket }) {
   const toast = useToast()
   const [meta, setMeta] = useState(null)
   const [f, setF] = useState(blank)
   const [saving, setSaving] = useState(false)
+  const [dups, setDups] = useState([])   // incidencias abiertas ya existentes del cliente
   const desc = useRef(null)   // el editor: HTML + adjuntos
 
   useEffect(() => { api.ticketMeta().then(setMeta) }, [])
+
+  // Aviso de duplicado: al escribir el email/teléfono, mira si ese cliente ya tiene
+  // incidencias abiertas (con un respiro para no consultar en cada tecla).
+  useEffect(() => {
+    const email = f.email.trim(), phone = f.phone.trim()
+    if (!email && !phone) { setDups([]); return }
+    const t = setTimeout(() => {
+      api.contactOpenTickets(email, phone)
+        .then((r) => setDups(r?.ok ? (r.tickets || []) : []))
+        .catch(() => setDups([]))
+    }, 500)
+    return () => clearTimeout(t)
+  }, [f.email, f.phone])
 
   const can = (p) => (user?.permissions || []).includes(p)
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v?.target ? v.target.value : v }))
@@ -87,6 +101,27 @@ export default function NewTicket({ user, onCreated, onCancel }) {
                 <input value={f.phone} onChange={set('phone')} placeholder="+34 600 000 000" />
               </label>
             </div>
+
+            {/* AVISO DE DUPLICADO: no bloquea (a veces sí es un caso nuevo), solo avisa
+                y deja abrir la existente para añadir a ella en vez de duplicar. */}
+            {dups.length > 0 && (
+              <div className="nt-dup">
+                <div className="nt-dup-h">
+                  <Icon.warn /> Este cliente ya tiene {dups.length} incidencia{dups.length > 1 ? 's' : ''} abierta{dups.length > 1 ? 's' : ''}
+                </div>
+                <div className="nt-dup-list">
+                  {dups.map((t) => (
+                    <button key={t.id} type="button" className="nt-dup-item"
+                      onClick={() => onOpenTicket?.(t.id)} title="Abrir esta incidencia">
+                      <b className="mono">{t.code}</b>
+                      <span className="nt-dup-subj">{t.subject || 'Sin asunto'}</span>
+                      <small>{t.agent_name || 'Sin asignar'}</small>
+                    </button>
+                  ))}
+                </div>
+                <p className="nt-dup-note">Puedes añadir a una existente en vez de crear otra.</p>
+              </div>
+            )}
           </div>
 
           {/* --- Problema --- */}

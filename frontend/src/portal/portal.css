@@ -306,6 +306,18 @@
   /* ---- Crear: categoría en chips ---- */
   .acc-aviso{background:var(--wait-soft);color:var(--wait);font-size:13px;font-weight:600;
     text-align:center;padding:10px 12px;border-radius:10px;margin-bottom:14px}
+  /* Aviso de duplicado: el cliente ya tiene incidencias abiertas. */
+  .dup-open{background:var(--wait-soft);border:1px solid var(--wait);border-radius:12px;padding:12px 14px;margin:0 0 16px}
+  .dup-open>b{color:var(--wait);font-size:13.5px}
+  .dup-open>p{color:var(--ink-2);font-size:12.5px;margin:4px 0 10px}
+  .dup-open-list{display:flex;flex-direction:column;gap:6px}
+  .dup-open-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;
+    border:1px solid var(--line-2);border-radius:9px;background:var(--surface);cursor:pointer}
+  .dup-open-item:hover{border-color:var(--brand)}
+  .dup-open-item b{color:var(--brand);font-size:12.5px;flex:0 0 auto}
+  .dup-open-item span{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .dup-open .linkbtn{margin-top:10px}
+
   .catchips{display:flex;flex-wrap:wrap;gap:8px}
   .catchip{border:1.5px solid var(--line-2);background:var(--surface-2);color:var(--ink-2);
     font-size:14px;font-weight:600;font-family:inherit;padding:9px 15px;border-radius:999px;cursor:pointer;transition:.14s}

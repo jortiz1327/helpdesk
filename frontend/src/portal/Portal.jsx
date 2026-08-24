@@ -620,7 +620,17 @@ function Crear({ go, prefill, onOpen, onExpire }) {
   const [err, setErr] = useState('')
   const [okCode, setOkCode] = useState(null)
   const [copiado, setCopiado] = useState(false)
+  const [abiertas, setAbiertas] = useState([])   // incidencias abiertas del cliente (si ya está identificado)
   const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())
+
+  // Aviso de duplicado: solo para quien YA está identificado (con pase). No se sondea
+  // por un correo suelto —sería filtrar si un email tiene incidencias— sino sus propias.
+  useEffect(() => {
+    if (!getPass()) return
+    portal.tickets()
+      .then((r) => { if (r.ok) setAbiertas((r.tickets || []).filter((x) => x.fase !== 'resuelto')) })
+      .catch(() => {})
+  }, [])
 
   // Al cargar las categorías se elige la vinculada de la FAQ (si vino de un CTA) o,
   // en su defecto, la primera de la lista.
@@ -673,6 +683,21 @@ function Crear({ go, prefill, onOpen, onExpire }) {
       <button className="back" onClick={() => go('home')}>{I.back}{t('back_home')}</button>
       <h3 className="ttl">{t('create_form_title')}</h3>
       <p className="desc">{t('create_form_desc')}</p>
+
+      {abiertas.length > 0 && (
+        <div className="dup-open">
+          <b>{t('dup_open_title')}</b>
+          <p>{t('dup_open_sub')}</p>
+          <div className="dup-open-list">
+            {abiertas.slice(0, 4).map((tk) => (
+              <button key={tk.code} type="button" className="dup-open-item" onClick={() => onOpen(tk.code)}>
+                <b>{tk.code}</b><span>{tk.subject}</span>
+              </button>
+            ))}
+          </div>
+          <button type="button" className="linkbtn" onClick={() => go('mis')}>{t('my_tickets')} {I.arrow}</button>
+        </div>
+      )}
 
       <label className="f"><span className="lab">{t('your_email')}</span>
         <input className="inp" type="email" value={email} autoFocus autoComplete="email"

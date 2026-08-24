@@ -2091,6 +2091,21 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .nt-sec { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 4px; }
 .nt-sec svg { width: 17px; height: 17px; fill: var(--primary); }
 .nt-help { font-size: 12px; color: var(--ink-2); margin: 0 0 14px; }
+
+/* Aviso de duplicado en «Nuevo ticket»: ámbar suave, no bloquea, invita a abrir la existente. */
+.nt-dup { margin-top: 14px; padding: 12px 14px; border: 1px solid #f4d48a; border-radius: 12px;
+  background: color-mix(in srgb, #f59e0b 8%, var(--panel)); }
+.nt-dup-h { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: #a15c00; }
+.nt-dup-h svg { width: 16px; height: 16px; fill: currentColor; flex: 0 0 auto; }
+.nt-dup-list { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 6px; }
+.nt-dup-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel);
+  transition: border-color .14s, box-shadow .14s; }
+.nt-dup-item:hover { border-color: var(--primary); box-shadow: var(--shadow-sm, 0 4px 14px rgba(20,40,70,.09)); }
+.nt-dup-item .mono { font-size: 12.5px; color: var(--primary); flex: 0 0 auto; }
+.nt-dup-subj { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nt-dup-item small { color: var(--ink-3); font-size: 11.5px; flex: 0 0 auto; }
+.nt-dup-note { margin: 4px 0 0; font-size: 11.5px; color: #a15c00; }
 .field .lbl em { font-style: normal; color: var(--danger); margin-left: 2px; }
 .nt-card textarea { resize: vertical; min-height: 120px; font-family: inherit; }
 

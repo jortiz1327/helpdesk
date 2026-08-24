@@ -986,6 +986,11 @@ export default function App() {
                             <NewTicket
                                 user={auth.user}
                                 onCreated={() => setView("tickets")}
+                                onOpenTicket={(id) => {
+                                    setTicketsTab("tickets");
+                                    setTicketAbierto(id);
+                                    setView("tickets");
+                                }}
                                 onCancel={() => setView("support")}
                             />
                         )}

@@ -46,6 +46,7 @@ class TicketsController extends Controller
             'assign' => $this->assign($request),
             'snooze'   => $this->snoozeTicket($request),
             'unsnooze' => $this->unsnoozeTicket($request),
+            'contact_open' => $this->contactOpen($request),
             'category' => $this->setCategory($request),
             'bulk'   => $this->bulk($request),
             'create' => $this->create($request),
@@ -1195,6 +1196,37 @@ class TicketsController extends Controller
 
         $this->tickets->wake($id, 'manual');
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * ¿Este cliente (por email o teléfono) ya tiene incidencias ABIERTAS? Lo usa el
+     * formulario de «Nuevo ticket» para avisar antes de duplicar. Devuelve las abiertas
+     * del contacto (código, asunto, agente) o lista vacía si no hay contacto/abiertas.
+     */
+    protected function contactOpen(Request $request)
+    {
+        $me = $request->user();
+        if (!$me->can('tickets.create')) return response()->json(['ok' => false], 403);
+
+        $email = trim((string) $request->query('email', ''));
+        $phone = preg_replace('/\D+/', '', (string) $request->query('phone', ''));
+        if ($email === '' && $phone === '') return response()->json(['ok' => true, 'tickets' => []]);
+
+        $cid = DB::table('contacts')
+            ->when($email !== '', fn ($q) => $q->whereRaw('LOWER(email) = ?', [mb_strtolower($email)]),
+                fn ($q) => $q->where('wa_id', $phone))
+            ->value('id');
+        if (!$cid) return response()->json(['ok' => true, 'tickets' => []]);
+
+        $tickets = DB::table('tickets as t')
+            ->leftJoin('users as u', 'u.id', '=', 't.assigned_to')
+            ->where('t.contact_id', $cid)
+            ->whereIn('t.status', TicketService::OPEN_STATUSES)
+            ->whereNull('t.merged_into_id')->where('t.channel', '!=', 'cron')
+            ->orderByDesc('t.last_message_at')->limit(10)
+            ->get(['t.id', 't.code', 't.subject', 't.status', 'u.name as agent_name', 't.created_at']);
+
+        return response()->json(['ok' => true, 'tickets' => $tickets]);
     }
 
     /** Traduce un preset («el lunes», «mañana»…) a una fecha/hora concreta. */
