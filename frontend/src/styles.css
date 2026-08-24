@@ -1410,12 +1410,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .safety-cap { width: 90px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--bg); color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; outline: none; }
 .safety-cap:focus { border-color: var(--primary); }
 
-/* --- Conmutador de vista Lista / Kanban (cabecera de Contactos) --- */
-.view-toggle { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px; padding: 3px; gap: 2px; }
-.view-toggle button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--ink-2); transition: 0.13s; }
-.view-toggle button svg { width: 16px; height: 16px; fill: currentColor; }
-.view-toggle button:hover { color: var(--ink); }
-.view-toggle button.on { background: var(--panel); color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+/* Conmutador Lista / Kanban (Contactos): estilo unificado más abajo (con .seg). */
 
 /* Multi-agente: asignación y autoría en el Inbox */
 .assign-filter { margin-top: 9px; }
@@ -1531,11 +1526,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .wn-meta b { font-size: 14px; }
 .wn-meta span { font-size: 12.5px; color: var(--ink-2); }
 
-/* Selector segmentado (destino de campaña) */
-.seg { display: inline-flex; gap: 4px; background: var(--panel-2); border-radius: 11px; padding: 4px; margin-top: 6px; }
-.seg button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
-.seg button svg { width: 16px; height: 16px; fill: currentColor; }
-.seg button.on { background: var(--primary); color: #fff; }
+/* (El selector segmentado `.seg` está unificado más abajo, junto a kb-seg/tn-vista/view-toggle.) */
 
 /* Pantalla de Contactos */
 .cmp-select.sm { padding: 7px 10px; font-size: 12.5px; }
@@ -2300,12 +2291,22 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cmp-wrap { border-top: 1px solid var(--line); }
 .cmp-wrap .cmp { border-top: 0; }
 
-/* --- Conmutador Tickets / Agentes --- */
-.seg { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-2); gap: 2px; }
-.seg button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border: 0; border-radius: 8px; background: none; color: var(--ink-2); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: 0.14s; }
-.seg button:hover { color: var(--ink); }
-.seg button.on { background: var(--primary); color: #fff; }
-.seg button svg { width: 14px; height: 14px; fill: currentColor; }
+/* --- Controles segmentados UNIFICADOS (píldoras con activo relleno) -----------
+   Un solo estilo para .seg / .kb-seg / .tn-vista / .view-toggle: antes cada uno
+   derivaba en tamaños y estados distintos. Las pestañas con subrayado de la ficha
+   (.tkm-tabs) son OTRO patrón (tabs, no toggle) y van aparte. */
+.seg, .kb-seg, .tn-vista, .view-toggle {
+  display: inline-flex; padding: 3px; gap: 3px;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--panel-2);
+}
+.seg button, .kb-seg button, .tn-vista button, .view-toggle button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px;
+  border: 0; border-radius: 8px; background: none; color: var(--ink-2);
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.14s;
+}
+.seg button:hover, .kb-seg button:hover, .tn-vista button:hover, .view-toggle button:hover { color: var(--ink); }
+.seg button.on, .kb-seg button.on, .tn-vista button.on, .view-toggle button.on { background: var(--primary); color: #fff; }
+.seg button svg, .kb-seg button svg, .tn-vista button svg, .view-toggle button svg { width: 15px; height: 15px; fill: currentColor; }
 
 /* --- Gestión de agentes --- */
 .ag-alert { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px 16px; border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 13px; background: rgba(245, 158, 11, 0.10); cursor: pointer; transition: 0.15s; }
@@ -2411,10 +2412,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cnd-tx small { display: block; font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 620px; margin-top: 1px; }
 
 /* --- Base de conocimiento --- */
-.kb-seg { display: inline-flex; gap: 4px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; padding: 4px; margin: 0 0 16px; }
-.kb-seg button { display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; color: var(--ink-2); font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer; transition: 0.14s; }
-.kb-seg button:hover { color: var(--ink); }
-.kb-seg button.on { background: var(--primary); color: #fff; }
+.kb-seg { margin: 0 0 16px; }   /* estilo base unificado con .seg; aquí solo el margen propio */
 .kb-seg .kb-n { font-size: 11px; font-weight: 700; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-grid; place-items: center; background: rgba(255,255,255,0.22); }
 .kb-seg button:not(.on) .kb-n { background: var(--hover); color: var(--ink-2); }
 .faq-body { font-size: 12.5px; color: var(--ink-2); margin-top: 5px; white-space: pre-line; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -2602,12 +2600,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tn-nav b { font-size: 13.5px; min-width: 190px; text-align: center; }
 
 /* Calendario / listado: la misma información leída de dos formas. */
-.tn-vista { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
-.tn-vista button { display: flex; align-items: center; gap: 6px; padding: 6px 11px; border: 0; background: transparent; color: var(--ink-2); font-size: 12.5px; cursor: pointer; }
-.tn-vista button + button { border-left: 1px solid var(--line); }
-.tn-vista button svg { width: 14px; height: 14px; fill: currentColor; }
-.tn-vista button:hover { background: var(--hover); color: var(--ink); }
-.tn-vista button.on { background: var(--primary); color: #fff; }
+/* .tn-vista: estilo unificado con .seg (arriba). */
 
 /* --- Listado: una fila por semana, y debajo solo lo que se sale de lo normal --- */
 .tn-lista { padding: 0; overflow: hidden; }
