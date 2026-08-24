@@ -56,5 +56,16 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Errores de validación en formato propio de la API: el frontend lee `r.error`
+        // (no el `{message, errors}` por defecto de Laravel). Así se puede validar con
+        // reglas (`$request->validate([...])`) sin romper cómo la app muestra los errores.
+        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'ok'     => false,
+                    'error'  => $e->validator->errors()->first(),   // el primero, para el toast
+                    'errors' => $e->errors(),                        // por si algún día se usan campo a campo
+                ], 422);
+            }
+        });
     })->create();

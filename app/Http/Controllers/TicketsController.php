@@ -794,7 +794,8 @@ class TicketsController extends Controller
         if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
         if (!$me->can('tickets.reply')) return response()->json(['ok' => false, 'error' => 'No tienes permiso'], 403);
 
-        $id = (int) $request->input('id');
+        $data = $request->validate(['id' => ['required', 'integer']], ['id.required' => 'Falta el ticket']);
+        $id = (int) $data['id'];
         $t  = (clone $this->baseQuery($me))->where('t.id', $id)
             ->first(['t.id', 't.code', 't.subject', 't.channel', 't.contact_id',
                      'c.email as contact_email', 'c.name as contact_name', 'c.wa_id as contact_wa',
@@ -936,8 +937,15 @@ class TicketsController extends Controller
         if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
         if (!$me->can('tickets.reply')) return response()->json(['ok' => false, 'error' => 'No tienes permiso'], 403);
 
-        $principal = (int) $request->input('into');
-        $absorbido = (int) $request->input('from');
+        $data = $request->validate([
+            'into' => ['required', 'integer'],
+            'from' => ['required', 'integer'],
+        ], [
+            'into.required' => 'Falta el ticket principal',
+            'from.required' => 'Falta el ticket a fusionar',
+        ]);
+        $principal = (int) $data['into'];
+        $absorbido = (int) $data['from'];
 
         // Los dos tienen que estar dentro de lo que este usuario ve.
         foreach ([$principal, $absorbido] as $x) {
@@ -1039,22 +1047,28 @@ class TicketsController extends Controller
         $me = $request->user();
         if (!$me->can('tickets.close')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
 
-        $id = (int) $request->input('id');
-        $st = (string) $request->input('status');
-        if (!array_key_exists($st, TicketService::STATUSES)) {
-            return response()->json(['ok' => false, 'error' => 'Estado no válido'], 400);
-        }
+        $data = $request->validate([
+            'id'     => ['required', 'integer'],
+            'status' => ['required', \Illuminate\Validation\Rule::in(array_keys(TicketService::STATUSES))],
+        ], [
+            'id.required'     => 'Falta el ticket',
+            'status.required' => 'Falta el estado',
+            'status.in'       => 'Estado no válido',
+        ]);
 
-        $this->tickets->setStatus($id, $st, (int) $me->id);
+        $this->tickets->setStatus((int) $data['id'], $data['status'], (int) $me->id);
         return response()->json(['ok' => true]);
     }
 
     protected function assign(Request $request)
     {
-        $me  = $request->user();
-        $id  = (int) $request->input('id');
-        $uid = $request->input('user_id');
-        $target = $uid ? (int) $uid : null;
+        $me   = $request->user();
+        $data = $request->validate([
+            'id'      => ['required', 'integer'],
+            'user_id' => ['nullable', 'integer'],
+        ], ['id.required' => 'Falta el ticket']);
+        $id     = (int) $data['id'];
+        $target = !empty($data['user_id']) ? (int) $data['user_id'] : null;
 
         /*
          * Dos permisos distintos:
@@ -1152,6 +1166,20 @@ class TicketsController extends Controller
             return response()->json(['ok' => false, 'error' => 'No tienes permiso para crear tickets'], 403);
         }
 
+        // Reglas simples (nombre, asunto, email válido, y al menos email O teléfono).
+        $request->validate([
+            'name'    => ['required'],
+            'email'   => ['nullable', 'email', 'required_without:phone'],
+            'phone'   => ['nullable', 'required_without:email'],
+            'subject' => ['required'],
+        ], [
+            'name.required'          => 'El nombre es obligatorio',
+            'subject.required'       => 'El asunto es obligatorio',
+            'email.email'            => 'El email no es válido',
+            'email.required_without' => 'Indica al menos un email o un teléfono',
+            'phone.required_without' => 'Indica al menos un email o un teléfono',
+        ]);
+
         $name    = trim((string) $request->input('name'));
         $email   = trim((string) $request->input('email'));
         $phone   = preg_replace('/\D+/', '', (string) $request->input('phone'));
@@ -1162,13 +1190,8 @@ class TicketsController extends Controller
         $plain = HtmlSanitizer::toText($body);
         $files = $request->file('files', []);
 
-        if ($name === '')    return response()->json(['ok' => false, 'error' => 'El nombre es obligatorio'], 400);
-        if ($email === '' && $phone === '') return response()->json(['ok' => false, 'error' => 'Indica al menos un email o un teléfono'], 400);
-        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return response()->json(['ok' => false, 'error' => 'El email no es válido'], 400);
-        }
-        if ($subject === '') return response()->json(['ok' => false, 'error' => 'El asunto es obligatorio'], 400);
-        // Vale con que haya texto O adjuntos: a veces una captura lo dice todo.
+        // Cross-field que no es una regla simple: vale con TEXTO o ADJUNTOS (a veces una
+        // captura lo dice todo).
         if ($plain === '' && !$files) {
             return response()->json(['ok' => false, 'error' => 'Describe el problema o adjunta un archivo'], 400);
         }
