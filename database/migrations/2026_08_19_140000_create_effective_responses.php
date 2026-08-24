@@ -27,7 +27,9 @@ return new class extends Migration
             $table->timestamp('created_at')->nullable()->index();
 
             // Búsqueda por parecido (asunto + consulta del cliente).
-            $table->fullText('keywords', 'efres_kw_ft');
+            if (\Illuminate\Support\Facades\DB::getDriverName() === 'mysql') {
+                $table->fullText('keywords', 'efres_kw_ft');   // FULLTEXT solo en MySQL (tests con sqlite)
+            }
         });
     }
 

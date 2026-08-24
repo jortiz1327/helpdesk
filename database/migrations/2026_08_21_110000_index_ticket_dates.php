@@ -36,6 +36,7 @@ return new class extends Migration
 
     protected function existe(string $indice): bool
     {
+        if (DB::getDriverName() !== 'mysql') return false;   // sqlite (tests): se añaden sin comprobar
         foreach (DB::select('SHOW INDEX FROM tickets') as $i) {
             if ($i->Key_name === $indice) return true;
         }

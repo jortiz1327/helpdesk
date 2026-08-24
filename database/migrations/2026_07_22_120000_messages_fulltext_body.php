@@ -21,6 +21,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') return;   // FULLTEXT solo en MySQL (los tests usan sqlite)
         if (!$this->existe()) {
             DB::statement('CREATE FULLTEXT INDEX messages_body_fulltext ON messages (body)');
         }
@@ -28,6 +29,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') return;
         if ($this->existe()) {
             DB::statement('DROP INDEX messages_body_fulltext ON messages');
         }
