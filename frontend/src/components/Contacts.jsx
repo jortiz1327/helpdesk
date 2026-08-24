@@ -7,6 +7,7 @@ import LabelManager from './LabelManager.jsx'
 import Select from './Select.jsx'
 import SedeSelect from './SedeSelect.jsx'
 import Kanban from './Kanban.jsx'
+import LoadError from './LoadError.jsx'
 
 export default function Contacts({ onOpen, area = '' }) {
   const toast = useToast()
@@ -16,6 +17,7 @@ export default function Contacts({ onOpen, area = '' }) {
   // Las difusiones y las altas/bajas son de Campañas; en Helpdesk se ocultan.
   const esCampanas = area !== 'helpdesk'
   const [contacts, setContacts] = useState(null)
+  const [err, setErr] = useState(false)
   const [labels, setLabels] = useState([])
   const [phonebooks, setPhonebooks] = useState([])
   const [q, setQ] = useState('')
@@ -27,7 +29,10 @@ export default function Contacts({ onOpen, area = '' }) {
   const [bulkPbId, setBulkPbId] = useState('')
 
   const load = useCallback(() => {
-    api.listContacts(q, labelFilter, optoutFilter, area).then((d) => setContacts(d.contacts || []))
+    setErr(false)
+    api.listContacts(q, labelFilter, optoutFilter, area)
+      .then((d) => d && Array.isArray(d.contacts) ? setContacts(d.contacts) : setErr(true))
+      .catch(() => setErr(true))
   }, [q, labelFilter, optoutFilter, area])
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [load])
   const loadAux = useCallback(() => {
@@ -132,7 +137,27 @@ export default function Contacts({ onOpen, area = '' }) {
             </div>
           )}
 
-          {contacts === null ? <div className="center-load"><div className="spinner" /></div> :
+          {err && contacts === null ? (
+            <div className="card"><LoadError onRetry={load} msg="No se pudieron cargar los contactos" /></div>
+          ) : contacts === null ? (
+            <div className="card" style={{ padding: 0 }} aria-hidden="true">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div className="ct-row" key={i}>
+                  <span className="ct-check"><span className="sk sk-chk" /></span>
+                  <span className="ct-name">
+                    <span className="sk sk-av" />
+                    <span className="ct-meta" style={{ display: 'grid', gap: 6 }}>
+                      <span className="sk" style={{ width: 130 }} />
+                      <span className="sk" style={{ width: 84, height: 9 }} />
+                    </span>
+                  </span>
+                  <span className="ct-labels"><span className="sk sk-pill" /></span>
+                  <span className="ct-date"><span className="sk" style={{ width: 54 }} /></span>
+                  <span className="ct-edit" />
+                </div>
+              ))}
+            </div>
+          ) :
             contacts.length === 0 ? (
               <div className="empty"><div className="ico"><Icon.user /></div><p>No hay contactos {q || labelFilter ? 'con ese filtro' : 'todavía'}.</p></div>
             ) : (

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import TrendChart from './TrendChart.jsx'
+import LoadError from './LoadError.jsx'
 
 /* -------------------------------------------------------------------------
  * INFORMES del helpdesk (rendimiento): KPIs + por agente / categoría / canal,
@@ -53,11 +54,14 @@ function Tabla({ rows, primeraCol, colorDot }) {
 export default function Reports({ onGo }) {
   const [period, setPeriod] = useState('30d')
   const [d, setD] = useState(null)
+  const [err, setErr] = useState(false)
 
-  useEffect(() => {
-    setD(null)
-    api.reports(period).then((r) => setD(r.ok ? r : { kpis: {}, by_agent: [], by_category: [], by_channel: {} }))
+  const load = useCallback(() => {
+    setD(null); setErr(false)
+    api.reports(period).then((r) => r && r.ok ? setD(r) : setErr(true))
+      .catch(() => setErr(true))
   }, [period])
+  useEffect(() => { load() }, [load])
 
   const k = d?.kpis || {}
   const sla = d?.sla_activo
@@ -83,7 +87,18 @@ export default function Reports({ onGo }) {
       </header>
 
       <div className="page-scroll"><div className="page" style={{ maxWidth: 1000 }}>
-        {d === null ? <div className="center-load"><div className="spinner" /></div> : (
+        {err && d === null ? (
+          <LoadError onRetry={load} msg="No se pudieron cargar los informes" />
+        ) : d === null ? (
+          <div className="stat-grid rep-kpis" aria-hidden="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div className="stat-card" key={i}>
+                <div className="stat-num"><span className="sk" style={{ width: 54, height: 26 }} /></div>
+                <div className="stat-sub"><span className="sk" style={{ width: 72, height: 10 }} /></div>
+              </div>
+            ))}
+          </div>
+        ) : (
           <>
             <div className="stat-grid rep-kpis">
               <KPI n={k.total} label="Tickets" />

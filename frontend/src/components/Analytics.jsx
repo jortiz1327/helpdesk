@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
+import LoadError from './LoadError.jsx'
 
 const fmtDur = (s) => {
   if (s == null) return '—'
@@ -31,10 +32,12 @@ function Bars({ items, color }) {
 
 export default function Analytics() {
   const [d, setD] = useState(null)
+  const [err, setErr] = useState(false)
   const [allLabels, setAllLabels] = useState(false) // ver todas las etiquetas o solo el top
-  const load = useCallback(() => { api.analytics().then((r) => setD(r.ok ? r : null)) }, [])
+  const load = useCallback(() => { setErr(false); api.analytics().then((r) => r.ok ? setD(r) : setErr(true)).catch(() => setErr(true)) }, [])
   useEffect(() => { load() }, [load])
 
+  if (err && !d) return <LoadError onRetry={load} msg="No se pudieron cargar las analíticas" />
   if (!d) return <div className="center-load"><div className="spinner" /></div>
 
   const c = d.campaigns

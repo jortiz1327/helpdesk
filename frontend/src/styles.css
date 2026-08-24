@@ -545,6 +545,27 @@ input, textarea, select { font-family: inherit; }
 .sk-c.l2 { height: 11px; width: 85%; }
 @keyframes shine { to { background-position: -200% 0; } }
 
+/* Skeletons de carga reutilizables (tema claro y oscuro). Reemplazan el spinner a
+   pantalla completa en la tabla de tickets, los KPIs de Informes y la lista de
+   contactos: se ve la estructura al instante y la app «se siente» más rápida. */
+:root { --skel-1: #172530; --skel-2: #223039; }
+:root[data-theme="light"] { --skel-1: #e6eaef; --skel-2: #f2f4f8; }
+.sk { display: inline-block; height: 12px; border-radius: 6px; vertical-align: middle;
+  background: linear-gradient(90deg, var(--skel-1) 25%, var(--skel-2) 50%, var(--skel-1) 75%);
+  background-size: 200% 100%; animation: shine 1.3s infinite; }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+.sk-block { display: block; }
+.sk-chk   { width: 16px; height: 16px; border-radius: 4px; }
+.sk-badge { width: 26px; height: 18px; border-radius: 6px; }
+.sk-pill  { width: 62px; height: 20px; border-radius: 999px; }
+.sk-av    { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; }
+.tk-skel td { padding: 13px 12px; }
+
+/* Estado de error de carga (con reintento), en vez de spinner infinito. */
+.load-err { display: grid; place-items: center; gap: 10px; padding: 48px 20px; text-align: center; color: var(--ink-2); }
+.load-err svg { width: 30px; height: 30px; fill: var(--warn); }
+.load-err p { margin: 0; font-size: 14px; }
+
 .boot { height: 100vh; display: grid; place-items: center; background: var(--bg); }
 
 /* ===========================================================================

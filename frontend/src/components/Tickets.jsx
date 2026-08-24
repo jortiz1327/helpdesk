@@ -10,6 +10,7 @@ import OrgFilter from './OrgFilter.jsx'
 import Composer from './Composer.jsx'
 import Agents from './Agents.jsx'
 import CronAlerts from './CronAlerts.jsx'
+import LoadError from './LoadError.jsx'
 import { onTicketActivity } from '../realtime.js'
 
 /* Enter/Espacio activan una fila clicable con el teclado (Espacio sin hacer scroll
@@ -20,6 +21,29 @@ const teclaAbrir = (fn) => (e) => {
   // (checkbox, Selects): si no, marcar el checkbox con Espacio abriría el ticket.
   if (e.target !== e.currentTarget) return
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() }
+}
+
+/* Fila «fantasma» mientras carga la bandeja: imita las columnas con shimmer, en vez
+   de un spinner que sustituye toda la tabla. Se siente más rápida y no salta el layout. */
+function SkelRow({ canTimes }) {
+  return (
+    <tr className="tk-skel" aria-hidden="true">
+      <td className="tk-chk"><span className="sk sk-chk" /></td>
+      <td><span className="sk" style={{ width: 80 }} /></td>
+      <td><span className="sk sk-badge" /></td>
+      <td>
+        <span className="sk sk-block" style={{ width: '70%' }} />
+        <span className="sk sk-block" style={{ width: '45%', height: 9, marginTop: 5 }} />
+      </td>
+      <td><span className="sk" style={{ width: '85%' }} /></td>
+      <td><span className="sk" style={{ width: 66 }} /></td>
+      <td><span className="sk" style={{ width: 66 }} /></td>
+      <td><span className="sk sk-pill" /></td>
+      <td><span className="sk sk-pill" /></td>
+      {canTimes && <><td><span className="sk" style={{ width: 40 }} /></td><td><span className="sk" style={{ width: 40 }} /></td></>}
+      <td><span className="sk" style={{ width: 52 }} /></td>
+    </tr>
+  )
 }
 
 /* ---------------------------------------------------------------------------
@@ -306,6 +330,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   const [crones, setCrones] = useState(0)     // crones fallando, para el distintivo
   const [meta, setMeta] = useState(null)
   const [rows, setRows] = useState(null)
+  const [err, setErr] = useState(false)   // fallo de carga de la bandeja
   const [canTimes, setCanTimes] = useState(false)
   const [counts, setCounts] = useState({})
   const [open, setOpen] = useState(initialTicket)   // id del ticket abierto en el modal
@@ -333,14 +358,16 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   const can = (p) => (user?.permissions || []).includes(p)
 
   const load = useCallback(() => {
+    setErr(false)
     api.listTickets({ ...f, page, per_page: perPage }).then((d) => {
-      setRows(d.tickets || [])
+      if (!d || !Array.isArray(d.tickets)) { setErr(true); return }   // 500/no-JSON → error, no lista vacía falsa
+      setRows(d.tickets)
       setCanTimes(!!d.can_times)
       setCounts(d.counts || {})
       setPag({ total: d.total ?? 0, pages: d.pages ?? 1 })
       // El servidor recorta si pides una página que ya no existe (p. ej. tras filtrar).
       if (d.page && d.page !== page) setPage(d.page)
-    })
+    }).catch(() => setErr(true))
   }, [f, page, perPage])
 
   // Al cambiar de filtro o de tamaño, se vuelve a la primera página: quedarse en la
@@ -653,7 +680,9 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
           )}
 
           {/* --- Tabla --- */}
-          {rows === null ? <div className="center-load"><div className="spinner" /></div> : rows.length === 0 ? (
+          {err && rows === null ? (
+            <div className="card"><LoadError onRetry={load} msg="No se pudo cargar la bandeja" /></div>
+          ) : rows !== null && rows.length === 0 ? (
             <div className="card tk-empty">
               <div className="e-ic"><Icon.check style={{ width: 26, height: 26, fill: 'var(--ink-2)' }} /></div>
               <h3>{refined ? 'Sin resultados' : viewOn(VIEWS[1]) ? '¡Todo respondido!' : 'Nada por aquí'}</h3>
@@ -677,7 +706,9 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((t) => {
+                  {rows === null
+                    ? Array.from({ length: 8 }).map((_, i) => <SkelRow key={i} canTimes={canTimes} />)
+                    : rows.map((t) => {
                     const waiting = t.last_direction === 'in'   // habló el cliente: nos toca
                     return (
                       <tr key={t.id} className={`${waiting ? 'wait' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}

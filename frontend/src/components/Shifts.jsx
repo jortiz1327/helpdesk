@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
+import LoadError from './LoadError.jsx'
 
 /* ---------------------------------------------------------------------------
  * CUADRANTE DE TURNOS — sustituye al Excel de soporte.
@@ -87,12 +88,14 @@ export default function Shifts() {
   const [vista, setVista] = useState(() => localStorage.getItem('turnos_vista') || 'cal')
   const cambiarVista = (v) => { setVista(v); localStorage.setItem('turnos_vista', v) }
 
-  const load = useCallback(() => { api.getShiftMonth(mes).then(setD) }, [mes])
+  const [err, setErr] = useState(false)
+  const load = useCallback(() => { setErr(false); api.getShiftMonth(mes).then((r) => r && Array.isArray(r.days) ? setD(r) : setErr(true)).catch(() => setErr(true)) }, [mes])
   useEffect(() => { load() }, [load])
 
   // El día abierto se relee del mes recargado: si no, el panel se queda con datos viejos.
   const diaVivo = dia && d ? d.days.find((x) => x.date === dia.date) || dia : dia
 
+  if (err && !d) return <LoadError onRetry={load} msg="No se pudo cargar el cuadrante" />
   if (!d) return <div className="center-load"><div className="spinner" /></div>
 
   const puedeEditar = !!d.can_edit
