@@ -456,6 +456,52 @@ class TicketService
     }
 
     /**
+     * POSPONER el ticket («snooze»): lo aparta de la cola hasta una FECHA ($until) o
+     * hasta que el CLIENTE RESPONDA ($wakeOnReply, sin fecha). Es del ticket, no un
+     * recordatorio personal: quien lo pospone ($userId) es a quien se le recuerda al
+     * despertar. $reason es un motivo corto opcional («esperando repuesto»).
+     */
+    public function snooze(int $ticketId, ?\DateTimeInterface $until, bool $wakeOnReply, ?int $userId, ?string $reason = null): void
+    {
+        $reason = $reason !== null ? mb_substr(trim($reason), 0, 160) : null;
+
+        DB::table('tickets')->where('id', $ticketId)->update([
+            'snoozed_until'        => $until,
+            'snooze_wake_on_reply' => $wakeOnReply ? 1 : 0,
+            'snoozed_by'           => $userId,
+            'snoozed_at'           => now(),
+            'snooze_reason'        => $reason ?: null,
+        ]);
+
+        $to = $wakeOnReply ? 'reply' : ($until ? $until->format('Y-m-d H:i') : null);
+        $this->event($ticketId, 'snooze', null, $to, $userId, $reason ?: null);
+        $this->broadcast('snoozed', $ticketId);
+    }
+
+    /**
+     * DESPERTAR un ticket dormido: vuelve a la cola y se limpian sus campos de snooze.
+     * $motivo: 'reply' (el cliente respondió), 'due' (venció la fecha) o 'manual'
+     * (reactivado a mano). El despertar se registra a nombre de QUIEN LO POSPUSO, para
+     * alimentar su recibimiento matutino. No hace nada si el ticket no estaba dormido.
+     */
+    public function wake(int $ticketId, string $motivo = 'manual'): void
+    {
+        $t = DB::table('tickets')->where('id', $ticketId)->first(['snoozed_at', 'snoozed_by']);
+        if (!$t || !$t->snoozed_at) return;   // no estaba dormido
+
+        DB::table('tickets')->where('id', $ticketId)->update([
+            'snoozed_until'        => null,
+            'snooze_wake_on_reply' => 0,
+            'snoozed_by'           => null,
+            'snoozed_at'           => null,
+            'snooze_reason'        => null,
+        ]);
+
+        $this->event($ticketId, 'snooze_wake', null, $motivo, $t->snoozed_by ? (int) $t->snoozed_by : null);
+        $this->broadcast('snoozed', $ticketId);
+    }
+
+    /**
      * ESCALADO al vencer el SLA. Lo llama el cron `sla:check` UNA sola vez por ticket
      * (protegido por `sla_breached_at`). Si el escalado está activo:
      *   1) sube la prioridad a la de escalado (por defecto la ACTIVA más alta),

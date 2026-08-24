@@ -31,6 +31,7 @@ import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
+import MorningBriefing from "./components/MorningBriefing.jsx";
 import AreaChooser from "./components/AreaChooser.jsx";
 import Users from "./components/Users.jsx";
 import Analytics from "./components/Analytics.jsx";
@@ -723,6 +724,15 @@ export default function App() {
         <ToastCtx.Provider value={toast}>
             <ConfirmCtx.Provider value={confirm}>
                 <div className="app">
+                    {/* Recibimiento matutino: tickets pospuestos que han despertado. */}
+                    <MorningBriefing
+                        user={auth.user}
+                        onOpen={(id) => {
+                            setTicketsTab("tickets");
+                            setTicketAbierto(id);
+                            setView("tickets");
+                        }}
+                    />
                     <nav className={`rail ${expanded ? "expanded" : ""}`}>
                         {/*
                           * MARCA. Desplegado se ve el logotipo entero; plegado, solo

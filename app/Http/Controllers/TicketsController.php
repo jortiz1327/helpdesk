@@ -21,6 +21,15 @@ use Illuminate\Support\Facades\Storage;
  */
 class TicketsController extends Controller
 {
+    /*
+     * «Despierto» = NO pospuesto. Un ticket duerme mientras tenga fecha futura
+     * (snoozed_until > now) o espere respuesta del cliente (snooze_wake_on_reply=1).
+     * Se comparte entre la cola (aplicarFiltros) y los contadores (counts) para que
+     * nunca discrepen: lo que no cuenta, tampoco se lista, y al revés.
+     */
+    protected const SQL_DESPIERTO =
+        '(t.snoozed_at IS NULL OR ((t.snoozed_until IS NULL OR t.snoozed_until <= NOW()) AND t.snooze_wake_on_reply = 0))';
+
     public function __construct(
         protected TicketService $tickets,
         protected AttachmentService $attachments,
@@ -35,6 +44,8 @@ class TicketsController extends Controller
             'detail' => $this->detail($request),
             'status' => $this->status($request),
             'assign' => $this->assign($request),
+            'snooze'   => $this->snoozeTicket($request),
+            'unsnooze' => $this->unsnoozeTicket($request),
             'category' => $this->setCategory($request),
             'bulk'   => $this->bulk($request),
             'create' => $this->create($request),
@@ -306,6 +317,19 @@ class TicketsController extends Controller
         } elseif ($r === 'answered') {
             $q->where('t.last_direction', 'out');
         }
+
+        /*
+         * POSPUESTOS. Por defecto la cola OCULTA los dormidos (no molestan). La vista
+         * «Pospuestos» (snoozed=only) enseña solo esos; snoozed=all no filtra. El
+         * ocultado por defecto se aplica solo a la cola diaria («Abiertos») y cuando no
+         * hay búsqueda: así buscar por código/texto sí encuentra un ticket dormido.
+         */
+        $snz = $request->query('snoozed', '');
+        if ($snz === 'only') {
+            $q->whereNotNull('t.snoozed_at')->whereRaw('NOT ' . self::SQL_DESPIERTO);
+        } elseif ($snz !== 'all' && $status === 'open' && $s === '') {
+            $q->whereRaw(self::SQL_DESPIERTO);
+        }
     }
 
     protected function list(Request $request)
@@ -366,6 +390,8 @@ class TicketsController extends Controller
                 'pri.sla_response_mins as pri_response_mins', 'pri.sla_resolve_mins as pri_resolve_mins',
                 'u.name as agent_name', 'u.email as agent_email',
                 't.last_direction',
+                // Posponer: el chip «💤 hasta …» y su motivo.
+                't.snoozed_until', 't.snooze_wake_on_reply', 't.snoozed_by', 't.snooze_reason',
             ]);
 
         /*
@@ -480,7 +506,10 @@ class TicketsController extends Controller
      */
     protected function counts(User $me): array
     {
-        $abiertos = "t.status IN ('" . implode("','", TicketService::OPEN_STATUSES) . "')";
+        // «Despierto» = NO dormido. Un ticket pospuesto está fuera de tu plato: no cuenta
+        // en Activos/Pendientes/Míos/Sin asignar (igual que sale de la cola por defecto).
+        $despierto = self::SQL_DESPIERTO;
+        $abiertos  = "(t.status IN ('" . implode("','", TicketService::OPEN_STATUSES) . "') AND $despierto)";
 
         // Fuera de plazo: o se pasó la resolución, o se pasó la respuesta sin contestar.
         $vencido = SlaService::activo()
@@ -503,6 +532,7 @@ class TicketsController extends Controller
              SUM($abiertos AND t.assigned_to = ?) AS mios,
              SUM($abiertos AND t.assigned_to IS NULL) AS sin_asignar,
              SUM($abiertos AND $vencido) AS vencidos,
+             SUM(NOT ($despierto)) AS pospuestos,
              COUNT(*) AS total",
             [$me->id],
         )->first();
@@ -514,6 +544,7 @@ class TicketsController extends Controller
             'unassigned' => (int) ($r->sin_asignar ?? 0),
             'all'        => (int) ($r->total ?? 0),
             'sla_late'   => (int) ($r->vencidos ?? 0),
+            'snoozed'    => (int) ($r->pospuestos ?? 0),   // dormidos (vista «Pospuestos»)
         ];
     }
 
@@ -1106,6 +1137,70 @@ class TicketsController extends Controller
 
         $this->tickets->setCategory($id, $catId, (int) $me->id);
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * POSPONER un ticket. Cualquier agente puede posponer un ticket que ve. `preset`
+     * fija el «cuándo»; `reply` lo aparta hasta que el cliente conteste; `custom` usa
+     * la fecha de `until`. `reason` es un motivo corto opcional.
+     */
+    protected function snoozeTicket(Request $request)
+    {
+        $me = $request->user();
+        $id = (int) $request->input('id');
+        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el ticket'], 400);
+        if (!(clone $this->baseQuery($me))->where('t.id', $id)->exists()) {
+            return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
+        }
+
+        $preset = (string) $request->input('preset', '');
+        $reason = trim((string) $request->input('reason', ''));
+        $wakeOnReply = false;
+        $until = null;
+
+        if ($preset === 'reply') {
+            $wakeOnReply = true;
+        } elseif ($preset === 'custom') {
+            try { $until = \Illuminate\Support\Carbon::parse((string) $request->input('until', '')); }
+            catch (\Throwable $e) { $until = null; }
+            if (!$until || $until->isPast()) {
+                return response()->json(['ok' => false, 'error' => 'Elige una fecha futura'], 400);
+            }
+        } else {
+            $until = $this->snoozePreset($preset);
+            if (!$until) return response()->json(['ok' => false, 'error' => 'Elige cuándo retomarlo'], 400);
+        }
+
+        $this->tickets->snooze($id, $until, $wakeOnReply, (int) $me->id, $reason ?: null);
+        return response()->json(['ok' => true]);
+    }
+
+    /** Reactivar ahora un ticket dormido (vuelve a la cola). */
+    protected function unsnoozeTicket(Request $request)
+    {
+        $me = $request->user();
+        $id = (int) $request->input('id');
+        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el ticket'], 400);
+        if (!(clone $this->baseQuery($me))->where('t.id', $id)->exists()) {
+            return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
+        }
+
+        $this->tickets->wake($id, 'manual');
+        return response()->json(['ok' => true]);
+    }
+
+    /** Traduce un preset («el lunes», «mañana»…) a una fecha/hora concreta. */
+    protected function snoozePreset(string $preset): ?\Illuminate\Support\Carbon
+    {
+        $now = now();
+        return match ($preset) {
+            // Si aún no son las 16:00, esta tarde; si ya pasó, mañana a primera hora.
+            'later_today' => $now->hour < 16 ? $now->copy()->setTime(16, 0) : $now->copy()->addDay()->setTime(9, 0),
+            'tomorrow'    => $now->copy()->addDay()->setTime(9, 0),
+            'monday'      => $now->copy()->next(\Carbon\Carbon::MONDAY)->setTime(9, 0),
+            'week'        => $now->copy()->addWeek()->setTime(9, 0),
+            default       => null,
+        };
     }
 
     /** Acciones EN LOTE sobre varios tickets a la vez (cerrar, asignar…). */

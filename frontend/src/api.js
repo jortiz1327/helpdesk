@@ -299,6 +299,13 @@ export const api = {
   setTicketCategory: (id, category_id) => req('tickets.php?action=category', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, category_id }),
   }),
+  // Posponer un ticket. payload: { preset:'later_today'|'tomorrow'|'monday'|'week'|'reply'|'custom', until?, reason? }
+  snoozeTicket: (id, payload) => req('tickets.php?action=snooze', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...payload }),
+  }),
+  unsnoozeTicket: (id) => req('tickets.php?action=unsnooze', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
   // Nota interna (no se envía al cliente): body en HTML
   ticketNote: (id, body, sla = false, mentions = []) => req('tickets.php?action=note', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, body, sla, mentions }),
@@ -310,6 +317,9 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
   readAllNotifications: () => req('notifications.php?action=read_all', { method: 'POST' }),
+  // Recibimiento matutino: tickets pospuestos que han despertado desde la última visita.
+  snoozeBriefing: () => req('notifications.php?action=briefing'),
+  snoozeBriefingSeen: () => req('notifications.php?action=briefing_seen', { method: 'POST' }),
   // Responder al cliente (canal correo → SMTP). Multipart: HTML + adjuntos.
   ticketReply: (id, body, files = [], cc = [], bcc = []) => {
     const fd = new FormData()

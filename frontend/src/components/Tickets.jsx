@@ -174,12 +174,18 @@ function describeEvent(e, meta) {
  * archivo, no trabajo: solo aparecen si los pides expresamente en «Todos».
  */
 const VIEWS = [
-  { k: 'active',     label: 'Activos',       hint: 'Todo menos resueltos y cerrados', f: { status: 'open', assigned: 'all',  reply: 'all' } },
-  { k: 'pending',    label: 'Sin responder', hint: 'El cliente escribió lo último',   f: { status: 'open', assigned: 'all',  reply: 'pending' }, accent: 'warn' },
-  { k: 'mine',       label: 'Mis tickets',   hint: 'Los que tengo asignados',         f: { status: 'open', assigned: 'me',   reply: 'all' } },
-  { k: 'unassigned', label: 'Sin asignar',   hint: 'Nadie los ha cogido todavía',     f: { status: 'open', assigned: 'none', reply: 'all' } },
-  { k: 'all',        label: 'Todos',         hint: 'Incluye resueltos y cerrados',    f: { status: 'all',  assigned: 'all',  reply: 'all' } },
+  { k: 'active',     label: 'Activos',       hint: 'Todo menos resueltos y cerrados', f: { status: 'open', assigned: 'all',  reply: 'all', snoozed: '' } },
+  { k: 'pending',    label: 'Sin responder', hint: 'El cliente escribió lo último',   f: { status: 'open', assigned: 'all',  reply: 'pending', snoozed: '' }, accent: 'warn' },
+  { k: 'mine',       label: 'Mis tickets',   hint: 'Los que tengo asignados',         f: { status: 'open', assigned: 'me',   reply: 'all', snoozed: '' } },
+  { k: 'unassigned', label: 'Sin asignar',   hint: 'Nadie los ha cogido todavía',     f: { status: 'open', assigned: 'none', reply: 'all', snoozed: '' } },
+  { k: 'all',        label: 'Todos',         hint: 'Incluye resueltos y cerrados',    f: { status: 'all',  assigned: 'all',  reply: 'all', snoozed: '' } },
 ]
+
+/*
+ * «Pospuestos» va aparte (como «SLA vencido»): solo aparece si hay tickets dormidos.
+ * Enseña justo esos —los que salen de la cola diaria— para poder repescar alguno.
+ */
+const VISTA_SNOOZE = { k: 'snoozed', label: '💤 Pospuestos', hint: 'Apartados hasta una fecha o una respuesta', accent: 'snz', f: { status: 'all', assigned: 'all', reply: 'all', sla: 'all', snoozed: 'only' } }
 
 /*
  * «SLA vencido» va aparte de las demás vistas: solo aparece si el SLA está encendido
@@ -211,6 +217,79 @@ function resaltar(texto, aguja) {
 
 // search_in: 'ficha' (código/asunto/cliente) o 'messages' (dentro de la conversación)
 const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', label: 'all', sla: 'all', org: 'all', ...VIEWS[0].f }
+
+/*
+ * POSPONER un ticket. Si ya está dormido, enseña hasta cuándo + «Reactivar ahora».
+ * Si no, un botón que abre el menú de presets (esta tarde, el lunes, hasta que
+ * responda…) con fecha a medida y un motivo corto opcional.
+ */
+function SnoozeControl({ t, onSnooze, onWake }) {
+  const [open, setOpen] = useState(false)
+  const [custom, setCustom] = useState(false)
+  const [when, setWhen] = useState('')
+  const [reason, setReason] = useState('')
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setCustom(false) } }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const dormido = t.snoozed_at && (Number(t.snooze_wake_on_reply)
+    || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
+
+  if (dormido) {
+    return (
+      <div className="tkm-snoozed">
+        <div className="tkm-snoozed-h">
+          <Icon.clock />
+          <b>{Number(t.snooze_wake_on_reply)
+            ? 'Pospuesto hasta que el cliente responda'
+            : `Pospuesto hasta ${fmtDate(t.snoozed_until)}`}</b>
+        </div>
+        {t.snooze_reason && <p className="tkm-snoozed-why">«{t.snooze_reason}»</p>}
+        <button className="btn ghost block" style={{ marginTop: 8 }} onClick={onWake}>
+          <Icon.check /> Reactivar ahora
+        </button>
+      </div>
+    )
+  }
+
+  const pick = (preset) => { onSnooze({ preset, reason: reason.trim() || undefined }); setOpen(false); setCustom(false) }
+
+  return (
+    <div className="tkm-snooze" ref={ref}>
+      <button className="btn ghost block" style={{ marginTop: 10 }} onClick={() => setOpen((o) => !o)}>
+        <Icon.clock /> Posponer…
+      </button>
+      {open && (
+        <div className="snz-menu">
+          <div className="snz-h"><b>¿Cuándo lo retomas?</b><small>Se aparta de la cola y te lo recuerdo ese día.</small></div>
+          <button className="snz-opt" onClick={() => pick('later_today')}><span className="snz-ic">🌆</span>Esta tarde</button>
+          <button className="snz-opt" onClick={() => pick('tomorrow')}><span className="snz-ic">☀️</span>Mañana por la mañana</button>
+          <button className="snz-opt" onClick={() => pick('monday')}><span className="snz-ic">📅</span>El lunes</button>
+          <button className="snz-opt" onClick={() => pick('week')}><span className="snz-ic">🗓️</span>En una semana</button>
+          <button className="snz-opt special" onClick={() => pick('reply')}><span className="snz-ic">💬</span>Hasta que el cliente responda</button>
+          {custom ? (
+            <div className="snz-custom">
+              <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+              <button className="btn primary sm" disabled={!when}
+                onClick={() => when && (onSnooze({ preset: 'custom', until: when, reason: reason.trim() || undefined }), setOpen(false), setCustom(false))}>
+                Posponer
+              </button>
+            </div>
+          ) : (
+            <button className="snz-opt" onClick={() => setCustom(true)}><span className="snz-ic">⏰</span>Fecha y hora…</button>
+          )}
+          <input className="snz-reason" placeholder="Motivo (opcional): esperando repuesto…"
+            value={reason} onChange={(e) => setReason(e.target.value)} maxLength={160} />
+        </div>
+      )}
+    </div>
+  )
+}
 
 /*
  * ETIQUETAS de un ticket (en la ficha). Chips de color + un selector que carga el
@@ -412,6 +491,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   // `sla` entra en la comparación: si no, «Activos» y «SLA vencido» se verían las dos activas.
   const viewOn = (v) => f.status === v.f.status && f.assigned === v.f.assigned
     && f.reply === v.f.reply && (f.sla || 'all') === (v.f.sla || 'all')
+    && (f.snoozed || '') === (v.f.snoozed || '')
   //  primero: al salir de la vista de vencidos hay que quitar ese filtro,
   // que las demás vistas no lo mencionan y se quedaría pegado.
   const applyView = (v) => setF((s) => ({ ...s, sla: 'all', ...v.f }))
@@ -538,7 +618,10 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
           {/* --- Vistas rápidas: «¿qué me toca ahora?» en un clic --- */}
           <div className="tk-views">
             {/* La de SLA solo se cuela si hay algo fuera de plazo (ver VISTA_SLA). */}
-            {[...VIEWS, ...(counts.sla_late > 0 ? [VISTA_SLA] : [])].map((v) => (
+            {[...VIEWS,
+              ...(counts.sla_late > 0 ? [VISTA_SLA] : []),
+              ...(counts.snoozed > 0 ? [VISTA_SNOOZE] : []),
+            ].map((v) => (
               <button key={v.k} className={`tkv ${viewOn(v) ? 'on' : ''} ${v.accent || ''}`} onClick={() => applyView(v)} title={v.hint}>
                 {v.label}
                 {counts[v.k] !== undefined && <span className="tkv-n">{counts[v.k]}</span>}
@@ -734,8 +817,10 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                     ? Array.from({ length: 8 }).map((_, i) => <SkelRow key={i} canTimes={canTimes} />)
                     : rows.map((t) => {
                     const waiting = t.last_direction === 'in'   // habló el cliente: nos toca
+                    const sleeping = t.snoozed_at && (Number(t.snooze_wake_on_reply)
+                      || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
                     return (
-                      <tr key={t.id} className={`${waiting ? 'wait' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
+                      <tr key={t.id} className={`tk-row ${waiting ? 'wait' : ''} ${sleeping ? 'sleeping' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
                         tabIndex={0} onKeyDown={teclaAbrir(() => setOpen(t.id))}
                         aria-label={`Ticket ${t.code}, ${t.contact_name || 'sin nombre'}: ${t.subject || 'sin asunto'}. Pulsa Intro para abrir.`}>
                         <td className="tk-chk" onClick={(e) => e.stopPropagation()}>
@@ -749,6 +834,11 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                           {t.subject}
                           {/* Solo se marca el SLA que pide atención (vencido o por vencer). */}
                           {(() => { const p = slaPeor(t.sla); return p ? slaChip(p[0], p[1]) : null })()}
+                          {sleeping && (
+                            <span className="tk-sleep-chip" title={t.snooze_reason || 'Pospuesto'}>
+                              💤 {Number(t.snooze_wake_on_reply) ? 'Hasta que responda' : `Hasta ${fmtDate(t.snoozed_until)}`}
+                            </span>
+                          )}
                           {t.labels?.length > 0 && (
                             <div className="tk-row-tags">
                               {t.labels.map((l) => (
@@ -1148,6 +1238,14 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
     const r = await api.setTicketCategory(id, category_id || null)
     if (r.ok) { toast('Categoría actualizada'); load(); onChange?.() } else toast(r.error || 'Error', 'err')
   }
+  const posponer = async (payload) => {
+    const r = await api.snoozeTicket(id, payload)
+    if (r.ok) { toast('Ticket pospuesto 😴'); load(); onChange?.() } else toast(r.error || 'No se pudo posponer', 'err')
+  }
+  const reactivar = async () => {
+    const r = await api.unsnoozeTicket(id)
+    if (r.ok) { toast('Ticket reactivado'); load(); onChange?.() } else toast(r.error || 'Error', 'err')
+  }
   const del = async () => {
     const ok = await confirm({
       title: 'Eliminar ticket',
@@ -1308,6 +1406,12 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                   <button className="btn ghost block" style={{ marginTop: 10 }} onClick={() => assign(String(user.id))}>
                     <Icon.user /> Asignármelo a mí
                   </button>
+                )}
+
+                {/* Posponer: apartar el ticket de la cola hasta una fecha o hasta que
+                    el cliente responda. No en cerrados/fusionados (nada que aparcar). */}
+                {can('tickets.reply') && !t.merged_into_id && t.status !== 'cerrado' && (
+                  <SnoozeControl t={t} onSnooze={posponer} onWake={reactivar} />
                 )}
 
                 {/* Exportar el hilo a PDF (con diálogo de opciones). */}

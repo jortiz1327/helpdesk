@@ -110,6 +110,15 @@ class ChatService
             DB::table('tickets')->where('id', $opts['ticket_id'])->update($cambios);
 
             /*
+             * DESPERTAR si estaba pospuesto: una respuesta del CLIENTE (mensaje entrante,
+             * no nota interna) reactiva el ticket, aunque se hubiera pospuesto «hasta el
+             * lunes». Lo urgente no se queda dormido. wake() es no-op si no dormía.
+             */
+            if ($direction === 'in' && empty($opts['is_internal_note'])) {
+                app(TicketService::class)->wake((int) $opts['ticket_id'], 'reply');
+            }
+
+            /*
              * Auto-paso: cuando un AGENTE (autor humano) responde por primera vez a un
              * ticket nuevo, pasa a «En progreso». Solo si hay autor → el bot (autor null)
              * no lo dispara, ni las notas internas. Hoy es no-op (aún no hay respuestas

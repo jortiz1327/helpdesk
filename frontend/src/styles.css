@@ -602,6 +602,76 @@ input, textarea, select { font-family: inherit; }
 .notif-body { font-size: 13px; line-height: 1.4; }
 .notif-tx small { color: var(--ink-3); font-size: 11.5px; font-family: var(--mono, monospace); }
 
+/* ---- Posponer (snooze) : menú en la ficha del ticket ---- */
+.tkm-snooze { position: relative; }
+.snz-menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 13px;
+  box-shadow: var(--shadow); overflow: hidden; }
+.snz-h { padding: 11px 14px 9px; border-bottom: 1px solid var(--line); }
+.snz-h b { font-size: 13.5px; }
+.snz-h small { display: block; color: var(--ink-3); font-size: 11.5px; margin-top: 2px; }
+.snz-opt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--ink);
+  border-bottom: 1px solid var(--line); transition: background .12s; }
+.snz-opt:hover { background: var(--primary-soft); }
+.snz-ic { width: 24px; text-align: center; font-size: 14px; flex: 0 0 auto; }
+.snz-opt.special { color: var(--secondary); font-weight: 600; }
+.snz-custom { display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.snz-custom input { flex: 1; min-width: 0; height: 32px; border: 1px solid var(--line-2);
+  border-radius: 8px; padding: 0 8px; font-size: 12.5px; background: var(--panel); color: var(--ink); }
+.snz-reason { display: block; width: 100%; height: 34px; border: 0; border-top: 1px solid var(--line);
+  padding: 0 14px; font-size: 12.5px; background: var(--bg); color: var(--ink); }
+.snz-reason::placeholder { color: var(--ink-3); }
+
+/* ---- Banner «este ticket está dormido» ---- */
+.tkm-snoozed { margin-top: 10px; padding: 12px 13px; border: 1px solid var(--line-2);
+  border-radius: 12px; background: var(--bg); }
+.tkm-snoozed-h { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; }
+.tkm-snoozed-h svg { width: 16px; height: 16px; fill: currentColor; flex: 0 0 auto; }
+.tkm-snoozed-h b { color: var(--ink); font-weight: 600; }
+.tkm-snoozed-why { margin: 6px 0 0; color: var(--ink-3); font-size: 12.5px; font-style: italic; }
+
+/* ---- Chip «💤 pospuesto» en la lista de la bandeja ---- */
+.tk-sleep-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px;
+  border-radius: 6px; font-size: 11px; font-weight: 700; background: #eef1f6; color: #64748b;
+  white-space: nowrap; flex: 0 0 auto; }
+.tk-row.sleeping { opacity: .72; }
+
+/* ---- Recibimiento matutino (MorningBriefing) ---- */
+.mb-overlay { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center;
+  padding: 20px; background: rgba(16,28,40,.42); backdrop-filter: blur(3px);
+  animation: mbFade .22s ease; }
+.mb-overlay.out { animation: mbFade .18s ease reverse; }
+@keyframes mbFade { from { opacity: 0 } to { opacity: 1 } }
+.mb-card { width: 100%; max-width: 470px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 20px; box-shadow: 0 24px 60px rgba(16,28,40,.4); overflow: hidden;
+  animation: mbRise .28s cubic-bezier(.2,.8,.2,1); }
+@keyframes mbRise { from { transform: translateY(14px) scale(.98); opacity: 0 } to { transform: none; opacity: 1 } }
+.mb-top { position: relative; padding: 26px 26px 20px;
+  background: linear-gradient(180deg, #fff2dc, #fff8ef); border-bottom: 1px solid #f2e3cb; overflow: hidden; }
+.mb-sun { position: absolute; top: -34px; right: -12px; width: 120px; height: 120px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #ffcf7a, #ff9f45); box-shadow: 0 0 46px rgba(255,159,69,.55); opacity: .9; }
+.mb-hi { position: relative; font-size: 23px; font-weight: 700; letter-spacing: -.01em; color: #16232e; }
+.mb-em { color: #d98324; }
+.mb-sub { position: relative; color: #55677a; font-size: 14px; margin-top: 4px; }
+.mb-sub b { color: #16232e; }
+.mb-body { padding: 18px 20px 8px; max-height: 46vh; overflow-y: auto; }
+.mb-lbl { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-3); margin: 2px 4px 10px; }
+.mb-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 9px;
+  transition: border-color .14s, box-shadow .14s; }
+.mb-item:hover { border-color: var(--primary); box-shadow: var(--shadow-sm, 0 4px 14px rgba(20,40,70,.09)); }
+.mb-mid { flex: 1; min-width: 0; display: block; }
+.mb-mid b { display: block; font-size: 13.5px; font-weight: 600; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-meta { color: var(--ink-3); font-size: 12px; }
+.mb-why { display: inline-flex; align-items: center; gap: 4px; font-size: 11px;
+  font-weight: 700; color: var(--primary); background: var(--primary-soft); padding: 1px 7px; border-radius: 6px; }
+.mb-why.reply { color: var(--secondary); background: var(--secondary-soft, #e7f7ef); }
+.mb-go { color: var(--primary); font-weight: 600; font-size: 12.5px; flex: 0 0 auto; }
+.mb-foot { padding: 6px 20px 20px; }
+
 .boot { height: 100vh; display: grid; place-items: center; background: var(--bg); }
 
 /* ===========================================================================
@@ -2867,6 +2937,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 /* Vista rápida «SLA vencido»: en rojo, que es lo que es. */
 .tkv.late { color: var(--danger); }
 .tkv.late .tkv-n { background: rgba(242,92,84,0.16); color: var(--danger); }
+.tkv.snz { color: #64748b; }
+.tkv.snz .tkv-n { background: rgba(100,116,139,0.16); color: #64748b; }
+.tkv.snz.on { background: #64748b; border-color: #64748b; color: #fff; box-shadow: 0 3px 12px rgba(100,116,139,0.32); }
+.tkv.snz.on .tkv-n { background: rgba(255,255,255,0.28); color: #fff; }
 .tkv.late.on { background: var(--danger); color: #fff; border-color: var(--danger); }
 .tkv.late.on .tkv-n { background: rgba(255,255,255,0.25); color: #fff; }
 

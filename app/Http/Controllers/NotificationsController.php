@@ -19,11 +19,55 @@ class NotificationsController extends Controller
     public function handle(Request $request)
     {
         return match ($request->query('action', 'list')) {
-            'unread'   => $this->unread($request),
-            'read'     => $this->read($request),
-            'read_all' => $this->readAll($request),
-            default    => $this->list($request),
+            'unread'        => $this->unread($request),
+            'read'          => $this->read($request),
+            'read_all'      => $this->readAll($request),
+            'briefing'      => $this->briefing($request),
+            'briefing_seen' => $this->briefingSeen($request),
+            default         => $this->list($request),
         };
+    }
+
+    /**
+     * RECIBIMIENTO MATUTINO: los tickets que POSPUSISTE y han despertado (por vencer la
+     * fecha o por responder el cliente) desde tu última visita al recibimiento. El
+     * frontend lo pide al cargar y lo enseña una vez. Solo tickets aún vivos.
+     */
+    protected function briefing(Request $request)
+    {
+        $me = $request->user();
+
+        // Desde la última vez que lo vio; nunca más de 24 h atrás (no arrastrar días).
+        $last  = DB::table('users')->where('id', $me->id)->value('snooze_briefing_at');
+        $since = $last ? \Illuminate\Support\Carbon::parse($last) : now()->subDay();
+        if ($since->lt(now()->subDay())) $since = now()->subDay();
+
+        $rows = DB::table('ticket_events as e')
+            ->join('tickets as t', 't.id', '=', 'e.ticket_id')
+            ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+            ->where('e.type', 'snooze_wake')
+            ->where('e.to_value', '!=', 'manual')   // reactivado a mano: no hace falta recordarlo
+            ->where('e.user_id', $me->id)
+            ->where('e.created_at', '>', $since)
+            ->where('t.status', '!=', 'cerrado')
+            ->whereNull('t.merged_into_id')
+            ->orderByDesc('e.created_at')
+            ->limit(20)
+            ->get(['t.id', 't.code', 't.subject', 'e.to_value as reason', 'e.created_at',
+                   'c.name as contact_name']);
+
+        // Un ticket pudo despertar más de una vez: nos quedamos con el más reciente.
+        $items = [];
+        foreach ($rows as $r) { $items[$r->id] ??= $r; }
+
+        return response()->json(['ok' => true, 'items' => array_values($items)]);
+    }
+
+    /** Marca el recibimiento como visto (para no repetirlo hasta que despierte algo nuevo). */
+    protected function briefingSeen(Request $request)
+    {
+        DB::table('users')->where('id', $request->user()->id)->update(['snooze_briefing_at' => now()]);
+        return response()->json(['ok' => true]);
     }
 
     protected function list(Request $request)
