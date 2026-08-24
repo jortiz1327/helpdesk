@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { portal, getPass, setPass, getSeen, markSeen } from './portalApi.js'
+import { LangProvider, useLang, LANGS, LOCALES } from './i18n.js'
 import logo from '../assets/logo.png'
+
+/* Pinta una cadena traducida que puede llevar énfasis <b>…</b>. El texto es
+   nuestro y estático (del diccionario), así que dangerouslySetInnerHTML es seguro. */
+function Rich({ tag = 'span', html, className, style }) {
+  const Tag = tag
+  return <Tag className={className} style={style} dangerouslySetInnerHTML={{ __html: html }} />
+}
 
 /* ---------------------------------------------------------------------------
  * PORTAL PÚBLICO — la cara del cliente.
@@ -54,6 +62,7 @@ const humanSize = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.
  * de respuesta; en el formulario de crear va la zona grande.
  */
 function Adjuntar({ files, setFiles, compacta }) {
+  const { t } = useLang()
   const ref = useRef(null)
   const [drag, setDrag] = useState(false)
   const add = (nuevos) => setFiles((s) => [...s, ...nuevos.filter((f) => f && f.size)].slice(0, 5))
@@ -68,8 +77,8 @@ function Adjuntar({ files, setFiles, compacta }) {
         onDragLeave={() => setDrag(false)} onDrop={soltar}>
         <span className="adj-ic">{I.clip}</span>
         <span className="adj-tx">
-          <b>{compacta ? 'Adjuntar' : 'Adjunta un archivo'}</b>
-          {!compacta && <small> o arrástralo aquí · imágenes, PDF o documentos (máx. 10 MB)</small>}
+          <b>{compacta ? t('attach_short') : t('attach_a_file')}</b>
+          {!compacta && <small> {t('attach_hint')}</small>}
         </span>
       </button>
       {files.length > 0 && (
@@ -77,7 +86,7 @@ function Adjuntar({ files, setFiles, compacta }) {
           {files.map((f, i) => (
             <span key={i} className="adj-chip">
               {I.file}<span className="adj-name">{f.name}</span><span className="adj-size">{humanSize(f.size)}</span>
-              <button type="button" onClick={() => setFiles((s) => s.filter((_, j) => j !== i))} title="Quitar">{I.x}</button>
+              <button type="button" onClick={() => setFiles((s) => s.filter((_, j) => j !== i))} title={t('remove')}>{I.x}</button>
             </span>
           ))}
         </div>
@@ -95,6 +104,7 @@ function Adjuntar({ files, setFiles, compacta }) {
  */
 const CORREO_TOPE = 320   // px: por encima, el correo se colapsa con «ver más»
 function CorreoFrame({ html }) {
+  const { t } = useLang()
   const ref = useRef(null)
   const [alto, setAlto] = useState(80)     // alto real del contenido
   const [abierto, setAbierto] = useState(false)
@@ -111,11 +121,11 @@ function CorreoFrame({ html }) {
 
   return (
     <div className={`correo ${largo && !abierto ? 'colapsado' : ''}`}>
-      <iframe ref={ref} className="mailframe" title="Mensaje" srcDoc={doc} onLoad={medir}
+      <iframe ref={ref} className="mailframe" title={t('email_frame_title')} srcDoc={doc} onLoad={medir}
         style={{ height: visible }} sandbox="allow-same-origin allow-popups" scrolling="no" />
       {largo && (
         <button type="button" className="correo-mas" onClick={() => setAbierto((v) => !v)}>
-          {abierto ? 'Ver menos' : 'Ver el correo completo'}
+          {abierto ? t('see_less') : t('see_full_email')}
         </button>
       )}
     </div>
@@ -145,28 +155,34 @@ function Adjuntos({ items }) {
 
 
 const mask = (m) => { const [u, d] = (m || '').split('@'); return (u?.[0] || '') + '***@' + (d || '') }
-const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) } catch { return '' } }
-const fmtHora = (iso) => { try { return new Date(iso).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
-/* «hace 3 días», «hoy», «ahora mismo»… en cristiano. */
-const relTime = (iso) => {
+const fmtDate = (iso, lang = 'es') => { try { return new Date(iso).toLocaleDateString(LOCALES[lang] || 'es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) } catch { return '' } }
+const fmtHora = (iso, lang = 'es') => { try { return new Date(iso).toLocaleString(LOCALES[lang] || 'es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
+/* «hace 3 días», «hoy», «ahora mismo»… en el idioma activo (recibe `t` y `lang`). */
+const relTime = (iso, t, lang = 'es') => {
   const s = (Date.now() - new Date(iso).getTime()) / 1000
-  if (s < 60) return 'ahora mismo'
-  if (s < 3600) { const m = Math.floor(s / 60); return `hace ${m} min` }
-  if (s < 86400) { const h = Math.floor(s / 3600); return `hace ${h} h` }
+  if (s < 60) return t('rel_now')
+  if (s < 3600) { const m = Math.floor(s / 60); return t('rel_min', { n: m }) }
+  if (s < 86400) { const h = Math.floor(s / 3600); return t('rel_hour', { n: h }) }
   const d = Math.floor(s / 86400)
-  if (d === 1) return 'ayer'
-  if (d < 30) return `hace ${d} días`
-  return fmtDate(iso)
+  if (d === 1) return t('rel_yesterday')
+  if (d < 30) return t('rel_days', { n: d })
+  return fmtDate(iso, lang)
 }
 const CHIP = { recibido: 'nuevo', en_proceso: 'proceso', resuelto: 'resuelto' }
-/* Estado del ticket → cómo se ve. El estado es el centro de la pantalla. */
+/* Estado del ticket → cómo se ve. El estado es el centro de la pantalla. Las
+   etiquetas y subtítulos son CLAVES del diccionario (se resuelven con `t`). */
 const FASE = {
-  recibido:   { cls: 'recibido', label: 'Recibida', sub: 'La hemos recibido y la revisaremos en breve.' },
-  en_proceso: { cls: 'proceso', label: 'En proceso', sub: 'Nuestro equipo está trabajando en ella.' },
-  resuelto:   { cls: 'resuelto', label: 'Resuelta', sub: 'Se ha dado por resuelta. Si vuelve, respóndenos.' },
+  recibido:   { cls: 'recibido', labelKey: 'phase_received', subKey: 'phase_received_sub' },
+  en_proceso: { cls: 'proceso', labelKey: 'phase_progress', subKey: 'phase_progress_sub' },
+  resuelto:   { cls: 'resuelto', labelKey: 'phase_resolved', subKey: 'phase_resolved_sub' },
 }
 
 export default function Portal() {
+  // Provee el idioma a todo el portal (selector en la cabecera + t()).
+  return <LangProvider><PortalApp /></LangProvider>
+}
+
+function PortalApp() {
   // Pantalla: home | crear | mis | ticket. El «pase» decide si hay que pedir código.
   const [view, setView] = useState('home')
   const [pass, setPassState] = useState(getPass())
@@ -211,6 +227,7 @@ export default function Portal() {
 
 /* -------------------------------- Barra ---------------------------------- */
 function Top({ onLogo }) {
+  const { lang, setLang, t } = useLang()
   const [scr, setScr] = useState(false)
   useEffect(() => {
     const h = () => setScr(window.scrollY > 8)
@@ -221,19 +238,27 @@ function Top({ onLogo }) {
       <div className="top-in">
         {/* El logo lleva al inicio: es un botón de verdad (área de clic clara y
             accesible por teclado), no un <img> con onClick. */}
-        <button className="logo-btn" onClick={onLogo} title="Volver al inicio" aria-label="Ir al inicio">
+        <button className="logo-btn" onClick={onLogo} title={t('top_home_title')} aria-label={t('top_home_aria')}>
           <img className="logo" src={logo} alt="AEME Group" />
         </button>
         <div className="spacer" />
-        <a className="ghostlink" href="/agentes">{I.lock} Acceso agentes</a>
+        {/* Selector de idioma: discreto, siglas ES/EN/PT. Recuerda la elección. */}
+        <div className="lang-switch" role="group" aria-label={t('lang_label')}>
+          {LANGS.map(([code, label]) => (
+            <button key={code} type="button" className={lang === code ? 'on' : ''}
+              aria-pressed={lang === code} onClick={() => setLang(code)}>{label}</button>
+          ))}
+        </div>
+        <a className="ghostlink" href="/agentes">{I.lock} {t('agent_access')}</a>
       </div>
     </div>
   )
 }
 
 /* -------------------------------- Home ----------------------------------- */
-/* Sugerencias de búsqueda: rellenan el buscador de un toque. */
-const SUGERENCIAS = ['las etiquetas no cargan', 'cambiar el menú', 'repetidor apagado', 'etiqueta rota']
+/* Sugerencias de búsqueda: rellenan el buscador de un toque. Son CLAVES del
+   diccionario (el texto se traduce en el render). */
+const SUGERENCIAS = ['sug_1', 'sug_2', 'sug_3', 'sug_4']
 
 /* Convierte correos y teléfonos del texto en enlaces «mailto:» / «tel:» clicables;
    el resto queda tal cual (los saltos de línea los respeta el CSS con pre-line). */
@@ -251,6 +276,7 @@ function linkify(text) {
   return out
 }
 function Home({ go, irCrear }) {
+  const { t } = useLang()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(-1)         // id de la FAQ abierta (-1 = ninguna)
   const [faqs, setFaqs] = useState([])
@@ -347,32 +373,32 @@ function Home({ go, irCrear }) {
           {/* Estado en vivo: honesto y tranquilizador. Verde si atendemos ahora. */}
           <span className={`eyebrow ${abierto ? '' : 'cerrado'}`}>
             <span className="dot" />
-            {abierto ? 'Estamos atendiendo ahora' : 'Ahora fuera de horario · te leemos pronto'}
+            {abierto ? t('status_open') : t('status_closed')}
           </span>
-          <h1><span className="h1-l1">Buenas <span className="wave">👋</span>,</span>¿En qué podemos ayudarte?</h1>
+          <h1><span className="h1-l1">{t('hero_greeting')} <span className="wave">👋</span>,</span>{t('hero_help')}</h1>
           <p className="sub">
-            Busca tu duda o abre una incidencia.
-            <span className="sub-2">Un técnico te responde por correo, de lunes a viernes de 7:00 a 21:00.</span>
+            {t('hero_sub_1')}
+            <span className="sub-2">{t('hero_sub_2')}</span>
           </p>
           <div className="search">
             <div className="search-box">
               <span className="mag" style={{ display: 'flex' }}>{I.mag}</span>
               <input value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off"
-                placeholder="Escribe tu duda… ej: las etiquetas no cargan" />
-              {q && <button className="search-x" onClick={() => setQ('')} title="Borrar">{I.x}</button>}
+                placeholder={t('search_placeholder')} />
+              {q && <button className="search-x" onClick={() => setQ('')} title={t('clear')}>{I.x}</button>}
             </div>
             {!filtro && (
               <div className="sugs">
-                <span>Prueba con</span>
-                {SUGERENCIAS.map((s) => <button key={s} onClick={() => buscar(s)}>{s}</button>)}
+                <span>{t('try_with')}</span>
+                {SUGERENCIAS.map((s) => <button key={s} onClick={() => buscar(t(s))}>{t(s)}</button>)}
               </div>
             )}
           </div>
         </div>
 
         <div ref={faqRef} className="section-h reveal">
-          <h2>Dudas frecuentes</h2>
-          {filtro && <span className="section-n">{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span>}
+          <h2>{t('faq_title')}</h2>
+          {filtro && <span className="section-n">{items.length} {items.length === 1 ? t('result_one') : t('result_many')}</span>}
           <span className="rule" />
         </div>
         <div className="faq">
@@ -388,12 +414,12 @@ function Home({ go, irCrear }) {
                   {/* Pie de la respuesta: ¿te ha servido? + salida a incidencia. */}
                   <div className="qa-foot">
                     {voted[f.id]
-                      ? <span className="qa-thanks">{I.check} ¡Gracias por tu voto!</span>
-                      : <span className="qa-vote"><b>¿Te ha servido?</b>
-                          <button onClick={() => votar(f, true)} aria-label="Sí, me ha servido">👍</button>
-                          <button onClick={() => votar(f, false)} aria-label="No me ha servido">👎</button>
+                      ? <span className="qa-thanks">{I.check} {t('vote_thanks')}</span>
+                      : <span className="qa-vote"><b>{t('vote_q')}</b>
+                          <button onClick={() => votar(f, true)} aria-label={t('vote_yes_aria')}>👍</button>
+                          <button onClick={() => votar(f, false)} aria-label={t('vote_no_aria')}>👎</button>
                         </span>}
-                    <button className="qa-cta" onClick={() => abrirIncidencia(f)}>No me sirve, abrir incidencia {I.arrow}</button>
+                    <button className="qa-cta" onClick={() => abrirIncidencia(f)}>{t('faq_cta')} {I.arrow}</button>
                   </div>
                 </div>
               </div>
@@ -402,29 +428,29 @@ function Home({ go, irCrear }) {
         </div>
         {!items.length && (
           <div className="faq-empty">
-            <b>{filtro ? `No encontramos nada con «${q}».` : 'Aún no hay preguntas frecuentes.'}</b>
-            <p>{filtro ? 'Prueba con otras palabras, o cuéntanoslo y lo resolvemos contigo.' : 'Cuéntanos tu caso y lo resolvemos contigo.'}</p>
-            <button className="btn" style={{ width: 'auto', margin: '4px auto 0' }} onClick={() => irCrear()}>{I.plus} Crear una incidencia</button>
+            <b>{filtro ? t('empty_search', { q }) : t('empty_no_faq')}</b>
+            <p>{filtro ? t('empty_search_sub') : t('empty_no_faq_sub')}</p>
+            <button className="btn" style={{ width: 'auto', margin: '4px auto 0' }} onClick={() => irCrear()}>{I.plus} {t('create_ticket')}</button>
           </div>
         )}
 
         <div className="actions">
-          <div className="act-sep reveal"><span>¿No lo encuentras aquí?</span></div>
+          <div className="act-sep reveal"><span>{t('not_here')}</span></div>
           <div className="act-grid">
             <button className="act primary reveal" style={{ '--r': 0 }} onClick={() => irCrear()}>
               <span className="ic">{I.plus}</span>
-              <span><h3>Crear una incidencia</h3><p>Cuéntanos el problema y te asignamos un técnico.</p></span>
+              <span><h3>{t('create_ticket')}</h3><p>{t('create_ticket_desc')}</p></span>
               <span className="arrow">{I.arrow}</span>
             </button>
             <button className="act ghost reveal" style={{ '--r': 1 }} onClick={() => go('mis')}>
               <span className="ic">{I.tickets}</span>
-              <span><h3>Ver mis incidencias</h3><p>Consulta el estado y responde a las tuyas.</p></span>
+              <span><h3>{t('my_tickets')}</h3><p>{t('my_tickets_desc')}</p></span>
               <span className="arrow">{I.arrow}</span>
             </button>
           </div>
           {/* Atajo sin correo: solo ver cómo va, por número. */}
           <button className="est-link reveal" onClick={() => go('estado')}>
-            {I.mag}<span>¿Ya tienes tu número? <b>Consulta el estado</b> sin correo</span>
+            {I.mag}<Rich html={t('est_link')} />
             <span className="est-link-arw">{I.arrow}</span>
           </button>
         </div>
@@ -437,7 +463,7 @@ function Home({ go, irCrear }) {
       {info.length > 0 && (
         <div className="centro-band reveal">
           <div className="centro-inner">
-            <span className="centro-eyebrow">Centro de atención</span>
+            <span className="centro-eyebrow">{t('help_center')}</span>
             <div className="centro-cols">
               {info.map((a) => (
                 <div key={a.id} className="centro-col">
@@ -458,13 +484,14 @@ function Home({ go, irCrear }) {
 
 /* --------------------- Acceso: correo → código → pase --------------------- */
 function Acceso({ intent, go, onReady, caducado }) {
+  const { t } = useLang()
   const [paso, setPaso] = useState('mail')   // mail | code
   const [mail, setMail] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [espera, setEspera] = useState(0)   // segundos hasta poder pedir otro código
   const valido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)
-  const titulo = intent === 'crear' ? 'Crear una incidencia' : 'Ver mis incidencias'
+  const titulo = intent === 'crear' ? t('create_ticket') : t('my_tickets')
 
   // Cuenta atrás del enfriamiento: sin esto, el botón de reenviar se puede
   // machacar hasta topar con el límite del servidor. 60 s es el estándar.
@@ -480,7 +507,7 @@ function Acceso({ intent, go, onReady, caducado }) {
     const r = await portal.requestCode(mail.trim())
     setBusy(false)
     if (r.ok) { setPaso('code'); setEspera(60) }
-    else setErr(r.error || 'No se pudo enviar el código')
+    else setErr(r.error || t('err_send_code'))
   }
   // Cambiar de correo apunta a otro buzón (otro cupo en el servidor): se reinicia
   // el enfriamiento para no bloquear un envío legítimo a una dirección distinta.
@@ -489,14 +516,14 @@ function Acceso({ intent, go, onReady, caducado }) {
   const verificar = async (code) => {
     const r = await portal.verifyCode(mail.trim(), code)
     if (r.ok) { onReady(r.token); return true }
-    setErr(r.error || 'Código incorrecto')
+    setErr(r.error || t('err_bad_code'))
     return false
   }
 
   return (
     <section className="screen on"><div className="flow"><div className="card">
       <button className="back" onClick={() => paso === 'code' ? setPaso('mail') : go('home')}>
-        {I.back}{paso === 'code' ? 'Cambiar de correo' : 'Volver al inicio'}
+        {I.back}{paso === 'code' ? t('change_email') : t('back_home')}
       </button>
       <div className="steps"><i className={paso === 'mail' ? 'on' : 'done'} /><i className={paso === 'code' ? 'on' : ''} /></div>
 
@@ -508,34 +535,34 @@ function Acceso({ intent, go, onReady, caducado }) {
         // <form>: así el Enter envía de forma nativa (y sin recargar la página).
         <form onSubmit={(e) => { e.preventDefault(); if (valido && !busy) pedir() }}>
           <h3 className="ttl">{titulo}</h3>
-          {caducado && <div className="acc-aviso">Tu sesión ha caducado por seguridad. Confirma tu correo otra vez.</div>}
-          <p className="desc">Escribe tu <b>correo</b> y te enviamos un código para confirmar que eres tú.</p>
-          <label className="f"><span className="lab">Tu correo</span>
+          {caducado && <div className="acc-aviso">{t('session_expired')}</div>}
+          <Rich tag="p" className="desc" html={t('acc_email_desc')} />
+          <label className="f"><span className="lab">{t('your_email')}</span>
             <input className="inp" type="email" value={mail} autoFocus autoComplete="username"
-              onChange={(e) => cambiarMail(e.target.value)} placeholder="nombre@tuempresa.com" /></label>
+              onChange={(e) => cambiarMail(e.target.value)} placeholder={t('email_placeholder')} /></label>
           {err && <p className="hint" style={{ color: 'var(--danger)' }}>{err}</p>}
           <button className="btn" type="submit" disabled={!valido || busy || espera > 0}>
-            {busy ? 'Enviando…' : espera > 0 ? `Espera ${espera}s` : 'Enviarme el código'}{!busy && !espera && I.arrow}
+            {busy ? t('sending') : espera > 0 ? t('wait_seconds', { n: espera }) : t('send_code')}{!busy && !espera && I.arrow}
           </button>
           {/* Si ya tienes uno de hace un rato (viven 10 min), no hace falta pedir
               otro: pasas directo a introducirlo. */}
           <button type="button" className="linkbtn" disabled={!valido}
             onClick={() => { setErr(''); setPaso('code') }}>
-            Ya tengo un código →
+            {t('have_code')}
           </button>
-          <p className="acc-trust">{I.lock}<span>No hace falta registrarse. El código solo confirma que <b>este correo es tuyo</b> — así nadie más puede ver tus incidencias.</span></p>
+          <p className="acc-trust">{I.lock}<Rich html={t('acc_trust_email')} /></p>
         </form>
       ) : (
         <>
-          <h3 className="ttl">Revisa tu correo</h3>
-          <p className="desc">Escribe el código de 6 dígitos que enviamos a <b>{mask(mail)}</b>.</p>
+          <h3 className="ttl">{t('check_email')}</h3>
+          <Rich tag="p" className="desc" html={t('code_desc', { mail: mask(mail) })} />
           <Otp onComplete={verificar} error={err} clearError={() => setErr('')} />
-          <p className="resend">¿No te llega o ha caducado?{' '}
+          <p className="resend">{t('resend_q')}{' '}
             {espera > 0
-              ? <span className="resend-wait">Puedes pedir otro en {espera}s</span>
-              : <button onClick={pedir} disabled={busy}>{busy ? 'Enviando…' : 'Enviar uno nuevo'}</button>}
+              ? <span className="resend-wait">{t('resend_wait', { n: espera })}</span>
+              : <button onClick={pedir} disabled={busy}>{busy ? t('sending') : t('resend_new')}</button>}
           </p>
-          <p className="acc-trust"><span>Mira también en <b>spam</b> o «no deseado». El código caduca a los <b>10 minutos</b>.</span></p>
+          <p className="acc-trust"><Rich html={t('code_trust')} /></p>
         </>
       )}
     </div></div></section>
@@ -582,6 +609,7 @@ function Otp({ onComplete, error, clearError }) {
 
 /* ----------------------------- Crear ticket ------------------------------ */
 function Crear({ go, prefill, onOpen, onExpire }) {
+  const { t } = useLang()
   const [cats, setCats] = useState([])
   const [email, setEmail] = useState('')
   const [subject, setSubject] = useState(prefill?.subject || '')
@@ -612,7 +640,7 @@ function Crear({ go, prefill, onOpen, onExpire }) {
     const r = await portal.create({ email: email.trim(), subject, category_id: catId || null, body, files })
     setBusy(false)
     if (r.reauth) return onExpire()
-    if (r.ok) setOkCode(r.code); else setErr(r.error || 'No se pudo crear la incidencia')
+    if (r.ok) setOkCode(r.code); else setErr(r.error || t('err_create'))
   }
 
   const copiar = () => {
@@ -625,38 +653,38 @@ function Crear({ go, prefill, onOpen, onExpire }) {
   if (okCode) return (
     <section className="screen on"><div className="flow"><div className="card card-ok">
       <div className="ok-mark">{I.check}</div>
-      <h3 className="ttl">¡Incidencia creada!</h3>
-      <p className="desc">Guarda este número: con él y tu correo puedes seguir su estado cuando quieras.</p>
+      <h3 className="ttl">{t('created_title')}</h3>
+      <p className="desc">{t('created_desc')}</p>
       <div className="tk-box">
-        <span className="tk-lb">Tu número de incidencia</span>
+        <span className="tk-lb">{t('your_ticket_number')}</span>
         <div className="tk-row">
           <span className="tk-num">{okCode}</span>
-          <button className="tk-copy" onClick={copiar}>{copiado ? <>{I.check} Copiado</> : <>{I.copy2} Copiar</>}</button>
+          <button className="tk-copy" onClick={copiar}>{copiado ? <>{I.check} {t('copied')}</> : <>{I.copy2} {t('copy')}</>}</button>
         </div>
       </div>
-      <p className="ok-mail">{I.mail} Te avisaremos por correo en cuanto un técnico responda.</p>
-      <button className="btn" onClick={() => onOpen(okCode)}>Ver la incidencia {I.arrow}</button>
-      <button className="btn sec" style={{ marginTop: 10 }} onClick={() => go('home')}>Volver al inicio</button>
+      <p className="ok-mail">{I.mail} {t('created_mail_note')}</p>
+      <button className="btn" onClick={() => onOpen(okCode)}>{t('view_ticket')} {I.arrow}</button>
+      <button className="btn sec" style={{ marginTop: 10 }} onClick={() => go('home')}>{t('back_home')}</button>
     </div></div></section>
   )
 
   return (
     <section className="screen on"><div className="flow"><div className="card">
-      <button className="back" onClick={() => go('home')}>{I.back}Volver al inicio</button>
-      <h3 className="ttl">Cuéntanos qué pasa</h3>
-      <p className="desc">Sin registros ni contraseñas. Rellénalo y verás tu incidencia al instante.</p>
+      <button className="back" onClick={() => go('home')}>{I.back}{t('back_home')}</button>
+      <h3 className="ttl">{t('create_form_title')}</h3>
+      <p className="desc">{t('create_form_desc')}</p>
 
-      <label className="f"><span className="lab">Tu correo</span>
+      <label className="f"><span className="lab">{t('your_email')}</span>
         <input className="inp" type="email" value={email} autoFocus autoComplete="email"
-          onChange={(e) => setEmail(e.target.value)} placeholder="nombre@tuempresa.com" />
-        <span className="hint">Aquí te avisamos cuando un técnico responda.</span></label>
+          onChange={(e) => setEmail(e.target.value)} placeholder={t('email_placeholder')} />
+        <span className="hint">{t('email_hint')}</span></label>
 
-      <label className="f"><span className="lab">Asunto</span>
+      <label className="f"><span className="lab">{t('subject')}</span>
         <input className="inp" value={subject} onChange={(e) => setSubject(e.target.value)}
-          placeholder="Ej: Las etiquetas de la tienda no cargan" /></label>
+          placeholder={t('subject_placeholder')} /></label>
 
       {/* Categoría como CHIPS: se ven todas las opciones y se elige de un toque. */}
-      <div className="f"><span className="lab">Categoría</span>
+      <div className="f"><span className="lab">{t('category')}</span>
         <div className="catchips">
           {cats.map((c) => (
             <button key={c.id} type="button" className={`catchip ${String(c.id) === catId ? 'on' : ''}`}
@@ -664,17 +692,17 @@ function Crear({ go, prefill, onOpen, onExpire }) {
           ))}
         </div></div>
 
-      <label className="f"><span className="lab">Descripción</span>
+      <label className="f"><span className="lab">{t('description')}</span>
         <textarea className="inp" rows={5} value={body} onChange={(e) => setBody(e.target.value)}
-          placeholder="¿Qué ocurre? ¿Desde cuándo? ¿Qué has probado ya?" />
-        {cortoDeMas && <span className="hint" style={{ color: 'var(--wait)' }}>Cuéntanos un poco más para poder ayudarte.</span>}</label>
+          placeholder={t('desc_placeholder')} />
+        {cortoDeMas && <span className="hint" style={{ color: 'var(--wait)' }}>{t('too_short')}</span>}</label>
 
-      <div className="f"><span className="lab">Adjuntar <span className="hint" style={{ fontWeight: 400 }}>(opcional, ayuda mucho una captura)</span></span>
+      <div className="f"><span className="lab">{t('attach_label')} <span className="hint" style={{ fontWeight: 400 }}>{t('attach_optional')}</span></span>
         <Adjuntar files={files} setFiles={setFiles} /></div>
 
       {err && <p className="hint" style={{ color: 'var(--danger)' }}>{err}</p>}
       <button className="btn" disabled={busy || !emailOk || !subject.trim() || body.trim().length < 5} onClick={enviar}>
-        {busy ? 'Enviando…' : <>{I.send} Enviar incidencia</>}
+        {busy ? t('sending') : <>{I.send} {t('send_ticket')}</>}
       </button>
     </div></div></section>
   )
@@ -686,6 +714,7 @@ function Crear({ go, prefill, onOpen, onExpire }) {
  * conversación o responder, el cliente entra con su correo.
  * ------------------------------------------------------------------------- */
 function Estado({ go }) {
+  const { t, lang } = useLang()
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -698,7 +727,7 @@ function Estado({ go }) {
     const r = await portal.estado(c)
     setBusy(false)
     if (r.ok) setData(r.status)
-    else setErr(r.error || 'No encontramos esa incidencia')
+    else setErr(r.error || t('err_not_found'))
   }
 
   const dotCur = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3.5" /></svg>
@@ -710,25 +739,25 @@ function Estado({ go }) {
     const fase = FASE[data.fase] || FASE.recibido
     return (
       <section className="screen on"><div className="flow">
-        <button className="back" onClick={() => go('home')}>{I.back}Volver al inicio</button>
+        <button className="back" onClick={() => go('home')}>{I.back}{t('back_home')}</button>
 
         <div className={`thero ${fase.cls}`}>
           <div className="thero-top">
             <span className="thero-eyebrow">{data.code}</span>
-            <span className="thero-pill"><span className="cd" />Actualizada {relTime(data.updated)}</span>
+            <span className="thero-pill"><span className="cd" />{t('updated', { time: relTime(data.updated, t, lang) })}</span>
           </div>
-          <h2 className="thero-title">{fase.label}</h2>
-          <p className="thero-sub">{resuelto && data.resuelto_en ? `Se resolvió ${relTime(data.resuelto_en)}. Si el problema vuelve, respóndenos y la reabrimos.` : fase.sub}</p>
+          <h2 className="thero-title">{t(fase.labelKey)}</h2>
+          <p className="thero-sub">{resuelto && data.resuelto_en ? t('resolved_sub', { time: relTime(data.resuelto_en, t, lang) }) : t(fase.subKey)}</p>
 
           <div className="prog">
-            {[['recibido', 'Recibida'], ['en_proceso', 'En proceso'], ['resuelto', 'Resuelta']].map(([k, lb], i) => {
+            {[['recibido', 'phase_received'], ['en_proceso', 'phase_progress'], ['resuelto', 'phase_resolved']].map(([k, lb], i) => {
               const done = i < idx || (i === idx && resuelto)
               const cur = i === idx && !resuelto
               return (
                 <div key={k} className={`prog-st ${done ? 'done' : ''} ${cur ? 'cur' : ''}`}>
                   {i > 0 && <span className="prog-bar" />}
                   <span className="prog-dot">{done ? I.check : cur ? dotCur : null}</span>
-                  <span className="prog-lb">{lb}</span>
+                  <span className="prog-lb">{t(lb)}</span>
                 </div>
               )
             })}
@@ -736,14 +765,14 @@ function Estado({ go }) {
         </div>
 
         <div className="est-meta">
-          <div><span>Creada</span><b>{fmtDate(data.created)}</b></div>
-          <div><span>{resuelto ? 'Resuelta' : 'Última novedad'}</span><b>{relTime(resuelto && data.resuelto_en ? data.resuelto_en : data.updated)}</b></div>
+          <div><span>{t('created_label')}</span><b>{fmtDate(data.created, lang)}</b></div>
+          <div><span>{resuelto ? t('resolved_label') : t('last_update')}</span><b>{relTime(resuelto && data.resuelto_en ? data.resuelto_en : data.updated, t, lang)}</b></div>
         </div>
 
         <div className="est-foot">
-          <p>Aquí solo ves el estado. Para leer la conversación o responder:</p>
-          <button className="btn sec" onClick={() => go('mis')}>{I.lock} Entrar con mi correo</button>
-          <button className="linkbtn" onClick={() => { setData(null); setCode(''); setErr('') }}>Consultar otro número</button>
+          <p>{t('status_only_note')}</p>
+          <button className="btn sec" onClick={() => go('mis')}>{I.lock} {t('enter_with_email')}</button>
+          <button className="linkbtn" onClick={() => { setData(null); setCode(''); setErr('') }}>{t('check_another')}</button>
         </div>
       </div></section>
     )
@@ -752,51 +781,54 @@ function Estado({ go }) {
   // ---- Formulario ----
   return (
     <section className="screen on"><div className="flow"><div className="card">
-      <button className="back" onClick={() => go('home')}>{I.back}Volver al inicio</button>
+      <button className="back" onClick={() => go('home')}>{I.back}{t('back_home')}</button>
       <div className="acc-ico">{I.tickets}</div>
       <form onSubmit={(e) => { e.preventDefault(); consultar() }}>
-        <h3 className="ttl">Ver el estado de tu incidencia</h3>
-        <p className="desc">Escribe tu número y te decimos cómo va. Sin contraseñas ni esperas.</p>
-        <label className="f"><span className="lab">Número de incidencia</span>
+        <h3 className="ttl">{t('status_form_title')}</h3>
+        <p className="desc">{t('status_form_desc')}</p>
+        <label className="f"><span className="lab">{t('ticket_number_label')}</span>
           <input className="inp est-code" value={code} autoFocus autoComplete="off"
             onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="TK-2607-0025" /></label>
         {err && <p className="hint" style={{ color: 'var(--danger)' }}>{err}</p>}
         <button className="btn" type="submit" disabled={busy || !code.trim()}>
-          {busy ? 'Consultando…' : <>{I.mag} Ver estado</>}
+          {busy ? t('checking') : <>{I.mag} {t('view_status')}</>}
         </button>
-        <p className="acc-trust">{I.lock}<span>Aquí solo se ve el <b>estado</b>. Para leer la conversación o responder, se entra con el correo.</span></p>
+        <p className="acc-trust">{I.lock}<Rich html={t('status_trust')} /></p>
       </form>
     </div></div></section>
   )
 }
 
 /* ----------------------------- Mis tickets ------------------------------- */
-/* Qué significa «quién habló el último» para el cliente. */
+/* Qué significa «quién habló el último» para el cliente (texto por clave). */
 const ULTIMO = {
-  soporte: { txt: 'Soporte te respondió', cls: 'resp' },
-  cliente: { txt: 'Enviado · esperando respuesta', cls: 'wait' },
-  cerrado: { txt: '', cls: '' },
+  soporte: { key: 'last_support', cls: 'resp' },
+  cliente: { key: 'last_waiting', cls: 'wait' },
+  cerrado: { key: '', cls: '' },
 }
 
-/* Una tarjeta de ticket. `apagada` = resuelta: se ve más calmada (es archivo). */
-function TicketCard({ t, onOpen, apagada }) {
-  const u = ULTIMO[t.ultimo] || ULTIMO.cliente
+/* Una tarjeta de ticket. `apagada` = resuelta: se ve más calmada (es archivo).
+   OJO: `ticket` es el ticket; el traductor viene como `tr` para no chocar. */
+function TicketCard({ ticket, onOpen, apagada }) {
+  const { t: tr, lang } = useLang()
+  const u = ULTIMO[ticket.ultimo] || ULTIMO.cliente
+  const fase = FASE[ticket.fase] || FASE.recibido
   // «Respuesta nueva»: soporte fue el último en hablar y el cliente aún no lo ha
   // visto (su última visita a este ticket es anterior al último mensaje).
-  const seen = getSeen(t.code)
-  const nuevo = t.ultimo === 'soporte' && (!seen || new Date(t.fecha) > new Date(seen))
+  const seen = getSeen(ticket.code)
+  const nuevo = ticket.ultimo === 'soporte' && (!seen || new Date(ticket.fecha) > new Date(seen))
   return (
-    <button className={`tcard ${t.fase} ${apagada ? 'apagada' : ''} ${nuevo ? 'nuevo' : ''}`} onClick={() => onOpen(t.code)}>
+    <button className={`tcard ${ticket.fase} ${apagada ? 'apagada' : ''} ${nuevo ? 'nuevo' : ''}`} onClick={() => onOpen(ticket.code)}>
       <div className="tcard-top">
-        <span className={`chip ${CHIP[t.fase]}`}><span className="cd" />{t.estado}</span>
-        {nuevo && <span className="tcard-new">Respuesta nueva</span>}
-        <span className="tcard-code">{t.code}</span>
+        <span className={`chip ${CHIP[ticket.fase]}`}><span className="cd" />{tr(fase.labelKey)}</span>
+        {nuevo && <span className="tcard-new">{tr('new_reply')}</span>}
+        <span className="tcard-code">{ticket.code}</span>
       </div>
-      <h3 className="tcard-subj">{t.subject}</h3>
-      {t.preview && <p className="tcard-prev">{t.preview}</p>}
+      <h3 className="tcard-subj">{ticket.subject}</h3>
+      {ticket.preview && <p className="tcard-prev">{ticket.preview}</p>}
       <div className="tcard-foot">
-        {u.txt && <span className={`tcard-last ${u.cls}`}><span className="tcard-last-dot" />{u.txt}</span>}
-        <span className="tcard-when">{relTime(t.fecha)}</span>
+        {u.key && <span className={`tcard-last ${u.cls}`}><span className="tcard-last-dot" />{tr(u.key)}</span>}
+        <span className="tcard-when">{relTime(ticket.fecha, tr, lang)}</span>
         <span className="tcard-go">{I.arrow}</span>
       </div>
     </button>
@@ -804,6 +836,7 @@ function TicketCard({ t, onOpen, apagada }) {
 }
 
 function Mis({ go, onOpen, onExpire }) {
+  const { t } = useLang()
   const [rows, setRows] = useState(null)
   const [filtro, setFiltro] = useState('todas')   // todas | abiertas | resueltas
   useEffect(() => {
@@ -817,33 +850,33 @@ function Mis({ go, onOpen, onExpire }) {
 
   return (
     <section className="screen on"><div className="wrap mislist">
-      <button className="back" onClick={() => go('home')}>{I.back}Inicio</button>
+      <button className="back" onClick={() => go('home')}>{I.back}{t('home')}</button>
 
       <div className="mis-head">
         <div>
-          <h1>Tus incidencias</h1>
-          <p>{rows === null ? '' : rows.length === 0 ? 'Aún no has abierto ninguna'
-            : `${rows.length} en total · ${abiertas} ${abiertas === 1 ? 'abierta' : 'abiertas'}`}</p>
+          <h1>{t('my_tickets_title')}</h1>
+          <p>{rows === null ? '' : rows.length === 0 ? t('none_yet')
+            : t('mis_summary', { total: rows.length, open: abiertas, openWord: abiertas === 1 ? t('open_one') : t('open_many') })}</p>
         </div>
-        <button className="mis-nueva" onClick={() => go('crear')}>{I.plus} Crear incidencia</button>
+        <button className="mis-nueva" onClick={() => go('crear')}>{I.plus} {t('create_ticket_short')}</button>
       </div>
 
       {/* Filtro: solo si hay de sobra para que aporte. */}
       {rows && rows.length > 1 && (
         <div className="mis-filtro">
-          {[['todas', 'Todas', rows.length], ['abiertas', 'Abiertas', abiertas], ['resueltas', 'Resueltas', resueltas]].map(([k, lb, n]) => (
+          {[['todas', t('filter_all'), rows.length], ['abiertas', t('filter_open'), abiertas], ['resueltas', t('filter_resolved'), resueltas]].map(([k, lb, n]) => (
             <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(k)}>{lb} <em>{n}</em></button>
           ))}
         </div>
       )}
 
-      {rows === null ? <div className="mis-cargando">Cargando…</div>
+      {rows === null ? <div className="mis-cargando">{t('loading')}</div>
         : rows.length === 0 ? (
           <div className="mis-vacia">
             <div className="mis-vacia-ic">{I.tickets}</div>
-            <b>Aún no tienes incidencias</b>
-            <p>Cuando abras una, aquí verás su estado y podrás responder.</p>
-            <button className="btn" style={{ width: 'auto', margin: '4px auto 0' }} onClick={() => go('crear')}>{I.plus} Crear una incidencia</button>
+            <b>{t('mis_empty_title')}</b>
+            <p>{t('mis_empty_sub')}</p>
+            <button className="btn" style={{ width: 'auto', margin: '4px auto 0' }} onClick={() => go('crear')}>{I.plus} {t('create_ticket')}</button>
           </div>
         ) : (
           <>
@@ -851,10 +884,10 @@ function Mis({ go, onOpen, onExpire }) {
                 seguir. Solo se ocultan si el filtro pide ver solo las resueltas. */}
             {filtro !== 'resueltas' && abiertasList.length > 0 && (
               <div className="mis-grupo">
-                <div className="mis-grupo-h abre"><span className="mis-grupo-pt" />Abiertas
-                  <em>{abiertas}</em><small>en seguimiento</small></div>
+                <div className="mis-grupo-h abre"><span className="mis-grupo-pt" />{t('group_open')}
+                  <em>{abiertas}</em><small>{t('group_open_sub')}</small></div>
                 <div className="mlist">
-                  {abiertasList.map((t) => <TicketCard key={t.code} t={t} onOpen={onOpen} />)}
+                  {abiertasList.map((ti) => <TicketCard key={ti.code} ticket={ti} onOpen={onOpen} />)}
                 </div>
               </div>
             )}
@@ -862,16 +895,16 @@ function Mis({ go, onOpen, onExpire }) {
             {/* RESUELTAS: archivo, más calmadas y debajo. */}
             {filtro !== 'abiertas' && resueltasList.length > 0 && (
               <div className="mis-grupo">
-                <div className="mis-grupo-h"><span className="mis-grupo-pt done" />Resueltas
-                  <em>{resueltas}</em><small>cerradas</small></div>
+                <div className="mis-grupo-h"><span className="mis-grupo-pt done" />{t('group_resolved')}
+                  <em>{resueltas}</em><small>{t('group_resolved_sub')}</small></div>
                 <div className="mlist">
-                  {resueltasList.map((t) => <TicketCard key={t.code} t={t} onOpen={onOpen} apagada />)}
+                  {resueltasList.map((ti) => <TicketCard key={ti.code} ticket={ti} onOpen={onOpen} apagada />)}
                 </div>
               </div>
             )}
 
-            {filtro === 'abiertas' && !abiertasList.length && <div className="mis-cargando">No tienes incidencias abiertas. 🎉</div>}
-            {filtro === 'resueltas' && !resueltasList.length && <div className="mis-cargando">Aún no tienes incidencias resueltas.</div>}
+            {filtro === 'abiertas' && !abiertasList.length && <div className="mis-cargando">{t('no_open')}</div>}
+            {filtro === 'resueltas' && !resueltasList.length && <div className="mis-cargando">{t('no_resolved')}</div>}
           </>
         )}
     </div></section>
@@ -880,6 +913,8 @@ function Mis({ go, onOpen, onExpire }) {
 
 /* ---------------------------- Detalle ticket ----------------------------- */
 function Detalle({ code, back, onExpire }) {
+  // `t` es el ticket; el traductor viene como `tr` para no chocar con él.
+  const { t: tr, lang } = useLang()
   const [t, setT] = useState(null)
   const [txt, setTxt] = useState('')
   const [files, setFiles] = useState([])
@@ -932,10 +967,10 @@ function Detalle({ code, back, onExpire }) {
     if (r.ok) load()
   }
 
-  if (t === null) return <section className="screen on"><div className="wrap" style={{ maxWidth: 600, paddingTop: 34, textAlign: 'center', color: 'var(--ink-3)' }}>Cargando…</div></section>
+  if (t === null) return <section className="screen on"><div className="wrap" style={{ maxWidth: 600, paddingTop: 34, textAlign: 'center', color: 'var(--ink-3)' }}>{tr('loading')}</div></section>
   if (t === false) return <section className="screen on"><div className="wrap" style={{ maxWidth: 600, paddingTop: 34 }}>
-    <button className="back" onClick={back}>{I.back}Mis incidencias</button>
-    <div className="faq-empty">No encontramos esa incidencia.</div>
+    <button className="back" onClick={back}>{I.back}{tr('my_tickets_back')}</button>
+    <div className="faq-empty">{tr('err_not_found')}</div>
   </div></section>
 
   const idx = ['recibido', 'en_proceso', 'resuelto'].indexOf(t.fase)
@@ -952,32 +987,32 @@ function Detalle({ code, back, onExpire }) {
   ].sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
 
   const subResuelto = resuelto && t.resuelto_en
-    ? `Se resolvió ${relTime(t.resuelto_en)}. Si el problema vuelve, respóndenos y la reabrimos.`
-    : fase.sub
+    ? tr('resolved_sub', { time: relTime(t.resuelto_en, tr, lang) })
+    : tr(fase.subKey)
 
   return (
     <section className="screen on"><div className="wrap tdetail">
-      <button className="back" onClick={back}>{I.back}Mis incidencias</button>
+      <button className="back" onClick={back}>{I.back}{tr('my_tickets_back')}</button>
 
       {/* HERO del ticket: el estado es el protagonista. Todo el bloque se tiñe
           según la fase (azul recibida · ámbar en proceso · verde resuelta). */}
       <div className={`thero ${fase.cls}`}>
         <div className="thero-top">
-          <span className="thero-eyebrow">{t.code} · abierta {relTime(t.fecha)}</span>
-          <span className="thero-pill"><span className="cd" />{fase.label}{resuelto && t.resuelto_en ? ` · ${relTime(t.resuelto_en)}` : ''}</span>
+          <span className="thero-eyebrow">{tr('opened_rel', { code: t.code, time: relTime(t.fecha, tr, lang) })}</span>
+          <span className="thero-pill"><span className="cd" />{tr(fase.labelKey)}{resuelto && t.resuelto_en ? ` · ${relTime(t.resuelto_en, tr, lang)}` : ''}</span>
         </div>
         <h2 className="thero-title">{t.subject}</h2>
         <p className="thero-sub">{subResuelto}</p>
 
         <div className="prog">
-          {[['recibido', 'Recibida'], ['en_proceso', 'En proceso'], ['resuelto', 'Resuelta']].map(([k, lb], i) => {
+          {[['recibido', 'phase_received'], ['en_proceso', 'phase_progress'], ['resuelto', 'phase_resolved']].map(([k, lb], i) => {
             const done = i < idx || (i === idx && resuelto)
             const cur = i === idx && !resuelto
             return (
               <div key={k} className={`prog-st ${done ? 'done' : ''} ${cur ? 'cur' : ''}`}>
                 {i > 0 && <span className="prog-bar" />}
                 <span className="prog-dot">{done ? I.check : cur ? dotCur : null}</span>
-                <span className="prog-lb">{lb}</span>
+                <span className="prog-lb">{tr(lb)}</span>
               </div>
             )
           })}
@@ -986,7 +1021,7 @@ function Detalle({ code, back, onExpire }) {
         {!resuelto && (
           <div className="thero-act">
             <button className="btn-ok" disabled={marking} onClick={resolver}>
-              {I.check}{marking ? 'Marcando…' : 'Ya está resuelto para mí'}
+              {I.check}{marking ? tr('marking') : tr('resolved_for_me')}
             </button>
           </div>
         )}
@@ -1006,7 +1041,7 @@ function Detalle({ code, back, onExpire }) {
                 <span className="tl-hito-dot" />
                 <span className="tl-hito-body">
                   <b className="tl-hito-lb">{it.h.label}</b>
-                  <span className="tl-hito-time" title={fmtHora(it.h.fecha)}>{relTime(it.h.fecha)}</span>
+                  <span className="tl-hito-time" title={fmtHora(it.h.fecha, lang)}>{relTime(it.h.fecha, tr, lang)}</span>
                 </span>
               </div>
             )
@@ -1015,11 +1050,11 @@ function Detalle({ code, back, onExpire }) {
           const yo = m.de === 'cliente'
           return (
             <div key={i} className={`tl-item ${yo ? 'yo' : 'sop'}`}>
-              <div className="tl-av">{yo ? 'Tú' : 'AE'}</div>
+              <div className="tl-av">{yo ? tr('me_avatar') : 'AE'}</div>
               <div className="tl-content">
                 <div className="tl-head">
-                  <b>{yo ? 'Tú' : (m.autor || 'Soporte AEME')}</b>
-                  <span className="tl-time" title={fmtHora(m.fecha)}>{relTime(m.fecha)}</span>
+                  <b>{yo ? tr('me_name') : (m.autor || tr('support_name'))}</b>
+                  <span className="tl-time" title={fmtHora(m.fecha, lang)}>{relTime(m.fecha, tr, lang)}</span>
                 </div>
                 {m.html && esCorreo(m.cuerpo) ? (
                   // Es un correo (venga de soporte o del propio cliente por su buzón):
@@ -1040,14 +1075,14 @@ function Detalle({ code, back, onExpire }) {
       {/* Responder. El recuadro está SIEMPRE: responder un ticket resuelto lo
           reabre, que es justo lo que quiere quien vuelve a escribir. */}
       <div className="reply">
-        {resuelto && <p className="reply-note">¿El problema ha vuelto? Respóndenos y reabrimos la incidencia.</p>}
-        <span className="reply-lab">{resuelto ? 'Escribir de nuevo' : 'Responder a soporte'}</span>
+        {resuelto && <p className="reply-note">{tr('reply_reopen_note')}</p>}
+        <span className="reply-lab">{resuelto ? tr('reply_again') : tr('reply_to_support')}</span>
         <textarea value={txt} onChange={(e) => setTxt(e.target.value)}
-          placeholder={resuelto ? 'Cuéntanos si el problema ha vuelto y lo retomamos…' : 'Escribe aquí tu mensaje para el equipo de soporte…'} />
+          placeholder={resuelto ? tr('reply_ph_reopen') : tr('reply_ph')} />
         <Adjuntar files={files} setFiles={setFiles} compacta />
         <div className="reply-foot">
           <button className="btn" style={{ width: 'auto', marginLeft: 'auto', padding: '11px 22px' }}
-            disabled={busy || (!txt.trim() && !files.length)} onClick={responder}>{busy ? 'Enviando…' : 'Responder'}</button>
+            disabled={busy || (!txt.trim() && !files.length)} onClick={responder}>{busy ? tr('sending') : tr('reply_btn')}</button>
         </div>
       </div>
     </div></section>
@@ -1060,6 +1095,7 @@ function Detalle({ code, back, onExpire }) {
  * cambiar durante unos días; el backend actualiza sin duplicar.
  */
 function Csat({ code, csat }) {
+  const { t } = useLang()
   const [score, setScore] = useState(csat.score || 0)
   const [hover, setHover] = useState(0)
   // La caja del comentario SIEMPRE nace vacía (con su placeholder): no se precarga
@@ -1090,13 +1126,13 @@ function Csat({ code, csat }) {
 
   return (
     <div className={`csat ${rated ? 'done' : ''}`}>
-      <div className="csat-title">{rated ? '¡Gracias por tu valoración!' : '¿Cómo valoras la atención recibida?'}</div>
-      {!rated && <p className="csat-sub">Un clic y listo. Nos ayuda a mejorar.</p>}
+      <div className="csat-title">{rated ? t('csat_thanks') : t('csat_q')}</div>
+      {!rated && <p className="csat-sub">{t('csat_sub')}</p>}
 
       <div className="csat-stars" onMouseLeave={() => setHover(0)}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button key={n} type="button" className={`csat-star ${n <= marcadas ? 'on' : ''}`} disabled={busy}
-            onMouseEnter={() => setHover(n)} onClick={() => pulsarEstrella(n)} aria-label={`${n} de 5`}>
+            onMouseEnter={() => setHover(n)} onClick={() => pulsarEstrella(n)} aria-label={t('csat_star_aria', { n })}>
             {I.star}
           </button>
         ))}
@@ -1105,11 +1141,11 @@ function Csat({ code, csat }) {
       {rated && (
         <div className="csat-more">
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} maxLength={2000}
-            placeholder="¿Quieres contarnos algo más? (opcional)" />
+            placeholder={t('csat_comment_ph')} />
           <div className="csat-foot">
-            {saved && <span className="csat-saved">{I.check} Guardado</span>}
+            {saved && <span className="csat-saved">{I.check} {t('saved')}</span>}
             <button className="btn" style={{ width: 'auto', padding: '10px 20px' }} disabled={busy} onClick={guardarComentario}>
-              {busy ? 'Guardando…' : 'Enviar comentario'}
+              {busy ? t('saving') : t('csat_send')}
             </button>
           </div>
         </div>
@@ -1119,22 +1155,23 @@ function Csat({ code, csat }) {
 }
 
 function Footer() {
+  const { t } = useLang()
   return (
     <footer>
       <div className="foot-in">
         <div className="foot brand-blurb">
           <h4>AEME Group</h4>
-          <p>Soluciones tecnológicas para el retail: etiquetas electrónicas, menús digitales y consultoría para el punto de venta.</p>
-          <a className="weblink" href="https://etiquetaselectronicas.com/" target="_blank" rel="noopener noreferrer">Visita nuestra web {I.ext}</a>
+          <p>{t('foot_blurb')}</p>
+          <a className="weblink" href="https://etiquetaselectronicas.com/" target="_blank" rel="noopener noreferrer">{t('visit_web')} {I.ext}</a>
         </div>
         <div className="foot">
-          <h4>Sectores</h4>
-          <ul><li>Hoteles</li><li>Farmacias</li><li>Supermercados</li><li>Carnicerías</li><li>Gasolineras</li></ul>
+          <h4>{t('sectors')}</h4>
+          <ul><li>{t('sector_hotels')}</li><li>{t('sector_pharmacies')}</li><li>{t('sector_supermarkets')}</li><li>{t('sector_butchers')}</li><li>{t('sector_gas')}</li></ul>
         </div>
       </div>
       <div className="foot-bar">
         <span>© 2026 AEME Group</span><span className="spacer" />
-        <span>Soporte · Lun–Vie 07:00–21:00</span>
+        <span>{t('foot_hours')}</span>
       </div>
     </footer>
   )
