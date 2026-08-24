@@ -51,14 +51,31 @@ class NotifyService
                 foreach ($agentes as $a) $out[mb_strtolower($a->email)] = $a->name;
             }
         }
-        // Administradores = quienes pueden configurar el soporte.
+        // Administradores = quienes pueden configurar el soporte. Se resuelven por
+        // rol/permiso en una consulta, sin recorrer TODOS los usuarios llamando a can().
         if (!empty($r['admins'])) {
-            foreach (User::all() as $u) {
-                if ($u->email && $u->can('support.config')) $out[mb_strtolower($u->email)] = $u->name;
+            foreach (User::whereIn('id', $this->adminUserIds())->whereNotNull('email')->get(['email', 'name']) as $u) {
+                $out[mb_strtolower($u->email)] = $u->name;
             }
         }
 
         return $out;
+    }
+
+    /**
+     * IDs de los usuarios que pueden configurar el soporte, en una consulta por
+     * rol/permiso: los que tienen el permiso `support.config` (directo o por rol) MÁS
+     * los superadministradores (que lo tienen por bypass de Gate, sin permiso explícito,
+     * así que `permission('support.config')` no los incluiría). Evita el `User::all()`
+     * + `can()` uno a uno en cada aviso.
+     */
+    protected function adminUserIds(): \Illuminate\Support\Collection
+    {
+        $super = config('rbac.super_role', 'superadmin');
+
+        return User::role($super)->pluck('id')
+            ->merge(User::permission('support.config')->pluck('id'))
+            ->unique()->values();
     }
 
     /**
@@ -85,8 +102,9 @@ class NotifyService
             foreach ($agentes as $a) $out[mb_strtolower($a->email)] = $a->name;
         }
         if (!empty($r['admins'])) {
-            foreach (User::where('notify_sla', true)->whereNotNull('email')->get() as $u) {
-                if ($u->can('support.config')) $out[mb_strtolower($u->email)] = $u->name;
+            foreach (User::whereIn('id', $this->adminUserIds())
+                ->where('notify_sla', true)->whereNotNull('email')->get(['email', 'name']) as $u) {
+                $out[mb_strtolower($u->email)] = $u->name;
             }
         }
 

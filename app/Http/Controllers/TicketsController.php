@@ -1103,15 +1103,20 @@ class TicketsController extends Controller
             ->orderByDesc('t.created_at')->limit(50)
             ->get(['t.id', 't.code', 't.subject', 't.status', 't.created_at', 't.channel']);
 
+        // Nº de mensajes de todos los candidatos + el principal en UNA consulta (antes
+        // era un count() por cada uno: hasta 51 consultas por diálogo de fusión).
+        $ids = $otros->pluck('id')->push($t->id)->all();
+        $conteos = DB::table('messages')->whereIn('ticket_id', $ids)->where('is_internal_note', 0)
+            ->groupBy('ticket_id')->selectRaw('ticket_id, COUNT(*) n')->pluck('n', 'ticket_id');
         foreach ($otros as $o) {
-            $o->messages = DB::table('messages')->where('ticket_id', $o->id)->where('is_internal_note', 0)->count();
+            $o->messages = (int) ($conteos[$o->id] ?? 0);
         }
 
         return response()->json([
             'ok'      => true,
             'ticket'  => $t,
             'others'  => $otros,
-            'messages' => DB::table('messages')->where('ticket_id', $t->id)->where('is_internal_note', 0)->count(),
+            'messages' => (int) ($conteos[$t->id] ?? 0),
         ]);
     }
 

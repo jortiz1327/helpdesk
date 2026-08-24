@@ -73,11 +73,20 @@ class SlaService
         return (int) ($catHoras ?? 0) * 60;
     }
 
-    /** ¿Está encendido el SLA? Se consulta mucho, así que se recuerda en la petición. */
+    /**
+     * ¿Está encendido el SLA? Se consulta mucho (una vez por ticket en la bandeja y en
+     * el cron), así que se recuerda. Pero POR PETICIÓN, no por proceso: se guarda como
+     * instancia «scoped» del contenedor, que Laravel vacía entre peticiones y entre
+     * trabajos de cola (forgetScopedInstances). Con un `static` quedaba congelado toda la
+     * vida del proceso —un worker de cola no se enteraba de que se apagó el SLA—.
+     */
     public static function activo(): bool
     {
-        static $v = null;
-        return $v ??= (string) \App\Models\Setting::get('sla_active', '1') === '1';
+        $app = app();
+        if (!$app->bound('sla.activo')) {
+            $app->scoped('sla.activo', fn () => (string) \App\Models\Setting::get('sla_active', '1') === '1');
+        }
+        return (bool) $app->make('sla.activo');
     }
 
     /**
