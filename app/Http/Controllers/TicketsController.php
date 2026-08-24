@@ -812,228 +812,34 @@ class TicketsController extends Controller
             return response()->json(['ok' => false, 'error' => 'La respuesta está vacía'], 400);
         }
 
-        // Canal WhatsApp: se responde por el número de SOPORTE (opción B). Va con
-        // CANDADO por nivel: bloqueado hasta que haya número de soporte configurado.
+        $svc = app(\App\Services\TicketReplyService::class);
+
+        // Canal WhatsApp: candado por nivel (necesita número de soporte). El envío lo
+        // hace el servicio; el candado y los permisos son de la frontera HTTP (aquí).
         if ($t->channel === 'whatsapp') {
-            return $this->replyWhatsApp($t, $html, $me, $files);
+            if ($g = \App\Services\GatingService::guard('wa_ticket_reply')) return $g;
+            return $this->respuesta($svc->porWhatsapp($t, $html, (array) $files, $me));
         }
 
         // De momento el resto solo se responde por CORREO (los demás canales aún no envían).
         if ($t->channel !== 'email') {
             return response()->json(['ok' => false, 'error' => 'El envío para el canal «' . $t->channel . '» aún no está disponible'], 422);
         }
-        if (!$t->contact_email) {
-            return response()->json(['ok' => false, 'error' => 'El contacto no tiene dirección de correo'], 422);
-        }
-        $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
-        if (!$acc) {
-            return response()->json(['ok' => false, 'error' => 'No hay un buzón SMTP configurado'], 422);
-        }
 
-        // Adjuntos primero (validados + en disco), pero SIN mensaje aún: si el SMTP
-        // falla, se limpian y no queda un mensaje fantasma en el hilo.
-        $savedIds = [];
-        $warnings = [];
-        $forMail  = [];
-        if ($files) {
-            [$savedIds, $warnings] = $this->attachments->store($files, (int) $t->id, null, (int) $me->id);
-            foreach ($savedIds as $aid) {
-                if ($f = $this->attachments->find($aid)) {
-                    [$path, $row] = $f;
-                    $forMail[] = ['path' => $path, 'name' => $row->name, 'mime' => $row->mime];
-                }
-            }
-        }
-
-        // Enviar por SMTP.
-        $subject = $this->replySubject((string) $t->subject, (string) $t->code);
-
-        // Encadenado del hilo: cadena de Message-IDs previos del ticket (In-Reply-To =
-        // el último; References = toda la cadena) para que el correo del cliente los agrupe.
-        $refs = DB::table('messages')->where('ticket_id', $t->id)->whereNotNull('wamid')
-            ->orderBy('id')->pluck('wamid')
-            ->map(fn ($w) => trim((string) $w, "<> \t\r\n"))
-            ->filter()->values()->all();
-        $inReplyTo = $refs ? end($refs) : null;
-
-        /*
-         * COPIAS: quien venía en Cc sigue en la conversación, así que el agente puede
-         * mantenerlo, quitarlo o añadir a alguien más. Lo que llega del formulario se
-         * valida aquí; el filtrado fino (destinatario repetido, nuestro propio buzón)
-         * lo hace sendMail() justo antes de enviar.
-         */
+        // COPIAS del hilo que el agente mantiene/edita; el filtrado fino (repetidos,
+        // nuestro propio buzón) lo hace sendMail() justo antes de enviar.
         $cc  = $this->direcciones($request->input('cc'));
         $bcc = $this->direcciones($request->input('bcc'));
 
-        // Firma del DEPARTAMENTO (categoría del ticket), con {{agente}}/{{departamento}}.
-        $firma = trim((string) ($t->cat_signature ?? ''));
-        if ($firma !== '') {
-            $firma = strtr($firma, [
-                '{{agente}}'       => e((string) ($me->name ?? '')),
-                '{{departamento}}' => e((string) ($t->category_name ?? '')),
-            ]);
-        }
-
-        try {
-            $smtpId = app(MailService::class)->sendMail(
-                $acc, (string) $t->contact_email, (string) $t->contact_name,
-                $subject, $this->absolutizeInline($html), $forMail, $inReplyTo, $refs, $cc, $bcc, $firma
-            );
-        } catch (\Throwable $e) {
-            // Deshacer adjuntos guardados (ficheros + filas) para no dejar basura.
-            foreach ($savedIds as $aid) {
-                if ($f = $this->attachments->find($aid)) { try { Storage::disk('local')->delete($f[1]->path); } catch (\Throwable $x) {} }
-            }
-            if ($savedIds) DB::table('attachments')->whereIn('id', $savedIds)->delete();
-
-            return response()->json(['ok' => false, 'error' => 'No se pudo enviar el correo: ' . mb_substr($e->getMessage(), 0, 160)], 502);
-        }
-
-        // Enviado: guardar el mensaje saliente y colgarle los adjuntos.
-        $messageId = ChatService::storeMessage((int) $t->contact_id, (string) ($t->contact_wa ?? ''), 'out', 'text', $html, [
-            'ticket_id'      => (int) $t->id,
-            'author_user_id' => (int) $me->id,
-            'is_html'        => true,
-            'channel'        => 'email',
-            'status'         => 'sent',
-            'cc'             => $cc ? implode(', ', $cc) : null,
-            'bcc'            => $bcc ? implode(', ', $bcc) : null,
-            'wamid'          => $smtpId ? mb_substr($smtpId, 0, 128) : null,
-        ]);
-        if ($savedIds) {
-            DB::table('attachments')->whereIn('id', $savedIds)->update(['message_id' => $messageId]);
-        }
-
-        return response()->json(['ok' => true, 'id' => $messageId, 'warnings' => $warnings]);
+        return $this->respuesta($svc->porCorreo($t, $html, (array) $files, $cc, $bcc, $me));
     }
 
-    /**
-     * Responder un ticket por WhatsApp (canal 'whatsapp'), por el número de SOPORTE.
-     *
-     * CANDADO: si no hay número de soporte configurado, devuelve el bloqueo (la UI lo
-     * pinta como candado / solo lectura). WhatsApp es texto plano; el HTML del editor
-     * se aplana. El envío sale por `WhatsAppService::paraFuncion('soporte')`.
-     */
-    protected function replyWhatsApp($t, string $html, $me, $files = [])
+    /** Traduce el resultado de TicketReplyService (array, con opcional _status) a JSON. */
+    protected function respuesta(array $r)
     {
-        // Candado por nivel: necesita al menos el número de prueba de soporte.
-        if ($g = \App\Services\GatingService::guard('wa_ticket_reply')) {
-            return $g;
-        }
-        if (!$t->contact_wa) {
-            return response()->json(['ok' => false, 'error' => 'El contacto no tiene número de WhatsApp'], 422);
-        }
-
-        // Se recopila el multimedia a enviar: adjuntos (clip) + imágenes EN LÍNEA del
-        // editor (botón imagen / pegar), que llegan dentro del HTML como <img src=".../inline/ID">.
-        $medios = $this->recopilarMediosWhatsapp($html, $files);
-        $texto  = trim(HtmlSanitizer::toText($html));
-
-        if (!$medios && $texto === '') {
-            return response()->json(['ok' => false, 'error' => 'La respuesta está vacía'], 400);
-        }
-
-        $wa   = app(\App\Services\WhatsAppService::class)->paraFuncion('soporte');
-        $to   = (string) $t->contact_wa;
-        $base = [
-            'ticket_id'      => $t->id,
-            'channel'        => 'whatsapp',
-            'funcion'        => 'soporte',   // respuesta de soporte: va al Helpdesk, no a Campañas
-            'status'         => 'sent',
-            'author_user_id' => $me->id,
-        ];
-        $ultimoId = null;
-
-        if ($medios) {
-            // El texto acompaña a la PRIMERA imagen/vídeo como pie (comportamiento nativo
-            // de WhatsApp). El resto de medios van sueltos. Los documentos no llevan pie.
-            foreach ($medios as $i => $md) {
-                $type    = $this->tipoMediaPorMime($md['mime']);
-                $caption = ($i === 0 && $type !== 'document') ? $texto : '';
-
-                [$uc, $ur] = $wa->uploadMedia($md['path'], $md['mime'], $md['name']);
-                $mediaId   = $ur['id'] ?? null;
-                if (!$mediaId) {
-                    $err = $ur['error']['message'] ?? 'No se pudo subir el archivo a WhatsApp';
-                    return response()->json(['ok' => false, 'error' => $err], 422);
-                }
-
-                [$code, $res] = $wa->sendMedia($to, $type, $mediaId, $caption, $type === 'document' ? $md['name'] : null);
-                if ($code < 200 || $code >= 300) {
-                    $err = $res['error']['message'] ?? 'No se pudo enviar por WhatsApp';
-                    return response()->json(['ok' => false, 'error' => $err], 422);
-                }
-
-                $body = $caption !== '' ? nl2br(e($caption)) : ($type === 'document' ? e($md['name']) : '');
-                $ultimoId = \App\Services\ChatService::storeMessage($t->contact_id, $to, 'out', $type, $body, $base + [
-                    'is_html'    => $caption !== '',
-                    'wamid'      => $res['messages'][0]['id'] ?? null,
-                    'media_url'  => $mediaId,
-                    'media_mime' => $md['mime'],
-                ]);
-            }
-        } else {
-            // Solo texto (comportamiento clásico).
-            [$code, $res] = $wa->sendText($to, $texto);
-            if ($code < 200 || $code >= 300) {
-                // La ventana de 24 h de WhatsApp: fuera de ella Meta rechaza el texto libre.
-                $err = $res['error']['message'] ?? 'No se pudo enviar por WhatsApp';
-                return response()->json(['ok' => false, 'error' => $err], 422);
-            }
-            $ultimoId = \App\Services\ChatService::storeMessage($t->contact_id, $to, 'out', 'text', nl2br(e($texto)), $base + [
-                'is_html' => true,
-                'wamid'   => $res['messages'][0]['id'] ?? null,
-            ]);
-        }
-
-        $this->tickets->broadcast('message', (int) $t->id);
-
-        return response()->json(['ok' => true, 'id' => $ultimoId]);
-    }
-
-    /**
-     * Reúne el multimedia de una respuesta de WhatsApp: los ficheros adjuntos (clip)
-     * y las imágenes EN LÍNEA del editor, que viajan en el HTML como <img src=".../inline/ID">
-     * apuntando a la tabla inline_uploads. Devuelve [['path','mime','name'], ...] en orden.
-     */
-    protected function recopilarMediosWhatsapp(string $html, $files): array
-    {
-        $medios = [];
-
-        foreach ((array) $files as $f) {
-            if ($f && $f->isValid()) {
-                $medios[] = [
-                    'path' => $f->getRealPath(),
-                    'mime' => $f->getClientMimeType() ?: 'application/octet-stream',
-                    'name' => $f->getClientOriginalName() ?: 'archivo',
-                ];
-            }
-        }
-
-        // Imágenes en línea del editor: /inline/ID (con o sin prefijo /api).
-        if (preg_match_all('#/inline/(\d+)#', $html, $mm)) {
-            foreach (array_unique($mm[1]) as $iid) {
-                $row = \Illuminate\Support\Facades\DB::table('inline_uploads')->find((int) $iid);
-                if ($row && \Illuminate\Support\Facades\Storage::disk('local')->exists($row->path)) {
-                    $medios[] = [
-                        'path' => \Illuminate\Support\Facades\Storage::disk('local')->path($row->path),
-                        'mime' => $row->mime ?: 'application/octet-stream',
-                        'name' => basename($row->path),
-                    ];
-                }
-            }
-        }
-
-        return $medios;
-    }
-
-    /** Traduce el MIME a uno de los tipos de mensaje de WhatsApp. */
-    protected function tipoMediaPorMime(string $mime): string
-    {
-        if (str_starts_with($mime, 'image/')) return 'image';
-        if (str_starts_with($mime, 'video/')) return 'video';
-        if (str_starts_with($mime, 'audio/')) return 'audio';
-        return 'document';
+        $status = $r['_status'] ?? 200;
+        unset($r['_status']);
+        return response()->json($r, $status);
     }
 
     /**
@@ -1074,27 +880,6 @@ class TicketsController extends Controller
             if ($d !== '' && filter_var($d, FILTER_VALIDATE_EMAIL) && !in_array($d, $ok, true)) $ok[] = $d;
         }
         return array_slice($ok, 0, 20);   // tope sano: nadie responde a 50 copias
-    }
-
-    /** Asunto de respuesta: «Re: … [TK-AAMM-NNNN]» para mantener el hilo por código. */
-    protected function replySubject(string $subject, string $code): string
-    {
-        $s = trim($subject) ?: 'Sin asunto';
-        if (stripos($s, 're:') !== 0)   $s = 'Re: ' . $s;
-        if (stripos($s, $code) === false) $s .= ' [' . $code . ']';
-        return mb_substr($s, 0, 200);
-    }
-
-    /**
-     * Convierte las rutas de imágenes EN LÍNEA (relativas /api/inline/.. y
-     * /api/attachment_inline/..) en ABSOLUTAS, para que carguen en el cliente de
-     * correo del destinatario (la firma de la URL las autoriza sin token).
-     */
-    protected function absolutizeInline(string $html): string
-    {
-        $base = rtrim((string) config('app.url'), '/');
-        if ($base === '') return $html;
-        return preg_replace('#(src=")(/api/(?:inline|attachment_inline)/)#i', '$1' . $base . '$2', $html);
     }
 
     /**
