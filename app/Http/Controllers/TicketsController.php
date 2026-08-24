@@ -370,6 +370,9 @@ class TicketsController extends Controller
         $pagina  = max(1, min($paginas, (int) $request->query('page', 1)));   // fuera de rango → última
 
         $rows = $q
+            // Quién tiene el ticket abierto AHORA (presencia «alguien está viendo esto»).
+            // El join va aquí y no en baseQuery para no cargar el contador con él.
+            ->leftJoin('users as lk', 'lk.id', '=', 't.locked_by')
             // ORDEN: por ÚLTIMA ACTIVIDAD, no por fecha de creación. Un ticket de hace un
             // mes con una respuesta de hace un minuto tiene que salir el primero.
             ->orderByDesc('t.last_message_at')
@@ -392,6 +395,8 @@ class TicketsController extends Controller
                 't.last_direction',
                 // Posponer: el chip «💤 hasta …» y su motivo.
                 't.snoozed_until', 't.snooze_wake_on_reply', 't.snoozed_by', 't.snooze_reason',
+                // Presencia: quién lo tiene abierto y desde cuándo (vigencia la calcula el front).
+                't.locked_by', 't.locked_at', 'lk.name as locked_name',
             ]);
 
         /*
@@ -602,6 +607,9 @@ class TicketsController extends Controller
             'categories' => DB::table('ticket_categories')->where('active', 1)->orderBy('position')->get(),
             'labels'     => \App\Models\TicketLabel::activas(),   // catálogo activo (filtro + acción masiva)
             'users'      => $users,   // a quién se puede asignar
+            // Minutos que dura el bloqueo: el frontend lo usa para saber si la marca
+            // «alguien está viendo esto» de la lista sigue vigente. 0 = función apagada.
+            'lock_minutes' => app(TicketLockService::class)->minutes(),
         ]);
     }
 

@@ -434,6 +434,12 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   // pantalla y su forma de trabajar.
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(() => Number(localStorage.getItem('tk_per_page')) || 25)
+  // Densidad de la tabla: «cómoda» (por defecto) o «compacta» para barrer más cola de un vistazo.
+  const [density, setDensity] = useState(() => localStorage.getItem('tk_density') || 'comoda')
+  const toggleDensity = () => {
+    const d = density === 'compacta' ? 'comoda' : 'compacta'
+    localStorage.setItem('tk_density', d); setDensity(d)
+  }
   const [pag, setPag] = useState({ total: 0, pages: 1 })
 
   // Vistas guardadas: personales de cada agente + COMPARTIDAS del equipo.
@@ -592,6 +598,12 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             {crones > 0 && <span className="seg-n">{crones}</span>}
           </button>
         </div>
+        {tab === 'tickets' && (
+          <button className="btn ghost" onClick={toggleDensity}
+            title={density === 'compacta' ? 'Vista cómoda (filas más altas)' : 'Vista compacta (más filas en pantalla)'}>
+            <Icon.list /> {density === 'compacta' ? 'Cómoda' : 'Compacta'}
+          </button>
+        )}
         {can('tickets.export') && (
           <button className="btn ghost" disabled={exporting} onClick={exportar}
             title="Descargar en Excel lo que ves con los filtros actuales">
@@ -818,7 +830,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             </div>
           ) : (
             <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-              <table className="tk-table">
+              <table className={`tk-table ${density === 'compacta' ? 'compact' : ''}`}>
                 <thead>
                   <tr>
                     <th className="tk-chk" onClick={(e) => e.stopPropagation()}>
@@ -837,6 +849,11 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                     const waiting = t.last_direction === 'in'   // habló el cliente: nos toca
                     const sleeping = t.snoozed_at && (Number(t.snooze_wake_on_reply)
                       || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
+                    // Presencia: otro agente lo tiene abierto AHORA (bloqueo vigente).
+                    const lockMin = meta?.lock_minutes || 0
+                    const viewing = (lockMin > 0 && t.locked_by && Number(t.locked_by) !== Number(user?.id)
+                      && t.locked_at && (Date.now() - new Date(t.locked_at).getTime()) < lockMin * 60000)
+                      ? t.locked_name : null
                     return (
                       <tr key={t.id} className={`tk-row ${waiting ? 'wait' : ''} ${sleeping ? 'sleeping' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
                         tabIndex={0} onKeyDown={teclaAbrir(() => setOpen(t.id))}
@@ -855,6 +872,11 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                           {sleeping && (
                             <span className="tk-sleep-chip" title={t.snooze_reason || 'Pospuesto'}>
                               💤 {Number(t.snooze_wake_on_reply) ? 'Hasta que responda' : `Hasta ${fmtDate(t.snoozed_until)}`}
+                            </span>
+                          )}
+                          {viewing && (
+                            <span className="tk-view-chip" title={`${viewing} está viendo este ticket ahora`}>
+                              <span className="tk-view-dot" />{(viewing || '').split(' ')[0]}
                             </span>
                           )}
                           {t.labels?.length > 0 && (

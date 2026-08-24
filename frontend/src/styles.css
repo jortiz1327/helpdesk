@@ -1805,6 +1805,20 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tk-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-2); font-weight: 700; padding: 12px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .tk-table td { padding: 12px 9px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+/* Vista COMPACTA: menos aire para barrer más cola de un vistazo (toggle Cómoda/Compacta). */
+.tk-table.compact th { padding: 7px 9px; }
+.tk-table.compact td { padding: 5px 9px; font-size: 12.5px; }
+.tk-table.compact .tk-cli small,
+.tk-table.compact .tk-row-tags { display: none; }   /* en compacta, lo secundario se calla */
+
+/* Presencia: «alguien está viendo este ticket ahora». */
+.tk-view-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px;
+  margin-left: 6px; border-radius: 6px; font-size: 11px; font-weight: 700; vertical-align: middle;
+  background: var(--secondary-soft, #e7f7ef); color: var(--secondary, #14a06a); white-space: nowrap; }
+.tk-view-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent); animation: tkViewPulse 1.8s ease-in-out infinite; }
+@keyframes tkViewPulse { 0%, 100% { opacity: 1 } 50% { opacity: .4 } }
+
 .tk-table tbody tr { cursor: pointer; transition: background 0.12s; }
 .tk-table tbody tr:hover { background: var(--primary-soft); }
 .tk-table tbody tr:last-child td { border-bottom: 0; }
