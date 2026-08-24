@@ -350,6 +350,20 @@ class PortalService
                 ->where('active', 1)->value('id');
         }
 
+        /*
+         * IDEMPOTENCIA: un doble-submit (doble clic, reintento de red, el botón «atrás»)
+         * NO debe crear dos incidencias. Si este mismo contacto abrió una idéntica (mismo
+         * asunto) hace unos segundos, devolvemos ESA —el mismo criterio que el dedup por
+         * Message-ID del correo—. Ventana corta: dos incidencias reales con idéntico
+         * asunto en segundos no existen, es siempre el mismo envío repetido.
+         */
+        $dup = DB::table('tickets')
+            ->where('contact_id', $contactId)->where('source', 'portal')
+            ->where('subject', $subject)
+            ->where('created_at', '>=', now()->subSeconds(90))
+            ->orderByDesc('id')->value('code');
+        if ($dup) return [true, null, $dup];
+
         // MISMO create() que el correo: reglas, reparto por turno, SLA y acuse de
         // recibo salen gratis. El canal es 'email' para que el hilo se comporte como
         // un correo (el cliente puede seguir por el portal o respondiendo al aviso).
