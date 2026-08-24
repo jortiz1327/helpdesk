@@ -77,6 +77,7 @@ class SlaCheck extends Command
                     $cambios = app(TicketService::class)->escalarPorSla((int) $t->id, $reloj);
                     $notify->slaAlert('sla_breach', (int) $t->id, $this->vars($reloj, $info, true));
                     DB::table('tickets')->where('id', $t->id)->update(['sla_breached_at' => now()]);
+                    $this->notifSla((int) $t->id, 'sla_breach', $reloj);
                     if ($cambios) $this->line("  ↳ escalado: " . implode(', ', array_map(fn ($k, $v) => "$k=$v", array_keys($cambios), $cambios)));
                 }
                 $vencidos++;
@@ -86,6 +87,7 @@ class SlaCheck extends Command
                 if (!$dry) {
                     $notify->slaAlert('sla_warning', (int) $t->id, $this->vars($reloj, $info, false));
                     DB::table('tickets')->where('id', $t->id)->update(['sla_warned_at' => now()]);
+                    $this->notifSla((int) $t->id, 'sla_warning', $reloj);
                 }
                 $avisados++;
                 $this->line(($dry ? '[dry] ' : '') . "Ticket #{$t->id}: por vencer ({$reloj})");
@@ -120,6 +122,21 @@ class SlaCheck extends Command
             '{{vence}}'   => $vence,
             '{{retraso}}' => $this->humano($mins),
         ];
+    }
+
+    /**
+     * Aviso IN-APP de SLA al AGENTE ASIGNADO (centro de notificaciones). Va aparte del
+     * correo (que depende de que la plantilla esté activa): el aviso in-app llega siempre.
+     * Sin asignado no hay a quién avisar.
+     */
+    protected function notifSla(int $ticketId, string $key, string $reloj): void
+    {
+        $inf = DB::table('tickets')->where('id', $ticketId)->first(['assigned_to', 'code', 'subject']);
+        if (!$inf || !$inf->assigned_to) return;
+
+        $etiqueta = $key === 'sla_breach' ? "SLA VENCIDO ({$reloj})" : "SLA por vencer ({$reloj})";
+        $cuerpo   = $etiqueta . " en {$inf->code}" . ($inf->subject ? ": «" . mb_substr($inf->subject, 0, 120) . "»" : '');
+        app(\App\Services\NotificationService::class)->push((int) $inf->assigned_to, $key, $cuerpo, $ticketId, null);
     }
 
     /** «135» → «2 h 15 min»; en horario laboral (así se miden los relojes). */

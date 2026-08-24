@@ -419,7 +419,15 @@ class TicketService
         $this->broadcast('assigned', $ticketId, $assignee);
 
         // Solo cuando se asigna a alguien (al desasignar no hay a quién avisar).
-        if ($assignee) app(NotifyService::class)->ticket('ticket_assigned', $ticketId);
+        if ($assignee) {
+            app(NotifyService::class)->ticket('ticket_assigned', $ticketId);   // correo
+            // Aviso in-app al nuevo responsable (push se salta si se autoasignó).
+            $inf    = DB::table('tickets')->where('id', $ticketId)->first(['code', 'subject']);
+            $quien  = $userId ? DB::table('users')->where('id', $userId)->value('name') : null;
+            $cuerpo = ($quien ? "{$quien} te asignó" : 'Te han asignado') . " el ticket {$inf->code}"
+                . ($inf->subject ? ": «" . mb_substr($inf->subject, 0, 120) . "»" : '');
+            app(NotificationService::class)->push((int) $assignee, 'assigned', $cuerpo, $ticketId, $userId);
+        }
     }
 
     /**
