@@ -73,6 +73,36 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
     setEmpty(true)
     setAvisosIA([])   // al enviar se limpian los avisos de la IA
     setBcc([])   // el Cco no se arrastra al siguiente mensaje; el Cc sí (sigue el hilo)
+    if (draftKey) localStorage.removeItem(draftKey)   // enviado: fuera el borrador
+  }
+
+  /* --- Autosave del borrador por ticket -------------------------------------
+   * Al saltar de un ticket a otro, el Composer se remonta y se perdía lo escrito.
+   * Se guarda un borrador por ticket (con su modo) y se restaura al volver; se borra
+   * al enviar. En una cola donde se salta mucho, esto evita perder respuestas a medias. */
+  const draftKey = ticketId ? `tk_draft_${ticketId}` : null
+  const draftTimer = useRef(null)
+
+  useEffect(() => {
+    if (!draftKey) return
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null')
+      if (saved?.html) {
+        setMode(saved.note ? 'note' : 'reply')
+        ed.current?.setHtml(saved.html)   // el hijo ya montó: el ref está listo
+        setEmpty(false)
+      }
+    } catch { /* borrador corrupto: se ignora */ }
+  }, [draftKey])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const guardarBorrador = () => {
+    setEmpty(ed.current.isEmpty())
+    if (!draftKey) return
+    clearTimeout(draftTimer.current)
+    draftTimer.current = setTimeout(() => {
+      if (ed.current?.isEmpty()) localStorage.removeItem(draftKey)
+      else localStorage.setItem(draftKey, JSON.stringify({ html: ed.current.getHtml(), note }))
+    }, 400)
   }
 
   return (
@@ -123,7 +153,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
           : bloqueoResp ? 'Envío al cliente bloqueado — puedes cambiar a «Nota interna»'
           : note ? 'Escribe una nota interna… (solo la verán los agentes)'
           : 'Escribe tu respuesta… (o / para respuestas rápidas)'}
-        onChange={() => setEmpty(ed.current.isEmpty())}
+        onChange={guardarBorrador}
       />
       {/* Guardarraíles: la IA propuso algo que roza una línea roja (precio, datos
           internos). No bloquea, pero se avisa para revisarlo antes de enviar. */}
