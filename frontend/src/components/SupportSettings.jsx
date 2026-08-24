@@ -108,7 +108,7 @@ function Categories() {
   const load = useCallback(() => { api.supCategories().then((d) => setRows(d.categories || [])) }, [])
   useEffect(() => { load() }, [load])
 
-  const blank = { id: 0, name: '', description: '', color: '#8b5cf6', sla_response_hours: 4, sla_resolve_hours: 24, use_shift: false }
+  const blank = { id: 0, name: '', description: '', color: '#8b5cf6', sla_response_hours: 4, sla_resolve_hours: 24, use_shift: false, signature: '' }
 
   const save = async () => {
     if (!form.name.trim()) { toast('El nombre es obligatorio', 'err'); return }
@@ -149,7 +149,7 @@ function Categories() {
                 <b>{c.sla_resolve_hours ? `${c.sla_resolve_hours} h` : '—'}</b>
               </div>
               <div className="cfg-actions">
-                <button className="icon-btn" title="Editar" onClick={() => setForm({ id: c.id, name: c.name, description: c.description || '', color: c.color, sla_response_hours: c.sla_response_hours || '', sla_resolve_hours: c.sla_resolve_hours || '', use_shift: !!Number(c.use_shift) })}><Icon.pencil /></button>
+                <button className="icon-btn" title="Editar" onClick={() => setForm({ id: c.id, name: c.name, description: c.description || '', color: c.color, sla_response_hours: c.sla_response_hours || '', sla_resolve_hours: c.sla_resolve_hours || '', use_shift: !!Number(c.use_shift), signature: c.signature || '' })}><Icon.pencil /></button>
                 <button className="icon-btn" title="Eliminar" style={{ color: 'var(--danger)' }} onClick={() => del(c)}><Icon.trash /></button>
               </div>
             </div>
@@ -193,6 +193,18 @@ function Categories() {
               <span className="fb-req-label">{form.use_shift ? 'Al agente de guardia (según el cuadrante de turnos)' : 'Sin asignar (o lo que digan las reglas automáticas)'}</span>
             </label>
           </div>
+
+          {/* Firma del DEPARTAMENTO: se anexa a las respuestas por correo de esta categoría,
+              antes del pie de empresa. Admite variables. */}
+          <label className="field" style={{ marginTop: 14 }}>
+            <span className="lbl">Firma del departamento <span className="hint">· se añade al responder por correo</span></span>
+            <textarea rows={3} value={form.signature}
+              onChange={(e) => setForm((f) => ({ ...f, signature: e.target.value }))}
+              placeholder={'Atentamente,\n{{agente}} — {{departamento}}\nAEME Group · 962 012 074'} />
+            <span className="hint" style={{ display: 'block', marginTop: 6 }}>
+              Variables: <b>{'{{agente}}'}</b> (quien responde) · <b>{'{{departamento}}'}</b> (esta categoría). Va antes del pie de empresa.
+            </span>
+          </label>
         </Modal>
       )}
     </>

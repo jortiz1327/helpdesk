@@ -57,6 +57,11 @@ class SupportSettingsController extends Controller
         $data = [
             'name'        => mb_substr($name, 0, 80),
             'description' => mb_substr(trim((string) $request->input('description')), 0, 200) ?: null,
+            // Firma del departamento: HTML saneado (lo edita un encargado). {{agente}} y
+            // {{departamento}} se sustituyen al enviar la respuesta.
+            'signature'   => trim((string) $request->input('signature')) !== ''
+                ? \App\Services\HtmlSanitizer::clean((string) $request->input('signature'))
+                : null,
             'color'       => preg_match('/^#[0-9a-f]{6}$/i', (string) $request->input('color')) ? $request->input('color') : '#64748b',
             'sla_response_hours' => $horas($request->input('sla_response_hours')),
             'sla_resolve_hours'  => $horas($request->input('sla_resolve_hours')),

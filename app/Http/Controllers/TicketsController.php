@@ -796,7 +796,8 @@ class TicketsController extends Controller
         $id = (int) $request->input('id');
         $t  = (clone $this->baseQuery($me))->where('t.id', $id)
             ->first(['t.id', 't.code', 't.subject', 't.channel', 't.contact_id',
-                     'c.email as contact_email', 'c.name as contact_name', 'c.wa_id as contact_wa']);
+                     'c.email as contact_email', 'c.name as contact_name', 'c.wa_id as contact_wa',
+                     'cat.signature as cat_signature', 'cat.name as category_name']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
         // Bloqueo: evita que dos agentes respondan a la vez al mismo cliente.
@@ -863,10 +864,19 @@ class TicketsController extends Controller
         $cc  = $this->direcciones($request->input('cc'));
         $bcc = $this->direcciones($request->input('bcc'));
 
+        // Firma del DEPARTAMENTO (categoría del ticket), con {{agente}}/{{departamento}}.
+        $firma = trim((string) ($t->cat_signature ?? ''));
+        if ($firma !== '') {
+            $firma = strtr($firma, [
+                '{{agente}}'       => e((string) ($me->name ?? '')),
+                '{{departamento}}' => e((string) ($t->category_name ?? '')),
+            ]);
+        }
+
         try {
             $smtpId = app(MailService::class)->sendMail(
                 $acc, (string) $t->contact_email, (string) $t->contact_name,
-                $subject, $this->absolutizeInline($html), $forMail, $inReplyTo, $refs, $cc, $bcc
+                $subject, $this->absolutizeInline($html), $forMail, $inReplyTo, $refs, $cc, $bcc, $firma
             );
         } catch (\Throwable $e) {
             // Deshacer adjuntos guardados (ficheros + filas) para no dejar basura.

@@ -325,6 +325,15 @@ class MailService
      * Añade el PIE configurable al final del correo, separado por una línea.
      * Si está desactivado o vacío, devuelve el cuerpo tal cual.
      */
+    /** Firma del departamento (categoría del ticket), si la tiene. Ya viene saneada. */
+    protected function conFirma(string $html, ?string $firma): string
+    {
+        $firma = trim((string) $firma);
+        if ($firma === '') return $html;
+
+        return $html . '<br><div style="margin-top:16px;font-size:13.5px;color:#333">' . $firma . '</div>';
+    }
+
     protected function conPie(string $html): string
     {
         if ((string) Setting::get('email_footer_active', '0') !== '1') return $html;
@@ -458,7 +467,7 @@ class MailService
      * @param array   $cc          copias visibles
      * @param array   $bcc         copias ocultas
      */
-    public function sendMail(EmailAccount $acc, string $toEmail, ?string $toName, string $subject, string $html, array $attachments = [], ?string $inReplyTo = null, array $references = [], array $cc = [], array $bcc = []): string
+    public function sendMail(EmailAccount $acc, string $toEmail, ?string $toName, string $subject, string $html, array $attachments = [], ?string $inReplyTo = null, array $references = [], array $cc = [], array $bcc = [], ?string $signature = null): string
     {
         $enc = $acc->smtp_encryption ?: 'ssl';
         // tls=true => TLS implícito (SSL, 465); null => STARTTLS/auto (587); false => sin cifrar.
@@ -470,8 +479,10 @@ class MailService
             $transport->setPassword((string) $acc->smtp_password);
         }
 
-        // PIE de empresa: se añade solo AL ENVIAR, no se guarda en el hilo del ticket.
-        // Así la conversación interna queda limpia (sin la firma repetida en cada mensaje).
+        // FIRMA de departamento (categoría) + PIE de empresa: se añaden solo AL ENVIAR,
+        // no se guardan en el hilo del ticket. Así la conversación interna queda limpia
+        // (sin la firma repetida en cada mensaje). La firma va primero, el pie común después.
+        $html = $this->conFirma($html, $signature);
         $html = $this->conPie($html);
 
         $email = (new MimeEmail())
