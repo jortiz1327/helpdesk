@@ -26,7 +26,14 @@ export default function NewTicket({ user, onCreated, onCancel, onOpenTicket }) {
   const [dups, setDups] = useState([])   // incidencias abiertas ya existentes del cliente
   const desc = useRef(null)   // el editor: HTML + adjuntos
 
-  useEffect(() => { api.ticketMeta().then(setMeta) }, [])
+  useEffect(() => {
+    api.ticketMeta().then((m) => {
+      setMeta(m)
+      // Las prioridades son configurables: si «media» no existe, arrancar con la primera.
+      const claves = Object.keys(m?.priorities || {})
+      if (claves.length && !claves.includes(f.priority)) setF((s) => ({ ...s, priority: claves[0] }))
+    })
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Aviso de duplicado: al escribir el email/teléfono, mira si ese cliente ya tiene
   // incidencias abiertas (con un respiro para no consultar en cada tecla).

@@ -216,6 +216,19 @@ class MailService
 
         // --- Ticket: threading por código en el asunto, si no, nuevo ---
         $ticketId  = $this->ticketByCode($subject);
+
+        // SEGURIDAD: solo se engancha al hilo si el REMITENTE es el contacto del ticket.
+        // Un tercero que acierte un código «TK-…» no debe poder inyectar mensajes en la
+        // incidencia de otro cliente. Si no coincide, se trata como ticket nuevo y se anota.
+        if ($ticketId) {
+            $dueno = (int) DB::table('tickets')->where('id', $ticketId)->value('contact_id');
+            if ($dueno !== (int) $contactId) {
+                logger()->warning("Correo con código de OTRO contacto: ticket {$ticketId} (contacto {$dueno}) "
+                    . "desde {$email} (contacto {$contactId}). Se crea ticket nuevo en vez de inyectar.");
+                $ticketId = null;
+            }
+        }
+
         $ticketNew = false;
         if ($ticketId) {
             $this->tickets->touch($ticketId);

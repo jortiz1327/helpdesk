@@ -430,11 +430,15 @@ function Home({ go, irCrear }) {
         <div className="faq">
           {items.map((f, i) => (
             <div key={f.id} className={`qa ${open === f.id ? 'open' : ''}`} style={{ '--r': i }}>
-              <button className="qa-q" onClick={() => abrir(f)}>
+              <button className="qa-q" onClick={() => abrir(f)}
+                aria-expanded={open === f.id} aria-controls={`qa-a-${f.id}`}>
                 <span className="qmark">?</span>{f.question}
                 <span className="plus">{I.plus}</span>
               </button>
-              <div className="qa-a" style={{ maxHeight: open === f.id ? '600px' : 0 }}>
+              {/* `inert` cuando está cerrada: sus botones (👍/👎, «abrir incidencia») no
+                  quedan en el orden de tabulación ni los anuncia el lector de pantalla. */}
+              <div id={`qa-a-${f.id}`} className="qa-a" style={{ maxHeight: open === f.id ? '600px' : 0 }}
+                {...(open === f.id ? {} : { inert: '' })}>
                 <div className="qa-a-in">
                   {f.answer}{f.hint && <div className="tip">💡 {f.hint}</div>}
                   {/* Pie de la respuesta: ¿te ha servido? + salida a incidencia. */}

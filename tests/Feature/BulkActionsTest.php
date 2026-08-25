@@ -28,6 +28,20 @@ class BulkActionsTest extends TestCase
         ]);
     }
 
+    public function test_top_priority_key_es_la_mas_alta_activa(): void
+    {
+        // Las prioridades son configurables: la «más alta» sale del catálogo, no cableada.
+        // Añadimos una por encima de todas las sembradas.
+        DB::table('ticket_priorities')->insert(['key' => 'critica', 'name' => 'Crítica', 'color' => '#888', 'position' => 99, 'active' => 1]);
+        $this->assertSame('critica', TicketService::topPriorityKey());
+
+        // Al desactivarla cae a la siguiente activa (la de mayor position), no a «urgente» fijo.
+        $siguiente = DB::table('ticket_priorities')->where('active', 1)->where('key', '!=', 'critica')
+            ->orderByDesc('position')->value('key');
+        DB::table('ticket_priorities')->where('key', 'critica')->update(['active' => 0]);
+        $this->assertSame($siguiente, TicketService::topPriorityKey());
+    }
+
     public function test_set_priority_cambia_y_registra(): void
     {
         $svc = app(TicketService::class);

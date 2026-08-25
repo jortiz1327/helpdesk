@@ -74,6 +74,15 @@ class TicketService
         return TicketPriority::activas();
     }
 
+    /**
+     * Clave de la prioridad MÁS ALTA (la de mayor `position`) entre las activas, o null.
+     * Las prioridades son configurables: no se puede asumir la clave «urgente» a fuego.
+     */
+    public static function topPriorityKey(): ?string
+    {
+        return DB::table('ticket_priorities')->where('active', 1)->orderByDesc('position')->value('key');
+    }
+
     /** Estado con el que nace un ticket (configurable en Ajustes de tickets). */
     public static function defaultStatus(): string
     {

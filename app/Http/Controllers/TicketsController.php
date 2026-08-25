@@ -592,7 +592,7 @@ class TicketsController extends Controller
             'total'     => array_sum($byStatus),
             'open'      => array_sum(array_intersect_key($byStatus, array_flip(TicketService::OPEN_STATUSES))),
             'resolved'  => $byStatus['resuelto'] + $byStatus['cerrado'],
-            'urgent'    => (clone $this->baseQuery($me))->where('t.priority', 'urgente')
+            'urgent'    => (clone $this->baseQuery($me))->where('t.priority', TicketService::topPriorityKey() ?? 'urgente')
                                 ->whereIn('t.status', TicketService::OPEN_STATUSES)->count(),
             'by_status' => $byStatus,
             'recent'    => $recent,
@@ -1557,6 +1557,8 @@ class TicketsController extends Controller
         }
 
         $open = "'" . implode("','", TicketService::OPEN_STATUSES) . "'";
+        // Prioridad más alta (configurable): la clave viene de la BD, se escapa igualmente.
+        $top = DB::getPdo()->quote(TicketService::topPriorityKey() ?? 'urgente');
 
         $stats = DB::table('tickets')
             ->whereNotNull('assigned_to')
@@ -1566,7 +1568,7 @@ class TicketsController extends Controller
                 DB::raw('COUNT(*) AS total'),
                 DB::raw("SUM(status IN ($open)) AS open_n"),
                 DB::raw("SUM(status IN ('resuelto','cerrado')) AS resolved_n"),
-                DB::raw("SUM(priority = 'urgente' AND status IN ($open)) AS urgent_n"),
+                DB::raw("SUM(priority = $top AND status IN ($open)) AS urgent_n"),
                 DB::raw('AVG(CASE WHEN first_response_at IS NOT NULL
                                   THEN TIMESTAMPDIFF(MINUTE, opened_at, first_response_at) END) AS avg_response'),
                 DB::raw('AVG(CASE WHEN resolved_at IS NOT NULL

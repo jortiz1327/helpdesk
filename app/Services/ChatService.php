@@ -95,9 +95,10 @@ class ChatService
             ]);
         }
 
-        // Mantener ordenada la bandeja de tickets
+        // Mantener ordenada la bandeja de tickets. Se usa la fecha REAL del mensaje si
+        // viene (correo con cabecera Date, importación); si no, la hora actual.
         if (!empty($opts['ticket_id'])) {
-            $cambios = ['last_message_at' => DB::raw('NOW()')];
+            $cambios = ['last_message_at' => !empty($opts['created_at']) ? $opts['created_at'] : DB::raw('NOW()')];
 
             /*
              * QUIÉN HABLÓ EL ÚLTIMO, guardado en el ticket. Antes se calculaba con una
