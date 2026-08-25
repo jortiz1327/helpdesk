@@ -113,60 +113,60 @@ lo que convierte los **correos entrantes en tickets**.
 > (Si es la PRIMERA instalación, sigue los pasos 1-8 de arriba: el instalador ya hace
 > `migrate` y `db:seed` por ti.)
 
+Con el **despliegue Git de Plesk** (Sitios web y dominios → Git) NO hace falta zip ni
+SSH: Plesk hace el `git pull`, el `composer install` y ejecuta un **script de despliegue**
+con las tareas de Laravel. `vendor/` va por `composer install` (no está en el repo) y el
+frontend ya va COMPILADO en `public/assets` (sí está en el repo) → no se compila nada.
+
 **Regla de oro: copia de seguridad ANTES de migrar.**
 
 1. **Backup** — la BD (backup de Plesk o `mysqldump`) y el `.env`. Si algo sale mal,
    restauras y no ha pasado nada.
 
-2. **Subir el código nuevo** — en local, regenera `public/` y empaqueta:
-   ```bash
-   cd frontend && npm run build      # deja public/ con la última versión
-   ```
-   Descomprime el zip **SOBRE** la instalación (o `git pull` si el server tiene el repo).
-   ⚠️ **NO pises** el `.env` de producción, `storage/` ni `bootstrap/cache/`.
-   El `public/` ya va compilado: **no se compila nada en el servidor**.
+2. **Configurar los «Pasos de despliegue» de Plesk** (setup de UNA vez):
+   - ✅ **1. Activar modo mantenimiento** · ✅ **2-3. Recuperar/desplegar el código de Git**
+   - ✅ **4. Instalar dependencias `composer.json`** (trae `vendor/`, imprescindible).
+   - ☐ **5. Instalar dependencias `package.json`** → **DESMARCADO** (el `public/` ya va
+     compilado en el repo; no hay que tocar npm en el servidor).
+   - ✅ **6. Ejecutar script de despliegue** → **MÁRCALO** y en «Editar script» pon:
+     ```bash
+     php artisan migrate --force
+     php artisan config:cache
+     php artisan route:cache
+     php artisan cache:clear
+     ```
+     > ⚠️ Si el paso 6 está desmarcado, Plesk sube el código pero **NO migra** → la app
+     > peta al buscar tablas/columnas nuevas. Es el error más fácil de cometer.
+     > Si «php» no se encuentra, usa la ruta del PHP del dominio (PHP settings), p. ej.
+     > `/opt/plesk/php/8.2/bin/php artisan migrate --force`.
+   - ✅ **7. Desactivar modo mantenimiento**.
 
-3. **Migrar** (por SSH, en la raíz del proyecto):
-   ```bash
-   php artisan migrate --force
-   ```
-   El `--force` es obligatorio en producción (si no, pregunta y aborta). Aplica lo
-   pendiente. En esta tanda entran, entre otras:
+3. **Desplegar** — en modo Manual, pulsa **«Desplegar»** (o push a la rama si está en
+   Automático). Plesk hace pull + composer + el script → migra y limpia caché solo.
+
+   Migraciones que entran en esta tanda, entre otras:
    - `ticket_snooze` — posponer tickets (columnas nuevas en tickets y users).
    - `scheduled_replies` — respuestas programadas (tabla nueva).
-   - `ticket_perf_indexes` — 2 índices compuestos (en una tabla grande tarda unos
-     segundos; MariaDB los crea en línea, no bloquea).
+   - `ticket_perf_indexes` — 2 índices compuestos (unos segundos; en línea, no bloquea).
    - `drop_ai_agent_results` — elimina la tabla del webhook experimental retirado.
 
-4. **Sincronizar permisos** (idempotente, solo si hiciste cambios de roles):
-   ```bash
-   php artisan db:seed --class=RolesPermissionsSeeder --force
-   ```
-   ⚠️ NO corras `php artisan db:seed` a secas: ese recrea admin/categorías/ajustes.
-   Solo el seeder de roles si lo necesitas. (En esta sesión no se añadieron permisos
-   nuevos, así que puedes saltártelo.)
+4. **Permisos** (solo si cambiaste roles; idempotente): añade al script, si lo necesitas,
+   `php artisan db:seed --class=RolesPermissionsSeeder --force`. ⚠️ NUNCA `db:seed` a
+   secas (recrea admin/categorías). En esta sesión no se añadieron permisos: puedes omitirlo.
 
-5. **Re-cachear la config** (¡importante! suele estar cacheada y no vería los cambios):
-   ```bash
-   php artisan config:cache
-   php artisan route:cache
-   php artisan cache:clear        # tira cachés de datos: informes y contadores
-   ```
-   (Alternativa sin SSH: borra `bootstrap/cache/config.php` por el Gestor de archivos.)
-
-6. **Los crones nuevos entran solos** — `tickets:wake` (despierta pospuestos) y
+5. **Los crones nuevos entran solos** — `tickets:wake` (despierta pospuestos) y
    `replies:send` (respuestas programadas) ya están en el planificador. Con la tarea
-   `schedule:run` cada minuto (paso 7) funcionan sin tocar nada. Verifica en
+   `schedule:run` cada minuto (paso 7 del install) funcionan sin tocar nada. Verifica en
    *Agentes → Configuración → Tareas programadas* que el planificador está corriendo.
 
-7. **Verificar la zona horaria** (pendiente de esta sesión). En SSH:
+6. **Verificar la zona horaria** (pendiente de esta sesión). Por SSH (o un script puntual):
    ```bash
    php artisan tinker --execute="echo now().' | '.DB::selectOne('SELECT NOW() n')->n;"
    ```
    Si las **dos horas coinciden**, todo bien. Si **difieren**, el servidor está en otra
    zona que PHP (Europe/Madrid) y hay que alinear MySQL — avisa antes de tocar.
 
-8. **Smoke test** — entra en `/agentes` y comprueba: abrir un ticket largo (botón
+7. **Smoke test** — entra en `/agentes` y comprueba: abrir un ticket largo (botón
    «Ver mensajes anteriores»), *Configuración → Funciones* (mover un interruptor),
    posponer un ticket, y el portal `/` con las banderas de idioma.
 
