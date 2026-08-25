@@ -12,6 +12,7 @@ use App\Services\SlaService;
 use App\Services\TicketLockService;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -517,6 +518,18 @@ class TicketsController extends Controller
      * Todos ignoran resueltos y cerrados salvo «todos».
      */
     protected function counts(User $me): array
+    {
+        /*
+         * Se CACHEA 15 s por usuario. Los contadores son agregaciones sobre todo el
+         * alcance (para un encargado con view_all, un barrido de ~50k) y se recalculaban
+         * en CADA carga/filtro/refresco. Con la caché se cuentan como mucho una vez cada
+         * 15 s: un correo/mensaje nuevo se refleja en el siguiente recálculo (≤15 s) y las
+         * propias acciones también. Desfase asumido a cambio de no recontar sin parar.
+         */
+        return Cache::remember("tk.counts.{$me->id}", 15, fn () => $this->calcularCounts($me));
+    }
+
+    protected function calcularCounts(User $me): array
     {
         // «Despierto» = NO dormido. Un ticket pospuesto está fuera de tu plato: no cuenta
         // en Activos/Pendientes/Míos/Sin asignar (igual que sale de la cola por defecto).
