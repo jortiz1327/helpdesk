@@ -10,7 +10,6 @@ import { Icon } from "./icons.jsx";
 import { api, onUnauthorized, setToken } from "./api.js";
 import Inbox from "./components/Inbox.jsx";
 import Templates from "./components/Templates.jsx";
-import Settings from "./components/Settings.jsx";
 import Account from "./components/Account.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import SupportCenter from "./components/SupportCenter.jsx";
@@ -318,17 +317,8 @@ const ADMIN_GROUP = {
             perm: "activity.view",
             color: "#12b886",
         },
-        {
-            // Config de WhatsApp (números, webhook…). Transversal: el número de
-            // Soporte es del Helpdesk y el de Campañas del área Campañas, así que
-            // debe alcanzarse desde cualquier área (solo superadmin). Etiqueta corta
-            // Icono compuesto (WhatsApp + engranaje) para que se lea «configuración de WhatsApp».
-            key: "settings",
-            label: "WhatsApp",
-            icon: Icon.whatsappCfg,
-            perm: "settings.manage",
-            color: "#25d366",
-        },
+        // La configuración de WhatsApp (números, webhook…) ya no cuelga de aquí como
+        // pantalla propia: vive dentro de «Configuración → WhatsApp» (solo superadmin).
     ],
 };
 
@@ -1048,9 +1038,6 @@ export default function App() {
                             <Analytics />
                         )}
                         {view === "users" && can("users.manage") && <Users />}
-                        {view === "settings" && can("settings.manage") && (
-                            <Settings />
-                        )}
                         {view === "account" && (
                             <Account
                                 user={auth.user}

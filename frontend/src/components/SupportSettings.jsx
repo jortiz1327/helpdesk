@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
+import Settings from './Settings.jsx'   // configuración de WhatsApp (embebida como pestaña)
 
 /* ---------------------------------------------------------------------------
  * CONFIGURACIÓN DE SOPORTE — solo superadmin / encargado (permiso support.config).
@@ -53,6 +54,7 @@ export default function SupportSettings({ user }) {
   const secciones = user?.is_super
     ? [{ grupo: 'Superadmin', items: [
         { key: 'features', label: 'Funciones', icon: Icon.bolt, desc: 'Encender o apagar funciones, y ver qué le falta a cada una.' },
+        { key: 'whatsapp', label: 'WhatsApp',  icon: Icon.whatsappCfg, desc: 'Números, tokens y webhook de la API de WhatsApp Cloud.' },
       ] }, ...SECCIONES]
     : SECCIONES
   const [tab, setTab] = useState(user?.is_super ? 'features' : 'categories')
@@ -83,6 +85,7 @@ export default function SupportSettings({ user }) {
 
         <div className="cfg-body">
           {tab === 'features' && <Features />}
+          {tab === 'whatsapp' && <Settings embedded />}
           {tab === 'categories' && <Categories />}
           {tab === 'canned' && <Canned />}
           {tab === 'faqs' && <Faqs />}

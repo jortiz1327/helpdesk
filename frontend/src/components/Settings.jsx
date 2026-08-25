@@ -8,7 +8,7 @@ import AiWebhookPanel from './AiWebhookPanel.jsx'
 
 const FIELDS = ['business_name', 'wa_phone_number_id', 'wa_business_id', 'wa_app_id', 'wa_token', 'wa_app_secret', 'wa_verify_token', 'consent_message']
 
-export default function Settings() {
+export default function Settings({ embedded = false }) {
   const toast = useToast()
   const [f, setF] = useState(null)
   const [webhook, setWebhook] = useState('')
@@ -65,13 +65,17 @@ export default function Settings() {
 
   return (
     <>
-      <header className="page-head">
-        <h1>Configuración</h1>
-        <span className="sub">· API de WhatsApp Cloud</span>
-        <div className="spacer" />
-      </header>
-      <div className="page-scroll">
-        <div className="page">
+      {/* Cabecera propia solo como pantalla independiente; embebido en Configuración
+          de Soporte va sin ella (la pone el contenedor). */}
+      {!embedded && (
+        <header className="page-head">
+          <h1>Configuración</h1>
+          <span className="sub">· API de WhatsApp Cloud</span>
+          <div className="spacer" />
+        </header>
+      )}
+      <div className={embedded ? '' : 'page-scroll'}>
+        <div className={embedded ? '' : 'page'}>
           {/* Opción B: los números y su función (enrutado por phone_number_id).
               Aquí se configura TODO (token, App Secret, WABA…) por número; el viejo
               bloque global «Conexión con Meta» se retiró por redundante. */}

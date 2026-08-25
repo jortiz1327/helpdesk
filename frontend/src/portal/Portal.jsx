@@ -3,6 +3,31 @@ import { portal, getPass, setPass, getSeen, markSeen } from './portalApi.js'
 import { LangProvider, useLang, LANGS, LOCALES } from './i18n.js'
 import logo from '../assets/logo.png'
 
+/* Banderas del selector de idioma en SVG en línea. Los emoji de bandera (🇪🇸…) NO se
+   renderizan como banderas en Windows —se ven las siglas—, así que van dibujadas. */
+const FLAGS = {
+  es: (
+    <svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#c60b1e" />
+      <rect y="3.5" width="20" height="7" fill="#ffc400" /></svg>
+  ),
+  en: (
+    <svg viewBox="0 0 60 30" aria-hidden="true">
+      <clipPath id="uk-t"><path d="M30 15h30v15zv15H0zH0V0zV0h30z" /></clipPath>
+      <path d="M0 0v30h60V0z" fill="#012169" />
+      <path d="M0 0 60 30m0-30L0 30" stroke="#fff" strokeWidth="6" />
+      <path d="M0 0 60 30m0-30L0 30" clipPath="url(#uk-t)" stroke="#c8102e" strokeWidth="4" />
+      <path d="M30 0v30M0 15h60" stroke="#fff" strokeWidth="10" />
+      <path d="M30 0v30M0 15h60" stroke="#c8102e" strokeWidth="6" />
+    </svg>
+  ),
+  pt: (
+    <svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#da291c" />
+      <rect width="8" height="14" fill="#046a38" />
+      <circle cx="8" cy="7" r="2.4" fill="none" stroke="#ffcd00" strokeWidth="1" /></svg>
+  ),
+}
+const LANG_NAMES = { es: 'Español', en: 'English', pt: 'Português' }
+
 /* Pinta una cadena traducida que puede llevar énfasis <b>…</b>. El texto es
    nuestro y estático (del diccionario), así que dangerouslySetInnerHTML es seguro. */
 function Rich({ tag = 'span', html, className, style }) {
@@ -242,11 +267,12 @@ function Top({ onLogo }) {
           <img className="logo" src={logo} alt="AEME Group" />
         </button>
         <div className="spacer" />
-        {/* Selector de idioma: discreto, siglas ES/EN/PT. Recuerda la elección. */}
+        {/* Selector de idioma: banderas España / Reino Unido / Portugal. Recuerda la elección. */}
         <div className="lang-switch" role="group" aria-label={t('lang_label')}>
-          {LANGS.map(([code, label]) => (
-            <button key={code} type="button" className={lang === code ? 'on' : ''}
-              aria-pressed={lang === code} onClick={() => setLang(code)}>{label}</button>
+          {LANGS.map(([code]) => (
+            <button key={code} type="button" className={`lang-flag ${lang === code ? 'on' : ''}`}
+              aria-pressed={lang === code} aria-label={LANG_NAMES[code]} title={LANG_NAMES[code]}
+              onClick={() => setLang(code)}>{FLAGS[code]}</button>
           ))}
         </div>
         <a className="ghostlink" href="/agentes">{I.lock} {t('agent_access')}</a>
