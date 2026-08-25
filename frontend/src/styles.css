@@ -2253,6 +2253,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 
 /* Cliente: la cabecera de la ficha */
 .tkm-cli { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.tkm-cli-edit { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  color: var(--ink-3); transition: .14s; }
+.tkm-cli-edit:hover { background: var(--hover); color: var(--primary); }
+.tkm-cli-edit svg { width: 15px; height: 15px; fill: currentColor; }
 .tkm-av { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--primary), #3b82f6); }
 .tkm-cli-tx { min-width: 0; }
 .tkm-cli-tx b { display: block; font-size: 14.5px; }

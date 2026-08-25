@@ -322,6 +322,10 @@ export const api = {
   unsnoozeTicket: (id) => req('tickets.php?action=unsnooze', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
+  // Cambiar el solicitante (correo del cliente) de un ticket.
+  setRequester: (id, email, name) => req('tickets.php?action=set_requester', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, email, name }),
+  }),
   // ¿El cliente ya tiene incidencias abiertas? (aviso de duplicado en «Nuevo ticket»)
   contactOpenTickets: (email = '', phone = '') => req('tickets.php?action=contact_open&' + new URLSearchParams({ email, phone })),
   // Nota interna (no se envía al cliente): body en HTML

@@ -51,6 +51,7 @@ class TicketsController extends Controller
             'assign' => $this->assign($request),
             'snooze'   => $this->snoozeTicket($request),
             'unsnooze' => $this->unsnoozeTicket($request),
+            'set_requester' => $this->setRequester($request),
             'contact_open' => $this->contactOpen($request),
             'sched_cancel' => $this->cancelScheduled($request),
             'category' => $this->setCategory($request),
@@ -1280,6 +1281,47 @@ class TicketsController extends Controller
         }
 
         $this->tickets->snooze($id, $until, $wakeOnReply, (int) $me->id, $reason ?: null);
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * CAMBIAR EL SOLICITANTE (dueño) del ticket: corrige el correo del cliente (p. ej.
+     * un compañero lo escribió mal). Busca un contacto con ese correo o lo crea, y apunta
+     * SOLO este ticket a él (el contacto viejo se queda con sus otros tickets). Queda en
+     * el historial. Al responder, el correo ya sale al cliente correcto.
+     */
+    protected function setRequester(Request $request)
+    {
+        $me = $request->user();
+        if (!$me->can('tickets.reply')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
+
+        $data = $request->validate([
+            'id'    => ['required', 'integer'],
+            'email' => ['required', 'email'],
+            'name'  => ['nullable'],
+        ], ['email.required' => 'El correo es obligatorio', 'email.email' => 'El correo no es válido']);
+
+        $id = (int) $data['id'];
+        if (!(clone $this->baseQuery($me))->where('t.id', $id)->exists()) {
+            return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
+        }
+
+        $email = trim($data['email']);
+        $name  = trim((string) ($data['name'] ?? ''));
+
+        $actual  = (int) DB::table('tickets')->where('id', $id)->value('contact_id');
+        $antiguo = DB::table('contacts')->where('id', $actual)->value('email') ?: '—';
+
+        // Buscar/crear el contacto por correo; no se pisa el nombre de uno que ya existe.
+        $nuevo = ChatService::upsertContactByEmail($email, $name ?: null, false);
+        if ((int) $nuevo === $actual) {
+            return response()->json(['ok' => true, 'unchanged' => true]);
+        }
+
+        DB::table('tickets')->where('id', $id)->update(['contact_id' => $nuevo]);
+        $this->tickets->event($id, 'requester', $antiguo, $email, (int) $me->id);
+        $this->tickets->broadcast('updated', $id);
+
         return response()->json(['ok' => true]);
     }
 

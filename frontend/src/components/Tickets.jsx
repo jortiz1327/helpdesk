@@ -145,7 +145,7 @@ export function stChip(v, meta, small = false) {
 }
 
 // Historial de movimientos: icono + frase legible por tipo de evento.
-const EV_ICON = { created: '🎫', status: '🔄', assign: '👤', category: '🏷️', priority: '⚑', merge_in: '🔗', merge_out: '🔗' }
+const EV_ICON = { created: '🎫', status: '🔄', assign: '👤', category: '🏷️', priority: '⚑', merge_in: '🔗', merge_out: '🔗', requester: '✉️' }
 function describeEvent(e, meta) {
   const st = (v) => meta?.statuses?.[v] || v
   const pr = (v) => meta?.priorities?.[v] || v
@@ -161,6 +161,7 @@ function describeEvent(e, meta) {
     // El motivo se pinta aparte (e.note): aquí solo va qué pasó.
     case 'merge_in':  return `Se fusionó aquí el ticket ${e.from_value}`
     case 'merge_out': return `Fusionado en el ticket ${e.to_value}`
+    case 'requester': return `Solicitante: ${e.from_value} → ${e.to_value}`
     default: return e.type
   }
 }
@@ -1414,6 +1415,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
 
   // Generar PDF: se abre un diálogo con opciones (notas internas / imágenes) antes de descargar.
   const [pdfOpts, setPdfOpts] = useState(null)   // null | { notes, images, busy }
+  const [editReq, setEditReq] = useState(null)   // null | { email, name } — cambiar solicitante
   const [justificar, setJustificar] = useState(false)   // se cerró fuera de plazo
   const [motivo, setMotivo] = useState('')
   const genPdf = async () => {
@@ -1452,13 +1454,20 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
           <>
             {/* --- Panel izquierdo: la ficha --- */}
             <aside className="tkm-side">
-              {/* Cliente: lo primero, con cara. Es con quien estás hablando. */}
+              {/* Cliente: lo primero, con cara. Es con quien estás hablando. El lápiz
+                  permite CAMBIAR el solicitante (corregir el correo mal escrito). */}
               <div className="tkm-cli">
                 <span className="tkm-av">{(t.contact_name || '?').slice(0, 1).toUpperCase()}</span>
                 <div className="tkm-cli-tx">
                   <b>{t.contact_name || 'Sin nombre'}</b>
                   <small>{t.contact_email || (t.contact_wa ? '+' + t.contact_wa : 'Sin datos de contacto')}</small>
                 </div>
+                {can('tickets.reply') && (
+                  <button className="tkm-cli-edit" title="Cambiar solicitante (corregir el correo)"
+                    onClick={() => setEditReq({ email: t.contact_email || '', name: t.contact_name || '' })}>
+                    <Icon.pencil />
+                  </button>
+                )}
               </div>
               {t.contact_email && t.contact_wa && (
                 <div className="tkm-extra"><Icon.phone /> +{t.contact_wa}</div>
@@ -1938,6 +1947,34 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
       )}
 
       {/* Se cerró fuera de plazo: se ofrece dejar constancia del motivo. */}
+      {editReq && (
+        <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setEditReq(null)}>
+          <div className="modal" style={{ maxWidth: 440 }}>
+            <div className="modal-h"><h3>Cambiar solicitante</h3>
+              <button className="icon-btn" onClick={() => setEditReq(null)}>✕</button></div>
+            <div className="modal-body">
+              <p className="cfg-hint">Corrige el <b>correo del cliente</b> de esta incidencia (p. ej. si se escribió mal).
+                Solo cambia en este ticket; el contacto anterior se queda con los suyos.</p>
+              <label className="field"><span className="lbl">Correo <em>*</em></span>
+                <input type="email" autoFocus value={editReq.email}
+                  onChange={(e) => setEditReq((s) => ({ ...s, email: e.target.value }))} placeholder="cliente@empresa.com" /></label>
+              <label className="field"><span className="lbl">Nombre <span className="hint">(opcional)</span></span>
+                <input value={editReq.name}
+                  onChange={(e) => setEditReq((s) => ({ ...s, name: e.target.value }))} placeholder="Nombre del cliente" /></label>
+            </div>
+            <div className="modal-foot">
+              <button className="btn ghost" onClick={() => setEditReq(null)}>Cancelar</button>
+              <button className="btn" disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((editReq.email || '').trim())}
+                onClick={async () => {
+                  const r = await api.setRequester(id, editReq.email.trim(), editReq.name.trim())
+                  if (r?.ok) { setEditReq(null); toast(r.unchanged ? 'Ese ya era el solicitante' : 'Solicitante actualizado'); load(); onChange?.() }
+                  else toast(r?.error || 'No se pudo cambiar', 'err')
+                }}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {justificar && (
         <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setJustificar(false)}>
           <div className="modal jst-dlg">

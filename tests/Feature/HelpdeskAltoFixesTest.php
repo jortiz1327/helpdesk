@@ -62,6 +62,26 @@ class HelpdeskAltoFixesTest extends TestCase
         $this->assertNotContains($pausado, $ids);
     }
 
+    public function test_cambiar_el_solicitante_del_ticket(): void
+    {
+        [, $token] = $this->superadmin();
+        $viejo = DB::table('contacts')->insertGetId(['name' => 'Malescrito', 'email' => 'malo@x.com']);
+        $id = $this->ticket(['contact_id' => $viejo]);
+
+        $this->withHeader('X-App-Token', $token)
+            ->postJson('/api/tickets.php?action=set_requester', ['id' => $id, 'email' => 'bueno@x.com', 'name' => 'Cliente OK'])
+            ->assertOk();
+
+        // El ticket apunta al contacto correcto (creado), no al viejo.
+        $nuevoCid = (int) DB::table('tickets')->where('id', $id)->value('contact_id');
+        $this->assertNotSame($viejo, $nuevoCid);
+        $this->assertSame('bueno@x.com', DB::table('contacts')->where('id', $nuevoCid)->value('email'));
+        // Queda registrado en el historial.
+        $this->assertSame(1, DB::table('ticket_events')->where('ticket_id', $id)->where('type', 'requester')->count());
+        // El contacto viejo NO se toca.
+        $this->assertSame('malo@x.com', DB::table('contacts')->where('id', $viejo)->value('email'));
+    }
+
     public function test_crear_ticket_exige_el_correo_del_cliente(): void
     {
         [, $token] = $this->superadmin();
