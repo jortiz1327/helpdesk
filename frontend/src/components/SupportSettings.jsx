@@ -48,9 +48,15 @@ const SECCIONES = [
   ] },
 ]
 
-export default function SupportSettings() {
-  const [tab, setTab] = useState('categories')
-  const actual = SECCIONES.flatMap((s) => s.items).find((i) => i.key === tab)
+export default function SupportSettings({ user }) {
+  // El panel de FUNCIONES (interruptores) es solo del superadmin y va el primero.
+  const secciones = user?.is_super
+    ? [{ grupo: 'Superadmin', items: [
+        { key: 'features', label: 'Funciones', icon: Icon.bolt, desc: 'Encender o apagar funciones, y ver qué le falta a cada una.' },
+      ] }, ...SECCIONES]
+    : SECCIONES
+  const [tab, setTab] = useState(user?.is_super ? 'features' : 'categories')
+  const actual = secciones.flatMap((s) => s.items).find((i) => i.key === tab)
 
   return (
     <>
@@ -63,7 +69,7 @@ export default function SupportSettings() {
 
       <div className="cfg-layout">
         <nav className="cfg-nav">
-          {SECCIONES.map((s) => (
+          {secciones.map((s) => (
             <div key={s.grupo} className="cfg-nav-group">
               <span className="cfg-nav-t">{s.grupo}</span>
               {s.items.map((i) => (
@@ -76,6 +82,7 @@ export default function SupportSettings() {
         </nav>
 
         <div className="cfg-body">
+          {tab === 'features' && <Features />}
           {tab === 'categories' && <Categories />}
           {tab === 'canned' && <Canned />}
           {tab === 'faqs' && <Faqs />}
@@ -98,6 +105,55 @@ export default function SupportSettings() {
 }
 
 /* ------------------------------- Categorías ------------------------------- */
+
+/* PANEL DE FUNCIONES (superadmin): interruptores de todo el helpdesk en un sitio, con
+   el estado de cada uno y qué le falta (una clave, un buzón). */
+function Features() {
+  const toast = useToast()
+  const [grupos, setGrupos] = useState(null)
+  const load = () => api.features().then((r) => setGrupos(r?.ok ? r.grupos : []))
+  useEffect(() => { load() }, [])
+
+  const cambiar = async (key, value) => {
+    const r = await api.setFeature(key, value)
+    if (r?.ok) load(); else toast(r?.error || 'No se pudo cambiar', 'err')
+  }
+
+  if (grupos === null) return <div className="center-load"><div className="spinner" /></div>
+
+  return (
+    <div className="feat-panel">
+      <p className="cfg-hint">Enciende o apaga funciones del helpdesk. Si algo necesita una clave o un buzón, aquí verás qué falta y dónde ponerlo.</p>
+      {grupos.map((g) => (
+        <div key={g.grupo} className="feat-group">
+          <div className="feat-group-t">{g.grupo}</div>
+          {g.items.map((it) => (
+            <div key={it.key} className={`feat-row ${it.note ? 'blocked' : ''}`}>
+              <div className="feat-tx">
+                <b>{it.label}</b>
+                <span>{it.desc}</span>
+                {it.note && <span className="feat-note">⚠️ {it.note}</span>}
+              </div>
+              {it.type === 'bool' && (
+                <span className="fb-switch">
+                  <input type="checkbox" checked={!!it.value} onChange={(e) => cambiar(it.key, e.target.checked)} />
+                  <span className={`fb-toggle ${it.value ? 'on' : ''}`} />
+                </span>
+              )}
+              {it.type === 'int' && (
+                <input className="feat-num" type="number" min="0" defaultValue={it.value} key={it.value}
+                  onBlur={(e) => Number(e.target.value) !== it.value && cambiar(it.key, Number(e.target.value))} />
+              )}
+              {it.type === 'info' && (
+                <span className={`feat-badge ${it.value ? 'ok' : 'off'}`}>{it.value ? 'Configurado' : 'Sin configurar'}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function Categories() {
   const toast = useToast()

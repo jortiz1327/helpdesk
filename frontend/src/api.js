@@ -335,6 +335,11 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
   readAllNotifications: () => req('notifications.php?action=read_all', { method: 'POST' }),
+  // Panel de funciones (interruptores del superadmin).
+  features: () => req('features.php'),
+  setFeature: (key, value) => req('features.php?action=set', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }),
+  }),
   // Marca leídos los avisos de un ticket (p. ej. al abrirlo desde el recibimiento).
   readTicketNotifications: (ticket_id, type = '') => req('notifications.php?action=read_ticket', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id, type }),

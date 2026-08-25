@@ -173,24 +173,12 @@ export default function AiSettings() {
             <input type="number" min={0} value={s.ia_tope_dia} onChange={(e) => set('ia_tope_dia', e.target.value)} /></label>
         </div>
 
-        <div className="field">
-          <span className="lbl">Modo de trabajo <InfoTip text="«Borrador» = la IA propone y un agente revisa y envía (seguro). «Auto» = la IA responde sola al cliente. El envío automático se activará en un bloque posterior." wide /></span>
-          <div className="ai-modo">
-            <label className={`ai-radio ${s.ia_modo === 'borrador' ? 'on' : ''}`}>
-              <input type="radio" name="ia_modo" checked={s.ia_modo === 'borrador'} onChange={() => set('ia_modo', 'borrador')} />
-              <b>Borrador</b><span>propone, el agente envía</span>
-            </label>
-            <label className={`ai-radio ${s.ia_modo === 'auto' ? 'on' : ''}`}>
-              <input type="radio" name="ia_modo" checked={s.ia_modo === 'auto'} onChange={() => set('ia_modo', 'auto')} />
-              <b>Auto <span className="hint">(próximamente)</span></b><span>responde solo</span>
-            </label>
-          </div>
-        </div>
-
-        <label className="fb-req-row" style={{ marginTop: 4, marginBottom: 12 }}>
-          <span className="fb-switch"><input type="checkbox" checked={s.ia_solo_en_turno} onChange={(e) => set('ia_solo_en_turno', e.target.checked)} /><span className={`fb-toggle ${s.ia_solo_en_turno ? 'on' : ''}`} /></span>
-          <span className="fb-req-label">Trabajar solo dentro del horario del agente de guardia <span className="hint">· fuera de horario no propone</span></span>
-        </label>
+        {/*
+          OCULTO hasta implementarlo: el modo «Auto» (la IA responde sola) y «solo en
+          turno» se guardaban pero el backend NO los lee (eran humo, engañaban al
+          usuario). La IA trabaja siempre en modo BORRADOR (propone, el agente envía).
+          Cuando exista el envío automático + escalado, se vuelven a mostrar.
+        */}
 
         <label className="field">
           <span className="lbl">Personalidad e instrucciones <InfoTip text="El «cómo debe comportarse» del agente de texto: tono, qué puede prometer, líneas rojas. Sale de la entrevista de AEME; edítalo a tu gusto." wide /></span>

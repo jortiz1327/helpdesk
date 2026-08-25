@@ -158,6 +158,10 @@ Route::middleware('token')->group(function () {
     // Ajustes del ticket (estado por defecto, bloqueo de agentes, auto-cierre, seguridad)
     Route::match(['get', 'post'], 'ticket_settings.php', [TicketSettingsController::class, 'handle'])
         ->middleware('can:support.config');
+    // Panel de FUNCIONES (interruptores del superadmin): encender/apagar lo que hoy está
+    // repartido. El propio controlador exige superadmin (support.config es la puerta base).
+    Route::match(['get', 'post'], 'features.php', [\App\Http\Controllers\FeaturesController::class, 'handle'])
+        ->middleware('can:support.config');
     // Estado del planificador (cron): comando y si de verdad está corriendo
     Route::get('cron_status.php', [CronStatusController::class, 'handle'])
         ->middleware('can:support.config');

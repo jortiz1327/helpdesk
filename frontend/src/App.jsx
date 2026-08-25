@@ -1005,7 +1005,7 @@ export default function App() {
                         {view === "shifts" && <Shifts />}
                         {view === "reports" && <Reports onGo={setView} />}
                         {view === "activity" && <Activity />}
-                        {view === "support_cfg" && <SupportSettings />}
+                        {view === "support_cfg" && <SupportSettings user={auth.user} />}
                         {view === "tickets" && (
                             <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
                         )}

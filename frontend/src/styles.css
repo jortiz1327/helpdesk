@@ -2525,6 +2525,24 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cfg-head h2 { font-size: 17px; margin: 0; }
 .cfg-hint { font-size: 12.5px; color: var(--ink-2); margin: 4px 0 0; max-width: 620px; line-height: 1.5; }
 
+/* Panel de FUNCIONES (interruptores del superadmin). */
+.feat-panel { display: flex; flex-direction: column; gap: 22px; max-width: 720px; }
+.feat-group { display: flex; flex-direction: column; }
+.feat-group-t { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-3); margin: 4px 2px 8px; }
+.feat-row { display: flex; align-items: center; gap: 16px; padding: 13px 16px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; }
+.feat-row.blocked { border-style: dashed; }
+.feat-tx { flex: 1; min-width: 0; }
+.feat-tx b { font-size: 14px; display: block; }
+.feat-tx > span { display: block; font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.feat-note { color: var(--warn, #b9760a) !important; font-weight: 600; margin-top: 5px !important; }
+.feat-num { width: 70px; height: 34px; border: 1px solid var(--line-2); border-radius: 8px; padding: 0 10px;
+  font-size: 13px; background: var(--panel); color: var(--ink); text-align: center; flex: 0 0 auto; }
+.feat-badge { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 20px; flex: 0 0 auto; white-space: nowrap; }
+.feat-badge.ok { background: var(--secondary-soft, #e7f7ef); color: var(--secondary, #14a06a); }
+.feat-badge.off { background: var(--md-soft, #fbf0dc); color: var(--warn, #b9760a); }
+
 /* Categorías: tarjetas */
 .cfg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
 .cfg-card { padding: 18px; }
