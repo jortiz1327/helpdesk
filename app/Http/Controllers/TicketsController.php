@@ -1376,11 +1376,11 @@ class TicketsController extends Controller
     {
         $now = now();
         return match ($preset) {
-            // Si aún no son las 16:00, esta tarde; si ya pasó, mañana a primera hora.
-            'later_today' => $now->hour < 16 ? $now->copy()->setTime(16, 0) : $now->copy()->addDay()->setTime(9, 0),
-            'tomorrow'    => $now->copy()->addDay()->setTime(9, 0),
-            'monday'      => $now->copy()->next(\Carbon\Carbon::MONDAY)->setTime(9, 0),
-            'week'        => $now->copy()->addWeek()->setTime(9, 0),
+            // «Por la mañana» = 8:00 (como Teams). Si aún no son las 16:00, esta tarde; si ya pasó, mañana a primera hora.
+            'later_today' => $now->hour < 16 ? $now->copy()->setTime(16, 0) : $now->copy()->addDay()->setTime(8, 0),
+            'tomorrow'    => $now->copy()->addDay()->setTime(8, 0),
+            'monday'      => $now->copy()->next(\Carbon\Carbon::MONDAY)->setTime(8, 0),
+            'week'        => $now->copy()->addWeek()->setTime(8, 0),
             default       => null,
         };
     }

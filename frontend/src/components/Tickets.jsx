@@ -311,7 +311,7 @@ function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
           ) : (
             <button className="snz-opt" onClick={() => {
               if (!when) {                                   // precarga mañana 9:00 para que el botón salga habilitado
-                const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0)
+                const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0)  // como Teams: 8:00
                 const p = (n) => String(n).padStart(2, '0')
                 setWhen(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`)
               }
