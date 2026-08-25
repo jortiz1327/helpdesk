@@ -1291,6 +1291,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const [moreOld, setMoreOld] = useState(false)       // ¿hay mensajes antes de los cargados?
   const [loadingOld, setLoadingOld] = useState(false)
   const [loadErr, setLoadErr] = useState(false)       // no se pudo cargar el ticket (red/servidor)
+  const [masOpen, setMasOpen] = useState(false)       // menú «Más ⋯» de acciones secundarias
+  const masRef = useRef(null)
 
   const can = (p) => (user?.permissions || []).includes(p)
 
@@ -1457,8 +1459,6 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   // Generar PDF: se abre un diálogo con opciones (notas internas / imágenes) antes de descargar.
   const [pdfOpts, setPdfOpts] = useState(null)   // null | { notes, images, busy }
   const [editReq, setEditReq] = useState(null)   // null | { email, name } — cambiar solicitante
-  const [masOpen, setMasOpen] = useState(false)  // menú «Más ⋯» de acciones secundarias
-  const masRef = useRef(null)
   const [justificar, setJustificar] = useState(false)   // se cerró fuera de plazo
   const [motivo, setMotivo] = useState('')
   const genPdf = async () => {
