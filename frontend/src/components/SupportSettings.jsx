@@ -23,29 +23,35 @@ const COLORS = [
  * fila ya no se leían, y además «Seguridad» y «Cron» no son cosa del soporte sino
  * del sistema: aquí quedan separadas de verdad.
  */
+/*
+ * Reorganizado por TEMA (antes «Tickets» tenía 9 ítems sueltos) y con un icono distinto
+ * por entrada (había cuatro repetidos). Cada grupo ≤ 4 ítems para que se lea de un vistazo.
+ */
 const SECCIONES = [
-  { grupo: 'Tickets', items: [
-    { key: 'categories', label: 'Categorías',            icon: Icon.tag,      desc: 'Áreas de soporte, su color y su SLA.' },
-    { key: 'prio',       label: 'Prioridades',           icon: Icon.warn,     desc: 'Niveles de urgencia y sus colores.' },
-    { key: 'labels',     label: 'Etiquetas',             icon: Icon.tag,      desc: 'Post-its de color para agrupar y filtrar tickets.' },
-    { key: 'fields',     label: 'Campos personalizados', icon: Icon.note,     desc: 'Datos extra que se rellenan en cada ticket (nº de serie, urgencia…).' },
-    { key: 'canned',     label: 'Respuestas predefinidas', icon: Icon.note,   desc: 'Textos que se insertan con «/» al responder.' },
-    { key: 'faqs',       label: 'Base de conocimiento',  icon: Icon.search,   desc: 'Lo que ve el cliente en el portal: Centro de atención y Preguntas frecuentes.' },
-    { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo.' },
+  { grupo: 'Clasificación', items: [
+    { key: 'categories', label: 'Categorías',            icon: Icon.catalog, desc: 'Áreas de soporte, su color y su SLA.' },
+    { key: 'prio',       label: 'Prioridades',           icon: Icon.warn,    desc: 'Niveles de urgencia y sus colores.' },
+    { key: 'labels',     label: 'Etiquetas',             icon: Icon.tag,     desc: 'Post-its de color para agrupar y filtrar tickets.' },
+    { key: 'fields',     label: 'Campos personalizados', icon: Icon.forms,   desc: 'Datos extra en cada ticket (nº de serie, referencia…).' },
+  ] },
+  { grupo: 'Flujo de trabajo', items: [
+    { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo al entrar.' },
     { key: 'behavior',   label: 'Comportamiento',        icon: Icon.ticket,   desc: 'Estado inicial, bloqueo entre agentes y cierre automático.' },
     { key: 'hours',      label: 'Horario de atención',   icon: Icon.clock,    desc: 'Cuándo se atiende. Sobre esto corre el reloj del SLA.' },
   ] },
-  { grupo: 'Correo', items: [
-    { key: 'email', label: 'Buzón y envío',       icon: Icon.mail,  desc: 'Entrada, salida, pie y diagnóstico.' },
-    { key: 'tpl',   label: 'Avisos automáticos',  icon: Icon.send,  desc: 'Qué se envía y a quién cuando algo pasa.' },
-    { key: 'bans',  label: 'Correos bloqueados',  icon: Icon.lock,  desc: 'Remitentes que no generan ticket.' },
+  { grupo: 'Contenido y respuestas', items: [
+    { key: 'canned',     label: 'Respuestas predefinidas', icon: Icon.quote,  desc: 'Textos que se insertan con «/» al responder.' },
+    { key: 'faqs',       label: 'Portal y FAQ',            icon: Icon.globe,  desc: 'Lo que ve el cliente: Centro de atención y Preguntas frecuentes.' },
+    { key: 'knowledge',  label: 'Documentos IA',           icon: Icon.file,   desc: 'Manuales internos que la IA usa para responder (el cliente no los ve).' },
   ] },
-  { grupo: 'Agente IA', items: [
-    { key: 'knowledge', label: 'Documentos IA', icon: Icon.file, desc: 'Manuales y guías internas que la IA usa para responder (no los ve el cliente).' },
+  { grupo: 'Correo', items: [
+    { key: 'email', label: 'Buzón y envío',       icon: Icon.mail,   desc: 'Entrada, salida, pie y diagnóstico.' },
+    { key: 'tpl',   label: 'Avisos automáticos',  icon: Icon.send,   desc: 'Qué se envía y a quién cuando algo pasa.' },
+    { key: 'bans',  label: 'Correos bloqueados',  icon: Icon.eraser, desc: 'Remitentes que no generan ticket.' },
   ] },
   { grupo: 'Sistema', items: [
-    { key: 'security', label: 'Seguridad',          icon: Icon.lock,  desc: 'Protección del acceso frente a intentos.' },
-    { key: 'cron',     label: 'Tareas programadas', icon: Icon.clock, desc: 'El planificador que mueve el correo y los cierres.' },
+    { key: 'security', label: 'Seguridad',          icon: Icon.lock,    desc: 'Protección del acceso frente a intentos.' },
+    { key: 'cron',     label: 'Tareas programadas', icon: Icon.refresh, desc: 'El planificador que mueve el correo y los cierres.' },
   ] },
 ]
 
@@ -138,10 +144,10 @@ function Features() {
                 {it.note && <span className="feat-note">⚠️ {it.note}</span>}
               </div>
               {it.type === 'bool' && (
-                <span className="fb-switch">
+                <label className="fb-switch">
                   <input type="checkbox" checked={!!it.value} onChange={(e) => cambiar(it.key, e.target.checked)} />
                   <span className={`fb-toggle ${it.value ? 'on' : ''}`} />
-                </span>
+                </label>
               )}
               {it.type === 'int' && (
                 <input className="feat-num" type="number" min="0" defaultValue={it.value} key={it.value}
