@@ -1256,13 +1256,24 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const [older, setOlder] = useState([])              // mensajes anteriores cargados a demanda (paginación)
   const [moreOld, setMoreOld] = useState(false)       // ¿hay mensajes antes de los cargados?
   const [loadingOld, setLoadingOld] = useState(false)
+  const [loadErr, setLoadErr] = useState(false)       // no se pudo cargar el ticket (red/servidor)
 
   const can = (p) => (user?.permissions || []).includes(p)
 
   // Candados del envío: para saber si se puede responder por WhatsApp (número de soporte).
   useEffect(() => { api.gating().then((g) => setGate(g?.ok ? g : null)) }, [])
 
-  const load = useCallback(() => { api.getTicket(id).then(setD) }, [id])
+  // Guarda de VIGENCIA: cada carga lleva un número de secuencia; si al resolver ya hay
+  // otra más nueva (se saltó de ticket), se descarta. Y si la petición falla (red/500),
+  // se marca error en vez de dejar el spinner girando para siempre.
+  const reqSeq = useRef(0)
+  const load = useCallback(() => {
+    const seq = ++reqSeq.current
+    return api.getTicket(id).then((r) => {
+      if (seq !== reqSeq.current) return          // llegó tarde: hay una carga más nueva
+      if (r?.ok && r.ticket) { setD(r); setLoadErr(false) } else setLoadErr(true)
+    })
+  }, [id])
   useEffect(() => { load() }, [load])
 
   /* Paginación del hilo: al cambiar de ticket se olvidan los anteriores cargados; y
@@ -1300,10 +1311,12 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   useEffect(() => {
     const t = d?.ticket
     if (!t) return
+    let vivo = true   // guarda de vigencia: si se salta de ticket, no pisar con datos viejos
     const filtro = t.contact_email ? { contact_email: t.contact_email } : { contact: t.contact_id }
     api.listTickets({ ...filtro, status: 'all' })
-      .then((r) => setClientTickets((r.tickets || []).filter((x) => Number(x.id) !== Number(id))))
-      .catch(() => setClientTickets([]))
+      .then((r) => { if (vivo) setClientTickets((r.tickets || []).filter((x) => Number(x.id) !== Number(id))) })
+      .catch(() => { if (vivo) setClientTickets([]) })
+    return () => { vivo = false }
   }, [d?.ticket?.contact_email, d?.ticket?.contact_id, id]) // eslint-disable-line react-hooks/exhaustive-deps
   // Auto-scroll INTELIGENTE: baja al fondo solo al abrir el ticket (carga inicial) o
   // si llegan mensajes NUEVOS y ya estabas abajo. Si estás leyendo arriba, no te mueve
@@ -1429,7 +1442,13 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="tk-modal">
-        {!t ? <div className="center-load"><div className="spinner" /></div> : (
+        {!t ? (loadErr ? (
+          <div className="center-load tk-load-err">
+            <p>No se pudo cargar el ticket.</p>
+            <button className="btn" onClick={() => { setLoadErr(false); load() }}>Reintentar</button>
+            <button className="btn ghost" onClick={onClose}>Cerrar</button>
+          </div>
+        ) : <div className="center-load"><div className="spinner" /></div>) : (
           <>
             {/* --- Panel izquierdo: la ficha --- */}
             <aside className="tkm-side">

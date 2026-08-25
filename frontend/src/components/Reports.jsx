@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import TrendChart from './TrendChart.jsx'
@@ -60,10 +60,14 @@ export default function Reports({ onGo }) {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(false)
 
+  const reqSeq = useRef(0)
   const load = useCallback(() => {
+    const seq = ++reqSeq.current   // guarda de vigencia: al cambiar de periodo rápido, gana la última
     setD(null); setErr(false)
-    api.reports(period).then((r) => r && r.ok ? setD(r) : setErr(true))
-      .catch(() => setErr(true))
+    api.reports(period).then((r) => {
+      if (seq !== reqSeq.current) return
+      r && r.ok ? setD(r) : setErr(true)
+    }).catch(() => { if (seq === reqSeq.current) setErr(true) })
   }, [period])
   useEffect(() => { load() }, [load])
 

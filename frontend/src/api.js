@@ -21,8 +21,22 @@ async function req(path, opts = {}) {
   const headers = { ...(opts.headers || {}) }
   const tok = getToken()
   if (tok) headers['X-App-Token'] = tok
-  const r = await fetch(`${BASE}/${path}`, { ...opts, headers })
-  const text = await r.text()
+
+  let r, text
+  try {
+    r = await fetch(`${BASE}/${path}`, { ...opts, headers })
+    text = await r.text()
+  } catch (e) {
+    /*
+     * `fetch` RECHAZADO: red caída, timeout, servidor inaccesible. Antes esto
+     * propagaba el rechazo y dejaba spinners y botones «Guardando…» bloqueados para
+     * siempre (solo se recuperaba recargando). Ahora se resuelve como un error normal
+     * ({ ok:false }), y cada llamada lo trata como cualquier otro fallo.
+     */
+    if (!import.meta.env.PROD) console.error(`Fallo de red en ${path}:`, e)
+    return { ok: false, error: 'Sin conexión. Revisa tu red e inténtalo de nuevo.', _network: true }
+  }
+
   let json
   try {
     json = JSON.parse(text)
