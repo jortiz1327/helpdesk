@@ -1303,6 +1303,10 @@ input, textarea, select { font-family: inherit; }
 .toast { background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink); padding: 13px 22px; border-radius: 12px; font-size: 14px; font-weight: 500; box-shadow: var(--shadow); animation: rise 0.2s ease; }
 .toast.err { border-color: var(--danger); color: #ff8a82; }
 .toast.ok { border-color: var(--primary); color: var(--primary); }
+.toast.has-action { display: flex; align-items: center; gap: 14px; padding-right: 8px; }
+.toast-action { border: 0; background: var(--primary); color: #fff; font-weight: 700; font-size: 13px;
+  padding: 6px 13px; border-radius: 8px; cursor: pointer; flex: 0 0 auto; }
+.toast-action:hover { filter: brightness(1.08); }
 
 /* ===== Difusiones: campañas y agenda ===== */
 .search-box { display: flex; align-items: center; gap: 9px; padding: 0 13px; border: 1.5px solid var(--line-2); border-radius: 10px; background: var(--panel); }

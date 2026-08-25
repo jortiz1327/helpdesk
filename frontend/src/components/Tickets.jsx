@@ -548,6 +548,22 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
     if (r.ok) { toast(`${okMsg} (${r.affected})`); clearSel(); load() } else toast(r.error || 'Error', 'err')
   }
 
+  // Cambio de estado en lote CON deshacer: guarda el estado previo de cada uno y ofrece
+  // «Deshacer» unos segundos (como Gmail). Restaura cada ticket a SU estado anterior.
+  const bulkStatusUndo = async (status, verbo) => {
+    const previos = (rows || []).filter((x) => sel.has(x.id)).map((x) => ({ id: x.id, status: x.status }))
+    const r = await api.bulkTickets([...sel], { op: 'status', status })
+    if (!r.ok) { toast(r.error || 'Error', 'err'); return }
+    clearSel(); load()
+    toast(`${verbo} (${r.affected})`, 'ok', {
+      label: 'Deshacer',
+      fn: async () => {
+        const rr = await api.bulkTickets(previos.map((p) => p.id), { op: 'restore', states: previos })
+        if (rr?.ok) { toast('Deshecho'); load() } else toast('No se pudo deshacer', 'err')
+      },
+    })
+  }
+
   // Exportar a Excel lo que se ve (mismos filtros). Descarga binaria vía blob.
   const exportar = async () => {
     setExporting(true)
@@ -772,10 +788,10 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
               </button>
               {can('tickets.close') && (
                 <>
-                  <button className="btn ghost sm" onClick={() => bulk({ op: 'status', status: 'resuelto' }, 'Resueltos')}>
+                  <button className="btn ghost sm" onClick={() => bulkStatusUndo('resuelto', 'Resueltos')}>
                     <Icon.check /> Resolver
                   </button>
-                  <button className="btn ghost sm" onClick={() => bulk({ op: 'status', status: 'cerrado' }, 'Cerrados')}>
+                  <button className="btn ghost sm" onClick={() => bulkStatusUndo('cerrado', 'Cerrados')}>
                     Cerrar
                   </button>
                 </>

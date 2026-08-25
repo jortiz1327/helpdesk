@@ -1329,6 +1329,18 @@ class TicketsController extends Controller
                 $n++;
             }
 
+        } elseif ($op === 'restore') {
+            // DESHACER un cambio de estado en lote: cada ticket vuelve a SU estado previo
+            // (heterogéneo). `states` = [{id, status}, …] que capturó el frontend.
+            if (!$me->can('tickets.close')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
+            foreach ((array) $request->input('states', []) as $s) {
+                $tid = (int) ($s['id'] ?? 0);
+                $st  = (string) ($s['status'] ?? '');
+                if ($tid && array_key_exists($st, TicketService::STATUSES)
+                    && in_array($tid, $visible, true)
+                    && $this->tickets->setStatus($tid, $st, (int) $me->id)) $n++;
+            }
+
         } elseif ($op === 'priority') {
             if (!$me->can('tickets.categorize')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
             $pr = (string) $request->input('priority');

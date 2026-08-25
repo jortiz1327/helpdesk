@@ -48,17 +48,22 @@ import logo from "./assets/logo.png";
 const ToastCtx = createContext(() => {});
 export const useToast = () => useContext(ToastCtx);
 
-function ToastHost({ toasts }) {
+function ToastHost({ toasts, onClose }) {
     // Accesibilidad: cada aviso es una live-region para que el lector de pantalla lo
     // anuncie. Los errores interrumpen (alert/assertive); el resto espera un hueco
     // (status/polite). Sin esto, «Respuesta enviada» / «No se pudo enviar» pasaban mudos.
     return (
         <div className="toasts" role="region" aria-label="Notificaciones">
             {toasts.map((t) => (
-                <div key={t.id} className={`toast ${t.kind}`}
+                <div key={t.id} className={`toast ${t.kind} ${t.action ? 'has-action' : ''}`}
                     role={t.kind === 'err' ? 'alert' : 'status'}
                     aria-live={t.kind === 'err' ? 'assertive' : 'polite'}>
-                    {t.msg}
+                    <span>{t.msg}</span>
+                    {t.action && (
+                        <button className="toast-action" onClick={() => { t.action.fn(); onClose?.(t.id); }}>
+                            {t.action.label}
+                        </button>
+                    )}
                 </div>
             ))}
         </div>
@@ -441,11 +446,14 @@ export default function App() {
         setView("inbox");
     };
 
-    const toast = useCallback((msg, kind = "ok") => {
+    // `action` (opcional): { label, fn } añade un botón —p. ej. «Deshacer»— y da más
+    // tiempo antes de que el aviso desaparezca.
+    const toast = useCallback((msg, kind = "ok", action = null) => {
         const id = ++idRef.current;
-        setToasts((t) => [...t, { id, msg, kind }]);
-        setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2800);
+        setToasts((t) => [...t, { id, msg, kind, action }]);
+        setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 6500 : 2800);
     }, []);
+    const cerrarToast = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
 
     const [confirmState, setConfirmState] = useState(null);
     const confirm = useCallback(
@@ -1063,7 +1071,7 @@ export default function App() {
                     />
                 )}
             </ConfirmCtx.Provider>
-            <ToastHost toasts={toasts} />
+            <ToastHost toasts={toasts} onClose={cerrarToast} />
         </ToastCtx.Provider>
     );
 }
