@@ -204,7 +204,10 @@ class TicketService
             // más de N días sin actividad (hueco = nuevo asunto, aunque no se cerrara).
             $cerrado    = in_array($t->status, ['resuelto', 'cerrado'], true);
             $gap        = max(1, (int) Setting::get('wa_nueva_conversacion_dias', '7'));
-            $silencio   = $t->last_message_at && now()->diffInDays($t->last_message_at) >= $gap;
+            // OJO Carbon 3: diffInDays() devuelve valor CON SIGNO (en 2 era absoluto), y
+            // last_message_at es pasado → sin `true` daría negativo y esta rama nunca se
+            // dispararía (un contacto que reaparece tras semanas no arrancaría asunto nuevo).
+            $silencio   = $t->last_message_at && now()->diffInDays($t->last_message_at, true) >= $gap;
             $nuevaRacha = $cerrado || $silencio;
 
             // Reabrir limpiamente (borra resolved/closed, rehace SLA, registra evento).

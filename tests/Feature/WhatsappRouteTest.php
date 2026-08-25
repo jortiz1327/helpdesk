@@ -42,6 +42,26 @@ class WhatsappRouteTest extends TestCase
         $this->assertSame(1, DB::table('tickets')->where('contact_id', $cid)->count());
     }
 
+    public function test_tras_dias_de_silencio_arranca_conversacion_nueva_y_refresca_el_asunto(): void
+    {
+        $cid = $this->contacto();
+        // Ticket ABIERTO (no cerrado) pero con 10 días sin actividad (gap por defecto: 7).
+        $tid = DB::table('tickets')->insertGetId([
+            'code' => 'TK-WA', 'subject' => 'Asunto viejo', 'status' => 'abierto', 'priority' => 'media',
+            'channel' => 'whatsapp', 'contact_id' => $cid, 'subject_pending' => 0,
+            'opened_at' => now()->subDays(10), 'last_message_at' => now()->subDays(10),
+            'conversation_since' => now()->subDays(10), 'created_at' => now()->subDays(10), 'updated_at' => now()->subDays(10),
+        ]);
+
+        $id = app(TicketService::class)->routeIncoming($cid, 'whatsapp', 'las etiquetas no cargan otra vez');
+
+        $this->assertSame($tid, $id);   // el mismo ticket
+        $t = DB::table('tickets')->where('id', $tid)->first();
+        // La rama de «silencio» SÍ se disparó (antes, con el bug de Carbon 3, quedaba muerta):
+        $this->assertSame('las etiquetas no cargan otra vez', $t->subject);   // asunto refrescado
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($t->conversation_since)->gt(now()->subMinute()));
+    }
+
     public function test_un_mensaje_tras_cerrar_reabre_el_mismo_ticket(): void
     {
         $cid = $this->contacto();
