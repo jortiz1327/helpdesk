@@ -38,9 +38,10 @@ class TicketReportsController extends Controller
             default => null,   // 'all'
         };
 
-        // Expresiones de métrica reutilizadas (mismo criterio de «vencido» que la bandeja).
+        // Expresiones de métrica reutilizadas (mismo criterio de «vencido» que la bandeja:
+        // un ticket con el reloj en pausa —sla_paused_since— no cuenta como vencido).
         $vencido   = SlaService::activo()
-            ? '(t.sla_resolve_due_at < NOW() OR (t.sla_response_due_at < NOW() AND t.first_response_at IS NULL))'
+            ? '(t.sla_paused_since IS NULL AND (t.sla_resolve_due_at < NOW() OR (t.sla_response_due_at < NOW() AND t.first_response_at IS NULL)))'
             : '0';
         $abiertos  = "t.status IN ('nuevo','abierto','en_progreso','esperando_respuesta')";
         $resueltos = "t.status IN ('resuelto','cerrado')";

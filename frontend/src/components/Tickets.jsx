@@ -1253,6 +1253,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const msgCountRef = useRef(0)
   const lastTicketRef = useRef(null)
   const [composerKey, setComposerKey] = useState(0)   // fuerza recargar el compositor al «Editar» una programada
+  const [older, setOlder] = useState([])              // mensajes anteriores cargados a demanda (paginación)
+  const [moreOld, setMoreOld] = useState(false)       // ¿hay mensajes antes de los cargados?
+  const [loadingOld, setLoadingOld] = useState(false)
 
   const can = (p) => (user?.permissions || []).includes(p)
 
@@ -1261,6 +1264,22 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
 
   const load = useCallback(() => { api.getTicket(id).then(setD) }, [id])
   useEffect(() => { load() }, [load])
+
+  /* Paginación del hilo: al cambiar de ticket se olvidan los anteriores cargados; y
+     mientras no se haya cargado ninguno, «hay más» lo dice el propio detalle. */
+  useEffect(() => { setOlder([]); setMoreOld(false) }, [id])
+  useEffect(() => { if (d && older.length === 0) setMoreOld(!!d.messages_more) }, [d, older.length])
+
+  const cargarAnteriores = async () => {
+    const shown = [...older, ...(d?.messages || [])]
+    const oldestId = shown.reduce((m, x) => Math.min(m, x.id), Infinity)
+    if (!isFinite(oldestId) || loadingOld) return
+    setLoadingOld(true)
+    const r = await api.olderMessages(id, oldestId).catch(() => null)
+    setLoadingOld(false)
+    if (r?.ok) { setOlder((o) => [...(r.messages || []), ...o]); setMoreOld(!!r.more) }
+    else toast('No se pudieron cargar los mensajes anteriores', 'err')
+  }
 
   /* Al SALTAR a otro ticket (desde «Del cliente», o tras una fusión) se vuelve a la
      conversación. El modal no se desmonta, así que sin esto aterrizas en el nuevo
@@ -1398,6 +1417,14 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   }
 
   const t = d?.ticket
+
+  // Hilo a pintar: los anteriores cargados + la página del detalle, sin duplicar y por id.
+  const mensajes = (() => {
+    const vistos = new Set()
+    return [...older, ...(d?.messages || [])]
+      .filter((m) => (vistos.has(m.id) ? false : vistos.add(m.id)))
+      .sort((a, b) => a.id - b.id)
+  })()
 
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
@@ -1631,14 +1658,20 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                 </div>
               ) : (
               <div className="tkm-thread">
-                {d.messages.length === 0 && <div className="tk-empty"><p>Este ticket aún no tiene mensajes.</p></div>}
+                {mensajes.length === 0 && <div className="tk-empty"><p>Este ticket aún no tiene mensajes.</p></div>}
+                {/* Cargar mensajes anteriores (hilos largos de WhatsApp): no se traen todos de golpe. */}
+                {moreOld && (
+                  <button className="tk-loadmore" disabled={loadingOld} onClick={cargarAnteriores}>
+                    {loadingOld ? 'Cargando…' : '↑ Ver mensajes anteriores'}
+                  </button>
+                )}
                 {(() => {
                   // Separador «conversación más reciente»: solo en tickets ABIERTOS
                   // (en los cerrados es todo historial) y si hay mensajes anteriores.
                   const abierto = !['resuelto', 'cerrado'].includes(t.status)
                   const convSince = abierto ? t.conversation_since : null
                   let sepPuesto = false
-                  return d.messages.map((m, i) => {
+                  return mensajes.map((m, i) => {
                   const out = m.direction === 'out'
                   const sep = convSince && !sepPuesto && i > 0 && m.created_at >= convSince
                   if (sep) sepPuesto = true
@@ -1802,7 +1835,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
               {/* El editor solo en la conversación (no en el historial). */}
               {view === 'chat' && !t.merged_into_id && (
                 <Composer
-                  key={composerKey}
+                  // Remonta al cambiar de ticket (si no, el borrador del anterior se
+                  // quedaba en pantalla al saltar sin cerrar el modal) y al «Editar» una
+                  // respuesta programada (composerKey).
+                  key={`${id}-${composerKey}`}
                   ticketId={id}
                   // Variables de las respuestas predefinidas: se sustituyen al insertar.
                   cannedVars={{

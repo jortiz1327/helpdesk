@@ -84,6 +84,8 @@ export const api = {
   ticketStats: () => req('tickets.php?action=stats'),
   ticketMeta: () => req('tickets.php?action=meta'),
   getTicket: (id) => req(`tickets.php?action=detail&id=${id}`),
+  // Mensajes anteriores del hilo (paginación hacia atrás): los previos a `before`.
+  olderMessages: (id, before) => req(`tickets.php?action=messages&id=${id}&before=${before}`),
   // Se envía como multipart porque puede llevar adjuntos (JSON no transporta ficheros).
   createTicket: ({ files = [], ...payload }) => {
     const fd = new FormData()

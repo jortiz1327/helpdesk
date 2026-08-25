@@ -30,6 +30,9 @@ class TicketsController extends Controller
     protected const SQL_DESPIERTO =
         '(t.snoozed_at IS NULL OR ((t.snoozed_until IS NULL OR t.snoozed_until <= NOW()) AND t.snooze_wake_on_reply = 0))';
 
+    /** Tamaño de página del hilo de mensajes (los últimos N al abrir; el resto, bajo demanda). */
+    protected const MSG_PAGE = 60;
+
     public function __construct(
         protected TicketService $tickets,
         protected AttachmentService $attachments,
@@ -42,6 +45,7 @@ class TicketsController extends Controller
             'stats'  => $this->stats($request),
             'meta'   => $this->meta(),
             'detail' => $this->detail($request),
+            'messages' => $this->olderMessages($request),
             'status' => $this->status($request),
             'assign' => $this->assign($request),
             'snooze'   => $this->snoozeTicket($request),
@@ -307,6 +311,7 @@ class TicketsController extends Controller
 
         if ($request->query('sla') === 'late' && SlaService::activo()) {
             $q->whereIn('t.status', TicketService::OPEN_STATUSES)
+              ->whereNull('t.sla_paused_since')   // en pausa ≠ vencido (reloj parado)
               ->where(function ($w) {
                   $w->where('t.sla_resolve_due_at', '<', now())
                     ->orWhere(fn ($x) => $x->where('t.sla_response_due_at', '<', now())
@@ -519,9 +524,12 @@ class TicketsController extends Controller
         $abiertos  = "(t.status IN ('" . implode("','", TicketService::OPEN_STATUSES) . "') AND $despierto)";
 
         // Fuera de plazo: o se pasó la resolución, o se pasó la respuesta sin contestar.
+        // Un ticket con el reloj EN PAUSA (sla_paused_since puesto: esperando cliente,
+        // resuelto o cerrado) no está «vencido»: su due_at guardado está congelado y no
+        // incluye la pausa en curso. Se excluye, igual que hace el cron sla:check.
         $vencido = SlaService::activo()
-            ? "(t.sla_resolve_due_at < NOW()
-                OR (t.sla_response_due_at < NOW() AND t.first_response_at IS NULL))"
+            ? "(t.sla_paused_since IS NULL AND (t.sla_resolve_due_at < NOW()
+                OR (t.sla_response_due_at < NOW() AND t.first_response_at IS NULL)))"
             : '0';
 
         /*
@@ -715,27 +723,11 @@ class TicketsController extends Controller
             'value'    => $valsCampos[$d->id] ?? null,
         ])->values();
 
-        // Se une con users para saber QUIÉN escribió cada respuesta. Importa: en un
-        // ticket pueden contestar varios agentes, y hay que ver quién dijo qué.
-        $messages = DB::table('messages as m')
-            ->leftJoin('users as au', 'au.id', '=', 'm.author_user_id')
-            ->where('m.ticket_id', $id)->orderBy('m.id')
-            ->get([
-                'm.id', 'm.direction', 'm.channel', 'm.type', 'm.body', 'm.is_html', 'm.is_internal_note',
-                'm.media_url', 'm.media_mime', 'm.status', 'm.author_user_id', 'm.created_at',
-                'm.cc', 'm.bcc', 'm.payload',
-                'au.name as author_name', 'au.email as author_email',
-            ]);
-
-        // Adjuntos, colgados de su mensaje. Y el motivo de fallo de entrega si lo hubo.
-        $byMessage = $this->attachments->forTicket($id);
-        foreach ($messages as $m) {
-            $m->attachments = $byMessage[$m->id] ?? [];
-            if ($m->payload && ($p = json_decode($m->payload, true)) && !empty($p['delivery_error'])) {
-                $m->delivery_error = $p['delivery_error'];
-            }
-            unset($m->payload);
-        }
+        // Mensajes: solo los ÚLTIMOS N. Un ticket de WhatsApp (1 contacto = 1 ticket
+        // para siempre) puede acumular miles; cargarlos todos al abrir era el mayor coste.
+        // Los anteriores se piden bajo demanda (acción `messages`).
+        $totalMsg = DB::table('messages')->where('ticket_id', $id)->count();
+        $messages = $this->cargarMensajes($id, null, self::MSG_PAGE);
 
         $events = DB::table('ticket_events as e')
             ->leftJoin('users as u', 'u.id', '=', 'e.user_id')
@@ -761,9 +753,61 @@ class TicketsController extends Controller
 
         return response()->json([
             'ok' => true, 'ticket' => $t, 'messages' => $messages, 'events' => $events, 'lock' => $lock,
+            // ¿Hay mensajes anteriores a la página cargada? (para el botón «cargar más»).
+            'messages_more' => $totalMsg > $messages->count(),
             // Copias que ya estaban en la conversación, para proponerlas al responder.
             'cc_sugerido' => $this->ccDelHilo($messages, (string) $t->contact_email),
         ]);
+    }
+
+    /**
+     * Carga una PÁGINA de mensajes de un ticket (los `$limit` más recientes con id menor
+     * que `$before`, o los últimos si `$before` es null), en orden ascendente para pintar.
+     * Cuelga adjuntos y el motivo de fallo de entrega. Compartido por detail() y messages().
+     */
+    protected function cargarMensajes(int $id, ?int $before, int $limit)
+    {
+        $q = DB::table('messages as m')
+            ->leftJoin('users as au', 'au.id', '=', 'm.author_user_id')
+            ->where('m.ticket_id', $id);
+        if ($before) $q->where('m.id', '<', $before);
+
+        $messages = $q->orderByDesc('m.id')->limit($limit)
+            ->get([
+                'm.id', 'm.direction', 'm.channel', 'm.type', 'm.body', 'm.is_html', 'm.is_internal_note',
+                'm.media_url', 'm.media_mime', 'm.status', 'm.author_user_id', 'm.created_at',
+                'm.cc', 'm.bcc', 'm.payload',
+                'au.name as author_name', 'au.email as author_email',
+            ])
+            ->reverse()->values();   // se leyó desc (para el LIMIT); se pinta asc
+
+        $byMessage = $this->attachments->forTicket($id);
+        foreach ($messages as $m) {
+            $m->attachments = $byMessage[$m->id] ?? [];
+            if ($m->payload && ($p = json_decode($m->payload, true)) && !empty($p['delivery_error'])) {
+                $m->delivery_error = $p['delivery_error'];
+            }
+            unset($m->payload);
+        }
+        return $messages;
+    }
+
+    /** Mensajes ANTERIORES a uno dado (paginación hacia atrás del hilo). */
+    protected function olderMessages(Request $request)
+    {
+        $me = $request->user();
+        $id = (int) $request->query('id');
+        if (!(clone $this->baseQuery($me))->where('t.id', $id)->exists()) {
+            return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
+        }
+        $before   = (int) $request->query('before');
+        $messages = $this->cargarMensajes($id, $before ?: null, self::MSG_PAGE);
+        $firstId  = $messages->first()->id ?? null;
+        $more     = $firstId
+            ? DB::table('messages')->where('ticket_id', $id)->where('id', '<', $firstId)->exists()
+            : false;
+
+        return response()->json(['ok' => true, 'messages' => $messages, 'more' => $more]);
     }
 
     /** Suelta el bloqueo al cerrar el ticket (si no, caduca solo). */

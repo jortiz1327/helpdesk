@@ -219,6 +219,13 @@ class MailService
         $ticketNew = false;
         if ($ticketId) {
             $this->tickets->touch($ticketId);
+            // Una respuesta del cliente a un ticket RESUELTO/CERRADO lo REABRE (igual que
+            // el portal y WhatsApp). Sin esto, su correo entra pero el ticket sigue fuera
+            // de «Abiertos» y el mensaje queda invisible para el equipo.
+            $estado = DB::table('tickets')->where('id', $ticketId)->value('status');
+            if (in_array($estado, ['resuelto', 'cerrado'], true)) {
+                $this->tickets->setStatus($ticketId, 'en_progreso');
+            }
         } else {
             $ticketId  = $this->tickets->create([
                 'contact_id' => $contactId,
