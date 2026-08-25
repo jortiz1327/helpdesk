@@ -1304,11 +1304,12 @@ class TicketsController extends Controller
             ->value('id');
         if (!$cid) return response()->json(['ok' => true, 'tickets' => []]);
 
-        $tickets = DB::table('tickets as t')
-            ->leftJoin('users as u', 'u.id', '=', 't.assigned_to')
+        // baseQuery aplica scope(): solo avisa de las incidencias que este usuario PUEDE
+        // ver (sus áreas / asignadas). Sin esto se filtraban las de otros departamentos.
+        $tickets = (clone $this->baseQuery($me))
             ->where('t.contact_id', $cid)
             ->whereIn('t.status', TicketService::OPEN_STATUSES)
-            ->whereNull('t.merged_into_id')->where('t.channel', '!=', 'cron')
+            ->whereNull('t.merged_into_id')
             ->orderByDesc('t.last_message_at')->limit(10)
             ->get(['t.id', 't.code', 't.subject', 't.status', 'u.name as agent_name', 't.created_at']);
 

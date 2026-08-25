@@ -98,9 +98,22 @@ class TicketFieldsController extends Controller
     /** Guarda los valores de los campos de un ticket. */
     protected function saveValues(Request $request)
     {
+        $me = $request->user();
         $ticketId = (int) $request->input('ticket_id');
-        if (!DB::table('tickets')->where('id', $ticketId)->exists()) {
-            return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
+
+        // ALCANCE: solo se pueden editar campos de un ticket que este usuario PUEDE ver
+        // (misma regla que TicketsController::scope). Sin esto, un agente podía escribir
+        // en los campos de un ticket de otro departamento pasando un id arbitrario.
+        $visible = DB::table('tickets')->where('id', $ticketId)
+            ->when(!$me->can('tickets.view_all'), function ($q) use ($me) {
+                $cats = $me->categoryIds();
+                $q->where(function ($w) use ($cats, $me) {
+                    if ($cats) $w->whereIn('category_id', $cats);
+                    $w->orWhere('assigned_to', $me->id)->orWhere('status', 'cerrado');
+                });
+            })->exists();
+        if (!$visible) {
+            return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
         }
 
         $valores = (array) $request->input('values', []);   // { field_id: value }
