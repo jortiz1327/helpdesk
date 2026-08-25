@@ -541,8 +541,6 @@ export const api = {
   saveAiSettings: (payload) => req('ai_settings.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
-  // Panel del webhook receptor del agente externo (URL + secreto + resultados).
-  aiWebhook: () => req('ai_agent.php'),
   // Memoria de respuestas efectivas: guardar ⭐ / sugerir parecidas / contar uso.
   saveEffective: (ticket_id, message_id) => req('effective_responses.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id, message_id }),
