@@ -1458,18 +1458,18 @@ class TicketsController extends Controller
             return response()->json(['ok' => false, 'error' => 'No tienes permiso para crear tickets'], 403);
         }
 
-        // Reglas simples (nombre, asunto, email válido, y al menos email O teléfono).
+        // El CORREO es obligatorio: es por donde se responde al cliente. El teléfono es
+        // opcional (dato extra). El nombre y el asunto, obligatorios.
         $request->validate([
             'name'    => ['required'],
-            'email'   => ['nullable', 'email', 'required_without:phone'],
-            'phone'   => ['nullable', 'required_without:email'],
+            'email'   => ['required', 'email'],
+            'phone'   => ['nullable'],
             'subject' => ['required'],
         ], [
-            'name.required'          => 'El nombre es obligatorio',
-            'subject.required'       => 'El asunto es obligatorio',
-            'email.email'            => 'El email no es válido',
-            'email.required_without' => 'Indica al menos un email o un teléfono',
-            'phone.required_without' => 'Indica al menos un email o un teléfono',
+            'name.required'    => 'El nombre es obligatorio',
+            'subject.required' => 'El asunto es obligatorio',
+            'email.required'   => 'El correo del cliente es obligatorio',
+            'email.email'      => 'El email no es válido',
         ]);
 
         $name    = trim((string) $request->input('name'));

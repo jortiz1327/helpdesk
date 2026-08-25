@@ -62,6 +62,17 @@ class HelpdeskAltoFixesTest extends TestCase
         $this->assertNotContains($pausado, $ids);
     }
 
+    public function test_crear_ticket_exige_el_correo_del_cliente(): void
+    {
+        [, $token] = $this->superadmin();
+
+        // Sin email → 422 (es obligatorio: es por donde se responde).
+        $this->withHeader('X-App-Token', $token)
+            ->postJson('/api/tickets.php?action=create', ['name' => 'Test', 'subject' => 'Algo', 'body' => 'hola qué tal'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('email');
+    }
+
     public function test_el_hilo_de_mensajes_se_pagina(): void
     {
         [, $token] = $this->superadmin();

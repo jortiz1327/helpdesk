@@ -53,7 +53,8 @@ export default function NewTicket({ user, onCreated, onCancel, onOpenTicket }) {
 
   const submit = async () => {
     if (!f.name.trim())    return toast('El nombre del solicitante es obligatorio', 'err')
-    if (!f.email.trim() && !f.phone.trim()) return toast('Indica al menos un email o un teléfono', 'err')
+    if (!f.email.trim())   return toast('El correo del cliente es obligatorio', 'err')
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email.trim())) return toast('El correo no es válido', 'err')
     if (!f.subject.trim()) return toast('El asunto es obligatorio', 'err')
     if (desc.current.isEmpty()) return toast('Describe el problema o adjunta un archivo', 'err')
 
@@ -100,7 +101,7 @@ export default function NewTicket({ user, onCreated, onCancel, onOpenTicket }) {
                 <input value={f.name} onChange={set('name')} placeholder="María García" autoFocus />
               </label>
               <label className="field">
-                <span className="lbl">Email</span>
+                <span className="lbl">Email <em>*</em></span>
                 <input type="email" value={f.email} onChange={set('email')} placeholder="maria@empresa.com" />
               </label>
               <label className="field">
