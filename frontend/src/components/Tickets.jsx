@@ -230,6 +230,10 @@ function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
   const [when, setWhen] = useState('')
   const [reason, setReason] = useState('')
   const ref = useRef(null)
+  const btnRef = useRef(null)
+  // En compacto la ficha tiene overflow: el menú se sacaría del recuadro y se recorta.
+  // Lo anclamos con position:fixed calculado desde el botón (como la campana de avisos).
+  const [pos, setPos] = useState(null)
 
   useEffect(() => {
     if (!open) return
@@ -237,6 +241,21 @@ function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [open])
+
+  useEffect(() => {
+    if (!open || !compact || !btnRef.current) { setPos(null); return }
+    const calc = () => {
+      const r = btnRef.current.getBoundingClientRect()
+      const W = 250
+      let left = Math.max(8, r.right - W)                              // alinea por la derecha, sin salir por la izquierda
+      let top = r.bottom + 6
+      if (top + 360 > window.innerHeight - 8) top = Math.max(8, r.top - 6 - 360)  // sin sitio abajo → hacia arriba
+      setPos({ position: 'fixed', top, left, right: 'auto', width: W })
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [open, compact])
 
   const dormido = t.snoozed_at && (Number(t.snooze_wake_on_reply)
     || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
@@ -265,7 +284,7 @@ function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
   return (
     <div className={compact ? 'tkm-q-wrap' : 'tkm-snooze'} ref={ref}>
       {compact ? (
-        <button className="tkm-q" onClick={() => setOpen((o) => !o)} title="Posponer">
+        <button ref={btnRef} className="tkm-q" onClick={() => setOpen((o) => !o)} title="Posponer">
           <Icon.clock /><small>Posponer</small>
         </button>
       ) : (
@@ -274,7 +293,7 @@ function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
         </button>
       )}
       {open && (
-        <div className="snz-menu">
+        <div className="snz-menu" style={compact ? pos || { visibility: 'hidden' } : undefined}>
           <div className="snz-h"><b>¿Cuándo lo retomas?</b><small>Se aparta de la cola y te lo recuerdo ese día.</small></div>
           <button className="snz-opt" onClick={() => pick('later_today')}><span className="snz-ic">🌆</span>Esta tarde</button>
           <button className="snz-opt" onClick={() => pick('tomorrow')}><span className="snz-ic">☀️</span>Mañana por la mañana</button>
