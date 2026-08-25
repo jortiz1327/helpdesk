@@ -309,7 +309,14 @@ function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
               </button>
             </div>
           ) : (
-            <button className="snz-opt" onClick={() => setCustom(true)}><span className="snz-ic">⏰</span>Fecha y hora…</button>
+            <button className="snz-opt" onClick={() => {
+              if (!when) {                                   // precarga mañana 9:00 para que el botón salga habilitado
+                const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0)
+                const p = (n) => String(n).padStart(2, '0')
+                setWhen(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`)
+              }
+              setCustom(true)
+            }}><span className="snz-ic">⏰</span>Fecha y hora…</button>
           )}
           <input className="snz-reason" placeholder="Motivo (opcional): esperando repuesto…"
             value={reason} onChange={(e) => setReason(e.target.value)} maxLength={160} />
