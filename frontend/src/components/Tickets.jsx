@@ -224,7 +224,7 @@ const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', la
  * Si no, un botón que abre el menú de presets (esta tarde, el lunes, hasta que
  * responda…) con fecha a medida y un motivo corto opcional.
  */
-function SnoozeControl({ t, onSnooze, onWake }) {
+function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
   const [open, setOpen] = useState(false)
   const [custom, setCustom] = useState(false)
   const [when, setWhen] = useState('')
@@ -241,7 +241,9 @@ function SnoozeControl({ t, onSnooze, onWake }) {
   const dormido = t.snoozed_at && (Number(t.snooze_wake_on_reply)
     || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
 
-  if (dormido) {
+  // En modo compacto la ficha se encarga del estado «dormido» (una línea aparte); aquí
+  // solo el disparador de posponer. En modo normal se mantiene el banner completo.
+  if (dormido && !compact) {
     return (
       <div className="tkm-snoozed">
         <div className="tkm-snoozed-h">
@@ -261,10 +263,16 @@ function SnoozeControl({ t, onSnooze, onWake }) {
   const pick = (preset) => { onSnooze({ preset, reason: reason.trim() || undefined }); setOpen(false); setCustom(false) }
 
   return (
-    <div className="tkm-snooze" ref={ref}>
-      <button className="btn ghost block" style={{ marginTop: 10 }} onClick={() => setOpen((o) => !o)}>
-        <Icon.clock /> Posponer…
-      </button>
+    <div className={compact ? 'tkm-q-wrap' : 'tkm-snooze'} ref={ref}>
+      {compact ? (
+        <button className="tkm-q" onClick={() => setOpen((o) => !o)} title="Posponer">
+          <Icon.clock /><small>Posponer</small>
+        </button>
+      ) : (
+        <button className="btn ghost block" style={{ marginTop: 10 }} onClick={() => setOpen((o) => !o)}>
+          <Icon.clock /> Posponer…
+        </button>
+      )}
       {open && (
         <div className="snz-menu">
           <div className="snz-h"><b>¿Cuándo lo retomas?</b><small>Se aparta de la cola y te lo recuerdo ese día.</small></div>
@@ -288,6 +296,29 @@ function SnoozeControl({ t, onSnooze, onWake }) {
             value={reason} onChange={(e) => setReason(e.target.value)} maxLength={160} />
         </div>
       )}
+    </div>
+  )
+}
+
+/*
+ * Sección PLEGABLE de la ficha. Recuerda si el usuario la deja abierta o cerrada
+ * (localStorage global, por sección), para que la vista se adapte a cómo trabaja.
+ */
+function Collapsible({ id, title, defaultOpen = false, children }) {
+  const key = `tkm_fold_${id}`
+  const [open, setOpen] = useState(() => {
+    try { const v = localStorage.getItem(key); return v === null ? defaultOpen : v === '1' } catch { return defaultOpen }
+  })
+  const toggle = () => {
+    const n = !open; setOpen(n)
+    try { localStorage.setItem(key, n ? '1' : '0') } catch { /* sin storage */ }
+  }
+  return (
+    <div className={`tkm-fold ${open ? 'open' : ''}`}>
+      <button className="tkm-fold-h" onClick={toggle} aria-expanded={open}>
+        <span>{title}</span><Icon.chevron className="tkm-fold-ch" />
+      </button>
+      {open && <div className="tkm-fold-b">{children}</div>}
     </div>
   )
 }
@@ -344,7 +375,7 @@ function TicketLabels({ ticketId, initial }) {
  * Campos personalizados; aquí el agente rellena el valor de cada uno. Un solo
  * botón «Guardar» manda todos. Si no hay campos activos, no se pinta nada.
  */
-function TicketCustomFields({ ticketId, initial }) {
+function TicketCustomFields({ ticketId, initial, bare = false }) {
   const toast = useToast()
   const campos = initial || []
   const inicial = () => Object.fromEntries(campos.map((c) => [c.id, c.value ?? '']))
@@ -370,9 +401,8 @@ function TicketCustomFields({ ticketId, initial }) {
     if (r.ok) { toast('Campos guardados'); setDirty(false) } else toast(r.error || 'Error', 'err')
   }
 
-  return (
-    <div className="tkm-block">
-      <div className="tkm-sec">Campos personalizados</div>
+  const inner = (
+    <>
       <div className="tk-cf">
         {campos.map((c) => (
           <label key={c.id} className="tk-cf-row">
@@ -403,8 +433,11 @@ function TicketCustomFields({ ticketId, initial }) {
           {saving ? 'Guardando…' : 'Guardar campos'}
         </button>
       )}
-    </div>
+    </>
   )
+
+  if (bare) return inner
+  return <div className="tkm-block"><div className="tkm-sec">Campos personalizados</div>{inner}</div>
 }
 
 /*
@@ -1264,6 +1297,14 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   // Candados del envío: para saber si se puede responder por WhatsApp (número de soporte).
   useEffect(() => { api.gating().then((g) => setGate(g?.ok ? g : null)) }, [])
 
+  // Cerrar el menú «Más» al clicar fuera.
+  useEffect(() => {
+    if (!masOpen) return
+    const h = (e) => { if (masRef.current && !masRef.current.contains(e.target)) setMasOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [masOpen])
+
   // Guarda de VIGENCIA: cada carga lleva un número de secuencia; si al resolver ya hay
   // otra más nueva (se saltó de ticket), se descarta. Y si la petición falla (red/500),
   // se marca error en vez de dejar el spinner girando para siempre.
@@ -1416,6 +1457,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   // Generar PDF: se abre un diálogo con opciones (notas internas / imágenes) antes de descargar.
   const [pdfOpts, setPdfOpts] = useState(null)   // null | { notes, images, busy }
   const [editReq, setEditReq] = useState(null)   // null | { email, name } — cambiar solicitante
+  const [masOpen, setMasOpen] = useState(false)  // menú «Más ⋯» de acciones secundarias
+  const masRef = useRef(null)
   const [justificar, setJustificar] = useState(false)   // se cerró fuera de plazo
   const [motivo, setMotivo] = useState('')
   const genPdf = async () => {
@@ -1432,6 +1475,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   }
 
   const t = d?.ticket
+
+  // ¿Este ticket está dormido (pospuesto)? y ¿NO es mío? (para el panel de acciones).
+  const dormido = t?.snoozed_at && (Number(t.snooze_wake_on_reply)
+    || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
+  const masMio = Number(t?.assigned_to) !== Number(user?.id)
 
   // Hilo a pintar: los anteriores cargados + la página del detalle, sin duplicar y por id.
   const mensajes = (() => {
@@ -1473,87 +1521,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                 <div className="tkm-extra"><Icon.phone /> +{t.contact_wa}</div>
               )}
 
-              {/* Sede (organización) del cliente: se puede cambiar aquí mismo. */}
-              {can('contacts.edit') && (
-                <div className="tkm-block">
-                  <div className="tkm-sec">Sede</div>
-                  <SedeField contactId={t.contact_id} value={t.contact_sede_id} />
-                </div>
-              )}
-
-              {/*
-                EN COPIA: quién más sigue esta conversación. Va aquí arriba, junto al
-                cliente, porque antes de escribir hay que saber quién lo va a leer.
-              */}
-              {!!d.cc_sugerido?.length && (
-                <div className="tkm-cc">
-                  <div className="tkm-cc-h"><Icon.user /> En copia <span>{d.cc_sugerido.length}</span></div>
-                  <div className="tkm-cc-list">
-                    {d.cc_sugerido.map((c) => <span key={c} title={c}>{c}</span>)}
-                  </div>
-                  <small>Se les incluye al responder, salvo que los quites.</small>
-                </div>
-              )}
-
-              <div className="tkm-block">
-                <div className="tkm-sec">Ticket</div>
-                <div className="tkm-row"><span>Referencia</span><b className="tk-code">{t.code}</b></div>
-                <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} /></div>
-                <div className="tkm-row"><span>Categoría</span>
-                  {can('tickets.categorize') ? (
-                    <Select value={t.category_id ? String(t.category_id) : ''} onChange={(v) => cambiarCategoria(v || null)}
-                      options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
-                  ) : (
-                    <b>{(meta?.categories || []).find((c) => String(c.id) === String(t.category_id))?.name || 'Sin categoría'}</b>
-                  )}
-                </div>
-                <div className="tkm-row"><span>Prioridad</span>
-                  {prChip(t.priority, meta)}
-                </div>
-                <div className="tkm-row"><span>Creado</span><b>{fmtDate(t.created_at)}</b></div>
-              </div>
-
-              {/* Etiquetas: cualquier agente puede ponerlas/quitarlas del catálogo. */}
-              <TicketLabels ticketId={t.id} initial={t.labels} />
-
-              {/* Campos personalizados (globales), si hay definidos. */}
-              <TicketCustomFields ticketId={t.id} initial={t.custom_fields} />
-
-              {/* Valoración del cliente (CSAT), si la dejó desde el portal. */}
-              {t.rating && (
-                <div className="tkm-block">
-                  <div className="tkm-sec">Valoración del cliente</div>
-                  <div className="tkm-rating">
-                    <div className="tkm-stars" title={`${t.rating.score} de 5`}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <Icon.star key={n} className={n <= t.rating.score ? 'on' : 'off'} />
-                      ))}
-                      <b>{t.rating.score}/5</b>
-                    </div>
-                    {t.rating.comment && <p className="tkm-rating-cmt">“{t.rating.comment}”</p>}
-                  </div>
-                </div>
-              )}
-
-              {/* Los tiempos solo para quien tiene permiso */}
-              {can('tickets.view_times') && (
-                <div className="tkm-block">
-                  <div className="tkm-sec">Tiempos</div>
-                  <div className="tkm-time blue">
-                    <b>Primera atención</b>
-                    <span>{t.first_response_at ? fmtDate(t.first_response_at) : 'Pendiente de responder'}</span>
-                    <SlaLinea sla={t.sla?.response} />
-                  </div>
-                  <div className="tkm-time green">
-                    <b>Resolución</b>
-                    <span>{t.resolved_at ? fmtDate(t.resolved_at) : 'Aún sin resolver'}</span>
-                    <SlaLinea sla={t.sla?.resolve} />
-                  </div>
-                </div>
-              )}
-
-              <div className="tkm-block">
-                <div className="tkm-sec">Acciones</div>
+              {/* ACCIONES ARRIBA: lo que más se usa, a la vista y sin scroll. */}
+              <div className="tkm-act">
                 {can('tickets.close') ? (
                   <div className="field">
                     <span className="lbl">Estado</span>
@@ -1574,39 +1543,122 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                   <div className="tkm-row"><span>Asignado a</span><b>{t.agent_name || 'Sin asignar'}</b></div>
                 )}
 
-                {/* Cualquier agente puede COGERSE un ticket, aunque no reparta trabajo. */}
-                {Number(t.assigned_to) !== Number(user?.id) && (
-                  <button className="btn ghost block" style={{ marginTop: 10 }} onClick={() => assign(String(user.id))}>
-                    <Icon.user /> Asignármelo a mí
+                {/* Accesos rápidos (iconos): Posponer · Fusionar · PDF · Más ⋯ */}
+                <div className="tkm-quick">
+                  {can('tickets.reply') && !t.merged_into_id && t.status !== 'cerrado' && !dormido && (
+                    <SnoozeControl t={t} onSnooze={posponer} onWake={reactivar} compact />
+                  )}
+                  {can('tickets.reply') && !t.merged_into_id && (
+                    <button className="tkm-q" onClick={() => setFusion({ preselect: null })} title="Fusionar tickets">
+                      <Icon.merge /><small>Fusionar</small>
+                    </button>
+                  )}
+                  <button className="tkm-q" onClick={() => setPdfOpts({ notes: true, images: true, busy: false })} title="Generar PDF">
+                    <Icon.file /><small>PDF</small>
                   </button>
-                )}
+                  {(masMio || can('tickets.delete')) && (
+                    <div className="tkm-q-wrap" ref={masRef}>
+                      <button className="tkm-q" onClick={() => setMasOpen((o) => !o)} title="Más acciones">
+                        <Icon.settings /><small>Más</small>
+                      </button>
+                      {masOpen && (
+                        <div className="tkm-mas">
+                          {masMio && (
+                            <button onClick={() => { setMasOpen(false); assign(String(user.id)) }}>
+                              <Icon.user /> Asignármelo a mí
+                            </button>
+                          )}
+                          {can('tickets.delete') && (
+                            <button className="danger" onClick={() => { setMasOpen(false); del() }}>
+                              <Icon.trash /> Eliminar ticket
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                {/* Posponer: apartar el ticket de la cola hasta una fecha o hasta que
-                    el cliente responda. No en cerrados/fusionados (nada que aparcar). */}
-                {can('tickets.reply') && !t.merged_into_id && t.status !== 'cerrado' && (
-                  <SnoozeControl t={t} onSnooze={posponer} onWake={reactivar} />
-                )}
-
-                {/* Exportar el hilo a PDF (con diálogo de opciones). */}
-                <button className="btn ghost block" style={{ marginTop: 10 }} onClick={() => setPdfOpts({ notes: true, images: true, busy: false })}>
-                  <Icon.file /> Generar PDF
-                </button>
-
-                {/* Juntar dos tickets del mismo cliente en uno. No sale si este ya
-                    está fusionado: ahí no hay nada que juntar, solo que ir al bueno. */}
-                {can('tickets.reply') && !t.merged_into_id && (
-                  <button className="btn ghost block" style={{ marginTop: 10 }} onClick={() => setFusion({ preselect: null })}>
-                    <Icon.merge /> Fusionar tickets…
-                  </button>
-                )}
-
-                {/* Zona peligrosa: borrar el ticket entero (solo con permiso). */}
-                {can('tickets.delete') && (
-                  <button className="btn ghost block tk-del" style={{ marginTop: 10 }} onClick={del}>
-                    <Icon.trash /> Eliminar ticket
-                  </button>
+                {/* Si está pospuesto, una línea con hasta cuándo + reactivar. */}
+                {dormido && (
+                  <div className="tkm-snz-live">
+                    <Icon.clock />
+                    <span>{Number(t.snooze_wake_on_reply) ? 'Pospuesto hasta que responda' : `Pospuesto hasta ${fmtDate(t.snoozed_until)}`}</span>
+                    <button onClick={reactivar}>Reactivar</button>
+                  </div>
                 )}
               </div>
+
+              {/* PROPIEDADES compactas: una línea cada una. */}
+              <div className="tkm-props">
+                <div className="tkm-row"><span>Referencia</span><b className="tk-code">{t.code}</b></div>
+                <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} /></div>
+                <div className="tkm-row"><span>Prioridad</span>{prChip(t.priority, meta)}</div>
+                <div className="tkm-row"><span>Categoría</span>
+                  {can('tickets.categorize') ? (
+                    <Select value={t.category_id ? String(t.category_id) : ''} onChange={(v) => cambiarCategoria(v || null)}
+                      options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
+                  ) : (
+                    <b>{(meta?.categories || []).find((c) => String(c.id) === String(t.category_id))?.name || 'Sin categoría'}</b>
+                  )}
+                </div>
+                <div className="tkm-row"><span>Creado</span><b>{fmtDate(t.created_at)}</b></div>
+              </div>
+
+              {/* Etiquetas: chips editables (bloque propio, corto). */}
+              <TicketLabels ticketId={t.id} initial={t.labels} />
+
+              {/* SECUNDARIO plegable: Tiempos abierto por defecto; el resto cerrado
+                  (se recuerda lo que abras). Así la ficha cabe sin scroll. */}
+              {can('tickets.view_times') && (
+                <Collapsible id="times" title="Tiempos (SLA)" defaultOpen>
+                  <div className="tkm-time blue">
+                    <b>Primera atención</b>
+                    <span>{t.first_response_at ? fmtDate(t.first_response_at) : 'Pendiente de responder'}</span>
+                    <SlaLinea sla={t.sla?.response} />
+                  </div>
+                  <div className="tkm-time green">
+                    <b>Resolución</b>
+                    <span>{t.resolved_at ? fmtDate(t.resolved_at) : 'Aún sin resolver'}</span>
+                    <SlaLinea sla={t.sla?.resolve} />
+                  </div>
+                </Collapsible>
+              )}
+
+              {(can('contacts.edit') || !!d.cc_sugerido?.length) && (
+                <Collapsible id="sede" title={`Sede y copias${d.cc_sugerido?.length ? ` (${d.cc_sugerido.length})` : ''}`}>
+                  {can('contacts.edit') && <SedeField contactId={t.contact_id} value={t.contact_sede_id} />}
+                  {!!d.cc_sugerido?.length && (
+                    <div className="tkm-cc">
+                      <div className="tkm-cc-h"><Icon.user /> En copia <span>{d.cc_sugerido.length}</span></div>
+                      <div className="tkm-cc-list">
+                        {d.cc_sugerido.map((c) => <span key={c} title={c}>{c}</span>)}
+                      </div>
+                      <small>Se les incluye al responder, salvo que los quites.</small>
+                    </div>
+                  )}
+                </Collapsible>
+              )}
+
+              {!!t.custom_fields?.length && (
+                <Collapsible id="fields" title="Campos personalizados">
+                  <TicketCustomFields ticketId={t.id} initial={t.custom_fields} bare />
+                </Collapsible>
+              )}
+
+              {t.rating && (
+                <Collapsible id="rating" title="Valoración del cliente">
+                  <div className="tkm-rating">
+                    <div className="tkm-stars" title={`${t.rating.score} de 5`}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Icon.star key={n} className={n <= t.rating.score ? 'on' : 'off'} />
+                      ))}
+                      <b>{t.rating.score}/5</b>
+                    </div>
+                    {t.rating.comment && <p className="tkm-rating-cmt">“{t.rating.comment}”</p>}
+                  </div>
+                </Collapsible>
+              )}
             </aside>
 
             {/* --- Panel derecho: la conversación --- */}
