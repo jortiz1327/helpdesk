@@ -57,6 +57,30 @@ class DbExplain extends Command
                    AND t.status IN ($abiertos) AND $despierto
                  ORDER BY t.last_message_at DESC, t.id DESC LIMIT 25", []],
 
+            'Cola «Sin responder» (habló el cliente, ordenada)' => [
+                "SELECT t.id FROM tickets t
+                 WHERE t.channel <> 'cron' AND t.last_direction = 'in'
+                   AND t.status IN ($abiertos) AND $despierto
+                 ORDER BY t.last_message_at DESC, t.id DESC LIMIT 25", []],
+
+            'Vista «Pospuestos» (solo los dormidos)' => [
+                "SELECT t.id FROM tickets t
+                 WHERE t.snoozed_at IS NOT NULL AND NOT $despierto
+                 ORDER BY t.last_message_at DESC LIMIT 25", []],
+
+            'Filtro «SLA vencido» (no en pausa, plazo pasado)' => [
+                "SELECT t.id FROM tickets t
+                 WHERE t.status IN ($abiertos) AND t.sla_paused_since IS NULL
+                   AND (t.sla_resolve_due_at < NOW()
+                        OR (t.sla_response_due_at < NOW() AND t.first_response_at IS NULL))
+                 LIMIT 25", []],
+
+            'Cron sla:check (barrido de por-vencer/vencido)' => [
+                "SELECT t.id FROM tickets t
+                 WHERE t.status IN ('nuevo','abierto','en_progreso') AND t.channel <> 'cron'
+                   AND (t.sla_response_due_at IS NOT NULL OR t.sla_resolve_due_at IS NOT NULL)
+                 LIMIT 500", []],
+
             'Contador «míos» (asignados a mí y abiertos)' => [
                 "SELECT COUNT(*) FROM tickets t
                  WHERE t.channel <> 'cron' AND t.assigned_to = $me AND t.status IN ($abiertos) AND $despierto", []],

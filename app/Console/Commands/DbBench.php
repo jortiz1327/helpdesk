@@ -59,11 +59,23 @@ class DbBench extends Command
         $this->line(str_repeat('─', 60));
 
         if ($this->option('candidates')) {
-            $this->line('Añadiendo índices candidatos: (assigned_to, status) y (category_id, status, last_message_at)…');
-            DB::statement('CREATE INDEX bench_assigned_status ON tickets (assigned_to, status)');
-            DB::statement('CREATE INDEX bench_cat_status_lma ON tickets (category_id, status, last_message_at)');
+            // Los compuestos (assigned_to,status) y (category_id,status,last_message_at) YA
+            // están en producción (migrate:fresh los crea aquí). Se prueba lo NUEVO: un
+            // índice para la cola «Sin responder» (last_direction es igualdad → el orden
+            // por last_message_at podría salir del índice y evitar el filesort).
+            /*
+             * Aquí se prueban ÍNDICES CANDIDATOS (edítalos según lo que quieras medir).
+             * Medido con 50k realistas (ago-2026): NINGUNO de los probados mejoró —
+             *  - (last_direction,status,last_message_at) para «Sin responder»: filesort igual.
+             *  - (sla_resolve_due_at) + (sla_response_due_at,first_response_at) para «SLA
+             *    vencido»: el optimizador siguió eligiendo escaneo (filtro poco selectivo).
+             * Conclusión: el set de índices actual es el correcto; no añadir más.
+             */
+            $this->line('Añadiendo candidatos para «SLA vencido» (los dos plazos)…');
+            DB::statement('CREATE INDEX bench_resolve_due ON tickets (sla_resolve_due_at)');
+            DB::statement('CREATE INDEX bench_response_due ON tickets (sla_response_due_at, first_response_at)');
             $this->newLine();
-            $this->comment('DESPUÉS (con los índices candidatos):');
+            $this->comment('DESPUÉS (con el índice candidato):');
             $this->call('db:explain');
             $this->line(str_repeat('─', 60));
         }
@@ -129,8 +141,22 @@ class DbBench extends Command
                 $i = $base + $k;
                 $estado = $estados[array_rand($estados)];
                 $resuelto = in_array($estado, ['resuelto', 'cerrado'], true);
+                $abierto  = !$resuelto;
                 $creado = (clone $ahora)->subMinutes(random_int(0, 120 * 24 * 60));   // últimos ~120 días
                 $ultAct = (clone $creado)->addMinutes(random_int(0, 5000));
+
+                // SLA: plazos alrededor de ahora; ~1 de cada 7 abiertos, vencido.
+                $vencido = $abierto && random_int(0, 6) === 0;
+                $resolDue = $vencido ? (clone $ahora)->subHours(random_int(1, 48)) : (clone $creado)->addHours(random_int(24, 120));
+                $primeraResp = random_int(0, 2) !== 0 ? (clone $creado)->addMinutes(random_int(10, 600)) : null;
+                // Reloj EN PAUSA para los que esperan al cliente.
+                $pausa = ($estado === 'esperando_respuesta') ? (clone $ahora)->subHours(random_int(1, 72)) : null;
+                // Posponer: ~8% de los abiertos, dormidos (mitad por fecha, mitad hasta respuesta).
+                $snooze = $abierto && random_int(0, 12) === 0;
+                $snzReply = $snooze && random_int(0, 1) === 0;
+                // Bloqueo: ~5% tomados ahora mismo (dentro de la ventana del candado).
+                $locked = $abierto && random_int(0, 19) === 0;
+
                 $lote[] = [
                     'code'            => 'BCH-' . str_pad((string) $i, 7, '0', STR_PAD_LEFT),
                     'subject'         => 'Incidencia sintética ' . $i,
@@ -146,6 +172,19 @@ class DbBench extends Command
                     'updated_at'      => $ultAct,
                     'last_message_at' => $ultAct,
                     'resolved_at'     => $resuelto ? $ultAct : null,
+                    // SLA (para ejercitar los índices de vencido/pausa).
+                    'first_response_at'   => $primeraResp,
+                    'sla_response_due_at' => $abierto ? (clone $creado)->addHours(random_int(2, 8)) : null,
+                    'sla_resolve_due_at'  => $abierto ? $resolDue : null,
+                    'sla_paused_since'    => $pausa,
+                    // Snooze (para ejercitar SQL_DESPIERTO y sus índices).
+                    'snoozed_at'           => $snooze ? (clone $ahora)->subHours(random_int(1, 48)) : null,
+                    'snoozed_until'        => ($snooze && !$snzReply) ? (clone $ahora)->addHours(random_int(1, 120)) : null,
+                    'snooze_wake_on_reply' => $snzReply ? 1 : 0,
+                    'snoozed_by'           => $snooze ? $agentes[array_rand($agentes)] : null,
+                    // Bloqueo por colisión.
+                    'locked_by' => $locked ? $agentes[array_rand($agentes)] : null,
+                    'locked_at' => $locked ? (clone $ahora)->subSeconds(random_int(5, 110)) : null,
                 ];
             }
             DB::table('tickets')->insert($lote);
