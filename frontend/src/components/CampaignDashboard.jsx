@@ -57,12 +57,12 @@ function Detail({ id, onBack, onChange }) {
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 980 }}>
           <div className="stat-grid" style={{ marginBottom: 16 }}>
-            <div className="stat-card"><div className="stat-num" style={{ color: '#8696a0', marginTop: 0 }}>{c.total}</div><div className="stat-sub">Destinatarios</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: '#25d366', marginTop: 0 }}>{c.sent}</div><div className="stat-sub">Enviados</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: '#4a9bff', marginTop: 0 }}>{delivered}</div><div className="stat-sub">Entregados</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: '#00a884', marginTop: 0 }}>{read}</div><div className="stat-sub">Leídos</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--ink-3)', marginTop: 0 }}>{c.total}</div><div className="stat-sub">Destinatarios</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--primary)', marginTop: 0 }}>{c.sent}</div><div className="stat-sub">Enviados</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--info)', marginTop: 0 }}>{delivered}</div><div className="stat-sub">Entregados</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--secondary)', marginTop: 0 }}>{read}</div><div className="stat-sub">Leídos</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: 'var(--danger)', marginTop: 0 }}>{c.failed}</div><div className="stat-sub">Fallidos</div></div>
-            {pending > 0 && <div className="stat-card"><div className="stat-num" style={{ color: '#f4b740', marginTop: 0 }}>{pending}</div><div className="stat-sub">En cola</div></div>}
+            {pending > 0 && <div className="stat-card"><div className="stat-num" style={{ color: 'var(--warn)', marginTop: 0 }}>{pending}</div><div className="stat-sub">En cola</div></div>}
           </div>
           <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>Plantilla <b>{c.template_name}</b> · Destino <b>{c.source_name || '—'}</b> · {fmt(c.scheduled_at)}</div>
           <div className="card" style={{ padding: 0 }}>
@@ -184,9 +184,9 @@ export default function CampaignDashboard({ onNew, user }) {
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1120 }}>
           <div className="stat-grid">
-            <div className="stat-card"><div className="stat-num" style={{ color: '#00a884', marginTop: 0 }}>{totals.camp}</div><div className="stat-sub">Campañas</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: '#25d366', marginTop: 0 }}>{totals.sent}</div><div className="stat-sub">Mensajes enviados</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: '#f4b740', marginTop: 0 }}>{totals.pend}</div><div className="stat-sub">En cola</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--primary)', marginTop: 0 }}>{totals.camp}</div><div className="stat-sub">Campañas</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--secondary)', marginTop: 0 }}>{totals.sent}</div><div className="stat-sub">Mensajes enviados</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--warn)', marginTop: 0 }}>{totals.pend}</div><div className="stat-sub">En cola</div></div>
           </div>
 
           {canManage && <SendSafety />}
@@ -208,15 +208,15 @@ export default function CampaignDashboard({ onNew, user }) {
                         <div className="camp-bar"><span style={{ width: pct + '%' }} /></div>
                       </div>
                       <div className="camp-nums">
-                        <span title="Enviados"><b style={{ color: '#25d366' }}>{c.sent}</b></span>
-                        <span title="Entregados"><b style={{ color: '#4a9bff' }}>{c.delivered ?? 0}</b></span>
-                        <span title="Leídos"><b style={{ color: '#00c39a' }}>{c.read_count ?? 0}</b></span>
+                        <span title="Enviados"><b style={{ color: 'var(--primary)' }}>{c.sent}</b></span>
+                        <span title="Entregados"><b style={{ color: 'var(--info)' }}>{c.delivered ?? 0}</b></span>
+                        <span title="Leídos"><b style={{ color: 'var(--secondary)' }}>{c.read_count ?? 0}</b></span>
                         <span title="Fallidos"><b style={{ color: 'var(--danger)' }}>{c.failed}</b></span>
                         <span title="Total"><b className="muted">/ {c.total}</b></span>
                       </div>
                       <div className="camp-acts" onClick={(e) => e.stopPropagation()}>
                         {pending > 0 && (c.status === 'sending' || c.status === 'scheduled') && <button className="icon-btn" title="Procesar pendientes" onClick={() => run(c.id)}><Icon.play /></button>}
-                        {(c.status === 'sending' || c.status === 'scheduled') && <button className="icon-btn" title="Cancelar" onClick={() => cancel(c.id)} style={{ color: '#f4b740' }}><Icon.warn /></button>}
+                        {(c.status === 'sending' || c.status === 'scheduled') && <button className="icon-btn" title="Cancelar" onClick={() => cancel(c.id)} style={{ color: 'var(--warn)' }}><Icon.warn /></button>}
                         <button className="icon-btn" title="Eliminar" style={{ color: 'var(--danger)' }} onClick={() => del(c.id)}><Icon.trash /></button>
                       </div>
                     </div>

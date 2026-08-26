@@ -47,10 +47,10 @@ export default function Analytics() {
   const labelsSorted = [...(d.by_label || [])].sort((a, b) => Number(b.n) - Number(a.n))
   const labelsShown = allLabels ? labelsSorted : labelsSorted.slice(0, LABELS_TOP)
   const cards = [
-    { label: 'Tiempo 1ª respuesta', value: fmtDur(d.first_response.avg_seconds), sub: `media de ${d.first_response.count} conversaciones`, color: '#4a9bff' },
-    { label: 'Conversaciones', value: d.funnel[1]?.v ?? 0, sub: `de ${d.funnel[0]?.v ?? 0} contactos`, color: '#00a884' },
-    { label: 'Tasa de lectura', value: pct(c.read, c.sent) + '%', sub: `${c.read} leídos de ${c.sent} enviados`, color: '#25d366' },
-    { label: 'Tasa de entrega', value: pct(c.delivered, c.sent) + '%', sub: `${c.delivered} entregados`, color: '#f4b740' },
+    { label: 'Tiempo 1ª respuesta', value: fmtDur(d.first_response.avg_seconds), sub: `media de ${d.first_response.count} conversaciones`, color: 'var(--primary)' },
+    { label: 'Conversaciones', value: d.funnel[1]?.v ?? 0, sub: `de ${d.funnel[0]?.v ?? 0} contactos`, color: 'var(--info)' },
+    { label: 'Tasa de lectura', value: pct(c.read, c.sent) + '%', sub: `${c.read} leídos de ${c.sent} enviados`, color: 'var(--secondary)' },
+    { label: 'Tasa de entrega', value: pct(c.delivered, c.sent) + '%', sub: `${c.delivered} entregados`, color: 'var(--warn)' },
   ]
   const funnelMax = Math.max(1, ...d.funnel.map((f) => f.v))
 
@@ -108,9 +108,9 @@ export default function Analytics() {
               <div className="an-h"><Icon.send /> Rendimiento de campañas</div>
               {c.recipients === 0 ? <p className="muted" style={{ fontSize: 12.5 }}>Aún no has lanzado campañas.</p> : (
                 <Bars items={[
-                  { k: 'Enviados', v: c.sent, c: '#25d366' },
-                  { k: 'Entregados', v: c.delivered, c: '#4a9bff' },
-                  { k: 'Leídos', v: c.read, c: '#00c39a' },
+                  { k: 'Enviados', v: c.sent, c: 'var(--primary)' },
+                  { k: 'Entregados', v: c.delivered, c: 'var(--info)' },
+                  { k: 'Leídos', v: c.read, c: 'var(--secondary)' },
                   { k: 'Fallidos', v: c.failed, c: 'var(--danger)' },
                 ]} />
               )}
@@ -120,7 +120,7 @@ export default function Analytics() {
             {/* Mensajes por operador */}
             <div className="card an-card">
               <div className="an-h"><Icon.user /> Mensajes por operador</div>
-              <Bars items={d.by_agent.map((a) => ({ k: a.name, v: Number(a.n) }))} color="#9b6dff" />
+              <Bars items={d.by_agent.map((a) => ({ k: a.name, v: Number(a.n) }))} color="var(--primary)" />
             </div>
           </div>
         </div>
