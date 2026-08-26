@@ -151,12 +151,14 @@ class TicketReportsController extends Controller
         $dias  = match ($period) { '7d' => 7, 'today' => 7, default => 30 };
         $desde = now()->subDays($dias - 1)->startOfDay();
 
+        // ORDER BY NULL: el GROUP BY DATE() ordena implícitamente por el día (una función,
+        // no indexable) → filesort inútil, porque el bucle de abajo reordena por día en PHP.
         $creados = DB::table('tickets')->where('channel', '!=', 'cron')->whereNull('merged_into_id')
             ->where('created_at', '>=', $desde)
-            ->selectRaw('DATE(created_at) d, COUNT(*) n')->groupBy('d')->pluck('n', 'd');
+            ->selectRaw('DATE(created_at) d, COUNT(*) n')->groupBy('d')->orderByRaw('NULL')->pluck('n', 'd');
         $resueltos = DB::table('tickets')->where('channel', '!=', 'cron')->whereNull('merged_into_id')
             ->whereNotNull('resolved_at')->where('resolved_at', '>=', $desde)
-            ->selectRaw('DATE(resolved_at) d, COUNT(*) n')->groupBy('d')->pluck('n', 'd');
+            ->selectRaw('DATE(resolved_at) d, COUNT(*) n')->groupBy('d')->orderByRaw('NULL')->pluck('n', 'd');
 
         $out = [];
         for ($i = 0; $i < $dias; $i++) {

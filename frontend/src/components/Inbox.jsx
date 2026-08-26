@@ -99,6 +99,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   const [detail, setDetail] = useState(null)       // contacto con note + labels
   const [messages, setMessages] = useState([])
   const [loadingMsgs, setLoadingMsgs] = useState(false)
+  const [msgsErr, setMsgsErr] = useState(false)       // no se pudieron cargar los mensajes (red/servidor)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -163,8 +164,10 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
     setActive(c)
     setDetail(null)
     setLoadingMsgs(true)
+    setMsgsErr(false)
     setMessages([])
     api.getMessages(c.id).then((d) => {
+      if (d.ok === false) { setLoadingMsgs(false); setMsgsErr(true); return }   // red/servidor: aviso, no «vacío»
       const msgs = d.messages || []
       setMessages(msgs)
       setDetail(d.contact || null)
@@ -459,7 +462,13 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
 
             <div className="chat-body" ref={bodyRef}>
               {loadingMsgs && <div className="center-load"><div className="spinner" /></div>}
-              {!loadingMsgs && messages.length === 0 && <div className="empty" style={{ margin: 'auto' }}><p>No hay mensajes todavía en esta conversación.</p></div>}
+              {!loadingMsgs && msgsErr && (
+                <div className="empty" style={{ margin: 'auto' }}>
+                  <p>No se pudieron cargar los mensajes.</p>
+                  <button className="btn ghost sm" onClick={() => active && openChat(active)}>Reintentar</button>
+                </div>
+              )}
+              {!loadingMsgs && !msgsErr && messages.length === 0 && <div className="empty" style={{ margin: 'auto' }}><p>No hay mensajes todavía en esta conversación.</p></div>}
               {rows.map((r) => r.sep ? <div className="day-sep" key={r.id}><span>{r.sep}</span></div> : <Bubble key={r.m.id} m={r.m} />)}
             </div>
 
