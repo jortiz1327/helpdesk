@@ -12,7 +12,7 @@ const SOURCE_OPTS = [
   { value: 'phone', label: 'Teléfono del contacto' },
 ]
 const langName = (c) => ({ es: 'Español', es_ES: 'Español', en: 'Inglés', en_US: 'Inglés (US)', pt_BR: 'Portugués' }[c] || c)
-const catColor = (c) => ({ MARKETING: '#f4b740', UTILITY: '#4a9bff', AUTHENTICATION: '#9b6dff' }[c] || '#00a884')
+const catColor = (c) => ({ MARKETING: 'var(--warn)', UTILITY: 'var(--primary)', AUTHENTICATION: 'var(--info)' }[c] || 'var(--secondary)')
 
 // Extrae los textos de body/header de los componentes de Meta
 function templateText(t) {

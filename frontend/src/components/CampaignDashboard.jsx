@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import LockTip from './LockTip.jsx'
+import LoadError from './LoadError.jsx'
 
 const STATUS = {
   draft:     { t: 'Borrador', c: 'gray' },
@@ -27,7 +28,8 @@ function Detail({ id, onBack, onChange }) {
   const toast = useToast()
   const [c, setC] = useState(null)
   const [busy, setBusy] = useState(false)
-  const load = useCallback(() => { api.getCampaign(id).then((d) => d.ok && setC(d.campaign)) }, [id])
+  const [err, setErr] = useState(false)
+  const load = useCallback(() => { setErr(false); api.getCampaign(id).then((d) => d.ok ? setC(d.campaign) : setErr(true)) }, [id])
   useEffect(() => { load() }, [load])
 
   const run = async () => {
@@ -38,6 +40,12 @@ function Detail({ id, onBack, onChange }) {
     else toast(r.error || 'Error', 'err')
   }
 
+  if (err && !c) return (
+    <>
+      <header className="page-head"><button className="btn ghost sm" onClick={onBack}><Icon.send style={{ transform: 'rotate(180deg)' }} /> Volver</button></header>
+      <LoadError onRetry={load} msg="No se pudo cargar la campaña" />
+    </>
+  )
   if (!c) return <div className="center-load"><div className="spinner" /></div>
   const st = STATUS[c.status] || STATUS.draft
   const cnt = (...s) => c.recipients.filter((r) => s.includes(r.status)).length
@@ -92,7 +100,7 @@ function SendSafety() {
   const [s, setS] = useState(null)
   const [cap, setCap] = useState('')
 
-  useEffect(() => { api.getSettings().then((d) => { setS(d); setCap(String(d.daily_send_cap ?? 0)) }) }, [])
+  useEffect(() => { api.getSettings().then((d) => { if (d && d.ok !== false) { setS(d); setCap(String(d.daily_send_cap ?? 0)) } }) }, [])
   if (!s) return null
 
   const togglePause = async () => {
@@ -146,20 +154,21 @@ export default function CampaignDashboard({ onNew, user }) {
   const canManage = (user?.permissions || []).includes('settings.manage')
 
   const [gate, setGate] = useState(null)
-  const load = useCallback(() => { api.listCampaigns().then((d) => setList(d.campaigns || [])) }, [])
+  const [listErr, setListErr] = useState(false)
+  const load = useCallback(() => { setListErr(false); api.listCampaigns().then((d) => { if (d.ok !== false && d.campaigns) setList(d.campaigns); else { setList([]); setListErr(true) } }) }, [])
   useEffect(() => { load() }, [load])
   useEffect(() => { api.gating().then((d) => setGate(d?.ok ? d : null)) }, [])
   const waLocked = gate?.features?.wa_campaign   // WhatsApp sin configurar
 
   const del = async (id) => {
     if (!(await confirm({ title: 'Eliminar campaña', message: '¿Eliminar esta campaña y su historial de envíos?', danger: true, confirmText: 'Eliminar' }))) return
-    const r = await api.deleteCampaign(id); if (r.ok) { toast('Campaña eliminada'); load() }
+    const r = await api.deleteCampaign(id); if (r.ok) { toast('Campaña eliminada'); load() } else toast(r.error || 'No se pudo eliminar', 'err')
   }
   const cancel = async (id) => {
     if (!(await confirm({ title: 'Cancelar campaña', message: '¿Detener los envíos pendientes de esta campaña?', danger: true, confirmText: 'Cancelar envío' }))) return
-    const r = await api.cancelCampaign(id); if (r.ok) { toast('Campaña cancelada'); load() }
+    const r = await api.cancelCampaign(id); if (r.ok) { toast('Campaña cancelada'); load() } else toast(r.error || 'No se pudo cancelar', 'err')
   }
-  const run = async (id) => { const r = await api.runCampaign(id); if (r.ok) { toast(`Procesados: ${r.sent} enviados, ${r.failed} fallidos`); load() } }
+  const run = async (id) => { const r = await api.runCampaign(id); if (r.ok) { toast(`Procesados: ${r.sent} enviados, ${r.failed} fallidos`); load() } else toast(r.error || 'No se pudo procesar', 'err') }
 
   if (openId) return <Detail id={openId} onBack={() => { setOpenId(null); load() }} onChange={load} />
 
@@ -192,6 +201,7 @@ export default function CampaignDashboard({ onNew, user }) {
           {canManage && <SendSafety />}
 
           {list === null ? <div className="center-load"><div className="spinner" /></div> :
+            listErr ? <LoadError onRetry={load} msg="No se pudieron cargar las campañas" /> :
             list.length === 0 ? (
               <div className="empty"><div className="ico"><Icon.send /></div><p><b>Aún no hay campañas</b><br />Crea tu primera difusión para enviar plantillas a una agenda.</p>{waLocked ? <button className="btn gated" disabled><Icon.lock /> Nueva campaña</button> : <button className="btn" onClick={onNew}><Icon.plus /> Nueva campaña</button>}</div>
             ) : (

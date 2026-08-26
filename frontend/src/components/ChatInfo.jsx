@@ -124,7 +124,7 @@ export default function ChatInfo({ contact, messages, onClose, onUpdated }) {
                 const on = assigned.has(l.id)
                 return (
                   <span key={l.id} className="lbl-pick" onClick={() => toggleLabel(l.id)}
-                    style={{ background: on ? l.color : 'transparent', color: on ? '#04130c' : l.color, borderColor: l.color }}>
+                    style={{ background: on ? l.color : 'transparent', color: on ? '#0b141a' : l.color, borderColor: l.color }}>
                     {on && <span className="check">✓</span>}{l.name}
                   </span>
                 )

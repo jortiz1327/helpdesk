@@ -72,8 +72,12 @@ export default function InteractiveBuilder({ mode, onClose, onSend }) {
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal imodal">
         <div className="modal-head">
-          <h3>{isList ? '📋 Mensaje de lista' : '🔘 Mensaje con botones'}</h3>
-          <button className="x" onClick={onClose}>×</button>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isList
+              ? <><Icon.list style={{ width: 16, height: 16, fill: 'var(--primary)' }} /> Mensaje de lista</>
+              : <><Icon.checkSquare style={{ width: 16, height: 16, fill: 'var(--primary)' }} /> Mensaje con botones</>}
+          </h3>
+          <button className="icon-btn" onClick={onClose}>✕</button>
         </div>
 
         <div className="modal-body ib">

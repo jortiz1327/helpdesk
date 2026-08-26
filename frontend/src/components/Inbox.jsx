@@ -512,7 +512,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
           <div className="modal mpv">
             <div className="modal-head">
               <h3>Enviar {ATTACH.find((a) => a.type === mediaPreview.type)?.label.toLowerCase() || 'archivo'}</h3>
-              <button className="x" onClick={cancelMedia}>×</button>
+              <button className="icon-btn" onClick={cancelMedia}>✕</button>
             </div>
             <div className="modal-body">
               <div className="mpv-preview">

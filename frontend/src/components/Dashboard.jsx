@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { initials, avatarBg, relTime } from '../util.js'
+import LoadError from './LoadError.jsx'
 
 const DAY_NAMES = ['D', 'L', 'M', 'X', 'J', 'V', 'S']
 
@@ -19,9 +20,12 @@ function Sparkbars({ daily }) {
 export default function Dashboard({ user, onOpen }) {
   const [s, setS] = useState(null)
   const [tpls, setTpls] = useState(null)
+  const [err, setErr] = useState(false)
 
   const load = () => {
-    api.stats().then(setS)
+    setErr(false)
+    // stats.php en éxito trae .daily; ante fallo de red req() resuelve {ok:false} sin datos.
+    api.stats().then((d) => { if (d && d.daily) setS(d); else setErr(true) })
     api.listTemplates().then((d) => setTpls(d.ok ? (d.templates || []).length : 0))
   }
   useEffect(() => { load() }, [])
@@ -29,6 +33,7 @@ export default function Dashboard({ user, onOpen }) {
   const now = new Date()
   const updated = now.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
+  if (err && !s) return <LoadError onRetry={load} msg="No se pudo cargar el panel" />
   if (!s) return <div className="center-load"><div className="spinner" /></div>
 
   const maxAct = Math.max(1, ...s.daily.map((d) => d.total))

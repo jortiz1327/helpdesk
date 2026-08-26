@@ -43,7 +43,7 @@ export default function TemplatePicker({ onClose, onPick }) {
       <div className="modal">
         <div className="modal-head">
           <h3>{sel ? `Plantilla · ${sel.t.name}` : 'Enviar plantilla'}</h3>
-          <button className="x" onClick={onClose}>×</button>
+          <button className="icon-btn" onClick={onClose}>✕</button>
         </div>
 
         {!sel ? (

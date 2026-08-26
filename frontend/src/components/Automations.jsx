@@ -720,7 +720,7 @@ function ImportModal({ onClose, onPick }) {
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 520 }}>
-        <div className="modal-head"><h3>Importar plantilla de flujo</h3><button className="x" onClick={onClose}>×</button></div>
+        <div className="modal-head"><h3>Importar plantilla de flujo</h3><button className="icon-btn" onClick={onClose}>✕</button></div>
         <div className="modal-body">
           {FLOW_TEMPLATES.map((t, i) => (
             <div key={i} className="pick" onClick={() => onPick(t)}>
@@ -904,8 +904,8 @@ export default function Automations() {
   const load = useCallback(() => api.listFlows().then((d) => setFlows(d.flows || [])), [])
   useEffect(() => { load() }, [load])
 
-  const open = async (id) => { const d = await api.getFlow(id); if (d.ok) setEditing(d.flow) }
-  const del = async (id) => { if (!(await confirm({ title: 'Eliminar flujo', message: '¿Eliminar este flujo de automatización?', danger: true, confirmText: 'Eliminar' }))) return; const r = await api.deleteFlow(id); if (r.ok) { toast('Flujo eliminado'); load() } }
+  const open = async (id) => { const d = await api.getFlow(id); if (d.ok) setEditing(d.flow); else toast(d.error || 'No se pudo abrir el flujo', 'err') }
+  const del = async (id) => { if (!(await confirm({ title: 'Eliminar flujo', message: '¿Eliminar este flujo de automatización?', danger: true, confirmText: 'Eliminar' }))) return; const r = await api.deleteFlow(id); if (r.ok) { toast('Flujo eliminado'); load() } else toast(r.error || 'No se pudo eliminar', 'err') }
 
   if (editing !== undefined) {
     return <Editor flow={editing} onBack={() => { setEditing(undefined); load() }} />

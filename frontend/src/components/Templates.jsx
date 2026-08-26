@@ -119,7 +119,7 @@ export default function Templates() {
                             <LockTip info={gate.features.template_delete} />
                           </span>
                         ) : (
-                          <button className="btn ghost sm" style={{ color: 'var(--danger)', borderColor: '#f3d2cd' }} onClick={() => del(t.name)}>Eliminar</button>
+                          <button className="btn ghost sm" style={{ color: 'var(--danger)', borderColor: 'color-mix(in srgb, var(--danger) 38%, transparent)' }} onClick={() => del(t.name)}>Eliminar</button>
                         )}
                       </span>
                     </div>

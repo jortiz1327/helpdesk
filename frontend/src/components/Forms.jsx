@@ -258,8 +258,8 @@ export default function Forms() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  const open = async (id) => { const d = await api.getForm(id); if (d.ok) setEditing(d.form) }
-  const del = async (id) => { if (!(await confirm({ title: 'Eliminar formulario', message: '¿Eliminar este formulario y sus envíos?', danger: true, confirmText: 'Eliminar' }))) return; const r = await api.deleteForm(id); if (r.ok) { toast('Formulario eliminado'); load() } }
+  const open = async (id) => { const d = await api.getForm(id); if (d.ok) setEditing(d.form); else toast(d.error || 'No se pudo abrir el formulario', 'err') }
+  const del = async (id) => { if (!(await confirm({ title: 'Eliminar formulario', message: '¿Eliminar este formulario y sus envíos?', danger: true, confirmText: 'Eliminar' }))) return; const r = await api.deleteForm(id); if (r.ok) { toast('Formulario eliminado'); load() } else toast(r.error || 'No se pudo eliminar', 'err') }
   const sync = async () => { setSyncing(true); const r = await api.syncForms(); setSyncing(false); if (r.ok) { toast(`${r.imported} importados de ${r.found} en Meta`); load() } else toast(r.error || 'No se pudo sincronizar', 'err') }
   const [publishing, setPublishing] = useState(0)
   const publish = async (id) => { setPublishing(id); const r = await api.publishFormToMeta(id); setPublishing(0); if (r.ok) { toast('Formulario publicado como Flow en WhatsApp ✅'); load() } else toast(r.error || 'No se pudo publicar', 'err') }
@@ -296,9 +296,9 @@ export default function Forms() {
             ))}
           </div>
 
-          <div className="tabs" style={{ padding: '0 0 16px' }}>
-            <button className={`tab ${tab === 'forms' ? 'active' : ''}`} onClick={() => setTab('forms')}>Mis formularios ({forms?.length || 0})</button>
-            <button className={`tab ${tab === 'subs' ? 'active' : ''}`} onClick={() => setTab('subs')}>Envíos ({subs.length})</button>
+          <div className="kb-seg">
+            <button className={tab === 'forms' ? 'on' : ''} onClick={() => setTab('forms')}>Mis formularios ({forms?.length || 0})</button>
+            <button className={tab === 'subs' ? 'on' : ''} onClick={() => setTab('subs')}>Envíos ({subs.length})</button>
           </div>
 
           {tab === 'forms' && (
