@@ -6,7 +6,7 @@ import { useToast } from '../App.jsx'
 import LabelManager from './LabelManager.jsx'
 import Select from './Select.jsx'
 
-export default function ChatInfo({ contact, messages, onClose, onUpdated }) {
+export default function ChatInfo({ contact, messages, onClose, onUpdated, onSendForm, formsEnabled }) {
   const toast = useToast()
   const [editName, setEditName] = useState(false)
   const [nameVal, setNameVal] = useState(contact.name || '')
@@ -114,6 +114,18 @@ export default function ChatInfo({ contact, messages, onClose, onUpdated }) {
               <div className="wd"><Icon.clock style={{ width: 13, height: 13, fill: 'currentColor' }} /> {win.detail}</div>
             </div>
           </div>
+
+          {/* Enviar formulario (mismo selector que en la barra del chat) */}
+          {onSendForm && (
+            <div className="info-sec">
+              <div className="sec-t"><Icon.forms /> Formulario</div>
+              <button className="info-btn" disabled={!formsEnabled || !win.open} onClick={onSendForm}
+                title={!formsEnabled ? 'WhatsApp no configurado' : (!win.open ? 'La ventana de 24 h está cerrada' : '')}>
+                <Icon.forms /> Enviar formulario
+              </button>
+              {formsEnabled && !win.open && <div className="hint" style={{ marginTop: 6 }}>Necesitas una ventana de 24 h abierta para enviarlo.</div>}
+            </div>
+          )}
 
           {/* Labels */}
           <div className="info-sec">

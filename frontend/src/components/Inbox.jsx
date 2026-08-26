@@ -512,6 +512,8 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
           messages={messages}
           onClose={() => setShowInfo(false)}
           onUpdated={onContactUpdated}
+          onSendForm={() => setFormPicker(true)}
+          formsEnabled={!waLocked}
         />
       )}
 
