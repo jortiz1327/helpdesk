@@ -1061,6 +1061,8 @@ input, textarea, select { font-family: inherit; }
 .react-flow__controls button { background: var(--panel-2); border-bottom: 1px solid var(--line); fill: var(--ink-2); }
 .react-flow__controls button:hover { background: var(--hover); }
 .react-flow__minimap { background: var(--panel) !important; border-radius: 8px; }
+/* El grid de fondo del lienzo se adapta al tema (el CSS gana sobre el atributo color del SVG). */
+.react-flow__background circle { fill: var(--line-2); }
 
 .flow-node { width: 270px; background: var(--panel); border: 1.5px solid var(--line-2); border-top: 3px solid var(--nc); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); position: relative; }
 .flow-node.loose { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 8px 24px rgba(0,0,0,0.35); }

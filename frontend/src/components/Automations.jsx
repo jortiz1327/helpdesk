@@ -8,29 +8,29 @@ import Select from './Select.jsx'
 
 // ---- Definición de los nodos ----
 export const NODE_DEFS = {
-  initial: { label: 'Nodo inicial', cat: 'start', color: '#00a884', icon: Icon.dashboard, fixed: true,
+  initial: { label: 'Nodo inicial', cat: 'start', color: '#0ea5e9', icon: Icon.dashboard, fixed: true,
     fields: [] },
   send_message: { label: 'Enviar mensaje', cat: 'message', color: '#25d366', icon: Icon.send,
     fields: [{ k: 'message', t: 'textarea', label: 'Mensaje', ph: 'Escribe el mensaje… usa {{{senderName}}}' }] },
-  send_template: { label: 'Enviar plantilla', cat: 'message', color: '#00a884', icon: Icon.templates,
+  send_template: { label: 'Enviar plantilla', cat: 'message', color: '#0ea5e9', icon: Icon.templates,
     fields: [{ k: 'template', t: 'template', label: 'Plantilla aprobada' }] },
   send_buttons: { label: 'Enviar botones / lista', cat: 'message', color: '#25d366', icon: Icon.checkSquare, interactive: true, fields: [] },
-  send_form: { label: 'Enviar formulario WA', cat: 'message', color: '#00a884', icon: Icon.forms,
+  send_form: { label: 'Enviar formulario WA', cat: 'message', color: '#0ea5e9', icon: Icon.forms,
     fields: [
       { k: 'form_id', t: 'form', label: 'Formulario publicado' },
       { k: 'body', t: 'textarea', label: 'Mensaje de invitación (opcional)', ph: 'Por defecto usa la Descripción del formulario' },
       { k: 'cta', t: 'text', label: 'Texto del botón (máx. 30)', ph: 'Ver formulario' },
     ] },
-  http_request: { label: 'Petición API (HTTP)', cat: 'logic', color: '#4a9bff', icon: Icon.link, http: true, fields: [] },
+  http_request: { label: 'Petición API (HTTP)', cat: 'logic', color: '#2563eb', icon: Icon.link, http: true, fields: [] },
   agent_transfer: { label: 'Transferir a agente', cat: 'logic', color: '#f4b740', icon: Icon.user,
     fields: [
       { k: 'target', t: 'select', label: 'Asignar a', options: [['specific', 'Un agente concreto'], ['any', 'Reparto entre agentes']] },
       { k: 'user_id', t: 'agent', label: 'Agente', showIf: (d) => (d.target || 'specific') === 'specific' },
       { k: 'auto', t: 'select', label: 'Modo de reparto', options: [['auto', 'Automático (el menos cargado)'], ['manual', 'Sin asignar (lo coge cualquiera)']], showIf: (d) => d.target === 'any' },
     ] },
-  response_saver: { label: 'Guardar respuesta', cat: 'input', color: '#4a9bff', icon: Icon.note,
+  response_saver: { label: 'Guardar respuesta', cat: 'input', color: '#2563eb', icon: Icon.note,
     fields: [{ k: 'prompt', t: 'textarea', label: 'Pregunta (opcional)', ph: '¿Cuál es tu email?' }, { k: 'variable', t: 'text', label: 'Guardar en variable', ph: 'ej. email' }] },
-  route_type: { label: 'Según tipo de mensaje', cat: 'logic', color: '#9b6dff', icon: Icon.list, fields: [],
+  route_type: { label: 'Según tipo de mensaje', cat: 'logic', color: '#2563eb', icon: Icon.list, fields: [],
     outputs: [
       { id: 'text', label: '💬 Texto' }, { id: 'image', label: '🖼️ Imagen' }, { id: 'audio', label: '🎤 Audio' },
       { id: 'video', label: '🎬 Vídeo' }, { id: 'document', label: '📄 Documento' }, { id: 'other', label: '➕ Otro' },
@@ -45,7 +45,7 @@ export const NODE_DEFS = {
       { id: 'in', label: '🟢 Dentro de horario' },
       { id: 'out', label: '🔴 Fuera de horario' },
     ] },
-  condition: { label: 'Condición', cat: 'logic', color: '#a06bff', icon: Icon.bolt, branches: true,
+  condition: { label: 'Condición', cat: 'logic', color: '#2563eb', icon: Icon.bolt, branches: true,
     fields: [
       { k: 'variable', t: 'text', label: 'Variable', ph: '{{{senderMessage}}}' },
       { k: 'operator', t: 'select', label: 'Operador', options: [['contains', 'contiene'], ['equals', 'es igual a'], ['not_equals', 'no es igual a'], ['exists', 'existe']] },
@@ -58,7 +58,7 @@ export const NODE_DEFS = {
   delay: { label: 'Retraso', cat: 'logic', color: '#f4b740', icon: Icon.clock,
     fields: [{ k: 'seconds', t: 'number', label: 'Segundos', ph: '30' }] },
   reset_session: { label: 'Reiniciar sesión', cat: 'logic', color: '#25d366', icon: Icon.refresh, fields: [] },
-  mysql_query: { label: 'Consultar base de datos', cat: 'logic', color: '#4a9bff', icon: Icon.dashboard, mysql: true, fields: [] },
+  mysql_query: { label: 'Consultar base de datos', cat: 'logic', color: '#2563eb', icon: Icon.dashboard, mysql: true, fields: [] },
 }
 const CATS = [['all', 'Todos'], ['message', 'Mensaje'], ['input', 'Entrada'], ['logic', 'Lógica']]
 const SYSTEM_VARS = ['senderName', 'senderMessage', 'senderMobile', 'messageType']
@@ -118,9 +118,9 @@ function renderVarHL(text, flowVars) {
 // ---- Coloreado de aristas por rama (legibilidad del grafo) ----
 const EDGE_BRANCH = { yes: { c: '#25d366', l: 'Sí' }, no: { c: '#f25c54', l: 'No' }, fallback: { c: '#f4b740', l: '↩︎ Sin coincidencia' } }
 // (sin #f4b740: reservado para la rama "Sin coincidencia"/fallback)
-const OPT_PALETTE = ['#4a9bff', '#9b6dff', '#ff7ab6', '#37c8c3', '#ff9f43', '#a0d911', '#e056fd', '#54a0ff', '#2dd4bf', '#f472b6']
+const OPT_PALETTE = ['#2563eb', '#0ea5e9', '#25d366', '#f4b740', '#f25c54', '#8b5cf6', '#14b8a6', '#ec4899', '#f97316', '#84cc16']
 const ROUTE_LABEL = { text: '💬 Texto', image: '🖼️ Imagen', audio: '🎤 Audio', video: '🎬 Vídeo', document: '📄 Doc', sticker: '🏷️ Sticker', other: '➕ Otro' }
-const EDGE_DEFAULT_COLOR = '#5b7083'
+const EDGE_DEFAULT_COLOR = '#64748b'
 
 // Calcula color + etiqueta de una arista según el nodo origen y su handle.
 function edgeBranch(srcNode, handle) {
@@ -235,7 +235,7 @@ function NodeWeekdays({ value, onChange }) {
         const on = sel.includes(n)
         return (
           <button key={n} onClick={() => toggle(n)} title={lbl}
-            style={{ width: 26, height: 26, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--nc)', background: on ? 'var(--nc)' : 'transparent', color: on ? '#04130c' : 'var(--ink-2)' }}>{lbl}</button>
+            style={{ width: 26, height: 26, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--nc)', background: on ? 'var(--nc)' : 'transparent', color: on ? '#0b141a' : 'var(--ink-2)' }}>{lbl}</button>
         )
       })}
     </div>
@@ -417,7 +417,7 @@ function CustomNode({ id, data }) {
         {labels.length === 0 && <span className="nd-hint">No hay etiquetas</span>}
         {labels.map((l) => {
           const on = (data.labels || []).includes(l.id)
-          return <span key={l.id} className="nd-lbl" style={{ background: on ? l.color : 'transparent', color: on ? '#04130c' : l.color, borderColor: l.color }}
+          return <span key={l.id} className="nd-lbl" style={{ background: on ? l.color : 'transparent', color: on ? '#0b141a' : l.color, borderColor: l.color }}
             onClick={() => set('labels', on ? (data.labels || []).filter((x) => x !== l.id) : [...(data.labels || []), l.id])}>{l.name}</span>
         })}
       </div>
@@ -445,7 +445,7 @@ function CustomNode({ id, data }) {
           <>
             <div className="nd-flabel">Se activa con</div>
             <div className="nd-trigger"><Icon.chat style={{ width: 14, height: 14, fill: 'var(--primary)' }} /> Mensaje entrante de WhatsApp</div>
-            <div className="nd-vars"><div className="nd-vars-t"><Icon.bolt style={{ width: 13, height: 13, fill: '#4a9bff' }} /> Variables disponibles</div>
+            <div className="nd-vars"><div className="nd-vars-t"><Icon.bolt style={{ width: 13, height: 13, fill: 'var(--primary)' }} /> Variables disponibles</div>
               <div className="nd-vars-list">{(allVars.length ? allVars : SYSTEM_VARS).map((v) => <span key={v} className={`nd-var ${varKind(v, flowVars)}`}>{`{{{${v}}}}`}</span>)}</div>
               <div className="nd-vars-legend"><span className="nd-var sys">del sistema</span><span className="nd-var custom">creadas por ti</span></div>
             </div>
@@ -811,7 +811,7 @@ function Editor({ flow, onBack }) {
         labelBgPadding: [6, 3],
         labelBgBorderRadius: 6,
         labelStyle: { fill: c, fontWeight: 700, fontSize: 10.5, opacity: dim ? 0.15 : 1 },
-        labelBgStyle: { fill: '#0e1621', opacity: dim ? 0.15 : 0.92 },
+        labelBgStyle: { fill: 'var(--panel)', opacity: dim ? 0.15 : 0.92 },
       }
     })
   }, [edges, nodes])

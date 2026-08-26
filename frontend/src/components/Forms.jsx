@@ -269,10 +269,10 @@ export default function Forms() {
   }
 
   const CARDS = [
-    { k: 'Total formularios', v: stats.total, c: '#00a884' },
-    { k: 'Publicados', v: stats.published, c: '#25d366' },
-    { k: 'Borradores', v: stats.drafts, c: '#f4b740' },
-    { k: 'Envíos', v: stats.submissions, c: '#4a9bff' },
+    { k: 'Total formularios', v: stats.total, c: 'var(--info)' },
+    { k: 'Publicados', v: stats.published, c: 'var(--secondary)' },
+    { k: 'Borradores', v: stats.drafts, c: 'var(--warn)' },
+    { k: 'Envíos', v: stats.submissions, c: 'var(--primary)' },
   ]
 
   return (

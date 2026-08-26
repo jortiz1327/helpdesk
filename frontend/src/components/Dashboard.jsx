@@ -34,10 +34,10 @@ export default function Dashboard({ user, onOpen }) {
   const maxAct = Math.max(1, ...s.daily.map((d) => d.total))
 
   const cards = [
-    { key: 'c', label: 'Conversaciones', value: s.contacts, icon: Icon.chat, color: '#00a884', sub: 'Contactos totales' },
-    { key: 'u', label: 'Sin leer', value: s.unread, icon: Icon.message, color: '#25d366', sub: `${s.unread_chats} chats pendientes` },
-    { key: 'm', label: 'Mensajes (7 días)', value: s.daily.reduce((a, d) => a + d.total, 0), icon: Icon.bolt, color: '#4a9bff', spark: true },
-    { key: 't', label: 'Plantillas', value: tpls === null ? '…' : tpls, icon: Icon.templates, color: '#f4b740', sub: 'Aprobadas en Meta' },
+    { key: 'c', label: 'Conversaciones', value: s.contacts, icon: Icon.chat, color: 'var(--info)', sub: 'Contactos totales' },
+    { key: 'u', label: 'Sin leer', value: s.unread, icon: Icon.message, color: 'var(--secondary)', sub: `${s.unread_chats} chats pendientes` },
+    { key: 'm', label: 'Mensajes (7 días)', value: s.daily.reduce((a, d) => a + d.total, 0), icon: Icon.bolt, color: 'var(--primary)', spark: true },
+    { key: 't', label: 'Plantillas', value: tpls === null ? '…' : tpls, icon: Icon.templates, color: 'var(--warn)', sub: 'Aprobadas en Meta' },
   ]
 
   return (
@@ -64,7 +64,7 @@ export default function Dashboard({ user, onOpen }) {
               <div className="stat-card" key={c.key}>
                 <div className="stat-top">
                   <span className="stat-label">{c.label}</span>
-                  <span className="stat-ico" style={{ background: c.color + '22', color: c.color }}><c.icon /></span>
+                  <span className="stat-ico" style={{ background: `color-mix(in srgb, ${c.color} 14%, transparent)`, color: c.color }}><c.icon /></span>
                 </div>
                 <div className="stat-num">{c.value}</div>
                 {c.spark ? <Sparkbars daily={s.daily} /> : <div className="stat-sub">{c.sub}</div>}
