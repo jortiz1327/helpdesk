@@ -1647,6 +1647,7 @@ class TicketsController extends Controller
                     'id'           => (int) $u->id,
                     'name'         => $u->name ?: $u->email,
                     'email'        => $u->email,
+                    'active'       => (bool) $u->active,   // false = ya no está (ex-empleado / histórico)
                     'role'         => $u->roleName(),
                     'role_label'   => config("rbac.roles.{$u->roleName()}.label"),
                     'total'        => $total,

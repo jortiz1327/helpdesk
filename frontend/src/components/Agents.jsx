@@ -38,8 +38,8 @@ export default function Agents({ onSeeTickets }) {
 
   const agents = (d.agents || [])
     .filter((a) => filter === 'all' || loadOf(a.open).k === filter)
-    // Menos cargado primero: es a quien hay que darle el siguiente ticket
-    .sort((a, b) => a.open - b.open || b.total - a.total)
+    // Por TOTAL de tickets (desc); a igualdad, el menos cargado primero.
+    .sort((a, b) => b.total - a.total || a.open - b.open)
 
   return (
     <>
@@ -85,14 +85,16 @@ export default function Agents({ onSeeTickets }) {
           {agents.map((a) => {
             const load = loadOf(a.open)
             return (
-              <div key={a.id} className="card ag-card">
+              <div key={a.id} className={`card ag-card ${a.active === false ? 'ag-off' : ''}`}>
                 <div className="ag-head">
                   <span className="ag-av">{a.name.slice(0, 1).toUpperCase()}</span>
                   <div className="ag-id">
                     <b>{a.name}</b>
                     <small>{a.email}</small>
                   </div>
-                  <span className={`chip load-${load.k}`}>{load.label}</span>
+                  {a.active === false
+                    ? <span className="chip ag-off-tag" title="Ya no trabaja aquí — se conserva por el histórico">Ya no está</span>
+                    : <span className={`chip load-${load.k}`}>{load.label}</span>}
                 </div>
 
                 <div className="ag-kpis">

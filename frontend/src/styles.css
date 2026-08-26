@@ -2524,6 +2524,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 
 .ag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px; }
 .ag-card { padding: 18px; display: flex; flex-direction: column; }
+/* Agente que ya no está: se conserva por el histórico, atenuado y marcado. */
+.ag-card.ag-off { opacity: .62; border-style: dashed; }
+.ag-card.ag-off:hover { opacity: .9; }
+.chip.ag-off-tag { background: var(--hover); color: var(--ink-3); }
 .ag-head { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
 .ag-av { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--primary), #3b82f6); }
 .ag-id { flex: 1; min-width: 0; }
