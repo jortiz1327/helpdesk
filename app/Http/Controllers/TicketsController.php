@@ -616,9 +616,12 @@ class TicketsController extends Controller
     /** Catálogos para los filtros y los selectores. */
     protected function meta()
     {
+        // Van TODOS (para resolver el nombre de un asignado que ya no está), con el flag
+        // `active`: el frontend solo ofrece los activos en «asignar», pero sigue mostrando
+        // el nombre del inactivo en los tickets históricos.
         $users = User::with('roles.permissions', 'permissions')->orderByRaw('name IS NULL, name ASC, email ASC')->get()
             ->filter(fn ($u) => $u->can('helpdesk.access'))
-            ->map(fn ($u) => ['id' => (int) $u->id, 'name' => $u->name ?: $u->email])
+            ->map(fn ($u) => ['id' => (int) $u->id, 'name' => $u->name ?: $u->email, 'active' => (bool) $u->active])
             ->values();
 
         return response()->json([

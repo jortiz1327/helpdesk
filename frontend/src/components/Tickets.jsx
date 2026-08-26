@@ -224,6 +224,17 @@ const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', la
  * Si no, un botón que abre el menú de presets (esta tarde, el lunes, hasta que
  * responda…) con fecha a medida y un motivo corto opcional.
  */
+// Opciones del desplegable de ASIGNAR: solo agentes activos. Si el ticket ya está
+// asignado a alguien que «ya no está», se mantiene en la lista (marcado) para no perder
+// el nombre ni reasignarlo sin querer al guardar.
+function opcionesAsignar(users, currentId) {
+  const us = users || []
+  const opts = us.filter((u) => u.active !== false).map((u) => ({ value: String(u.id), label: u.name }))
+  const cur = currentId ? us.find((u) => String(u.id) === String(currentId)) : null
+  if (cur && cur.active === false) opts.unshift({ value: String(cur.id), label: `${cur.name} (ya no está)` })
+  return [{ value: '', label: 'Sin asignar' }, ...opts]
+}
+
 function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
   const [open, setOpen] = useState(false)
   const [custom, setCustom] = useState(false)
@@ -860,7 +871,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                 <div style={{ minWidth: 170 }}>
                   <Select sm block value="" placeholder="Asignar a…"
                     onChange={(uid) => bulk({ op: 'assign', user_id: uid || null }, 'Asignados')}
-                    options={[{ value: '', label: 'Sin asignar' }, ...(meta?.users || []).map((u) => ({ value: String(u.id), label: u.name }))]} />
+                    options={opcionesAsignar(meta?.users)} />
                 </div>
               )}
               {/* Etiquetar en lote: pone la etiqueta elegida a todos los seleccionados
@@ -992,7 +1003,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                           {can('tickets.assign') ? (
                             <Select sm block value={String(t.assigned_to || '')}
                               onChange={(uid) => quickAssign(t.id, uid)}
-                              options={[{ value: '', label: 'Sin asignar' }, ...(meta?.users || []).map((u) => ({ value: String(u.id), label: u.name }))]} />
+                              options={opcionesAsignar(meta?.users, t.assigned_to)} />
                           ) : (t.agent_name || <span className="tk-time">Sin asignar</span>)}
                         </td>
                         <td>{prChip(t.priority, meta)}</td>
@@ -1563,7 +1574,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                   <div className="field">
                     <span className="lbl">Asignado a</span>
                     <Select block value={String(t.assigned_to || '')} onChange={assign}
-                      options={[{ value: '', label: 'Sin asignar' }, ...(meta?.users || []).map((u) => ({ value: String(u.id), label: u.name }))]} />
+                      options={opcionesAsignar(meta?.users, t.assigned_to)} />
                   </div>
                 ) : (
                   <div className="tkm-row"><span>Asignado a</span><b>{t.agent_name || 'Sin asignar'}</b></div>

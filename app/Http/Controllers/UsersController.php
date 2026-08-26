@@ -52,6 +52,7 @@ class UsersController extends Controller
                         'email'        => $u->email,
                         'role'         => $role,
                         'role_label'   => $role ? ($labels[$role] ?: $role) : '—',
+                        'active'       => (bool) $u->active,   // false = ya no está (ex-empleado / histórico)
                         'category_ids' => $userCats[$u->id] ?? [],
                         'view_all'     => $u->can('tickets.view_all'),
                         'notify_sla'      => (bool) $u->notify_sla,

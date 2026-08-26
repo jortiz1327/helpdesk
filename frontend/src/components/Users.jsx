@@ -226,7 +226,7 @@ export default function Users() {
                   const verTodo = roleOf(u.role)?.is_super || u.view_all
                   const areas = (u.category_ids || []).map((id) => cats.find((c) => c.id === id)?.name).filter(Boolean)
                   return (
-                    <div key={u.id} className="um-card" style={{ '--role': colorDe(u) }}>
+                    <div key={u.id} className={`um-card ${u.active === false ? 'um-off' : ''}`} style={{ '--role': colorDe(u) }}>
                       <div className="um-accent" />
                       <div className="um-cbody">
                         <div className="um-head">
@@ -235,7 +235,9 @@ export default function Users() {
                             <div className="um-name">{u.name || u.email}</div>
                             <div className="um-email">{u.email}</div>
                           </div>
-                          <span className="um-rolechip">{u.role_label || '—'}</span>
+                          {u.active === false
+                            ? <span className="um-off-tag" title="Ya no trabaja aquí — se conserva para el histórico">Ya no está</span>
+                            : <span className="um-rolechip">{u.role_label || '—'}</span>}
                         </div>
 
                         <div className="um-areas">
