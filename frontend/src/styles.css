@@ -526,6 +526,10 @@ input, textarea, select { font-family: inherit; }
 .pick:hover { border-color: var(--primary); background: var(--hover); }
 .pick .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .pick .body { color: var(--ink-2); font-size: 13px; margin-top: 7px; white-space: pre-wrap; line-height: 1.5; }
+/* Selector de formularios: fila no enviable (sin Flow en WhatsApp) y CTA de la vista previa. */
+.pick.fp-dis { opacity: 0.5; cursor: not-allowed; }
+.pick.fp-dis:hover { border-color: var(--line-2); background: none; }
+.fp-cta { margin-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 7px; text-align: center; color: #53bdeb; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .color-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent; transition: 0.12s; }
 .color-dot.sel { border-color: #fff; transform: scale(1.1); }

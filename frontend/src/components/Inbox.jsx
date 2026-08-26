@@ -5,6 +5,7 @@ import { initials, avatarBg, relTime, clockTime, dayLabel, parseDate } from '../
 import { useToast, useConfirm } from '../App.jsx'
 import TemplatePicker from './TemplatePicker.jsx'
 import InteractiveBuilder from './InteractiveBuilder.jsx'
+import FormPicker from './FormPicker.jsx'
 import ChatInfo from './ChatInfo.jsx'
 import Select from './Select.jsx'
 
@@ -108,6 +109,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   const [attachMenu, setAttachMenu] = useState(false)
   const [botMenu, setBotMenu] = useState(false)
   const [ibMode, setIbMode] = useState(null)          // 'button' | 'list'
+  const [formPicker, setFormPicker] = useState(false) // selector «Enviar formulario»
   const [mediaPreview, setMediaPreview] = useState(null) // { file, type, url, caption }
 
   const fileRef = useRef(null)
@@ -265,6 +267,15 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
       pushOut({ id: res.message_id, direction: 'out', type: 'interactive', body: interactive.body?.text || '', payload: JSON.stringify(interactive), status: 'sent', created_at: nowStamp() })
       setIbMode(null); loadConvs(query)
     } else toast(res.error || 'No se pudo enviar', 'err')
+    return res
+  }
+
+  // ---- Enviar formulario de WhatsApp (Flow) ----
+  const sendForm = async ({ id, body, cta }) => {
+    if (!active) return { ok: false }
+    const res = await api.sendFormFlow({ id, contact_id: active.id, to: active.wa_id, body, cta })
+    if (res.ok) { setFormPicker(false); toast('Formulario enviado'); loadConvs(query) }
+    else toast(res.error || 'No se pudo enviar el formulario', 'err')
     return res
   }
 
@@ -481,6 +492,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
                   )}
                 </div>
                 <button className="round tpl" title="Enviar plantilla" disabled={waLocked} onClick={() => setPickerOpen(true)}><Icon.templates /></button>
+                <button className="round" title="Enviar formulario" disabled={windowClosed || waLocked} onClick={() => setFormPicker(true)}><Icon.forms /></button>
               </div>
               <textarea placeholder={waLocked ? 'WhatsApp no configurado' : 'Escribe un mensaje'} value={draft} rows={1} disabled={waLocked}
                 onChange={(e) => setDraft(e.target.value)}
@@ -506,6 +518,8 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
       {pickerOpen && <TemplatePicker onClose={() => setPickerOpen(false)} onPick={sendTemplate} />}
 
       {ibMode && <InteractiveBuilder mode={ibMode} onClose={() => setIbMode(null)} onSend={sendInteractive} />}
+
+      {formPicker && <FormPicker onClose={() => setFormPicker(false)} onSend={sendForm} />}
 
       {mediaPreview && (
         <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && cancelMedia()}>
