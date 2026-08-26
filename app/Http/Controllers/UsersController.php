@@ -106,6 +106,19 @@ class UsersController extends Controller
                     return response()->json(['ok' => false, 'error' => 'La contraseña debe tener al menos 8 caracteres'], 400);
                 }
 
+                // Habilitar / deshabilitar (soft): un ex-empleado se marca inactivo sin
+                // borrarlo (conserva su atribución). Solo se toca si viene en la petición.
+                if ($request->has('active')) {
+                    $wantActive = $request->boolean('active');
+                    if (!$wantActive && $target->id === (int) $request->user()->id) {
+                        return response()->json(['ok' => false, 'error' => 'No puedes deshabilitar tu propia cuenta'], 400);
+                    }
+                    if (!$wantActive && $target->isSuperAdmin() && $this->superCount() <= 1) {
+                        return response()->json(['ok' => false, 'error' => 'Debe quedar al menos un superadministrador'], 400);
+                    }
+                    $target->active = $wantActive;
+                }
+
                 $target->name = $name ?: null;
                 $target->email = $email;
                 $target->notify_sla = $request->boolean('notify_sla', true);

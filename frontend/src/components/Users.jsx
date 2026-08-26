@@ -71,6 +71,15 @@ export default function Users() {
       password: '', category_ids: u.category_ids || [], notify_sla: !u.notify_sla, notify_assigned: u.notify_assigned })
     if (r.ok) load(); else toast(r.error || 'Error', 'err')
   }
+  // Deshabilitar / habilitar un usuario (soft): un empleado que se va se marca «ya no está»
+  // sin borrarlo (conserva su histórico y atribución) y deja de salir en «asignar».
+  const toggleActive = async (u) => {
+    const habilitar = u.active === false
+    if (!habilitar && !(await confirm({ title: 'Deshabilitar usuario', message: `¿Deshabilitar a «${u.name || u.email}»? Dejará de poder acceder y de recibir tickets nuevos, pero se conserva para el histórico. Podrás volver a habilitarlo.`, confirmText: 'Deshabilitar' }))) return
+    const r = await api.saveUser({ id: u.id, name: u.name || '', email: u.email, role: u.role,
+      password: '', category_ids: u.category_ids || [], notify_sla: u.notify_sla, notify_assigned: u.notify_assigned, active: habilitar })
+    if (r.ok) { toast(habilitar ? 'Usuario habilitado' : 'Usuario deshabilitado'); load() } else toast(r.error || 'Error', 'err')
+  }
   const visibles = (users || []).filter((u) => {
     if (grupo !== 'all' && grupoDe(u) !== grupo) return false
     if (q.trim() && !`${u.name || ''} ${u.email || ''}`.toLowerCase().includes(q.trim().toLowerCase())) return false
@@ -261,6 +270,9 @@ export default function Users() {
                           <span className={`um-sw ${u.notify_sla ? 'on' : ''}`} />
                         </button>
                         <span className="um-foot-sp" />
+                        {u.active === false
+                          ? <button className="icon-btn" title="Habilitar de nuevo" style={{ color: 'var(--secondary)' }} onClick={() => toggleActive(u)}><Icon.check /></button>
+                          : <button className="icon-btn" title="Deshabilitar (marcar como que ya no está)" onClick={() => toggleActive(u)}><Icon.lock /></button>}
                         <button className="icon-btn" title="Editar" onClick={() => setForm({ id: u.id, name: u.name || '', email: u.email || '', role: u.role || defRole, password: '', category_ids: u.category_ids || [], notify_sla: !!u.notify_sla, notify_assigned: !!u.notify_assigned })}><Icon.pencil /></button>
                         <button className="icon-btn" title="Eliminar" style={{ color: 'var(--danger)' }} onClick={() => del(u)}><Icon.trash /></button>
                       </div>

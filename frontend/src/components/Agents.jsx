@@ -38,8 +38,13 @@ export default function Agents({ onSeeTickets }) {
 
   const agents = (d.agents || [])
     .filter((a) => filter === 'all' || loadOf(a.open).k === filter)
-    // Por TOTAL de tickets (desc); a igualdad, el menos cargado primero.
-    .sort((a, b) => b.total - a.total || a.open - b.open)
+    // Primero los que SIGUEN (disponibles); los «ya no está» al final. Dentro de cada
+    // grupo, por total de tickets (desc) y, a igualdad, el menos cargado primero.
+    .sort((a, b) => {
+      const aOff = a.active === false, bOff = b.active === false
+      if (aOff !== bOff) return aOff ? 1 : -1
+      return b.total - a.total || a.open - b.open
+    })
 
   return (
     <>
