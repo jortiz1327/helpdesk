@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Memoria de RESPUESTAS EFECTIVAS. El agente marca con ⭐ una respuesta enviada que
  * funcionó; se guarda con la categoría y las palabras clave del caso. Luego, en tickets
- * parecidos, se SUGIEREN (aquí y también a la IA vía [[ClaudeBrain]]).
+ * parecidos, se SUGIEREN al agente en el compositor («Parecidas»).
  *
  * Guardar/sugerir/usar → cualquiera que pueda responder (tickets.reply). Gestionar el
  * catálogo (listar/borrar) → support.config, comprobado dentro.

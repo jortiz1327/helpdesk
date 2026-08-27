@@ -19,8 +19,6 @@ class FeaturesController extends Controller
 {
     /** Interruptores que este panel puede cambiar, con su tipo. */
     protected const TOGGLES = [
-        'ia_activa'             => 'bool',
-        'soporteqa_activo'      => 'bool',
         'sla_active'            => 'bool',
         'sla_alerts_active'     => 'bool',
         'sla_escalate_active'   => 'bool',
@@ -45,17 +43,9 @@ class FeaturesController extends Controller
     {
         $g = fn (string $k, string $d = '0') => (string) Setting::get($k, $d);
 
-        $iaKey = trim($g('ia_api_key', '')) !== '';
-        $qaKey = trim($g('soporteqa_key', '')) !== '';
         $buzon = EmailAccount::where('active', true)->whereNotNull('smtp_host')->exists();
 
         $grupos = [
-            ['grupo' => 'Inteligencia artificial', 'items' => [
-                $this->flag('ia_activa', 'bool', 'Agente de IA', 'Claude redacta borradores con FAQs, historial y plantillas.',
-                    $g('ia_activa') === '1', $iaKey ? null : 'Falta la clave de API — ponla en «Agente IA → Ajustes».'),
-                $this->flag('soporteqa_activo', 'bool', 'Lector de fotos (soporteQA)', 'Lee el código de la etiqueta en la foto del cliente.',
-                    $g('soporteqa_activo') === '1', $qaKey ? null : 'Falta la clave de soporteQA.'),
-            ]],
             ['grupo' => 'SLA', 'items' => [
                 $this->flag('sla_active', 'bool', 'SLA', 'Relojes de primera respuesta y de resolución.', $g('sla_active', '1') === '1'),
                 $this->flag('sla_alerts_active', 'bool', 'Avisos de SLA por correo', 'Correos «por vencer» y «vencido».', $g('sla_alerts_active', '1') === '1'),

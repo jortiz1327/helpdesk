@@ -10,11 +10,10 @@ import InfoTip from './InfoTip.jsx'
  * chat/flujos). Cada campo lleva su pista (?) para poder configurarlo a mano.
  * ---------------------------------------------------------------------- */
 
-const FUNC = { soporte: { label: 'Helpdesk / Soporte', color: '#2563eb', icon: Icon.headset, hint: 'crea tickets' },
-               campanas: { label: 'Campañas',          color: '#12925a', icon: Icon.send,    hint: 'chat en vivo / flujos' } }
-const funcOf = (k) => FUNC[k] || FUNC.soporte
+const FUNC = { campanas: { label: 'Campañas', color: '#12925a', icon: Icon.send, hint: 'chat en vivo / flujos' } }
+const funcOf = (k) => FUNC[k] || FUNC.campanas
 
-const blank = { id: 0, label: '', phone_number_id: '', funcion: 'soporte', entorno: 'prueba', token: '', app_secret: '', waba_id: '', app_id: '', active: true }
+const blank = { id: 0, label: '', phone_number_id: '', funcion: 'campanas', entorno: 'prueba', token: '', app_secret: '', waba_id: '', app_id: '', active: true }
 
 export default function WhatsAppNumbers() {
   const toast = useToast()
@@ -72,7 +71,7 @@ export default function WhatsAppNumbers() {
       {rows === null ? <div className="center-load"><div className="spinner" /></div> : rows.length === 0 ? (
         <div className="wa-num-empty">
           <Icon.message style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
-          <p>Aún no hay números. Añade el de <b>Soporte</b> (al menos el de prueba de Meta) para recibir tickets por WhatsApp.</p>
+          <p>Aún no hay números. Añade el de <b>Campañas</b> (al menos el de prueba de Meta) para el chat en vivo y las difusiones.</p>
         </div>
       ) : (
         <div className="wa-num-list">
@@ -113,13 +112,10 @@ export default function WhatsAppNumbers() {
             <div className="modal-head"><h3>{form.id ? 'Editar número' : 'Añadir número de WhatsApp'}</h3><button className="x" onClick={() => setForm(null)}>×</button></div>
             <div className="modal-body">
               <div className="grid2">
-                <label className="field"><span className="lbl">Etiqueta <em>*</em> <InfoTip text="Un nombre para reconocerlo, p. ej. «Soporte» o «Campañas»." /></span>
-                  <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="Soporte" autoFocus /></label>
-                <label className="field"><span className="lbl">Función <InfoTip text="A qué módulo van los mensajes de este número. Soporte crea tickets; Campañas alimenta el chat en vivo y los flujos." /></span>
-                  <select value={form.funcion} onChange={(e) => setForm((f) => ({ ...f, funcion: e.target.value }))}>
-                    <option value="soporte">Helpdesk / Soporte</option>
-                    <option value="campanas">Campañas</option>
-                  </select></label>
+                <label className="field"><span className="lbl">Etiqueta <em>*</em> <InfoTip text="Un nombre para reconocerlo, p. ej. «Campañas»." /></span>
+                  <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="Campañas" autoFocus /></label>
+                <label className="field"><span className="lbl">Función <InfoTip text="Los mensajes de este número alimentan el chat en vivo y los flujos de Campañas." /></span>
+                  <input value="Campañas" readOnly disabled /></label>
               </div>
 
               <div className="grid2">

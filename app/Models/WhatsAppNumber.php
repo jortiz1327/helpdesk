@@ -14,7 +14,7 @@ class WhatsAppNumber extends Model
     protected $guarded = [];
     protected $casts = ['active' => 'boolean'];
 
-    public const FUNCIONES = ['soporte', 'campanas'];
+    public const FUNCIONES = ['campanas'];   // WhatsApp solo alimenta Campañas (esta edición no usa WhatsApp de soporte)
 
     /** ¿Hay al menos un número configurado y activo? Decide si se enruta o se usa el legacy. */
     public static function hayConfigurados(): bool

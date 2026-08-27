@@ -182,49 +182,15 @@ class WebhookController extends Controller
             return;
         }
 
-        // Valoración CSAT por WhatsApp: el cliente tocó una estrella de la lista que le
-        // mandamos al resolver. El id es «csat:{ticket}:{nota}». Se guarda la nota y se
-        // dan las gracias, SIN crear mensaje ni reabrir el ticket.
-        if ($replyId && str_starts_with($replyId, 'csat:')) {
-            $p = explode(':', $replyId);
-            $tid = (int) ($p[1] ?? 0);
-            $score = (int) ($p[2] ?? 0);
-            if ($tid && $score >= 1 && $score <= 5) {
-                [$ok] = app(\App\Services\PortalService::class)->setRating($tid, $score, null);
-                $this->wa->paraFuncion('soporte')->sendText($from, $ok
-                    ? '¡Gracias por tu valoración! 🙏 Nos ayuda a mejorar.'
-                    : 'Gracias por responder 🙌');
-                if ($ok) $this->tickets->broadcast('message', $tid);   // refresca la ficha
-            }
-            return;
-        }
-
-        /*
-         * ENRUTADO POR FUNCIÓN (opción B):
-         *  · SOPORTE  → crea/actualiza un TICKET (Helpdesk, se atiende a mano).
-         *  · CAMPAÑAS → es CHAT («Chat en vivo»): el mensaje va SUELTO (sin ticket) y
-         *    lo gestiona el bot / los flujos. Por eso un número de campañas NO crea
-         *    tickets (antes se creaba siempre, ese era el bug).
-         */
-        $ticketId = $funcion === 'soporte'
-            ? $this->tickets->routeIncoming($contactId, 'whatsapp', $body ?: "[$type]")
-            : null;
-        $opts['ticket_id'] = $ticketId;
+        // En esta edición WhatsApp SOLO alimenta Campañas: el mensaje entra como CHAT
+        // («Chat en vivo»), NUNCA crea un ticket. Los tickets solo nacen por web o correo.
+        $opts['ticket_id'] = null;
         $opts['channel'] = 'whatsapp';
-        $opts['funcion'] = $funcion;   // soporte → Helpdesk · campanas → «Chat en vivo»
+        $opts['funcion'] = $funcion;   // siempre 'campanas'
 
         ChatService::storeMessage($contactId, $from, 'in', $type, $body, $opts);
 
-        // Aviso en tiempo real del ticket (solo soporte; campañas se ve en Chat en vivo).
-        if ($ticketId) $this->tickets->broadcast('message', $ticketId);
-
-        // SOPORTE (opción B): el número de tickets NO ejecuta el bot ni el
-        // consentimiento de campañas. La conversación ya es un ticket y se atiende a
-        // mano. Todo lo de abajo (formularios, consentimiento, bajas, motor de flujos)
-        // es de CAMPAÑAS.
-        if ($funcion !== 'campanas') {
-            return;
-        }
+        // A partir de aquí: formularios, consentimiento, bajas y motor de flujos (Campañas).
 
         // Campañas es chat: las respuestas del bot también van sueltas (sin ticket).
         $out = ['channel' => 'whatsapp', 'status' => 'sent'];

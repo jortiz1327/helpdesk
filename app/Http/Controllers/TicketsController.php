@@ -924,14 +924,7 @@ class TicketsController extends Controller
 
         $svc = app(\App\Services\TicketReplyService::class);
 
-        // Canal WhatsApp: candado por nivel (necesita número de soporte). El envío lo
-        // hace el servicio; el candado y los permisos son de la frontera HTTP (aquí).
-        if ($t->channel === 'whatsapp') {
-            if ($g = \App\Services\GatingService::guard('wa_ticket_reply')) return $g;
-            return $this->respuesta($svc->porWhatsapp($t, $html, (array) $files, $me));
-        }
-
-        // De momento el resto solo se responde por CORREO (los demás canales aún no envían).
+        // Los tickets solo se responden por CORREO (web/otros canales aún no envían).
         if ($t->channel !== 'email') {
             return response()->json(['ok' => false, 'error' => 'El envío para el canal «' . $t->channel . '» aún no está disponible'], 422);
         }

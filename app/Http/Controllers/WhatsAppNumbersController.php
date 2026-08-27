@@ -30,7 +30,6 @@ class WhatsAppNumbersController extends Controller
             'ok'      => true,
             'numbers' => WhatsAppNumber::orderBy('id')->get(),
             'funciones' => [
-                ['value' => 'soporte',  'label' => 'Helpdesk / Soporte'],
                 ['value' => 'campanas', 'label' => 'Campañas'],
             ],
         ]);
@@ -40,9 +39,9 @@ class WhatsAppNumbersController extends Controller
     {
         $label   = trim((string) $request->input('label'));
         $phoneId = trim((string) $request->input('phone_number_id'));
-        $funcion = (string) $request->input('funcion', 'soporte');
+        $funcion = (string) $request->input('funcion', 'campanas');
 
-        if ($label === '')   return response()->json(['ok' => false, 'error' => 'Ponle una etiqueta (p. ej. Soporte)'], 400);
+        if ($label === '')   return response()->json(['ok' => false, 'error' => 'Ponle una etiqueta (p. ej. Campañas)'], 400);
         if ($phoneId === '') return response()->json(['ok' => false, 'error' => 'Falta el ID del número (phone_number_id)'], 400);
         if (!in_array($funcion, WhatsAppNumber::FUNCIONES, true)) {
             return response()->json(['ok' => false, 'error' => 'Función no válida'], 400);

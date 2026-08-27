@@ -42,7 +42,6 @@ const SECCIONES = [
   { grupo: 'Contenido y respuestas', items: [
     { key: 'canned',     label: 'Respuestas predefinidas', icon: Icon.quote,  desc: 'Textos que se insertan con «/» al responder.' },
     { key: 'faqs',       label: 'Portal y FAQ',            icon: Icon.globe,  desc: 'Lo que ve el cliente: Centro de atención y Preguntas frecuentes.' },
-    { key: 'knowledge',  label: 'Documentos IA',           icon: Icon.file,   desc: 'Manuales internos que la IA usa para responder (el cliente no los ve).' },
   ] },
   { grupo: 'Correo', items: [
     { key: 'email', label: 'Buzón y envío',       icon: Icon.mail,   desc: 'Entrada, salida, pie y diagnóstico.' },
@@ -106,7 +105,6 @@ export default function SupportSettings({ user }) {
           {tab === 'security' && <SecuritySettings />}
           {tab === 'cron' && <CronStatus />}
           {tab === 'rules' && <TicketRules />}
-          {tab === 'knowledge' && <KnowledgeDocs />}
         </div>
       </div>
     </>
@@ -1873,117 +1871,3 @@ function MailDiagnostic({ from }) {
   )
 }
 
-/* --------------------------- Documentos de la IA -------------------------- */
-/* Base de conocimiento INTERNA del agente de IA (no la ve el cliente): manuales,
-   guías, tarifas… Se sube un fichero (PDF/TXT/MD/CSV, se extrae el texto) o se
-   pega texto directamente. La IA se apoya en ellos para responder. */
-function KnowledgeDocs() {
-  const toast = useToast()
-  const confirm = useConfirm()
-  const [rows, setRows] = useState(null)
-  const [subiendo, setSubiendo] = useState(false)
-  const [form, setForm] = useState(null)   // modal de pegar/editar texto
-
-  const load = useCallback(() => { api.listKnowledge().then((d) => setRows(d.docs || [])) }, [])
-  useEffect(() => { load() }, [load])
-
-  const subir = async (file) => {
-    if (!file) return
-    setSubiendo(true)
-    const r = await api.uploadKnowledge(file)
-    setSubiendo(false)
-    if (r.ok) { toast(`Documento añadido (${r.chars.toLocaleString('es')} caracteres leídos)`); load() }
-    else toast(r.error || 'No se pudo leer el fichero', 'err')
-  }
-
-  const guardarTexto = async () => {
-    if (!form.title.trim() || !form.content.trim()) { toast('Ponle título y texto', 'err'); return }
-    const r = await api.saveKnowledgeText({ id: form.id || 0, title: form.title, content: form.content })
-    if (r.ok) { toast(form.id ? 'Documento actualizado' : 'Documento añadido'); setForm(null); load() }
-    else toast(r.error || 'Error', 'err')
-  }
-
-  const toggle = async (d) => {
-    await api.saveKnowledgeText({ id: d.id, active: !Number(d.active) })
-    load()
-  }
-
-  const borrar = async (d) => {
-    if (!(await confirm({ title: 'Quitar documento', message: `¿Quitar «${d.title}»? La IA dejará de usarlo.`, danger: true, confirmText: 'Quitar' }))) return
-    const r = await api.deleteKnowledge(d.id)
-    if (r.ok) { toast('Documento quitado'); load() } else toast(r.error || 'Error', 'err')
-  }
-
-  // Abre el documento para VERLO y EDITARLO (trae el texto completo del servidor).
-  const abrir = async (d) => {
-    const r = await api.getKnowledge(d.id)
-    if (r.ok) setForm({ id: r.doc.id, title: r.doc.title, content: r.doc.content, filename: r.doc.filename })
-    else toast(r.error || 'No se pudo abrir el documento', 'err')
-  }
-
-  return (
-    <div className="card">
-      <div className="wa-num-head">
-        <div>
-          <h2>Documentos de la IA</h2>
-          <p className="desc" style={{ margin: '2px 0 0' }}>Manuales y guías internas que el agente de IA usa para responder. <b>No los ve el cliente</b> (para eso están las FAQs del portal). Sube un PDF/TXT/MD/CSV o pega el texto.</p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <label className={`btn ghost ${subiendo ? 'is-off' : ''}`} style={{ cursor: subiendo ? 'default' : 'pointer' }}>
-            <Icon.file /> {subiendo ? 'Leyendo…' : 'Subir documento'}
-            <input type="file" accept=".pdf,.txt,.md,.csv,.log" hidden disabled={subiendo}
-              onChange={(e) => { subir(e.target.files[0]); e.target.value = '' }} />
-          </label>
-          <button className="btn" onClick={() => setForm({ id: 0, title: '', content: '' })}><Icon.plus /> Pegar texto</button>
-        </div>
-      </div>
-
-      {rows === null ? <div className="center-load"><div className="spinner" /></div> : rows.length === 0 ? (
-        <div className="wa-num-empty">
-          <Icon.file style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
-          <p>Aún no hay documentos. Sube un manual o pega una guía para que la IA responda con vuestra información.</p>
-        </div>
-      ) : (
-        <div className="kb-list">
-          {rows.map((d) => (
-            <div key={d.id} className={`kb-doc ${Number(d.active) ? '' : 'off'}`}>
-              <span className="kb-ic"><Icon.file /></span>
-              <button className="kb-body kb-open" onClick={() => abrir(d)} title="Ver / editar">
-                <b>{d.title}</b>
-                <span className="kb-sub">
-                  {d.filename ? <>{d.filename} · </> : <>Texto · </>}
-                  {(d.chars || 0).toLocaleString('es')} caracteres
-                  {d.author ? <> · {d.author}</> : null}
-                </span>
-              </button>
-              <label className="fb-switch" title={Number(d.active) ? 'Activo (la IA lo usa)' : 'Inactivo'}>
-                <input type="checkbox" checked={!!Number(d.active)} onChange={() => toggle(d)} />
-                <span className={`fb-toggle ${Number(d.active) ? 'on' : ''}`} />
-              </label>
-              <button className="icon-btn" title="Ver / editar" onClick={() => abrir(d)}><Icon.pencil /></button>
-              <button className="icon-btn" title="Quitar" style={{ color: 'var(--danger)' }} onClick={() => borrar(d)}><Icon.trash /></button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {form && (
-        <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setForm(null)}>
-          <div className="modal" style={{ maxWidth: 620 }}>
-            <div className="modal-head"><h3>{form.id ? 'Editar documento' : 'Pegar un documento'}</h3><button className="x" onClick={() => setForm(null)}>×</button></div>
-            <div className="modal-body">
-              <label className="field"><span className="lbl">Título</span>
-                <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Manual de instalación de antenas" autoFocus /></label>
-              <label className="field"><span className="lbl">Texto del documento</span>
-                <textarea rows={12} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} placeholder="Pega aquí el contenido…" style={{ lineHeight: 1.5 }} /></label>
-            </div>
-            <div className="modal-foot">
-              <button className="btn ghost" onClick={() => setForm(null)}>Cancelar</button>
-              <button className="btn" onClick={guardarTexto}>{form.id ? 'Guardar' : 'Añadir'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}

@@ -77,7 +77,7 @@ function ago(s) {
   return dd === 1 ? 'ayer' : `hace ${dd} días`
 }
 
-const CHANNEL = { whatsapp: 'WhatsApp', email: 'Correo', web: 'Web' }
+const CHANNEL = { email: 'Correo', web: 'Web' }
 
 /* --- SLA: etiqueta del reloj ---
  * met/missed = ya se cumplió (a tiempo o tarde) · ok/warn/late = sigue corriendo.
@@ -1319,7 +1319,6 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const [d, setD] = useState(null)
   const [view, setView] = useState('chat')   // chat | history | client
   const [clientTickets, setClientTickets] = useState(null)
-  const [gate, setGate] = useState(null)     // candados (WhatsApp de soporte sin configurar…)
   const endRef = useRef(null)
   const msgCountRef = useRef(0)
   const lastTicketRef = useRef(null)
@@ -1332,9 +1331,6 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const masRef = useRef(null)
 
   const can = (p) => (user?.permissions || []).includes(p)
-
-  // Candados del envío: para saber si se puede responder por WhatsApp (número de soporte).
-  useEffect(() => { api.gating().then((g) => setGate(g?.ok ? g : null)) }, [])
 
   // Cerrar el menú «Más» al clicar fuera.
   useEffect(() => {
@@ -1977,25 +1973,6 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                     : (d.lock && !d.lock.mine)
                       ? `${d.lock.user_name || 'Otro agente'} lo está atendiendo`
                       : undefined}
-                  // Candado del ENVÍO al cliente por WhatsApp (número de soporte sin
-                  // configurar). No afecta a la nota interna ni a cambiar estados.
-                  replyLock={d.ticket.channel === 'whatsapp' ? (gate?.features?.wa_ticket_reply || null) : null}
-                  replyNote={d.ticket.channel === 'whatsapp' && gate?.wa_soporte === 'prueba'
-                    ? 'Modo prueba: solo se puede escribir a destinatarios registrados en Meta.'
-                    : ''}
-                  // La IA propone un borrador con las FAQs + el historial del cliente.
-                  onAiSuggest={async () => {
-                    const r = await api.aiDraft(id)
-                    if (!r.ok) { toast(r.error || 'La IA no pudo proponer una respuesta', 'err'); return r }
-                    toast(r.modo === 'soporteqa'
-                      ? (r.foto
-                          ? `🏷️ Borrador de soporteQA (leyó la foto${r.barcode ? ` · código ${r.barcode}` : ''}) — revísalo antes de enviar`
-                          : '🤖 Borrador de soporteQA — revísalo antes de enviar')
-                      : r.modo === 'simulado'
-                        ? '✨ Borrador simulado cargado — revísalo antes de enviar (sin clave de IA)'
-                        : '✨ Borrador de la IA cargado — revísalo antes de enviar')
-                    return r
-                  }}
                   onSend={async ({ html, files, internal, cc, bcc, mentions, schedule, send_at }) => {
                     if (internal) {
                       const r = await api.ticketNote(id, html, false, mentions)
@@ -2008,7 +1985,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                       const r = await api.ticketReply(id, html, files, cc, bcc, schedule, send_at)
                       if (r.ok) {
                         if (r.scheduled) toast(`⏱ Respuesta programada para ${fmtDate(r.send_at)}`)
-                        else toast(d.ticket.channel === 'whatsapp' ? '💬 Respuesta enviada por WhatsApp' : '✉️ Respuesta enviada por correo')
+                        else toast('✉️ Respuesta enviada por correo')
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()
                       } else toast(r.error || 'No se pudo enviar la respuesta', 'err')
