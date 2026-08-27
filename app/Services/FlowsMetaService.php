@@ -88,15 +88,19 @@ class FlowsMetaService
      */
     public function publish(object $form): array
     {
-        $waba = (string) Setting::get('wa_business_id');
+        // WABA y token del número (por-función), no del ajuste global vacío (mismo bug
+        // que Plantillas/sync de formularios: iba a «/flows» sin WABA delante).
+        $n = \App\Models\WhatsAppNumber::conWaba('campanas');
+        $wa = $n ? $this->wa->paraNumero($n) : $this->wa;
+        $waba = $n?->waba_id ? (string) $n->waba_id : (string) Setting::get('wa_business_id');
         $fields = json_decode($form->fields ?: '[]', true) ?: [];
         $flowJson = json_encode($this->buildFlowJson($fields, $form->name), JSON_UNESCAPED_UNICODE);
         $flowId = $form->meta_flow_id ?? null;
 
         if ($flowId) {
-            [$c, $r] = $this->wa->graph('POST', (string) $flowId, ['flow_json' => $flowJson]);
+            [$c, $r] = $wa->graph('POST', (string) $flowId, ['flow_json' => $flowJson]);
         } else {
-            [$c, $r] = $this->wa->graph('POST', $waba . '/flows', [
+            [$c, $r] = $wa->graph('POST', $waba . '/flows', [
                 'name'       => mb_substr($form->name ?: 'Formulario', 0, 200),
                 'categories' => ['LEAD_GENERATION'],
                 'flow_json'  => $flowJson,
@@ -112,7 +116,7 @@ class FlowsMetaService
             return [false, 'Meta rechazó el formulario: ' . $msg, $r['validation_errors']];
         }
 
-        [$pc, $pr] = $this->wa->graph('POST', $flowId . '/publish');
+        [$pc, $pr] = $wa->graph('POST', $flowId . '/publish');
         if ($pc >= 200 && $pc < 300) return [true, (string) $flowId, []];
         return [false, $pr['error']['error_user_msg'] ?? $pr['error']['message'] ?? 'No se pudo publicar el flow', []];
     }

@@ -13,7 +13,13 @@ class TemplatesController extends Controller
 {
     public function handle(Request $request, WhatsAppService $wa)
     {
-        $wabaId = (string) Setting::get('wa_business_id');
+        // El WABA (y el token) salen del NÚMERO, NO del ajuste global `wa_business_id`
+        // —que quedó vacío al pasar la config a por-número—. Ese era el bug: con el WABA
+        // vacío la llamada iba a «/message_templates» sin WABA delante y Meta respondía
+        // «Object 'message_templates' does not exist».
+        $n = \App\Models\WhatsAppNumber::conWaba('campanas');
+        if ($n) $wa = $wa->paraNumero($n);
+        $wabaId = $n?->waba_id ? (string) $n->waba_id : (string) Setting::get('wa_business_id');
 
         if ($request->isMethod('get')) {
             // Sin WhatsApp configurado no hay nada que listar en Meta: se devuelve

@@ -35,4 +35,15 @@ class WhatsAppNumber extends Model
         return static::where('funcion', $funcion)->where('active', true)
             ->orderBy('id')->first();
     }
+
+    /**
+     * El número cuyo WABA usar para operaciones sobre la cuenta (plantillas, flows…):
+     * el de la función pedida (campañas por defecto) o, si no, cualquiera activo que
+     * tenga WABA. La config del WABA vive AQUÍ (por número), no en el ajuste global.
+     */
+    public static function conWaba(string $funcion = 'campanas'): ?self
+    {
+        return static::porFuncion($funcion)
+            ?? static::whereNotNull('waba_id')->where('active', true)->orderBy('id')->first();
+    }
 }

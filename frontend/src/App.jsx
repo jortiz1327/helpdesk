@@ -15,6 +15,7 @@ import Dashboard from "./components/Dashboard.jsx";
 import SupportCenter from "./components/SupportCenter.jsx";
 import NewTicket from "./components/NewTicket.jsx";
 import SupportSettings from "./components/SupportSettings.jsx";
+import Settings from "./components/Settings.jsx";   // config WhatsApp (accesible desde Campañas)
 import Shifts from "./components/Shifts.jsx";
 import Tickets from "./components/Tickets.jsx";
 import Kanban from "./components/Kanban.jsx";
@@ -291,6 +292,20 @@ const AREAS = [
                         icon: Icon.bolt,
                         perm: "automations.manage",
                         color: "#ff7ab6",
+                    },
+                ],
+            },
+            {
+                // La config de WhatsApp (números, token, WABA, webhook) es lo que da vida
+                // a todo Campañas: aquí accesible directa, sin saltar a Helpdesk. Solo superadmin.
+                title: "Ajustes",
+                items: [
+                    {
+                        key: "wa_config",
+                        label: "Configuración",
+                        icon: Icon.whatsappCfg,
+                        perm: "support.config",
+                        color: "#12925a",
                     },
                 ],
             },
@@ -996,6 +1011,7 @@ export default function App() {
                         {view === "reports" && <Reports onGo={setView} />}
                         {view === "activity" && <Activity />}
                         {view === "support_cfg" && <SupportSettings user={auth.user} />}
+                        {view === "wa_config" && <Settings />}
                         {view === "tickets" && (
                             <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
                         )}

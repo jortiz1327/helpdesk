@@ -36,7 +36,11 @@ class FormsController extends Controller
         }
 
         if ($action === 'sync') {
-            $waba = (string) \App\Models\Setting::get('wa_business_id');
+            // El WABA sale del número (por-función), no del ajuste global vacío. Mismo bug
+            // que en Plantillas: sin esto la llamada iba a «/flows» sin WABA delante.
+            $n = \App\Models\WhatsAppNumber::conWaba('campanas');
+            if ($n) $wa = $wa->paraNumero($n);
+            $waba = $n?->waba_id ? (string) $n->waba_id : (string) \App\Models\Setting::get('wa_business_id');
             [$code, $res] = $wa->graph('GET', $waba . '/flows', null, ['fields' => 'id,name,status']);
             if ($code < 200 || $code >= 300) {
                 return response()->json(['ok' => false, 'error' => $res['error']['message'] ?? 'No se pudieron obtener los flujos de Meta']);
