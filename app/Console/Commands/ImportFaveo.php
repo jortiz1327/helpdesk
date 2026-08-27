@@ -31,7 +31,8 @@ class ImportFaveo extends Command
 {
     protected $signature = 'faveo:import
         {--apply : Escribe (por defecto solo previsualiza)}
-        {--db=faveo_old : BD donde está cargado el dump de Faveo}
+        {--db=faveo_old : BD con el dump de Faveo (si usas BD aparte)}
+        {--prefix= : Prefijo de las tablas de Faveo si están en la MISMA BD del helpdesk (p. ej. fav_) — sin BD puente}
         {--source=import-faveo : Marca en tickets.source, para revertir}
         {--fresh : Borra antes lo ya importado de ese source}
         {--limit=0 : Procesa solo N tickets (0=todos), para pruebas}';
@@ -52,11 +53,19 @@ class ImportFaveo extends Command
         $source = (string) $this->option('source');
         $limit  = (int) $this->option('limit');
 
-        // Conexión a la BD de Faveo (misma máquina, otro esquema).
-        config(['database.connections.faveo' => array_merge(
-            config('database.connections.mysql'),
-            ['database' => (string) $this->option('db')]
-        )]);
+        // Conexión a los datos de Faveo. Dos formas:
+        //  · --prefix=fav_  → las tablas de Faveo están en la MISMA BD del helpdesk con
+        //    ese prefijo (sin BD puente): se lee `fav_tickets`, `fav_users`… de la propia BD.
+        //  · --db=faveo_old → una BD aparte con el dump cargado.
+        $prefix = (string) $this->option('prefix');
+        $favCfg = config('database.connections.mysql');
+        if ($prefix !== '') {
+            $favCfg['prefix'] = $prefix;
+            if (($db = (string) $this->option('db')) !== 'faveo_old') $favCfg['database'] = $db;
+        } else {
+            $favCfg['database'] = (string) $this->option('db');
+        }
+        config(['database.connections.faveo' => $favCfg]);
         $fav = DB::connection('faveo');
         try { $fav->getPdo(); } catch (\Throwable $e) {
             $this->error('No conecto con la BD «' . $this->option('db') . '»: ' . $e->getMessage());

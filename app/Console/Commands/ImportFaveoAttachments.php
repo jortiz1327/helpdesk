@@ -20,7 +20,8 @@ class ImportFaveoAttachments extends Command
 {
     protected $signature = 'faveo:attachments
         {--apply : Guarda los ficheros (por defecto solo cuenta)}
-        {--db=faveo_old : BD donde está cargado el dump de Faveo}
+        {--db=faveo_old : BD con el dump de Faveo (si usas BD aparte)}
+        {--prefix= : Prefijo de las tablas de Faveo si están en la MISMA BD del helpdesk (p. ej. fav_) — sin BD puente}
         {--source=import-faveo : Marca de los tickets importados}';
 
     protected $description = 'Cuelga los adjuntos de Faveo de los mensajes ya importados (Bloque 2)';
@@ -30,10 +31,15 @@ class ImportFaveoAttachments extends Command
         $apply  = (bool) $this->option('apply');
         $source = (string) $this->option('source');
 
-        config(['database.connections.faveo' => array_merge(
-            config('database.connections.mysql'),
-            ['database' => (string) $this->option('db')]
-        )]);
+        $prefix = (string) $this->option('prefix');
+        $favCfg = config('database.connections.mysql');
+        if ($prefix !== '') {
+            $favCfg['prefix'] = $prefix;
+            if (($db = (string) $this->option('db')) !== 'faveo_old') $favCfg['database'] = $db;
+        } else {
+            $favCfg['database'] = (string) $this->option('db');
+        }
+        config(['database.connections.faveo' => $favCfg]);
         $fav = DB::connection('faveo');
         try { $fav->getPdo(); } catch (\Throwable $e) {
             $this->error('No conecto con «' . $this->option('db') . '»: ' . $e->getMessage());
