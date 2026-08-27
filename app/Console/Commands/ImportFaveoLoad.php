@@ -21,12 +21,18 @@ class ImportFaveoLoad extends Command
     protected $signature = 'faveo:load
         {file? : Ruta al fichero faveo.sql (súbelo antes con el Administrador de archivos)}
         {--prefix=fav_ : Prefijo con el que se cargan las tablas de Faveo}
+        {--max-mb=2 : Salta las sentencias mayores de N MB (evita el «MySQL gone away» por adjuntos gigantes)}
         {--drop : No carga nada: BORRA las tablas que empiecen por ese prefijo}';
 
     protected $description = 'Carga (o borra) el dump de Faveo en la misma BD, con prefijo — sin SSH ni BD aparte';
 
     public function handle(): int
     {
+        // El dump trae sentencias grandes (adjuntos en blob) que se pasan del límite de
+        // PHP por defecto. Como es un comando de consola puntual, le damos memoria de sobra.
+        @ini_set('memory_limit', '-1');
+        @set_time_limit(0);
+
         $prefix = (string) $this->option('prefix');
         if ($prefix === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $prefix)) {
             $this->error('Prefijo no válido (solo letras/números/guion bajo).');
@@ -51,21 +57,42 @@ class ImportFaveoLoad extends Command
         $pdo = DB::connection()->getPdo();
         $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
         $pdo->exec("SET sql_mode=''");
+        // Best-effort: sube el packet si tienes privilegio (en local sí; en Plesk normalmente no).
+        try { $pdo->exec('SET GLOBAL max_allowed_packet=536870912'); } catch (\Throwable $e) {}
 
         $re = '/(CREATE TABLE|INSERT INTO|ALTER TABLE|DROP TABLE IF EXISTS|REFERENCES|LOCK TABLES) `([a-zA-Z0-9_]+)`/';
         $rep = '$1 `' . $prefix . '$2`';
+        $maxBytes = max(1, (int) $this->option('max-mb')) * 1048576;
 
         $fh = fopen($file, 'rb');
         $buf = '';
         $inStr = false;
-        $stmts = 0; $errores = 0;
+        $stmts = 0; $errores = 0; $grandes = 0;
 
-        $ejecutar = function (string $sql) use ($pdo, $re, $rep, &$stmts, &$errores) {
-            $sql = trim($sql);
+        $ejecutar = function (string $sql) use (&$pdo, $re, $rep, $maxBytes, &$stmts, &$errores, &$grandes) {
+            // Sentencia demasiado grande (un adjunto en blob): superaría max_allowed_packet
+            // y tumbaría la conexión. Se SALTA (afecta solo a adjuntos gigantes, muy pocos).
+            if (strlen($sql) > $maxBytes) { $grandes++; return; }
+
+            // El nombre de tabla está SIEMPRE al principio; para no copiar en memoria un
+            // INSERT largo, solo prefijamos la cabecera si es grande.
+            if (strlen($sql) < 100000) {
+                $sql = trim($sql);
+                if ($sql === '') return;
+                $sql = preg_replace($re, $rep, $sql);
+            } else {
+                $sql = ltrim(preg_replace($re, $rep, substr($sql, 0, 300)) . substr($sql, 300));
+            }
             if ($sql === '') return;
-            $sql = preg_replace($re, $rep, $sql);   // prefija los nombres de tabla
             try { $pdo->exec($sql); $stmts++; }
-            catch (\Throwable $e) { $errores++; if ($errores <= 5) $this->warn('  · sentencia omitida: ' . mb_substr($e->getMessage(), 0, 120)); }
+            catch (\Throwable $e) {
+                $errores++;
+                // Si la conexión se cayó («gone away»), reconectar y seguir.
+                if (str_contains($e->getMessage(), 'gone away') || str_contains($e->getMessage(), '2006')) {
+                    try { DB::reconnect(); $pdo = DB::connection()->getPdo(); $pdo->exec('SET FOREIGN_KEY_CHECKS=0'); $pdo->exec("SET sql_mode=''"); } catch (\Throwable $e2) {}
+                }
+                if ($errores <= 5) $this->warn('  · sentencia omitida: ' . mb_substr($e->getMessage(), 0, 120));
+            }
         };
 
         while (($line = fgets($fh)) !== false) {
@@ -100,7 +127,7 @@ class ImportFaveoLoad extends Command
         fclose($fh);
         $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
 
-        $this->info("Cargado: $stmts sentencias · $errores omitidas.");
+        $this->info("Cargado: $stmts sentencias · $errores con error · $grandes saltadas por tamaño (adjuntos gigantes).");
         $this->line('Ahora: <info>php artisan faveo:import --apply --prefix=' . $prefix . '</info>');
         return self::SUCCESS;
     }
