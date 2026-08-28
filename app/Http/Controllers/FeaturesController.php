@@ -24,7 +24,6 @@ class FeaturesController extends Controller
         'sla_alerts_active'     => 'bool',
         'sla_escalate_active'   => 'bool',
         'csat_active'           => 'bool',
-        'email_footer_active'   => 'bool',
         'ticket_autoclose_days' => 'int',
         'ticket_lock_minutes'   => 'int',
     ];
@@ -54,13 +53,14 @@ class FeaturesController extends Controller
         $ultimaRaw   = EmailAccount::where('active', true)->whereNotNull('imap_host')->max('last_check_at');
         $intake = $this->saludRecogida($imapActivas, $ultimaRaw);
 
+        // El pie de los correos (texto + on/off) se configura en «Correo → Buzón y envío»,
+        // junto a su contenido; no se duplica aquí como interruptor suelto.
         $correo = array_values(array_filter([
             // Informativo: no es un interruptor, es «dar de alta el buzón».
             ['key' => 'email_channel', 'type' => 'info', 'label' => 'Canal de correo',
              'desc' => 'Convierte los correos entrantes en tickets y permite responder por email.',
              'value' => $buzon, 'note' => $buzon ? null : 'Falta dar de alta el buzón — ve a «Correo → Buzón y envío».'],
             $intake,
-            $this->flag('email_footer_active', 'bool', 'Pie de correos', 'Añade un pie fijo a los correos salientes.', $g('email_footer_active') === '1'),
         ]));
 
         $grupos = [

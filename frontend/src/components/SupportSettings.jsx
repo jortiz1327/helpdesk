@@ -270,7 +270,8 @@ function Categories() {
               onChange={(e) => setForm((f) => ({ ...f, signature: e.target.value }))}
               placeholder={'Atentamente,\n{{agente}} — {{departamento}}\nAEME Group · 962 012 074'} />
             <span className="hint" style={{ display: 'block', marginTop: 6 }}>
-              Variables: <b>{'{{agente}}'}</b> (quien responde) · <b>{'{{departamento}}'}</b> (esta categoría). Va antes del pie de empresa.
+              Cada departamento (categoría) firma sus respuestas. Variables: <b>{'{{agente}}'}</b> (quien responde) · <b>{'{{departamento}}'}</b> (esta categoría).
+              Debajo va el <b>pie de empresa</b>, común a todos, que se edita en <b>Correo → Buzón y envío</b>.
             </span>
           </label>
         </Modal>
@@ -1808,8 +1809,9 @@ function EmailChannel() {
         <h2>Pie de los correos</h2>
         <p className="em-desc">
           Se añade al final de cada correo que sale (respuestas de tickets y avisos automáticos),
-          separado por una línea. <b>No se guarda en el hilo del ticket</b>: la conversación interna
-          queda limpia, sin la firma repetida en cada mensaje.
+          separado por una línea, <b>debajo de la firma del departamento</b> (esa se pone en cada
+          categoría, en <b>Clasificación → Categorías</b>). <b>No se guarda en el hilo del ticket</b>:
+          la conversación interna queda limpia, sin la firma repetida en cada mensaje.
         </p>
         <label className="field"><span className="lbl">Contenido</span>
           <textarea rows={5} value={f.footer_html} onChange={set('footer_html')}
