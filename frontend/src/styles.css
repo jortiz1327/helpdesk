@@ -457,7 +457,7 @@ input, textarea, select { font-family: inherit; }
 /* Texto BLANCO: el azul AEME es un color saturado y oscuro. El #04130c que había
    aquí venía del verde WhatsApp (fondo claro → texto oscuro) y sobre azul daba un
    contraste de ~2.6:1, por debajo del mínimo accesible. En blanco sube a ~5.2:1. */
-.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--primary); color: #fff; padding: 11px 19px; border-radius: 11px; font-weight: 700; font-size: 13.5px; transition: 0.15s; box-shadow: 0 4px 14px var(--primary-glow); }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--primary); color: #fff; padding: 11px 19px; border-radius: 11px; font-weight: 700; font-size: 13.5px; text-decoration: none; transition: 0.15s; box-shadow: 0 4px 14px var(--primary-glow); }
 .btn:hover { background: var(--primary-dark); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 .btn svg { width: 18px; height: 18px; fill: currentColor; }

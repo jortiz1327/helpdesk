@@ -428,7 +428,13 @@ function Faqs() {
           <h2>Base de conocimiento</h2>
           <p className="cfg-hint">Lo que el cliente ve en el portal, en dos secciones: el <b>Centro de atención</b> (horario, correos, teléfonos) y las <b>Preguntas frecuentes</b>.</p>
         </div>
-        <button className="btn" onClick={() => setForm({ ...blank })}><Icon.plus /> {esInfo ? 'Nueva ficha' : 'Nueva pregunta'}</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Abre el portal público (raíz del dominio) para verlo como lo ve el cliente. */}
+          <a className="btn ghost" href="/" target="_blank" rel="noreferrer" title="Abrir el portal en una pestaña nueva, tal como lo ve el cliente">
+            <Icon.globe /> Ver portal público
+          </a>
+          <button className="btn" onClick={() => setForm({ ...blank })}><Icon.plus /> {esInfo ? 'Nueva ficha' : 'Nueva pregunta'}</button>
+        </div>
       </div>
 
       {/* Selector de sección */}
