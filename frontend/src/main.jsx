@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import ErrorBoundary from './ErrorBoundary.jsx'
 
 /*
  * Dos aplicaciones en una:
@@ -19,11 +20,11 @@ const root = ReactDOM.createRoot(document.getElementById('root'))
 if (esAgentes) {
   import('./styles.css')
   import('./App.jsx').then(({ default: App }) => {
-    root.render(<React.StrictMode><App /></React.StrictMode>)
+    root.render(<React.StrictMode><ErrorBoundary><App /></ErrorBoundary></React.StrictMode>)
   })
 } else {
   import('./portal/portal.css')
   import('./portal/Portal.jsx').then(({ default: Portal }) => {
-    root.render(<React.StrictMode><Portal /></React.StrictMode>)
+    root.render(<React.StrictMode><ErrorBoundary><Portal /></ErrorBoundary></React.StrictMode>)
   })
 }

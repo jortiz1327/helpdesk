@@ -2575,6 +2575,12 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .feat-badge { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 20px; flex: 0 0 auto; white-space: nowrap; }
 .feat-badge.ok { background: var(--secondary-soft, #e7f7ef); color: var(--secondary, #14a06a); }
 .feat-badge.off { background: var(--md-soft, #fbf0dc); color: var(--warn, #b9760a); }
+/* «Desactivado / Apagado»: no es un problema, solo estado — neutro, no ámbar. */
+.feat-badge.muted { background: var(--hover, #eef0f5); color: var(--ink-3, #8a94ad); }
+/* Fila de estado: badge + enlace a la pestaña donde se cambia. */
+.feat-state { display: inline-flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+.feat-goto { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; color: var(--primary); white-space: nowrap; }
+.feat-goto:hover { text-decoration: underline; }
 /* Salud de la recogida de correo: verde reciente / ámbar sin recoger aún / rojo parada. */
 .feat-badge.wait { background: var(--md-soft, #fbf0dc); color: var(--warn, #b9760a); }
 .feat-badge.stale { background: var(--danger-soft, #fbe9e7); color: var(--danger, #c0392b); }

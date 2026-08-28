@@ -8,17 +8,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 /**
- * PANEL DE FUNCIONES (solo superadmin). Un único sitio para ver y encender/apagar las
- * funciones que hoy están repartidas entre varios ajustes, y saber POR QUÉ cada una
- * está apagada: un interruptor, una credencial que falta, o un buzón sin dar de alta.
+ * PANEL DE FUNCIONES = TABLERO DE ESTADO (solo superadmin, solo lectura). Muestra de un
+ * vistazo qué funciones están activas y la salud del correo, y ENLAZA a la pestaña donde
+ * se cambia cada una (su interruptor real vive allí; aquí no se duplica el control).
  *
- * Solo se pueden FLIPAR los ajustes de la lista blanca TOGGLES (nada de escribir claves
- * de valor arbitrario desde aquí). Las credenciales (clave de IA, buzón) se configuran
- * en su propio apartado; aquí solo se informa de si están puestas.
+ * `set()` sigue existiendo por compatibilidad (whitelist TOGGLES), pero el panel ya no lo
+ * usa: cada ajuste se cambia en su apartado (SLA/escalado en «Horario de atención»,
+ * auto-cierre/colisión/CSAT en «Comportamiento»).
  */
 class FeaturesController extends Controller
 {
-    /** Interruptores que este panel puede cambiar, con su tipo. */
+    /** Ajustes que el endpoint set() admite (compatibilidad; el panel es de solo lectura). */
     protected const TOGGLES = [
         'sla_active'            => 'bool',
         'sla_alerts_active'     => 'bool',
@@ -63,21 +63,38 @@ class FeaturesController extends Controller
             $intake,
         ]));
 
+        // Este panel es de SOLO LECTURA: muestra qué está activo y enlaza a dónde se
+        // cambia cada cosa (su interruptor real vive en la pestaña correspondiente, para
+        // no tener el mismo ajuste en dos sitios).
+        $sla     = $g('sla_active', '1') === '1';
+        $slaAl   = $g('sla_alerts_active', '1') === '1';
+        $slaEsc  = $g('sla_escalate_active') === '1';
+        $csat    = $g('csat_active', '1') === '1';
+        $acDays  = (int) $g('ticket_autoclose_days', '0');
+        $lockMin = (int) $g('ticket_lock_minutes', '2');
+        $onOff   = fn (bool $on) => $on ? 'Activo' : 'Desactivado';
+
         $grupos = [
             ['grupo' => 'SLA', 'items' => [
-                $this->flag('sla_active', 'bool', 'SLA', 'Relojes de primera respuesta y de resolución.', $g('sla_active', '1') === '1'),
-                $this->flag('sla_alerts_active', 'bool', 'Avisos de SLA por correo', 'Correos «por vencer» y «vencido».', $g('sla_alerts_active', '1') === '1'),
-                $this->flag('sla_escalate_active', 'bool', 'Escalado automático', 'Al vencer: sube la prioridad y reasigna al agente de guardia.', $g('sla_escalate_active') === '1'),
+                $this->status('sla_active', 'SLA', 'Relojes de primera respuesta y de resolución.', $sla, $onOff($sla), 'hours', 'Horario de atención'),
+                $this->status('sla_alerts_active', 'Avisos de SLA por correo', 'Correos «por vencer» y «vencido».', $slaAl, $onOff($slaAl), 'hours', 'Horario de atención'),
+                $this->status('sla_escalate_active', 'Escalado automático', 'Al vencer: sube la prioridad y reasigna al agente de guardia.', $slaEsc, $onOff($slaEsc), 'hours', 'Horario de atención'),
             ]],
             ['grupo' => 'Tickets automáticos', 'items' => [
-                $this->flag('csat_active', 'bool', 'Encuesta de satisfacción (CSAT)', 'Valoración 1-5★ en el portal y por correo al resolver.', $g('csat_active', '1') === '1'),
-                $this->flag('ticket_autoclose_days', 'int', 'Auto-cierre de resueltos', 'Cierra los tickets tras N días resueltos sin actividad (0 = apagado).', (int) $g('ticket_autoclose_days', '0')),
-                $this->flag('ticket_lock_minutes', 'int', 'Bloqueo por colisión', 'Minutos que un agente «toma» un ticket para que otro no escriba encima (0 = apagado).', (int) $g('ticket_lock_minutes', '2')),
+                $this->status('csat_active', 'Encuesta de satisfacción (CSAT)', 'Valoración 1-5★ en el portal y por correo al resolver.', $csat, $onOff($csat), 'behavior', 'Comportamiento'),
+                $this->status('ticket_autoclose_days', 'Auto-cierre de resueltos', 'Cierra los tickets tras N días resueltos sin actividad.', $acDays > 0, $acDays > 0 ? $acDays . ' ' . ($acDays === 1 ? 'día' : 'días') : 'Apagado', 'behavior', 'Comportamiento'),
+                $this->status('ticket_lock_minutes', 'Bloqueo por colisión', 'Un agente «toma» el ticket para que otro no escriba encima.', $lockMin > 0, $lockMin > 0 ? $lockMin . ' min' : 'Apagado', 'behavior', 'Comportamiento'),
             ]],
             ['grupo' => 'Correo', 'items' => $correo],
         ];
 
         return response()->json(['ok' => true, 'grupos' => $grupos]);
+    }
+
+    /** Fila de ESTADO (solo lectura) con enlace a la pestaña donde se cambia. */
+    protected function status(string $key, string $label, string $desc, bool $on, string $value, string $goto, string $gotoLabel): array
+    {
+        return compact('key', 'label', 'desc', 'on', 'value', 'goto', 'gotoLabel') + ['type' => 'status'];
     }
 
     /**
@@ -115,11 +132,6 @@ class FeaturesController extends Controller
         if ($mins < 1440) return intdiv($mins, 60) . ' h';
         $d = intdiv($mins, 1440);
         return $d . ($d === 1 ? ' día' : ' días');
-    }
-
-    protected function flag(string $key, string $type, string $label, string $desc, $value, ?string $note = null): array
-    {
-        return compact('key', 'type', 'label', 'desc', 'value', 'note');
     }
 
     protected function set(Request $request)

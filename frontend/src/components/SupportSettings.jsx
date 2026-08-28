@@ -92,7 +92,7 @@ export default function SupportSettings({ user }) {
         </nav>
 
         <div className="cfg-body">
-          {tab === 'features' && <Features />}
+          {tab === 'features' && <Features onGoto={setTab} />}
           {tab === 'categories' && <Categories />}
           {tab === 'canned' && <Canned />}
           {tab === 'faqs' && <Faqs />}
@@ -117,22 +117,15 @@ export default function SupportSettings({ user }) {
 
 /* PANEL DE FUNCIONES (superadmin): interruptores de todo el helpdesk en un sitio, con
    el estado de cada uno y qué le falta (una clave, un buzón). */
-function Features() {
-  const toast = useToast()
+function Features({ onGoto }) {
   const [grupos, setGrupos] = useState(null)
-  const load = () => api.features().then((r) => setGrupos(r?.ok ? r.grupos : []))
-  useEffect(() => { load() }, [])
-
-  const cambiar = async (key, value) => {
-    const r = await api.setFeature(key, value)
-    if (r?.ok) load(); else toast(r?.error || 'No se pudo cambiar', 'err')
-  }
+  useEffect(() => { api.features().then((r) => setGrupos(r?.ok ? r.grupos : [])) }, [])
 
   if (grupos === null) return <div className="center-load"><div className="spinner" /></div>
 
   return (
     <div className="feat-panel">
-      <p className="cfg-hint">Enciende o apaga funciones del helpdesk. Si algo necesita una clave o un buzón, aquí verás qué falta y dónde ponerlo.</p>
+      <p className="cfg-hint">Un vistazo del estado del helpdesk: qué está activo y la salud del correo. Cada ajuste se cambia en su apartado (enlace a la derecha).</p>
       {grupos.map((g) => (
         <div key={g.grupo} className="feat-group">
           <div className="feat-group-t">{g.grupo}</div>
@@ -143,15 +136,13 @@ function Features() {
                 <span>{it.desc}</span>
                 {it.note && <span className="feat-note">⚠️ {it.note}</span>}
               </div>
-              {it.type === 'bool' && (
-                <label className="fb-switch">
-                  <input type="checkbox" checked={!!it.value} onChange={(e) => cambiar(it.key, e.target.checked)} />
-                  <span className={`fb-toggle ${it.value ? 'on' : ''}`} />
-                </label>
-              )}
-              {it.type === 'int' && (
-                <input className="feat-num" type="number" min="0" defaultValue={it.value} key={it.value}
-                  onBlur={(e) => Number(e.target.value) !== it.value && cambiar(it.key, Number(e.target.value))} />
+              {it.type === 'status' && (
+                <div className="feat-state">
+                  <span className={`feat-badge ${it.on ? 'ok' : 'muted'}`}>{it.value}</span>
+                  {it.goto && onGoto && (
+                    <button type="button" className="feat-goto" onClick={() => onGoto(it.goto)}>{it.gotoLabel} →</button>
+                  )}
+                </div>
               )}
               {it.type === 'info' && (
                 <span className={`feat-badge ${it.value ? 'ok' : 'off'}`}>{it.value ? 'Configurado' : 'Sin configurar'}</span>
