@@ -144,11 +144,19 @@ frontend ya va COMPILADO en `public/assets` (sí está en el repo) → no se com
 3. **Desplegar** — en modo Manual, pulsa **«Desplegar»** (o push a la rama si está en
    Automático). Plesk hace pull + composer + el script → migra y limpia caché solo.
 
-   Migraciones que entran en esta tanda, entre otras:
-   - `ticket_snooze` — posponer tickets (columnas nuevas en tickets y users).
-   - `scheduled_replies` — respuestas programadas (tabla nueva).
-   - `ticket_perf_indexes` — 2 índices compuestos (unos segundos; en línea, no bloquea).
-   - `drop_ai_agent_results` — elimina la tabla del webhook experimental retirado.
+   **Tanda actual (edición correo/web, sin IA) — SOLO código, sin migraciones ni
+   cambios de BD.** Basta el pull + `config:cache`/`cache:clear` del script; `migrate`
+   corre pero no encuentra nada nuevo. Qué entra:
+   - Limpieza de la variante (sin IA, WhatsApp solo en Campañas): fix del webhook
+     (`$ticketId` indefinido) y código muerto retirado.
+   - **Configuración**: menú reorganizado (título neutro «Configuración», grupo
+     «Plataforma» = Funciones + Seguridad + Tareas). La config de **WhatsApp deja de
+     estar en este hub** y vive en **Campañas → Ajustes**.
+   - Nuevo indicador **«Recogida de correo»** en *Configuración → Funciones* (semáforo
+     por `last_check_at`: verde recién recogido / rojo parada / ámbar sin recoger aún).
+
+   > Para futuras tandas CON migraciones, aquí se listan. Ejemplos ya desplegados:
+   > `ticket_snooze`, `scheduled_replies`, `ticket_perf_indexes`, `drop_ai_agent_results`.
 
 4. **Permisos** (solo si cambiaste roles; idempotente): añade al script, si lo necesitas,
    `php artisan db:seed --class=RolesPermissionsSeeder --force`. ⚠️ NUNCA `db:seed` a
@@ -167,12 +175,13 @@ frontend ya va COMPILADO en `public/assets` (sí está en el repo) → no se com
    zona que PHP (Europe/Madrid) y hay que alinear MySQL — avisa antes de tocar.
 
 7. **Smoke test** — entra en `/agentes` y comprueba: abrir un ticket largo (botón
-   «Ver mensajes anteriores»), *Configuración → Funciones* (mover un interruptor),
-   posponer un ticket, y el portal `/` con las banderas de idioma.
+   «Ver mensajes anteriores»), *Configuración → Funciones* (mover un interruptor y ver el
+   semáforo **«Recogida de correo»** en el grupo Correo — debería estar 🟢 si el cron
+   corre), posponer un ticket, y el portal `/` con las banderas de idioma.
 
-> Nota: las claves de IA/soporteQA y el buzón de correo se configuran **dentro de la
-> app** (Funciones + Correo), no en el `.env`. El App Secret del webhook de WhatsApp va
-> en *Configuración → WhatsApp*.
+> Nota: el buzón de correo se configura **dentro de la app** (*Configuración → Correo*),
+> no en el `.env`. En esta edición **no hay IA**; el WhatsApp (solo Campañas) y su App
+> Secret se configuran en **Campañas → Ajustes**, no en el hub de Configuración.
 
 ---
 
@@ -207,7 +216,7 @@ frontend ya va COMPILADO en `public/assets` (sí está en el repo) → no se com
 - **Rate-limiting**: el login tiene freno por cuenta+IP; el webhook de WhatsApp y el portal
   van limitados por ruta. No hace falta tocar nada.
 - **Contraseñas**: mínimo 8 caracteres (alta, edición y cambio propio).
-- **Firma del webhook**: pon el **App Secret** del número en Configuración → WhatsApp para
+- **Firma del webhook**: pon el **App Secret** del número en **Campañas → Ajustes** para
   que solo se procesen eventos firmados por Meta.
 - **Borra `install.php`** del servidor una vez instalado (deja de ser necesario y es una
   puerta abierta).
