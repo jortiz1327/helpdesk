@@ -76,12 +76,12 @@ class FeaturesController extends Controller
 
         $grupos = [
             ['grupo' => 'SLA', 'items' => [
-                $this->status('sla_active', 'SLA', 'Relojes de primera respuesta y de resolución.', $sla, $onOff($sla), 'hours', 'Horario de atención'),
-                $this->status('sla_alerts_active', 'Avisos de SLA por correo', 'Correos «por vencer» y «vencido».', $slaAl, $onOff($slaAl), 'hours', 'Horario de atención'),
-                $this->status('sla_escalate_active', 'Escalado automático', 'Al vencer: sube la prioridad y reasigna al agente de guardia.', $slaEsc, $onOff($slaEsc), 'hours', 'Horario de atención'),
+                $this->status('sla_active', 'SLA', 'Relojes de primera respuesta y de resolución.', $sla, $onOff($sla), 'sla', 'SLA'),
+                $this->status('sla_alerts_active', 'Avisos de SLA por correo', 'Correos «por vencer» y «vencido».', $slaAl, $onOff($slaAl), 'sla', 'SLA'),
+                $this->status('sla_escalate_active', 'Escalado automático', 'Al vencer: sube la prioridad y reasigna al agente de guardia.', $slaEsc, $onOff($slaEsc), 'sla', 'SLA'),
             ]],
             ['grupo' => 'Tickets automáticos', 'items' => [
-                $this->status('csat_active', 'Encuesta de satisfacción (CSAT)', 'Valoración 1-5★ en el portal y por correo al resolver.', $csat, $onOff($csat), 'behavior', 'Comportamiento'),
+                $this->status('csat_active', 'Encuesta de satisfacción (CSAT)', 'Valoración 1-5★ en el portal al resolver.', $csat, $onOff($csat), 'csat', 'Satisfacción'),
                 $this->status('ticket_autoclose_days', 'Auto-cierre de resueltos', 'Cierra los tickets tras N días resueltos sin actividad.', $acDays > 0, $acDays > 0 ? $acDays . ' ' . ($acDays === 1 ? 'día' : 'días') : 'Apagado', 'behavior', 'Comportamiento'),
                 $this->status('ticket_lock_minutes', 'Bloqueo por colisión', 'Un agente «toma» el ticket para que otro no escriba encima.', $lockMin > 0, $lockMin > 0 ? $lockMin . ' min' : 'Apagado', 'behavior', 'Comportamiento'),
             ]],

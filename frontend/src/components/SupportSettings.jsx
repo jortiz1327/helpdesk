@@ -37,11 +37,13 @@ const SECCIONES = [
   { grupo: 'Flujo de trabajo', items: [
     { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo al entrar.' },
     { key: 'behavior',   label: 'Comportamiento',        icon: Icon.ticket,   desc: 'Estado inicial, bloqueo entre agentes y cierre automático.' },
+    { key: 'sla',        label: 'SLA',                   icon: Icon.timer,    desc: 'Relojes de respuesta y resolución, avisos por correo y escalado.' },
     { key: 'hours',      label: 'Horario de atención',   icon: Icon.clock,    desc: 'Cuándo se atiende. Sobre esto corre el reloj del SLA.' },
   ] },
   { grupo: 'Contenido y respuestas', items: [
     { key: 'canned',     label: 'Respuestas predefinidas', icon: Icon.quote,  desc: 'Textos que se insertan con «/» al responder.' },
     { key: 'faqs',       label: 'Portal y FAQ',            icon: Icon.globe,  desc: 'Lo que ve el cliente: Centro de atención y Preguntas frecuentes.' },
+    { key: 'csat',       label: 'Satisfacción',            icon: Icon.star,   desc: 'Encuesta CSAT del portal (1-5★) al resolver una incidencia.' },
   ] },
   { grupo: 'Correo', items: [
     { key: 'email', label: 'Buzón y envío',       icon: Icon.mail,   desc: 'Entrada, salida, pie y diagnóstico.' },
@@ -59,7 +61,7 @@ const PLATAFORMA = [
   { key: 'security', label: 'Seguridad',          icon: Icon.lock,    desc: 'Protección del acceso frente a intentos.' },
   { key: 'cron',     label: 'Tareas programadas', icon: Icon.refresh, desc: 'El planificador que mueve el correo y los cierres.' },
 ]
-const FEATURES_ITEM = { key: 'features', label: 'Funciones', icon: Icon.bolt, desc: 'Encender o apagar funciones, y ver qué le falta a cada una.' }
+const FEATURES_ITEM = { key: 'features', label: 'Funciones', icon: Icon.bolt, desc: 'Un vistazo del estado: qué está activo y la salud del correo.' }
 
 export default function SupportSettings({ user }) {
   // «Plataforma» va la primera: Funciones (solo superadmin) + Seguridad + Tareas.
@@ -103,6 +105,8 @@ export default function SupportSettings({ user }) {
           {tab === 'labels' && <Labels />}
           {tab === 'fields' && <CustomFields />}
           {tab === 'behavior' && <TicketBehavior />}
+          {tab === 'sla' && <SlaSettings />}
+          {tab === 'csat' && <CsatSettings />}
           {tab === 'hours' && <BusinessHours />}
           {tab === 'security' && <SecuritySettings />}
           {tab === 'cron' && <CronStatus />}
@@ -768,7 +772,7 @@ function GuardarAjustes({ save, saving }) {
  * ------------------------------------------------------------------------- */
 function TicketBehavior() {
   const { d, f, setF, save, saving } = useAjustes([
-    'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify', 'csat_active',
+    'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify',
   ])
   if (!d || !f) return <div className="center-load"><div className="spinner" /></div>
 
@@ -828,83 +832,34 @@ function TicketBehavior() {
         </p>
       </div>
 
-      <div className="card em-card" style={{ marginTop: 16 }}>
-        <h2>Encuesta de satisfacción</h2>
-        <p className="em-desc">
-          Cuando una incidencia creada desde el <b>portal</b> queda resuelta, el cliente puede valorarla
-          con 1-5 estrellas y dejar un comentario. Aparece <b>dentro del portal</b>, no se envía nada por
-          correo. Las notas se ven en cada ticket y en <b>Informes</b>.
-        </p>
-        <label className="fb-req-row" style={{ marginTop: 4 }}>
-          <span className="fb-switch"><input type="checkbox" checked={!!f.csat_active}
-            onChange={(e) => setF((s) => ({ ...s, csat_active: e.target.checked }))} /><span className={`fb-toggle ${f.csat_active ? 'on' : ''}`} /></span>
-          <span className="fb-req-label">Pedir valoración al cliente <span className="hint">· solo incidencias del portal</span></span>
-        </label>
-      </div>
-
       <GuardarAjustes save={save} saving={saving} />
     </>
   )
 }
 
-/* ---------------------------- Horario de atención ----------------------------
- * Cuándo se atiende. Es la base del SLA: fuera de horario el reloj se PARA, así
- * que un ticket que entra un viernes por la noche no consume plazo hasta el lunes.
- * No confundir con el cuadrante de turnos (quién trabaja cada semana).
+/* -------------------------------- SLA --------------------------------
+ * Interruptor general del SLA + avisos por correo + escalado. Los PLAZOS concretos
+ * se ponen por prioridad (minutos) y por categoría (horas); aquí está el maestro.
+ * Comparte datos con «Horario de atención» (mismo endpoint), pero es su propia pestaña
+ * para que no viva escondido dentro del horario.
  * ------------------------------------------------------------------------- */
-function BusinessHours() {
+function SlaSettings() {
   const toast = useToast()
-  const confirm = useConfirm()
   const [d, setD] = useState(null)
-  const [h, setH] = useState(null)          // { 1: [{opens,closes}], … }
-  const [saving, setSaving] = useState(false)
-  const [nuevo, setNuevo] = useState({ date: '', name: '' })
-
-  const load = useCallback(() => {
-    api.getBusinessHours().then((r) => { setD(r); setH(r.hours) })
-  }, [])
+  const load = useCallback(() => { api.getBusinessHours().then(setD) }, [])
   useEffect(() => { load() }, [load])
-
-  const setTramo = (dia, i, k, v) => setH((s) => {
-    const c = { ...s, [dia]: [...s[dia]] }; c[dia][i] = { ...c[dia][i], [k]: v }; return c
-  })
-  const addTramo = (dia) => setH((s) => ({ ...s, [dia]: [...s[dia], { opens: '09:00', closes: '18:00' }] }))
-  const delTramo = (dia, i) => setH((s) => ({ ...s, [dia]: s[dia].filter((_, j) => j !== i) }))
-  // Copiar el lunes al resto de días laborables: lo normal es que sean iguales.
-  const copiarLunes = () => setH((s) => ({ ...s, 2: clonar(s[1]), 3: clonar(s[1]), 4: clonar(s[1]), 5: clonar(s[1]) }))
-  const clonar = (arr) => (arr || []).map((t) => ({ ...t }))
-
-  const save = async () => {
-    setSaving(true)
-    const r = await api.saveBusinessHours(h)
-    setSaving(false)
-    if (r.ok) { toast('Horario guardado'); load() } else toast(r.error || 'Error', 'err')
-  }
-
-  const addFestivo = async () => {
-    if (!nuevo.date) { toast('Elige una fecha', 'err'); return }
-    const r = await api.addHoliday(nuevo.date, nuevo.name)
-    if (r.ok) { toast('Festivo añadido'); setNuevo({ date: '', name: '' }); load() }
-    else toast(r.error || 'Error', 'err')
-  }
-  const delFestivo = async (f) => {
-    if (!(await confirm({ title: 'Quitar festivo', message: `¿Quitar el ${fmtDia(f.date)}?`, danger: true, confirmText: 'Quitar' }))) return
-    const r = await api.delHoliday(f.id)
-    if (r.ok) { toast('Festivo quitado'); load() } else toast(r.error || 'Error', 'err')
-  }
-
-  if (!d || !h) return <div className="center-load"><div className="spinner" /></div>
+  if (!d) return <div className="center-load"><div className="spinner" /></div>
 
   return (
     <>
       <div className="cfg-head">
-        <h2>Horario de atención</h2>
-        <span className={`chip ${d.open_now ? 'abierto' : 'cerrado'} sm`}>{d.open_now ? 'Abierto ahora' : 'Cerrado ahora'}</span>
+        <h2>SLA</h2>
+        <span className={`chip ${d.sla_active ? 'abierto' : 'cerrado'} sm`}>{d.sla_active ? 'Activado' : 'Desactivado'}</span>
       </div>
       <p className="cfg-hint" style={{ margin: '0 0 14px', fontSize: 13 }}>
-        Sobre esto corre el reloj del <b>SLA</b>: fuera de horario se para, así que un ticket que entra un viernes
-        por la noche no consume plazo hasta el lunes. Puedes poner <b>varios tramos por día</b> (jornada partida);
-        si se solapan, se juntan solos. <b>{d.week_hours} h</b> de atención a la semana.
+        Los <b>relojes</b> de primera respuesta y de resolución. Los <b>plazos</b> concretos se ponen por
+        <b> prioridad</b> (minutos) y por <b>categoría</b> (horas); aquí van el interruptor general, los avisos por
+        correo y el escalado. El reloj corre sobre el <b>Horario de atención</b>.
       </p>
 
       {/* Interruptor general: apagarlo NO borra las horas de cada categoría. */}
@@ -987,9 +942,104 @@ function BusinessHours() {
       </div>
 
       {/* El reloj se para cuando la pelota no está en nuestro tejado. */}
-      <p className="cfg-hint" style={{ margin: '10px 0 14px', fontSize: 12.5 }}>
+      <p className="cfg-hint" style={{ margin: '10px 0 0', fontSize: 12.5 }}>
         El reloj también se <b>pausa</b> mientras el ticket está en <b>Esperando respuesta</b>, <b>Resuelto</b> o
         <b> Cerrado</b>: si el cliente tarda tres días en contestar, ese tiempo no cuenta como retraso vuestro.
+      </p>
+    </>
+  )
+}
+
+/* ------------------------- Satisfacción (CSAT) -------------------------
+ * La encuesta del PORTAL (1-5★ al resolver). Es lo que ve el cliente, por eso vive
+ * en «Contenido y respuestas» junto a «Portal y FAQ», no en el flujo interno.
+ * ------------------------------------------------------------------------- */
+function CsatSettings() {
+  const { f, setF, save, saving } = useAjustes(['csat_active'])
+  if (!f) return <div className="center-load"><div className="spinner" /></div>
+
+  return (
+    <>
+      <div className="cfg-head"><h2>Encuesta de satisfacción</h2></div>
+      <div className="card em-card">
+        <p className="em-desc">
+          Cuando una incidencia creada desde el <b>portal</b> queda resuelta, el cliente puede valorarla
+          con 1-5 estrellas y dejar un comentario. Aparece <b>dentro del portal</b>, no se envía nada por
+          correo. Las notas se ven en cada ticket y en <b>Informes</b>.
+        </p>
+        <label className="fb-req-row" style={{ marginTop: 4 }}>
+          <span className="fb-switch"><input type="checkbox" checked={!!f.csat_active}
+            onChange={(e) => setF((s) => ({ ...s, csat_active: e.target.checked }))} /><span className={`fb-toggle ${f.csat_active ? 'on' : ''}`} /></span>
+          <span className="fb-req-label">Pedir valoración al cliente <span className="hint">· solo incidencias del portal</span></span>
+        </label>
+        <GuardarAjustes save={save} saving={saving} />
+      </div>
+    </>
+  )
+}
+
+/* ---------------------------- Horario de atención ----------------------------
+ * Cuándo se atiende. Es la base del SLA: fuera de horario el reloj se PARA, así
+ * que un ticket que entra un viernes por la noche no consume plazo hasta el lunes.
+ * No confundir con el cuadrante de turnos (quién trabaja cada semana).
+ * ------------------------------------------------------------------------- */
+function BusinessHours() {
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [d, setD] = useState(null)
+  const [h, setH] = useState(null)          // { 1: [{opens,closes}], … }
+  const [saving, setSaving] = useState(false)
+  const [nuevo, setNuevo] = useState({ date: '', name: '' })
+
+  const load = useCallback(() => {
+    api.getBusinessHours().then((r) => { setD(r); setH(r.hours) })
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const setTramo = (dia, i, k, v) => setH((s) => {
+    const c = { ...s, [dia]: [...s[dia]] }; c[dia][i] = { ...c[dia][i], [k]: v }; return c
+  })
+  const addTramo = (dia) => setH((s) => ({ ...s, [dia]: [...s[dia], { opens: '09:00', closes: '18:00' }] }))
+  const delTramo = (dia, i) => setH((s) => ({ ...s, [dia]: s[dia].filter((_, j) => j !== i) }))
+  // Copiar el lunes al resto de días laborables: lo normal es que sean iguales.
+  const copiarLunes = () => setH((s) => ({ ...s, 2: clonar(s[1]), 3: clonar(s[1]), 4: clonar(s[1]), 5: clonar(s[1]) }))
+  const clonar = (arr) => (arr || []).map((t) => ({ ...t }))
+
+  const save = async () => {
+    setSaving(true)
+    const r = await api.saveBusinessHours(h)
+    setSaving(false)
+    if (r.ok) { toast('Horario guardado'); load() } else toast(r.error || 'Error', 'err')
+  }
+
+  const addFestivo = async () => {
+    if (!nuevo.date) { toast('Elige una fecha', 'err'); return }
+    const r = await api.addHoliday(nuevo.date, nuevo.name)
+    if (r.ok) { toast('Festivo añadido'); setNuevo({ date: '', name: '' }); load() }
+    else toast(r.error || 'Error', 'err')
+  }
+  const delFestivo = async (f) => {
+    if (!(await confirm({ title: 'Quitar festivo', message: `¿Quitar el ${fmtDia(f.date)}?`, danger: true, confirmText: 'Quitar' }))) return
+    const r = await api.delHoliday(f.id)
+    if (r.ok) { toast('Festivo quitado'); load() } else toast(r.error || 'Error', 'err')
+  }
+
+  if (!d || !h) return <div className="center-load"><div className="spinner" /></div>
+
+  return (
+    <>
+      <div className="cfg-head">
+        <h2>Horario de atención</h2>
+        <span className={`chip ${d.open_now ? 'abierto' : 'cerrado'} sm`}>{d.open_now ? 'Abierto ahora' : 'Cerrado ahora'}</span>
+      </div>
+      <p className="cfg-hint" style={{ margin: '0 0 14px', fontSize: 13 }}>
+        Sobre esto corre el reloj del <b>SLA</b>: fuera de horario se para, así que un ticket que entra un viernes
+        por la noche no consume plazo hasta el lunes. Puedes poner <b>varios tramos por día</b> (jornada partida);
+        si se solapan, se juntan solos. <b>{d.week_hours} h</b> de atención a la semana.
+      </p>
+
+      <p className="cfg-hint" style={{ margin: '0 0 14px', fontSize: 12.5 }}>
+        El interruptor del SLA, los avisos por correo y el escalado están ahora en la pestaña <b>SLA</b>.
       </p>
 
       <div className="card em-card">
