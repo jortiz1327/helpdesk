@@ -1582,18 +1582,6 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cmp-similar:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
 .cmp-similar:disabled { opacity: 0.6; cursor: default; }
 
-/* Documentos de la IA (base de conocimiento interna) */
-.kb-list { display: flex; flex-direction: column; gap: 8px; }
-.kb-doc { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); transition: opacity 0.15s; }
-.kb-doc.off { opacity: 0.55; }
-.kb-ic { width: 36px; height: 36px; border-radius: 9px; background: var(--primary-soft); display: grid; place-items: center; flex: none; }
-.kb-ic svg { width: 17px; height: 17px; fill: var(--primary); }
-.kb-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.kb-open { border: 0; background: none; text-align: left; cursor: pointer; padding: 0; font: inherit; align-items: flex-start; }
-.kb-open:hover b { color: var(--primary); text-decoration: underline; }
-.kb-body b { font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.kb-sub { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 /* Separador «conversación más reciente» dentro del hilo del ticket */
 /* Respuesta PROGRAMADA en el hilo: aún no enviada, ámbar, con editar/cancelar. */
 .tk-sched { align-self: flex-end; max-width: 82%; margin: 4px 0 2px; border: 1px dashed var(--warn, #d99024);

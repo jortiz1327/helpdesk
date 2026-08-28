@@ -511,7 +511,6 @@ export const api = {
   saveSettings: (payload) => req('settings.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
-  testConnection: () => req('settings.php?action=test'),
   getSettings: () => req('settings.php?action=get'),
   // Números de WhatsApp (opción B: enrutado por número). Solo superadmin.
   waNumbers: () => req('whatsapp_numbers.php'),

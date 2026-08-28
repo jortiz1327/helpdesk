@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
-use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /** Portado de api/settings.php — solo admin. Dispatch por ?action=. */
 class SettingsController extends Controller
 {
-    public function handle(Request $request, WhatsAppService $wa)
+    public function handle(Request $request)
     {
         $action = $request->query('action', '');
 
@@ -19,9 +18,6 @@ class SettingsController extends Controller
         }
         if ($action === 'save' && $request->isMethod('post')) {
             return $this->save($request);
-        }
-        if ($action === 'test') {
-            return $this->test($wa);
         }
         return response()->json(['error' => 'Acción no válida'], 400);
     }
@@ -39,17 +35,14 @@ class SettingsController extends Controller
             Setting::put('wa_verify_token', $verifyToken);
         }
 
+        // La conexión con Meta (token, phone_number_id, WABA, App Secret) se configura
+        // POR NÚMERO en whatsapp_numbers; aquí solo quedan el nombre del negocio, el
+        // Verify Token del webhook (global) y el mensaje de consentimiento.
         return response()->json([
             'business_name'      => Setting::get('business_name'),
-            'wa_phone_number_id' => Setting::get('wa_phone_number_id'),
-            'wa_business_id'     => Setting::get('wa_business_id'),
-            'wa_app_id'          => Setting::get('wa_app_id'),
-            'wa_token'           => Setting::get('wa_token'),
-            'wa_app_secret'      => Setting::get('wa_app_secret'),
             'wa_verify_token'    => $verifyToken,
-            // Firma del webhook: activa solo si hay App Secret configurado
-            // Firma activa si hay App Secret global O en cualquier número de la Opción B
-            // (el webhook usa el App Secret del número dueño del evento).
+            // Firma del webhook: activa si hay App Secret global (legacy) O en cualquier
+            // número de la Opción B (el webhook usa el App Secret del número del evento).
             'webhook_signature_active' => (string) Setting::get('wa_app_secret', '') !== ''
                 || \App\Models\WhatsAppNumber::whereNotNull('app_secret')->where('app_secret', '!=', '')->exists(),
             'account_verified'   => (string) Setting::get('account_verified', '0') === '1',
@@ -68,7 +61,7 @@ class SettingsController extends Controller
     protected function save(Request $request)
     {
         $in = $request->all();
-        $allowed = ['wa_token', 'wa_phone_number_id', 'wa_business_id', 'wa_app_id', 'wa_app_secret', 'wa_verify_token', 'business_name', 'consent_message'];
+        $allowed = ['wa_verify_token', 'business_name', 'consent_message'];
         foreach ($allowed as $k) {
             if (array_key_exists($k, $in)) {
                 Setting::put($k, trim((string) $in[$k]));
@@ -88,18 +81,6 @@ class SettingsController extends Controller
             Setting::put('daily_send_cap', (string) max(0, (int) $in['daily_send_cap']));
         }
         return response()->json(['ok' => true]);
-    }
-
-    protected function test(WhatsAppService $wa)
-    {
-        $phoneId = Setting::get('wa_phone_number_id');
-        [$code, $res] = $wa->graph('GET', (string) $phoneId, null, [
-            'fields' => 'verified_name,display_phone_number,quality_rating,platform_type',
-        ]);
-        if ($code >= 200 && $code < 300 && !empty($res['display_phone_number'])) {
-            return response()->json(['ok' => true, 'info' => $res]);
-        }
-        return response()->json(['ok' => false, 'error' => $res['error']['message'] ?? 'No se pudo conectar']);
     }
 
     /** Texto por defecto del mensaje de consentimiento. */
