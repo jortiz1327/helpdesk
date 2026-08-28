@@ -8,8 +8,8 @@ use App\Models\TicketPriority;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Lógica central del ticket: creación, código legible, router de mensajes
- * entrantes, cambios de estado y auditoría.
+ * Lógica central del ticket: creación, código legible, cambios de estado y
+ * auditoría.
  */
 class TicketService
 {
@@ -133,113 +133,6 @@ class TicketService
                 usleep(50_000 * $intento);   // pequeña espera creciente antes de reintentar
             }
         }
-    }
-
-    /**
-     * EL ROUTER (decisión núcleo del sistema).
-     *
-     * Llega un mensaje de un contacto por un canal:
-     *   ¿tiene un ticket ABIERTO en ese canal?  → se añade a ese ticket
-     *   si no                                   → se crea uno nuevo
-     *
-     * Devuelve el id del ticket al que pertenece el mensaje.
-     */
-    public function routeIncoming(int $contactId, string $channel, string $preview = ''): int
-    {
-        // WhatsApp: un contacto = UN ticket (todo el chat junto). Tiene su propia ruta.
-        if ($channel === 'whatsapp') {
-            return $this->routeWhatsapp($contactId, $preview);
-        }
-
-        return DB::transaction(function () use ($contactId, $channel, $preview) {
-            $open = DB::table('tickets')
-                ->where('contact_id', $contactId)
-                ->where('channel', $channel)
-                ->whereIn('status', self::OPEN_STATUSES)
-                ->orderByDesc('id')
-                ->lockForUpdate()
-                ->first();
-
-            if ($open) {
-                DB::table('tickets')->where('id', $open->id)->update(['last_message_at' => now()]);
-                return (int) $open->id;
-            }
-
-            return $this->create([
-                'contact_id' => $contactId,
-                'channel'    => $channel,
-                'subject'    => $this->subjectFrom($preview),
-                'body'       => $preview,   // contexto para las reglas automáticas
-            ]);
-        });
-    }
-
-    /**
-     * WhatsApp: el mensaje entrante se pega SIEMPRE al mismo ticket del contacto.
-     *
-     *  · No tiene ninguno              → se crea (conversación reciente = ahora).
-     *  · Tiene uno resuelto/cerrado    → se REABRE y empieza conversación reciente.
-     *  · Tiene uno abierto pero llevaba
-     *    mucho callado (> N días)      → mismo ticket, pero se marca una
-     *                                     conversación reciente nueva (separador).
-     *  · Tiene uno abierto y activo    → mismo ticket, misma conversación.
-     */
-    private function routeWhatsapp(int $contactId, string $preview): int
-    {
-        return DB::transaction(function () use ($contactId, $preview) {
-            $t = DB::table('tickets')
-                ->where('contact_id', $contactId)
-                ->where('channel', 'whatsapp')
-                ->orderByDesc('id')
-                ->lockForUpdate()
-                ->first(['id', 'status', 'last_message_at', 'subject_pending']);
-
-            $conEnjundia = !$this->esSaludo($preview);   // ¿sirve como asunto?
-
-            if (!$t) {
-                $id = $this->create([
-                    'contact_id'         => $contactId,
-                    'channel'            => 'whatsapp',
-                    'subject'            => $this->subjectFrom($preview),
-                    'body'               => $preview,
-                    'conversation_since' => now(),
-                ]);
-                // Si abrió con un saludo, el asunto real llega en el próximo mensaje.
-                if (!$conEnjundia) DB::table('tickets')->where('id', $id)->update(['subject_pending' => 1]);
-                return $id;
-            }
-
-            // ¿Empieza una conversación NUEVA? Si estaba cerrado/resuelto, o si llevaba
-            // más de N días sin actividad (hueco = nuevo asunto, aunque no se cerrara).
-            $cerrado    = in_array($t->status, ['resuelto', 'cerrado'], true);
-            $gap        = max(1, (int) Setting::get('wa_nueva_conversacion_dias', '7'));
-            // OJO Carbon 3: diffInDays() devuelve valor CON SIGNO (en 2 era absoluto), y
-            // last_message_at es pasado → sin `true` daría negativo y esta rama nunca se
-            // dispararía (un contacto que reaparece tras semanas no arrancaría asunto nuevo).
-            $silencio   = $t->last_message_at && now()->diffInDays($t->last_message_at, true) >= $gap;
-            $nuevaRacha = $cerrado || $silencio;
-
-            // Reabrir limpiamente (borra resolved/closed, rehace SLA, registra evento).
-            if ($cerrado) {
-                $this->setStatus((int) $t->id, self::defaultStatus(), null);
-            }
-
-            $upd = ['last_message_at' => now()];
-            if ($nuevaRacha) {
-                $upd['conversation_since'] = now();
-                // El asunto pasa a reflejar la conversación NUEVA. Si es un saludo,
-                // se deja pendiente y lo rellenará el próximo mensaje con enjundia.
-                if ($conEnjundia) { $upd['subject'] = $this->subjectFrom($preview); $upd['subject_pending'] = 0; }
-                else              { $upd['subject_pending'] = 1; }
-            } elseif ($t->subject_pending && $conEnjundia) {
-                // Seguimos en la conversación recién abierta y por fin llega el tema real.
-                $upd['subject'] = $this->subjectFrom($preview);
-                $upd['subject_pending'] = 0;
-            }
-            DB::table('tickets')->where('id', $t->id)->update($upd);
-
-            return (int) $t->id;
-        });
     }
 
     /** Id del ticket abierto de un contacto en un canal, o null si no tiene ninguno. */
@@ -838,24 +731,4 @@ class TicketService
         ]);
     }
 
-    /** Asunto provisional a partir del primer mensaje (el usuario podrá editarlo). */
-    protected function subjectFrom(string $text): string
-    {
-        $t = trim(preg_replace('/\s+/', ' ', $text));
-        if ($t === '') return 'Nueva conversación';
-        return mb_substr($t, 0, 80) . (mb_strlen($t) > 80 ? '…' : '');
-    }
-
-    /**
-     * ¿El mensaje es un saludo/relleno sin sustancia? (No sirve como asunto.)
-     * Se usa para no dejar «Hola» de asunto cuando una conversación nueva abre así.
-     */
-    protected function esSaludo(string $text): bool
-    {
-        $t = trim(preg_replace('/\s+/', ' ', mb_strtolower($text)));
-        // Sin emojis, para medir de verdad.
-        $limpio = trim(preg_replace('/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}]/u', '', $t));
-        if (mb_strlen($limpio) < 12) return true;
-        return (bool) preg_match('/^(hola|buenas|buenos d[ií]as|buenas tardes|buenas noches|hey|hi|ola|bon dia|bones|gr[àa]cies|gracias|ok|vale|perfecto|adi[oó]s|hasta luego)[\s!¡.,:;)\-]*$/u', $t);
-    }
 }

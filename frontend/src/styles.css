@@ -1561,20 +1561,9 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .wn-banner.err { border-color: var(--danger); } .wn-banner.err svg { fill: var(--danger); } .wn-banner.err b { color: #ff8a82; }
 .wn-banner.warn { border-color: #e0a63a; } .wn-banner.warn svg { fill: #e0a63a; } .wn-banner.warn b { color: #c98a1e; }
 
-/* Agente de IA: selector de modo (borrador/auto) y pie con interruptor + guardar */
-.ai-modo { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-.ai-radio { display: flex; flex-direction: column; gap: 1px; flex: 1 1 200px; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--panel); cursor: pointer; transition: 0.14s; }
-.ai-radio:hover { border-color: var(--line-2); }
-.ai-radio input { position: absolute; opacity: 0; pointer-events: none; }
-.ai-radio b { font-size: 13.5px; color: var(--ink); }
-.ai-radio span { font-size: 12px; color: var(--ink-2); }
-.ai-radio.on { border-color: var(--primary); background: var(--primary-soft); }
-.ai-radio.on b { color: var(--primary); }
-.ai-foot { display: flex; align-items: center; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
-
-/* Botón «Sugerir (IA)» del compositor */
-.cmp-ia { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); color: var(--ink-2); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: 0.14s; }
-.cmp-ia svg { width: 14px; height: 14px; fill: currentColor; }
+/* Botón «Parecidas» del compositor (memoria de respuestas efectivas) */
+.cmp-similar { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); color: var(--ink-2); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: 0.14s; }
+.cmp-similar svg { width: 14px; height: 14px; fill: currentColor; }
 
 /* Estrella para guardar una respuesta enviada como «efectiva» */
 .tk-star { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 6px; border: 0; background: transparent; color: var(--ink-3); cursor: pointer; border-radius: 6px; vertical-align: middle; opacity: 0; transition: 0.14s; }
@@ -1590,14 +1579,8 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cmp-ef-item:hover { background: var(--hover); }
 .cmp-ef-tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmp-ef-uses { flex: none; font-size: 11px; font-weight: 700; color: var(--primary); background: var(--primary-soft); padding: 1px 7px; border-radius: 999px; }
-.cmp-ia:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
-.cmp-ia:disabled { opacity: 0.6; cursor: default; }
-.cmp-ia-star { font-size: 13px; line-height: 1; }
-.cmp-ia-spin { width: 13px; height: 13px; border: 2px solid var(--line-2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
-/* Avisos de guardarraíles de la IA (líneas rojas a revisar antes de enviar) */
-.cmp-ia-avisos { display: flex; flex-direction: column; gap: 5px; margin: 8px 2px 0; }
-.cmp-ia-aviso { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 9px; background: rgba(224,166,58,0.12); border: 1px solid rgba(224,166,58,0.4); color: #a9750f; font-size: 12.5px; font-weight: 600; }
-.cmp-ia-aviso svg { width: 15px; height: 15px; fill: #e0a63a; flex: none; }
+.cmp-similar:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.cmp-similar:disabled { opacity: 0.6; cursor: default; }
 
 /* Documentos de la IA (base de conocimiento interna) */
 .kb-list { display: flex; flex-direction: column; gap: 8px; }
@@ -2604,6 +2587,13 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .feat-badge { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 20px; flex: 0 0 auto; white-space: nowrap; }
 .feat-badge.ok { background: var(--secondary-soft, #e7f7ef); color: var(--secondary, #14a06a); }
 .feat-badge.off { background: var(--md-soft, #fbf0dc); color: var(--warn, #b9760a); }
+/* Salud de la recogida de correo: verde reciente / ámbar sin recoger aún / rojo parada. */
+.feat-badge.wait { background: var(--md-soft, #fbf0dc); color: var(--warn, #b9760a); }
+.feat-badge.stale { background: var(--danger-soft, #fbe9e7); color: var(--danger, #c0392b); }
+.feat-badge .feat-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 7px; vertical-align: middle; }
+.feat-badge.ok .feat-dot { animation: feat-pulse 2s ease-in-out infinite; }
+@keyframes feat-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .feat-badge.ok .feat-dot { animation: none; } }
 
 /* Categorías: tarjetas */
 .cfg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }

@@ -77,8 +77,6 @@ function ago(s) {
   return dd === 1 ? 'ayer' : `hace ${dd} días`
 }
 
-const CHANNEL = { email: 'Correo', web: 'Web' }
-
 /* --- SLA: etiqueta del reloj ---
  * met/missed = ya se cumplió (a tiempo o tarde) · ok/warn/late = sigue corriendo.
  * Solo se pinta lo que pide atención: lo que va bien no ensucia la lista. */

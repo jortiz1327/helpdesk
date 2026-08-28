@@ -4,15 +4,16 @@ import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
 import WhatsAppNumbers from './WhatsAppNumbers.jsx'
 
-const FIELDS = ['business_name', 'wa_phone_number_id', 'wa_business_id', 'wa_app_id', 'wa_token', 'wa_app_secret', 'wa_verify_token', 'consent_message']
+// La conexión con Meta (token, phone_number_id, WABA, App Secret) se configura
+// POR NÚMERO en <WhatsAppNumbers>; aquí solo quedan el Verify Token del webhook
+// (global) y el mensaje de consentimiento.
+const FIELDS = ['business_name', 'wa_verify_token', 'consent_message']
 
 export default function Settings({ embedded = false }) {
   const toast = useToast()
   const [f, setF] = useState(null)
   const [webhook, setWebhook] = useState('')
   const [saving, setSaving] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [conn, setConn] = useState({ state: 'idle', info: null, error: '' })
   const [verified, setVerified] = useState(false)
   const [consentOn, setConsentOn] = useState(true)
   const [sigActive, setSigActive] = useState(false)
@@ -37,29 +38,14 @@ export default function Settings({ embedded = false }) {
     setSaving(true)
     const res = await api.saveSettings({ ...f, consent_enabled: consentOn ? 1 : 0 })
     setSaving(false)
-    if (res.ok) setSigActive(!!(f.wa_app_secret || '').trim())
+    // El estado de la firma lo decide el backend (App Secret de un número), no
+    // un campo de este formulario: se refleja tal cual al cargar la pantalla.
     toast(res.ok ? 'Configuración guardada' : 'Error al guardar', res.ok ? 'ok' : 'err')
-  }
-
-  const test = async () => {
-    setTesting(true); setConn({ state: 'testing', info: null, error: '' })
-    const res = await api.testConnection()
-    setTesting(false)
-    if (res.ok) { setConn({ state: 'ok', info: res.info, error: '' }); toast('Conexión correcta') }
-    else { setConn({ state: 'err', info: null, error: res.error || 'No se pudo conectar' }) }
   }
 
   const copy = (val) => { navigator.clipboard?.writeText(val); toast('Copiado al portapapeles') }
 
   if (!f) return <div className="center-load"><div className="spinner" /></div>
-
-  const pill = conn.state === 'ok'
-    ? <span className="pill ok"><span className="dot" />Conectado</span>
-    : conn.state === 'err'
-      ? <span className="pill err"><span className="dot" />Error</span>
-      : conn.state === 'testing'
-        ? <span className="pill gray"><span className="dot" />Comprobando…</span>
-        : <span className="pill gray"><span className="dot" />Sin verificar</span>
 
   return (
     <>
@@ -128,7 +114,7 @@ export default function Settings({ embedded = false }) {
 
           <div className="card">
             <h2>Verificación de Meta</h2>
-            <p className="desc">Algunas acciones (publicar/enviar formularios nativos, borrar plantillas) están <b>bloqueadas con candado</b> porque la cuenta de prueba de Meta no las permite. Activa esto <b>solo cuando</b> el negocio "Aeme Group" esté verificado en Meta y hayas puesto arriba su WABA real.</p>
+            <p className="desc">Algunas acciones (publicar/enviar formularios nativos, borrar plantillas) están <b>bloqueadas con candado</b> porque la cuenta de prueba de Meta no las permite. Activa esto <b>solo cuando</b> {f.business_name ? `el negocio "${f.business_name}"` : 'tu negocio'} esté verificado en Meta y hayas puesto arriba su WABA real.</p>
             <label className="fb-req-row" style={{ marginTop: 4 }}>
               <span className="fb-switch"><input type="checkbox" checked={verified} onChange={(e) => toggleVerified(e.target.checked)} /><span className={`fb-toggle ${verified ? 'on' : ''}`} /></span>
               <span className="fb-req-label">Cuenta de Meta verificada (levantar candados)</span>

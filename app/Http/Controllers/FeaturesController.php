@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\EmailAccount;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * PANEL DE FUNCIONES (solo superadmin). Un único sitio para ver y encender/apagar las
@@ -45,6 +46,23 @@ class FeaturesController extends Controller
 
         $buzon = EmailAccount::where('active', true)->whereNotNull('smtp_host')->exists();
 
+        // SALUD DE LA RECOGIDA (IMAP). El correo es el canal del helpdesk: aquí se ve de un
+        // vistazo si de verdad está entrando. La señal es `last_check_at` (lo actualiza
+        // email:fetch cada minuto). Si lleva rato parada, casi siempre es que el planificador
+        // (schedule:run) no corre en el servidor — el fallo más típico y silencioso.
+        $imapActivas = EmailAccount::where('active', true)->whereNotNull('imap_host')->count();
+        $ultimaRaw   = EmailAccount::where('active', true)->whereNotNull('imap_host')->max('last_check_at');
+        $intake = $this->saludRecogida($imapActivas, $ultimaRaw);
+
+        $correo = array_values(array_filter([
+            // Informativo: no es un interruptor, es «dar de alta el buzón».
+            ['key' => 'email_channel', 'type' => 'info', 'label' => 'Canal de correo',
+             'desc' => 'Convierte los correos entrantes en tickets y permite responder por email.',
+             'value' => $buzon, 'note' => $buzon ? null : 'Falta dar de alta el buzón — ve a «Correo → Buzón y envío».'],
+            $intake,
+            $this->flag('email_footer_active', 'bool', 'Pie de correos', 'Añade un pie fijo a los correos salientes.', $g('email_footer_active') === '1'),
+        ]));
+
         $grupos = [
             ['grupo' => 'SLA', 'items' => [
                 $this->flag('sla_active', 'bool', 'SLA', 'Relojes de primera respuesta y de resolución.', $g('sla_active', '1') === '1'),
@@ -56,16 +74,47 @@ class FeaturesController extends Controller
                 $this->flag('ticket_autoclose_days', 'int', 'Auto-cierre de resueltos', 'Cierra los tickets tras N días resueltos sin actividad (0 = apagado).', (int) $g('ticket_autoclose_days', '0')),
                 $this->flag('ticket_lock_minutes', 'int', 'Bloqueo por colisión', 'Minutos que un agente «toma» un ticket para que otro no escriba encima (0 = apagado).', (int) $g('ticket_lock_minutes', '2')),
             ]],
-            ['grupo' => 'Correo', 'items' => [
-                $this->flag('email_footer_active', 'bool', 'Pie de correos', 'Añade un pie fijo a los correos salientes.', $g('email_footer_active') === '1'),
-                // Informativo: no es un interruptor, es «dar de alta el buzón».
-                ['key' => 'email_channel', 'type' => 'info', 'label' => 'Canal de correo',
-                 'desc' => 'Convierte los correos entrantes en tickets y permite responder por email.',
-                 'value' => $buzon, 'note' => $buzon ? null : 'Falta dar de alta el buzón — ve a «Correo → Buzón y envío».'],
-            ]],
+            ['grupo' => 'Correo', 'items' => $correo],
         ];
 
         return response()->json(['ok' => true, 'grupos' => $grupos]);
+    }
+
+    /**
+     * Estado de la recogida IMAP como ítem «health» (verde reciente / rojo parada /
+     * ámbar aún sin recoger). Devuelve null si no hay ningún buzón IMAP dado de alta
+     * (en ese caso ya lo dice el ítem «Canal de correo»).
+     */
+    protected function saludRecogida(int $imapActivas, $ultimaRaw): ?array
+    {
+        if ($imapActivas === 0) {
+            return null;
+        }
+        $base = ['key' => 'email_intake', 'type' => 'health', 'label' => 'Recogida de correo',
+                 'desc' => 'Cada minuto se leen los buzones IMAP y los correos nuevos entran como tickets.'];
+
+        if (!$ultimaRaw) {
+            return $base + ['state' => 'wait', 'value' => 'aún sin recoger',
+                'note' => 'Todavía no se ha recogido correo. Si acabas de configurar el buzón, espera un minuto; si no, revisa que el planificador (schedule:run) esté activo en el servidor.'];
+        }
+
+        $mins = (int) Carbon::parse($ultimaRaw)->diffInMinutes(now());
+        $hace = 'hace ' . $this->humano($mins);
+        if ($mins <= 5) {
+            return $base + ['state' => 'ok', 'value' => $hace, 'note' => null];
+        }
+        return $base + ['state' => 'stale', 'value' => $hace,
+            'note' => 'La última recogida fue ' . $hace . '. El correo no está entrando: probablemente el planificador (schedule:run) no corre en el servidor.'];
+    }
+
+    /** Minutos → texto humano corto («8 min», «3 h», «2 días»). */
+    protected function humano(int $mins): string
+    {
+        if ($mins < 1)    return 'un momento';
+        if ($mins < 60)   return $mins . ' min';
+        if ($mins < 1440) return intdiv($mins, 60) . ' h';
+        $d = intdiv($mins, 1440);
+        return $d . ($d === 1 ? ' día' : ' días');
     }
 
     protected function flag(string $key, string $type, string $label, string $desc, $value, ?string $note = null): array

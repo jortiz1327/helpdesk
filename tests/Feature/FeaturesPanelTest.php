@@ -43,11 +43,11 @@ class FeaturesPanelTest extends TestCase
         $r->assertOk();
         $this->assertNotEmpty($r->json('grupos'));
 
-        // Encender la IA.
+        // Encender un interruptor booleano (el escalado de SLA).
         $this->withHeader('X-App-Token', $token)
-            ->postJson('/api/features.php?action=set', ['key' => 'ia_activa', 'value' => true])
+            ->postJson('/api/features.php?action=set', ['key' => 'sla_escalate_active', 'value' => true])
             ->assertOk();
-        $this->assertSame('1', Setting::get('ia_activa'));
+        $this->assertSame('1', Setting::get('sla_escalate_active'));
 
         // Un número (auto-cierre).
         $this->withHeader('X-App-Token', $token)

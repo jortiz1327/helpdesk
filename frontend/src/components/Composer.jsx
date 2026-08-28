@@ -2,7 +2,6 @@ import { useRef, useState, useEffect } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import RichInput from './RichInput.jsx'
-import LockTip from './LockTip.jsx'
 
 const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
 
@@ -12,7 +11,7 @@ const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
  * En los tickets de correo lleva además los DESTINATARIOS: quien venía en copia en
  * el hilo sigue en la conversación, así que se propone solo y el agente decide.
  */
-export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], replyLock = null, replyNote = '', ticketId = null, cannedVars = null, mentionUsers = null, canSchedule = false }) {
+export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], ticketId = null, cannedVars = null, mentionUsers = null, canSchedule = false }) {
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
   const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
@@ -45,12 +44,6 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
     const tmp = document.createElement('div'); tmp.innerHTML = e.body || ''
     return (tmp.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90) || '(respuesta)'
   }
-
-  /* Candado SOLO del envío al cliente (p. ej. WhatsApp de soporte sin configurar):
-     capa el modo «Responder», pero la NOTA INTERNA sigue libre (no sale al cliente),
-     y cambiar estados tampoco se toca. En nota interna el candado no aplica. */
-  const bloqueoResp = !note && !!replyLock
-  const off = disabled || bloqueoResp
 
   const [cc, setCc] = useState([])
   const [bcc, setBcc] = useState([])
@@ -107,7 +100,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
 
   return (
     <div className={`cmp-wrap ${note ? 'note-mode' : ''}`} onKeyDown={(e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !off && !empty) send()
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !disabled && !empty) send()
     }}>
       {/* Conmutador: responder al cliente vs nota interna (solo la ven los agentes) */}
       <div className="cmp-mode">
@@ -144,32 +137,23 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
       {/* canned = activa el menú «/» de respuestas predefinidas */}
       <RichInput
         ref={ed}
-        disabled={off}
+        disabled={disabled}
         canned
         cannedVars={cannedVars}
         mentionUsers={note ? mentionUsers : null}
         minHeight={84}
         placeholder={disabled ? (disabledHint || 'No disponible')
-          : bloqueoResp ? 'Envío al cliente bloqueado — puedes cambiar a «Nota interna»'
           : note ? 'Escribe una nota interna… (solo la verán los agentes)'
           : 'Escribe tu respuesta… (o / para respuestas rápidas)'}
         onChange={guardarBorrador}
       />
       <div className="cmp-foot">
         {disabled && <span className="cmp-warn"><Icon.warn /> {disabledHint}</span>}
-        {/* Candado del envío al cliente: el motivo con su detalle (LockTip). */}
-        {!disabled && bloqueoResp && (
-          <span className="cmp-warn"><Icon.lock /> {replyLock.title} <LockTip info={replyLock} /></span>
-        )}
-        {/* Aviso de «modo prueba» (número de pruebas de Meta), solo al responder. */}
-        {!disabled && !bloqueoResp && !note && replyNote && (
-          <span className="cmp-note-tag test"><Icon.warn /> {replyNote}</span>
-        )}
         {!disabled && note && <span className="cmp-note-tag"><Icon.lock /> No se envía al cliente</span>}
         {/* Respuestas efectivas parecidas: memoria de lo que funcionó en casos similares. */}
-        {!disabled && !bloqueoResp && !note && efectivas.length > 0 && (
+        {!disabled && !note && efectivas.length > 0 && (
           <div className="cmp-ef">
-            <button type="button" className="cmp-ia" onClick={() => setVerEf((v) => !v)}
+            <button type="button" className="cmp-similar" onClick={() => setVerEf((v) => !v)}
               title="Respuestas que funcionaron en casos parecidos">
               <Icon.bolt /> Parecidas ({efectivas.length})
             </button>
@@ -189,15 +173,15 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
         <span className="spacer" />
         <span className="cmp-hint">Ctrl + Enter</span>
         {note || !canSchedule ? (
-          <button className={`btn ${note ? 'note-btn' : ''}`} disabled={off || empty} onClick={() => send()}>
+          <button className={`btn ${note ? 'note-btn' : ''}`} disabled={disabled || empty} onClick={() => send()}>
             {note ? <><Icon.note /> Guardar nota</> : <><Icon.send /> Enviar respuesta</>}
           </button>
         ) : (
           <span className="cmp-split" ref={schedRef}>
-            <button className="btn cmp-split-go" disabled={off || empty} onClick={() => send()}>
+            <button className="btn cmp-split-go" disabled={disabled || empty} onClick={() => send()}>
               <Icon.send /> Enviar respuesta
             </button>
-            <button className="btn cmp-split-caret" disabled={off || empty}
+            <button className="btn cmp-split-caret" disabled={disabled || empty}
               onClick={() => setSchedOpen((v) => !v)} title="Programar el envío">▾</button>
             {schedOpen && (
               <div className="cmp-sched">

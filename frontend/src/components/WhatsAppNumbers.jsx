@@ -6,8 +6,8 @@ import InfoTip from './InfoTip.jsx'
 
 /* -------------------------------------------------------------------------
  * NÚMEROS DE WHATSAPP (opción B). Un webhook, varios números; cada mensaje se
- * enruta por su `phone_number_id` a su FUNCIÓN (Soporte → tickets · Campañas →
- * chat/flujos). Cada campo lleva su pista (?) para poder configurarlo a mano.
+ * enruta por su `phone_number_id`. Todo el WhatsApp entrante es de Campañas
+ * (chat en vivo / flujos). Cada campo lleva su pista (?) para configurarlo a mano.
  * ---------------------------------------------------------------------- */
 
 const FUNC = { campanas: { label: 'Campañas', color: '#12925a', icon: Icon.send, hint: 'chat en vivo / flujos' } }
@@ -109,34 +109,33 @@ export default function WhatsAppNumbers() {
       {form && (
         <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setForm(null)}>
           <div className="modal" style={{ maxWidth: 560 }}>
-            <div className="modal-head"><h3>{form.id ? 'Editar número' : 'Añadir número de WhatsApp'}</h3><button className="x" onClick={() => setForm(null)}>×</button></div>
+            <div className="modal-head">
+              <h3>{form.id ? 'Editar número' : 'Añadir número de WhatsApp'} <span className="wa-num-func" style={{ marginLeft: 6 }}>Campañas</span></h3>
+              <button className="x" onClick={() => setForm(null)}>×</button>
+            </div>
             <div className="modal-body">
               <div className="grid2">
                 <label className="field"><span className="lbl">Etiqueta <em>*</em> <InfoTip text="Un nombre para reconocerlo, p. ej. «Campañas»." /></span>
                   <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="Campañas" autoFocus /></label>
-                <label className="field"><span className="lbl">Función <InfoTip text="Los mensajes de este número alimentan el chat en vivo y los flujos de Campañas." /></span>
-                  <input value="Campañas" readOnly disabled /></label>
-              </div>
-
-              <div className="grid2">
                 <label className="field"><span className="lbl">Entorno <InfoTip text="«Pruebas» = el número gratis que da Meta (solo escribe a destinatarios que registres en la app). «Real» = un número verificado de producción, para escribir a cualquier cliente." /></span>
                   <select value={form.entorno} onChange={(e) => setForm((f) => ({ ...f, entorno: e.target.value }))}>
                     <option value="prueba">Número de pruebas de Meta</option>
                     <option value="real">Número real (producción)</option>
                   </select></label>
+              </div>
+
+              <div className="grid2">
                 <label className="field"><span className="lbl">ID del número <InfoTip text="El phone_number_id. En Meta → tu App → WhatsApp → Configuración de la API. OJO: es el ID, no el número de teléfono en sí." /></span>
                   <input className="mono" value={form.phone_number_id} onChange={(e) => setForm((f) => ({ ...f, phone_number_id: e.target.value }))} placeholder="1186960007840194" /></label>
+                <label className="field"><span className="lbl">WABA ID <span className="hint">(opcional)</span> <InfoTip text="ID de la cuenta de WhatsApp Business. Informativo." /></span>
+                  <input className="mono" value={form.waba_id} onChange={(e) => setForm((f) => ({ ...f, waba_id: e.target.value }))} placeholder="106735…" /></label>
               </div>
 
               <label className="field"><span className="lbl">Token de acceso {form.id ? <span className="hint">(vacío = no cambiar)</span> : null} <InfoTip text="El token de la app (Meta → WhatsApp → Configuración de la API) o un token permanente de Usuario del Sistema. Vale para todos los números de su WABA." wide /></span>
                 <textarea className="mono" rows={2} value={form.token} onChange={(e) => setForm((f) => ({ ...f, token: e.target.value }))} placeholder={form.id ? '••••••••  (déjalo vacío para conservar el actual)' : 'EAAV…'} /></label>
 
-              <div className="grid2">
-                <label className="field"><span className="lbl">App Secret {form.id ? <span className="hint">(vacío = no cambiar)</span> : null} <InfoTip text="Meta → tu App → Configuración → Básica → Clave secreta. Sirve para verificar la firma del webhook (que los eventos vienen de Meta). Recomendado antes de producción." wide /></span>
-                  <input className="mono" type="password" value={form.app_secret} onChange={(e) => setForm((f) => ({ ...f, app_secret: e.target.value }))} placeholder={form.id ? '••••••••' : 'Clave secreta de la app'} /></label>
-                <label className="field"><span className="lbl">WABA ID <span className="hint">(opcional)</span> <InfoTip text="ID de la cuenta de WhatsApp Business. Informativo." /></span>
-                  <input className="mono" value={form.waba_id} onChange={(e) => setForm((f) => ({ ...f, waba_id: e.target.value }))} placeholder="106735…" /></label>
-              </div>
+              <label className="field"><span className="lbl">App Secret {form.id ? <span className="hint">(vacío = no cambiar)</span> : null} <InfoTip text="Meta → tu App → Configuración → Básica → Clave secreta. Sirve para verificar la firma del webhook (que los eventos vienen de Meta). Recomendado antes de producción." wide /></span>
+                <input className="mono" type="password" value={form.app_secret} onChange={(e) => setForm((f) => ({ ...f, app_secret: e.target.value }))} placeholder={form.id ? '••••••••' : 'Clave secreta de la app'} /></label>
 
               <label className="fb-req-row" style={{ marginTop: 2 }}>
                 <span className="fb-switch"><input type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} /><span className={`fb-toggle ${form.active ? 'on' : ''}`} /></span>

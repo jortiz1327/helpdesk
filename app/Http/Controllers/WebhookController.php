@@ -7,7 +7,6 @@ use App\Models\WhatsAppNumber;
 use App\Services\CampaignService;
 use App\Services\ChatService;
 use App\Services\FlowEngine;
-use App\Services\TicketService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +19,6 @@ class WebhookController extends Controller
         protected FlowEngine $flow,
         protected WhatsAppService $wa,
         protected CampaignService $campaigns,
-        protected TicketService $tickets,
     ) {}
 
     public function handle(Request $request)
@@ -42,7 +40,7 @@ class WebhookController extends Controller
         /*
          * VERIFICACIÓN DE FIRMA (X-Hub-Signature-256).
          * Meta firma el cuerpo con el App Secret (HMAC-SHA256). Sin esto, cualquiera que
-         * conozca la URL podría inyectar mensajes falsos → tickets falsos y disparar el bot
+         * conozca la URL podría inyectar mensajes falsos y disparar el bot de Campañas
          * (envíos de pago). Si hay App Secret configurado, la firma es OBLIGATORIA; si no lo
          * hay (p. ej. pruebas locales con curl), se permite pero la protección está INACTIVA
          * (se indica en Ajustes). Configura wa_app_secret antes de producción.
@@ -52,8 +50,8 @@ class WebhookController extends Controller
             /*
              * Sin App Secret no se puede verificar la firma. En LOCAL se permite (pruebas
              * con curl). En PRODUCCIÓN se RECHAZA: procesar un webhook sin firmar es una
-             * puerta abierta a inyectar mensajes/tickets falsos y disparar el bot (envíos
-             * de pago). Configura wa_app_secret antes de producción.
+             * puerta abierta a inyectar mensajes falsos y disparar el bot de Campañas
+             * (envíos de pago). Configura wa_app_secret antes de producción.
              */
             if (app()->environment('production')) {
                 Log::warning('Webhook rechazado: sin wa_app_secret en producción, no se puede verificar la firma.');
@@ -102,7 +100,7 @@ class WebhookController extends Controller
     protected function process(array $data): void
     {
         // Opción B: si hay números configurados, se enruta por `phone_number_id`. Si la
-        // tabla está vacía, se mantiene el comportamiento de siempre (todo → tickets).
+        // tabla está vacía, todo cae en Campañas (chat en vivo); WhatsApp no crea tickets.
         $enrutar = WhatsAppNumber::hayConfigurados();
 
         foreach ($data['entry'] as $entry) {
@@ -110,8 +108,7 @@ class WebhookController extends Controller
                 $value   = $change['value'] ?? [];
                 $phoneId = (string) ($value['metadata']['phone_number_id'] ?? '');
 
-                // ¿A qué FUNCIÓN pertenece este número? Sin tabla → «campanas» = el
-                // comportamiento legacy completo (ticket + bot).
+                // Todo el WhatsApp entrante es de Campañas (chat + bot). Nunca crea tickets.
                 $funcion = 'campanas';
                 if ($enrutar) {
                     $num = WhatsAppNumber::porPhoneId($phoneId);
@@ -272,8 +269,8 @@ class WebhookController extends Controller
         $flowTypes = ['text', 'button', 'interactive', 'image', 'audio', 'video', 'document', 'sticker', 'location'];
         if (!$isOptKeyword && !$skipFlow && in_array($type, $flowTypes, true) && !($textLike && trim($body) === '')) {
             try {
-                // Se pasa el ticket para que las respuestas del bot caigan en el mismo hilo.
-                $this->flow->handle(['id' => $contactId, 'wa_id' => $from, 'ticket_id' => $ticketId], $body, $name, $type, $replyId);
+                // Campañas es chat puro: el flujo no cuelga de ningún ticket.
+                $this->flow->handle(['id' => $contactId, 'wa_id' => $from, 'ticket_id' => null], $body, $name, $type, $replyId);
             } catch (\Throwable $e) { /* no romper el webhook */ }
         }
     }

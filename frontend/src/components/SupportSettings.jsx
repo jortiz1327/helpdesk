@@ -3,12 +3,12 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
-import Settings from './Settings.jsx'   // configuración de WhatsApp (embebida como pestaña)
 
 /* ---------------------------------------------------------------------------
- * CONFIGURACIÓN DE SOPORTE — solo superadmin / encargado (permiso support.config).
- * Dos apartados: CATEGORÍAS y RESPUESTAS PREDEFINIDAS.
- * (Departamentos: descartado. Automatización: más adelante, va con campañas.)
+ * CONFIGURACIÓN — solo superadmin / encargado (permiso support.config). Hub con
+ * nav lateral por grupos: Plataforma (Funciones/Seguridad/Tareas), Clasificación,
+ * Flujo de trabajo, Contenido y respuestas, y Correo. La config de WhatsApp NO
+ * está aquí: es de Campañas (Campañas → Ajustes).
  * ------------------------------------------------------------------------- */
 
 const COLORS = [
@@ -48,20 +48,23 @@ const SECCIONES = [
     { key: 'tpl',   label: 'Avisos automáticos',  icon: Icon.send,   desc: 'Qué se envía y a quién cuando algo pasa.' },
     { key: 'bans',  label: 'Correos bloqueados',  icon: Icon.eraser, desc: 'Remitentes que no generan ticket.' },
   ] },
-  { grupo: 'Sistema', items: [
-    { key: 'security', label: 'Seguridad',          icon: Icon.lock,    desc: 'Protección del acceso frente a intentos.' },
-    { key: 'cron',     label: 'Tareas programadas', icon: Icon.refresh, desc: 'El planificador que mueve el correo y los cierres.' },
-  ] },
 ]
 
+/*
+ * PLATAFORMA: lo transversal del sistema (no es propio del soporte). «Funciones»
+ * solo la ve el superadmin; «Seguridad» y «Tareas programadas» las ve quien tenga
+ * support.config. WhatsApp NO vive aquí: es de Campañas (Campañas → Ajustes).
+ */
+const PLATAFORMA = [
+  { key: 'security', label: 'Seguridad',          icon: Icon.lock,    desc: 'Protección del acceso frente a intentos.' },
+  { key: 'cron',     label: 'Tareas programadas', icon: Icon.refresh, desc: 'El planificador que mueve el correo y los cierres.' },
+]
+const FEATURES_ITEM = { key: 'features', label: 'Funciones', icon: Icon.bolt, desc: 'Encender o apagar funciones, y ver qué le falta a cada una.' }
+
 export default function SupportSettings({ user }) {
-  // El panel de FUNCIONES (interruptores) es solo del superadmin y va el primero.
-  const secciones = user?.is_super
-    ? [{ grupo: 'Superadmin', items: [
-        { key: 'features', label: 'Funciones', icon: Icon.bolt, desc: 'Encender o apagar funciones, y ver qué le falta a cada una.' },
-        { key: 'whatsapp', label: 'WhatsApp',  icon: Icon.whatsappCfg, desc: 'Números, tokens y webhook de la API de WhatsApp Cloud.' },
-      ] }, ...SECCIONES]
-    : SECCIONES
+  // «Plataforma» va la primera: Funciones (solo superadmin) + Seguridad + Tareas.
+  const plataforma = { grupo: 'Plataforma', items: user?.is_super ? [FEATURES_ITEM, ...PLATAFORMA] : PLATAFORMA }
+  const secciones = [plataforma, ...SECCIONES]
   const [tab, setTab] = useState(user?.is_super ? 'features' : 'categories')
   const actual = secciones.flatMap((s) => s.items).find((i) => i.key === tab)
 
@@ -69,7 +72,7 @@ export default function SupportSettings({ user }) {
     <>
       <header className="page-head">
         <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Configuración de Soporte</h1></div>
+        <div><h1>Configuración</h1></div>
         {actual && <span className="sub">· {actual.desc}</span>}
         <div className="spacer" />
       </header>
@@ -90,7 +93,6 @@ export default function SupportSettings({ user }) {
 
         <div className="cfg-body">
           {tab === 'features' && <Features />}
-          {tab === 'whatsapp' && <Settings embedded />}
           {tab === 'categories' && <Categories />}
           {tab === 'canned' && <Canned />}
           {tab === 'faqs' && <Faqs />}
@@ -153,6 +155,9 @@ function Features() {
               )}
               {it.type === 'info' && (
                 <span className={`feat-badge ${it.value ? 'ok' : 'off'}`}>{it.value ? 'Configurado' : 'Sin configurar'}</span>
+              )}
+              {it.type === 'health' && (
+                <span className={`feat-badge ${it.state}`}><span className="feat-dot" />{it.value}</span>
               )}
             </div>
           ))}
@@ -778,7 +783,7 @@ function TicketBehavior() {
 
       <div className="card em-card">
         <h2>Al crearse</h2>
-        <p className="em-desc">Con qué estado nace un ticket, venga de donde venga (correo, web o WhatsApp).</p>
+        <p className="em-desc">Con qué estado nace un ticket, venga de donde venga (correo o web).</p>
         <div className="field" style={{ maxWidth: 320 }}><span className="lbl">Estado por defecto</span>
           <Select block value={f.ticket_default_status} onChange={(v) => setF((s) => ({ ...s, ticket_default_status: v }))}
             options={estados.map(([value, label]) => ({ value, label }))} /></div>

@@ -10,7 +10,7 @@ const META = {
   helpdesk: {
     tagline: 'Tickets, soporte y atención al cliente',
     c1: '#2563eb', c2: '#1d4ed8', glow: 'rgba(37,99,235,0.42)',
-    points: ['Gestión de tickets', 'Web, correo y WhatsApp en una bandeja', 'SLA, categorías y agentes'],
+    points: ['Gestión de tickets', 'Web y correo en una bandeja', 'SLA, categorías y agentes'],
     // mini-gráfico decorativo: barras
     art: 'bars',
   },
