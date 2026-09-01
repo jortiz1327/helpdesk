@@ -1987,6 +1987,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                       if (r.ok) {
                         if (r.scheduled) toast(`⏱ Respuesta programada para ${fmtDate(r.send_at)}`)
                         else toast('✉️ Respuesta enviada por correo')
+                        if (r.reopened) toast('El ticket estaba cerrado y se ha reabierto')
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()
                       } else toast(r.error || 'No se pudo enviar la respuesta', 'err')

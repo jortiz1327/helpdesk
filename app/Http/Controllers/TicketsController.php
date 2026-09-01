@@ -906,7 +906,7 @@ class TicketsController extends Controller
         $data = $request->validate(['id' => ['required', 'integer']], ['id.required' => 'Falta el ticket']);
         $id = (int) $data['id'];
         $t  = (clone $this->baseQuery($me))->where('t.id', $id)
-            ->first(['t.id', 't.code', 't.subject', 't.channel', 't.contact_id',
+            ->first(['t.id', 't.code', 't.subject', 't.channel', 't.status', 't.contact_id',
                      'c.email as contact_email', 'c.name as contact_name', 'c.wa_id as contact_wa',
                      'cat.signature as cat_signature', 'cat.name as category_name']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
@@ -945,7 +945,16 @@ class TicketsController extends Controller
             return response()->json(['ok' => true, 'scheduled' => true, 'id' => $sid, 'send_at' => $sendAt->toIso8601String()]);
         }
 
-        return $this->respuesta($svc->porCorreo($t, $html, (array) $files, $cc, $bcc, $me));
+        $r = $svc->porCorreo($t, $html, (array) $files, $cc, $bcc, $me);
+
+        // Responder a un ticket resuelto/cerrado lo REABRE (la pelota vuelve a nuestro
+        // tejado): si no, el correo sale pero el ticket queda invisible en la bandeja.
+        if (($r['ok'] ?? false) && in_array($t->status, ['resuelto', 'cerrado'], true)) {
+            app(\App\Services\TicketService::class)->setStatus($id, 'en_progreso', (int) $me->id);
+            $r['reopened'] = true;
+        }
+
+        return $this->respuesta($r);
     }
 
     /** Traduce el preset de programación a una fecha/hora concreta (o null si no vale). */
