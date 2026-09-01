@@ -11,11 +11,21 @@ use Illuminate\Support\Facades\DB;
 /** Portado de api/campaigns.php — campañas de difusión. Requiere token. */
 class CampaignsController extends Controller
 {
+    /** 403 si el usuario no tiene el permiso (el superadmin lo tiene por bypass); null si sí. */
+    protected function exigir(Request $request, string $permiso)
+    {
+        if (!$request->user()?->can($permiso)) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para esta acción'], 403);
+        }
+        return null;
+    }
+
     public function handle(Request $request, CampaignService $campaigns)
     {
         $action = $request->query('action', '');
 
         if ($request->isMethod('post') && $action === 'run') {
+            if ($r = $this->exigir($request, 'campaigns.send')) return $r;
             if ($locked = GatingService::guard('wa_campaign')) return $locked;
             $id = (int) ($request->query('id') ?? $request->input('id') ?? 0);
             if (!$id) return response()->json(['ok' => false, 'error' => 'Falta id'], 400);
@@ -24,6 +34,7 @@ class CampaignsController extends Controller
         }
 
         if ($request->isMethod('post') && $action === 'cancel') {
+            if ($r = $this->exigir($request, 'campaigns.send')) return $r;
             $id = (int) ($request->query('id') ?? $request->input('id') ?? 0);
             if (!$id) return response()->json(['ok' => false, 'error' => 'Falta id'], 400);
             DB::table('campaigns')->where('id', $id)->whereIn('status', ['scheduled', 'sending'])->update(['status' => 'canceled', 'updated_at' => now()]);
@@ -32,6 +43,7 @@ class CampaignsController extends Controller
         }
 
         if ($request->isMethod('post')) {
+            if ($r = $this->exigir($request, 'campaigns.send')) return $r;
             if ($locked = GatingService::guard('wa_campaign')) return $locked;
             return $this->create($request, $campaigns);
         }
@@ -55,6 +67,7 @@ class CampaignsController extends Controller
         }
 
         if ($request->isMethod('delete')) {
+            if ($r = $this->exigir($request, 'campaigns.delete')) return $r;
             $id = (int) $request->query('id', 0);
             if (!$id) return response()->json(['ok' => false, 'error' => 'Falta id'], 400);
             DB::table('campaigns')->where('id', $id)->delete();
