@@ -6,6 +6,7 @@ use App\Models\EmailAccount;
 use App\Models\EmailBan;
 use App\Models\Message;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\CronAlertService;
 use App\Services\HtmlSanitizer;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,9 @@ class MailService
 {
     /** Máximo de correos a procesar por buzón y pasada (evita atascos). */
     public const MAX_PER_RUN = 50;
+
+    /** Fallos seguidos sobre el MISMO correo antes de saltarlo (evita bloquear el buzón). */
+    public const MAX_MAIL_ATTEMPTS = 5;
 
     public function __construct(
         protected TicketService $tickets,
@@ -109,6 +113,11 @@ class MailService
             ->get();
 
         $maxSeen = $lastUid;
+        // ¿Veníamos atascados en un UID? (cortafuegos anti «correo venenoso»)
+        $failUid   = (int) ($acc->fail_uid ?? 0);
+        $failCount = (int) ($acc->fail_count ?? 0);
+        $newFailUid = 0; $newFailCount = 0;
+
         foreach ($messages as $message) {
             $uid = (int) $message->getUid();
             if ($uid <= $lastUid) continue;
@@ -121,18 +130,91 @@ class MailService
                 $maxSeen = $uid;   // avanza solo tras éxito
             } catch (\Throwable $e) {
                 $r['errores'][] = "[{$acc->email}] " . $e->getMessage();
-                Log::warning('MailService: fallo al procesar correo', ['email' => $acc->email, 'uid' => $uid, 'error' => $e->getMessage()]);
-                // Paramos en el primer fallo: así no nos saltamos este correo (se
-                // reintenta en la próxima pasada, sin perder los ya procesados).
+                [$saltar, $newFailUid, $newFailCount] = self::decidirFallo($uid, $failUid, $failCount);
+
+                if ($saltar) {
+                    // Correo VENENOSO: falla siempre. Se SALTA para no bloquear el buzón;
+                    // queda registrado y se avisa al admin por correo para recuperarlo a mano.
+                    Log::error('MailService: correo saltado tras N fallos (venenoso)', [
+                        'email' => $acc->email, 'uid' => $uid, 'error' => $e->getMessage(),
+                    ]);
+                    $this->avisarVenenoso($acc, $message, $uid, $e);
+                    $maxSeen = $uid;   // avanza: lo damos por perdido
+                    continue;          // sigue con los siguientes
+                }
+
+                // Aún dentro del margen de reintento: paramos aquí y lo reintentamos la
+                // próxima pasada (sin perder los ya procesados). Se recuerda el intento.
+                Log::warning('MailService: fallo al procesar correo (se reintentará)', [
+                    'email' => $acc->email, 'uid' => $uid, 'intento' => $newFailCount, 'error' => $e->getMessage(),
+                ]);
                 break;
             }
         }
 
         $client->disconnect();
 
-        DB::table('email_accounts')->where('id', $acc->id)->update(['last_uid' => $maxSeen, 'last_check_at' => now()]);
+        DB::table('email_accounts')->where('id', $acc->id)->update([
+            'last_uid'    => $maxSeen,
+            'last_check_at' => now(),
+            'fail_uid'    => $newFailUid,
+            'fail_count'  => $newFailCount,
+        ]);
 
         return $r;
+    }
+
+    /**
+     * Decide qué hacer cuando el correo `$uid` falla al procesarse, según cuántas veces
+     * seguidas venía fallando ESE mismo uid. Puro (sin efectos) para poder probarlo sin IMAP.
+     *
+     * Devuelve [saltar, failUid, failCount]:
+     *   · saltar=true  → venenoso: se avanza (se pierde) y se limpia el contador.
+     *   · saltar=false → aún en margen: se recuerda el uid + nº de intento para reintentar.
+     */
+    public static function decidirFallo(int $uid, int $prevFailUid, int $prevFailCount): array
+    {
+        $intentos = ($uid === $prevFailUid) ? $prevFailCount + 1 : 1;
+        if ($intentos >= self::MAX_MAIL_ATTEMPTS) {
+            return [true, 0, 0];
+        }
+        return [false, $uid, $intentos];
+    }
+
+    /**
+     * Avisa a los superadministradores de que un correo se ha SALTADO por fallar siempre
+     * (dead-letter). Se manda desde el propio buzón. Si no hay admins o el envío falla,
+     * no rompe el sondeo (el detalle ya quedó en el log).
+     */
+    protected function avisarVenenoso(EmailAccount $acc, $message, int $uid, \Throwable $e): void
+    {
+        try {
+            $super  = config('rbac.super_role', 'superadmin');
+            $admins = User::role($super)->whereNotNull('email')->pluck('email')->all();
+            if (!$admins) return;
+
+            $from    = (string) ($message->getFrom()[0]->mail ?? '?');
+            $subject = (string) $message->getSubject();
+            $msgId   = (string) $message->getMessageId();
+
+            $cuerpo = '<p>Un correo entrante <b>no se ha podido convertir en ticket</b> tras '
+                . self::MAX_MAIL_ATTEMPTS . ' intentos, así que se ha <b>saltado</b> para no bloquear la entrada '
+                . 'del buzón <b>' . e($acc->email) . '</b>. Búscalo en el servidor de correo si hay que recuperarlo.</p>'
+                . '<table cellpadding="4" style="font-size:14px;border-collapse:collapse">'
+                . '<tr><td><b>Remitente</b></td><td>' . e($from) . '</td></tr>'
+                . '<tr><td><b>Asunto</b></td><td>' . e($subject !== '' ? $subject : '(sin asunto)') . '</td></tr>'
+                . '<tr><td><b>Message-ID</b></td><td>' . e($msgId !== '' ? $msgId : '—') . '</td></tr>'
+                . '<tr><td><b>UID IMAP</b></td><td>' . $uid . '</td></tr>'
+                . '<tr><td><b>Error</b></td><td>' . e(mb_substr($e->getMessage(), 0, 300)) . '</td></tr>'
+                . '</table>';
+            $asunto = '⚠️ Correo saltado en el buzón de soporte (no se pudo procesar)';
+
+            foreach ($admins as $email) {
+                $this->sendMail($acc, mb_strtolower((string) $email), null, $asunto, $cuerpo);
+            }
+        } catch (\Throwable $ex) {
+            Log::warning('MailService: no se pudo avisar del correo venenoso', ['error' => $ex->getMessage()]);
+        }
     }
 
     /**

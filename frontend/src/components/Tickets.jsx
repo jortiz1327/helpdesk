@@ -1972,6 +1972,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                       ? `${d.lock.user_name || 'Otro agente'} lo está atendiendo`
                       : undefined}
                   onSend={async ({ html, files, internal, cc, bcc, mentions, schedule, send_at }) => {
+                    // Devuelve si tuvo ÉXITO: el compositor solo limpia lo escrito si es true
+                    // (si falla el envío, se conserva la respuesta para reintentar).
                     if (internal) {
                       const r = await api.ticketNote(id, html, false, mentions)
                       if (r.ok) {
@@ -1979,6 +1981,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                         load(); onChange?.()
                       }
                       else toast(r.error || 'No se pudo guardar la nota', 'err')
+                      return r.ok
                     } else {
                       const r = await api.ticketReply(id, html, files, cc, bcc, schedule, send_at)
                       if (r.ok) {
@@ -1987,6 +1990,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()
                       } else toast(r.error || 'No se pudo enviar la respuesta', 'err')
+                      return r.ok
                     }
                   }}
                 />

@@ -14,6 +14,7 @@ const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
 export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], ticketId = null, cannedVars = null, mentionUsers = null, canSchedule = false }) {
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
+  const [sending, setSending] = useState(false)   // envío en curso: bloquea el botón y evita doble envío
   const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
   const note = mode === 'note'
   // Programar envío (solo respuesta por correo): menú del botón partido.
@@ -56,12 +57,19 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
     if (ccSugerido.length) setVerCopias(true)
   }, [ccSugerido.join(',')])
 
-  const send = (schedule = '', sendAt = '') => {
-    onSend?.({
-      html: ed.current.getHtml(), files: ed.current.getFiles(), internal: note, cc, bcc,
-      mentions: note ? (ed.current.getMentions?.() || []) : [],   // @menciones solo en nota interna
-      schedule, send_at: sendAt,   // programar el envío (solo respuesta, no nota)
-    })
+  const send = async (schedule = '', sendAt = '') => {
+    if (sending) return   // ya hay un envío en curso: no dispares otro
+    setSending(true)
+    let ok = false
+    try {
+      ok = await onSend?.({
+        html: ed.current.getHtml(), files: ed.current.getFiles(), internal: note, cc, bcc,
+        mentions: note ? (ed.current.getMentions?.() || []) : [],   // @menciones solo en nota interna
+        schedule, send_at: sendAt,   // programar el envío (solo respuesta, no nota)
+      })
+    } catch { ok = false } finally { setSending(false) }
+    // Si el envío FALLÓ (o lanzó), se conserva lo escrito y su borrador para reintentar.
+    if (!ok) return
     ed.current.reset()
     setEmpty(true)
     setBcc([])   // el Cco no se arrastra al siguiente mensaje; el Cc sí (sigue el hilo)
@@ -100,7 +108,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
 
   return (
     <div className={`cmp-wrap ${note ? 'note-mode' : ''}`} onKeyDown={(e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !disabled && !empty) send()
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !disabled && !empty && !sending) send()
     }}>
       {/* Conmutador: responder al cliente vs nota interna (solo la ven los agentes) */}
       <div className="cmp-mode">
@@ -173,15 +181,17 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
         <span className="spacer" />
         <span className="cmp-hint">Ctrl + Enter</span>
         {note || !canSchedule ? (
-          <button className={`btn ${note ? 'note-btn' : ''}`} disabled={disabled || empty} onClick={() => send()}>
-            {note ? <><Icon.note /> Guardar nota</> : <><Icon.send /> Enviar respuesta</>}
+          <button className={`btn ${note ? 'note-btn' : ''}`} disabled={disabled || empty || sending} onClick={() => send()}>
+            {sending
+              ? <>{note ? <Icon.note /> : <Icon.send />} {note ? 'Guardando…' : 'Enviando…'}</>
+              : (note ? <><Icon.note /> Guardar nota</> : <><Icon.send /> Enviar respuesta</>)}
           </button>
         ) : (
           <span className="cmp-split" ref={schedRef}>
-            <button className="btn cmp-split-go" disabled={disabled || empty} onClick={() => send()}>
-              <Icon.send /> Enviar respuesta
+            <button className="btn cmp-split-go" disabled={disabled || empty || sending} onClick={() => send()}>
+              <Icon.send /> {sending ? 'Enviando…' : 'Enviar respuesta'}
             </button>
-            <button className="btn cmp-split-caret" disabled={disabled || empty}
+            <button className="btn cmp-split-caret" disabled={disabled || empty || sending}
               onClick={() => setSchedOpen((v) => !v)} title="Programar el envío">▾</button>
             {schedOpen && (
               <div className="cmp-sched">

@@ -116,7 +116,15 @@ class ChatService
              * lunes». Lo urgente no se queda dormido. wake() es no-op si no dormía.
              */
             if ($direction === 'in' && empty($opts['is_internal_note'])) {
-                app(TicketService::class)->wake((int) $opts['ticket_id'], 'reply');
+                $tid = (int) $opts['ticket_id'];
+                $svc = app(TicketService::class);
+                $svc->wake($tid, 'reply');
+                // El cliente contestó a un ticket «esperando respuesta»: la pelota vuelve a
+                // nuestro tejado. Se pasa a «En progreso», lo que REANUDA el reloj del SLA
+                // (que estaba pausado en ese estado). Sin esto el SLA quedaba congelado.
+                if (DB::table('tickets')->where('id', $tid)->value('status') === 'esperando_respuesta') {
+                    $svc->setStatus($tid, 'en_progreso');
+                }
             }
 
             /*
