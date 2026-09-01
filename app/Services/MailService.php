@@ -447,6 +447,64 @@ class MailService
              . 'font-size:12.5px;color:#666">' . $pie . '</div>';
     }
 
+    /**
+     * Plantilla de MARCA para los correos salientes: cabecera + tarjeta con el mensaje +
+     * firma + pie. Todo en HTML de correo (tablas + estilos en línea) para que se vea
+     * igual en todos los clientes. $o = ['heading'=>..., 'meta'=>..., 'note'=>...].
+     * El $contentHtml y la $signature ya vienen saneados (no se re-escapan).
+     */
+    protected function layout(array $o, string $contentHtml, ?string $signature = null): string
+    {
+        $marca   = trim((string) Setting::get('business_name', '')) ?: 'Soporte';
+        $heading = (string) ($o['heading'] ?? '');
+        $meta    = (string) ($o['meta'] ?? '');
+        $note    = array_key_exists('note', $o)
+            ? (string) $o['note']
+            : 'Puedes responder directamente a este correo y tu respuesta se añadirá a la incidencia.';
+
+        $signature = trim((string) $signature);
+        $firma = $signature !== ''
+            ? '<tr><td style="padding:2px 28px 0"><div style="margin-top:16px;padding-top:16px;border-top:1px solid #eceff4;font-size:14px;color:#3a4453;line-height:1.5">' . $signature . '</div></td></tr>'
+            : '';
+
+        // Pie de empresa configurado (si está activo), dentro de la plantilla.
+        $pie = '';
+        if ((string) Setting::get('email_footer_active', '0') === '1') {
+            $pieTxt = trim((string) Setting::get('email_footer', ''));
+            if ($pieTxt !== '') $pie = '<div style="margin-top:14px;font-size:12px;color:#9aa3b2;line-height:1.6">' . $pieTxt . '</div>';
+        }
+
+        $metaHtml = $meta !== '' ? '<div style="font-size:13px;color:#8a94a6;margin-top:5px">' . e($meta) . '</div>' : '';
+        $noteHtml = $note !== '' ? '<tr><td style="padding:16px 28px 0"><div style="font-size:13px;color:#8a94a6;line-height:1.5">' . e($note) . '</div></td></tr>' : '';
+
+        $ff = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+        return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+            . '<body style="margin:0;padding:0;background:#f4f6fb;">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:24px 12px;">'
+            . '<tr><td align="center">'
+            . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid #e6e9f0;border-radius:14px;overflow:hidden;font-family:' . $ff . ';">'
+            // Cabecera de marca
+            . '<tr><td style="background:#2563eb;padding:16px 28px;">'
+            . '<span style="color:#ffffff;font-size:16px;font-weight:700;">' . e($marca) . '</span>'
+            . '<span style="color:#c6dbff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;">&nbsp;·&nbsp;Soporte</span>'
+            . '</td></tr>'
+            // Titular + meta (código · asunto)
+            . '<tr><td style="padding:26px 28px 0;">'
+            . '<h1 style="margin:0;font-size:20px;line-height:1.3;color:#161c26;font-weight:800;">' . e($heading) . '</h1>'
+            . $metaHtml . '</td></tr>'
+            // Tarjeta con el mensaje
+            . '<tr><td style="padding:18px 28px 4px;">'
+            . '<div style="border-left:3px solid #2563eb;background:#f7f9fc;border-radius:0 8px 8px 0;padding:14px 16px;font-size:15px;line-height:1.6;color:#20272f;">' . $contentHtml . '</div>'
+            . '</td></tr>'
+            . $firma
+            . $noteHtml
+            // Pie
+            . '<tr><td style="padding:22px 28px 26px;"><div style="border-top:1px solid #eceff4;padding-top:14px;">' . $pie . '</div></td></tr>'
+            . '</table>'
+            . '</td></tr></table></body></html>';
+    }
+
     /** Normaliza un content-id para casar «cid:» del HTML con el id del adjunto. */
     protected static function normalizeCid(string $cid): string
     {
@@ -569,7 +627,7 @@ class MailService
      * @param array   $cc          copias visibles
      * @param array   $bcc         copias ocultas
      */
-    public function sendMail(EmailAccount $acc, string $toEmail, ?string $toName, string $subject, string $html, array $attachments = [], ?string $inReplyTo = null, array $references = [], array $cc = [], array $bcc = [], ?string $signature = null): string
+    public function sendMail(EmailAccount $acc, string $toEmail, ?string $toName, string $subject, string $html, array $attachments = [], ?string $inReplyTo = null, array $references = [], array $cc = [], array $bcc = [], ?string $signature = null, array $layout = []): string
     {
         $enc = $acc->smtp_encryption ?: 'ssl';
         // tls=true => TLS implícito (SSL, 465); null => STARTTLS/auto (587); false => sin cifrar.
@@ -584,8 +642,14 @@ class MailService
         // FIRMA de departamento (categoría) + PIE de empresa: se añaden solo AL ENVIAR,
         // no se guardan en el hilo del ticket. Así la conversación interna queda limpia
         // (sin la firma repetida en cada mensaje). La firma va primero, el pie común después.
-        $html = $this->conFirma($html, $signature);
-        $html = $this->conPie($html);
+        // Con $layout['heading'] se envuelve en la plantilla de marca (cabecera + tarjeta);
+        // esa plantilla ya mete firma y pie dentro, así que no se añaden por separado.
+        if (!empty($layout['heading'])) {
+            $html = $this->layout($layout, $html, $signature);
+        } else {
+            $html = $this->conFirma($html, $signature);
+            $html = $this->conPie($html);
+        }
 
         $email = (new MimeEmail())
             ->from(new Address((string) $acc->email, (string) ($acc->from_name ?: $acc->email)))

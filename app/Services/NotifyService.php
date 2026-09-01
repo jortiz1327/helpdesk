@@ -78,6 +78,28 @@ class NotifyService
             ->unique()->values();
     }
 
+    /** Titular de la plantilla de marca según el tipo de aviso (envuelve el cuerpo). */
+    protected function encabezado(string $key): string
+    {
+        return [
+            'ticket_created'  => 'Hemos recibido tu incidencia',
+            'ticket_closed'   => 'Tu incidencia se ha cerrado',
+            'ticket_assigned' => 'Tu incidencia ya tiene agente asignado',
+            'sla_warning'     => 'Un ticket está por vencer',
+            'sla_breach'      => 'Un ticket ha vencido su SLA',
+            'csat_survey'     => '¿Cómo lo hemos hecho?',
+        ][$key] ?? 'Aviso de soporte';
+    }
+
+    /** Datos de la plantilla de marca para un aviso: titular + «código · asunto». */
+    protected function marco(string $key, object $t): array
+    {
+        return [
+            'heading' => $this->encabezado($key),
+            'meta'    => trim(((string) $t->code) . ($t->subject ? ' · ' . (string) $t->subject : '')),
+        ];
+    }
+
     /**
      * Destinatarios de un aviso de SLA. Como los normales, pero (1) NUNCA se avisa al
      * cliente de un retraso interno, y (2) solo a usuarios que aceptan avisos de SLA
@@ -151,10 +173,11 @@ class NotifyService
             $body    = strtr($tpl->body, $vars);
             if (stripos($subject, (string) $t->code) === false) $subject .= ' [' . $t->code . ']';
 
+            $marco = $this->marco($key, $t);
             $enviados = 0;
             foreach ($destinos as $email => $nombre) {
                 try {
-                    $this->mail->sendMail($acc, $email, $nombre, $subject, $body);
+                    $this->mail->sendMail($acc, $email, $nombre, $subject, $body, [], null, [], [], [], null, $marco);
                     $enviados++;
                 } catch (\Throwable $e) {
                     Log::warning('NotifyService SLA: destinatario falló', ['key' => $key, 'to' => $email, 'error' => $e->getMessage()]);
@@ -214,7 +237,8 @@ class NotifyService
             $subject = strtr($tpl->subject, $vars);
             $body    = strtr($tpl->body, $vars);
 
-            $this->mail->sendMail($acc, mb_strtolower($t->contact_email), $t->contact_name, $subject, $body);
+            $this->mail->sendMail($acc, mb_strtolower($t->contact_email), $t->contact_name, $subject, $body,
+                [], null, [], [], [], null, $this->marco('csat_survey', $t));
             return true;
         } catch (\Throwable $e) {
             Log::warning('NotifyService CSAT: no se pudo enviar', ['ticket' => $ticketId, 'error' => $e->getMessage()]);
@@ -281,10 +305,11 @@ class NotifyService
             if (stripos($subject, (string) $t->code) === false) $subject .= ' [' . $t->code . ']';
 
             // Un correo por destinatario: cada uno recibe el suyo, sin ver a los demás.
+            $marco = $this->marco($key, $t);
             $enviados = 0;
             foreach ($destinos as $email => $nombre) {
                 try {
-                    $this->mail->sendMail($acc, $email, $nombre, $subject, $body);
+                    $this->mail->sendMail($acc, $email, $nombre, $subject, $body, [], null, [], [], [], null, $marco);
                     $enviados++;
                 } catch (\Throwable $e) {
                     Log::warning('NotifyService: destinatario falló', ['key' => $key, 'to' => $email, 'error' => $e->getMessage()]);

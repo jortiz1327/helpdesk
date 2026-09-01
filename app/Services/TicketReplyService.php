@@ -86,10 +86,17 @@ class TicketReplyService
             ]);
         }
 
+        // Plantilla de marca: envuelve la respuesta en una cabecera + tarjeta «Se ha
+        // respondido a tu incidencia» (la firma y el pie los mete la propia plantilla).
+        $layout = [
+            'heading' => 'Se ha respondido a tu incidencia',
+            'meta'    => trim(((string) $t->code) . ($t->subject ? ' · ' . (string) $t->subject : '')),
+        ];
+
         try {
             $smtpId = $this->mail->sendMail(
                 $acc, (string) $t->contact_email, (string) $t->contact_name,
-                $subject, $this->absolutizeInline($html), $forMail, $inReplyTo, $refs, $cc, $bcc, $firma
+                $subject, $this->absolutizeInline($html), $forMail, $inReplyTo, $refs, $cc, $bcc, $firma, $layout
             );
         } catch (\Throwable $e) {
             // Deshacer adjuntos guardados (ficheros + filas) para no dejar basura. En la
