@@ -135,14 +135,23 @@ class WebhookController extends Controller
 
     protected function handleIncoming(array $msg, array $contactNames, string $funcion = 'campanas'): void
     {
-        $from = $msg['from'];
+        $from  = $msg['from'];
+        $wamid = $msg['id'] ?? null;
+
+        // DEDUP: Meta entrega los webhooks «al menos una vez» (reintenta si tardamos o
+        // devolvemos 5xx). Si este mensaje ya se guardó, salimos: no duplicar el mensaje,
+        // ni el envío de formulario, ni el avance del bot. (messages.wamid está indexado.)
+        if ($wamid && DB::table('messages')->where('wamid', $wamid)->exists()) {
+            return;
+        }
+
         $name = $contactNames[$from] ?? null;
         $contactId = ChatService::upsertContact($from, $name);
 
         $type = $msg['type'] ?? 'text';
         $body = '';
         $replyId = null;
-        $opts = ['wamid' => $msg['id'] ?? null, 'status' => 'received'];
+        $opts = ['wamid' => $wamid, 'status' => 'received'];
 
         switch ($type) {
             case 'text':
