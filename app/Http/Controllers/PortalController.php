@@ -148,6 +148,21 @@ class PortalController extends Controller
             return response()->json(['ok' => false, 'error' => 'Escribe un correo válido para poder avisarte'], 422);
         }
 
+        // Si ese correo YA está registrado, hay que demostrar que eres tú (código): así
+        // nadie abre incidencias en nombre de otro ni le dispara el acuse. Un correo NUEVO
+        // entra sin fricción. La UI ya trata `reauth` en el alta pidiendo el código.
+        if ($this->portal->contactoExiste($email)) {
+            $pass = $request->header('X-Portal-Token') ?: $request->bearerToken();
+            $suyo = $this->portal->emailFromToken($pass);
+            if (!$suyo || mb_strtolower($suyo) !== $email) {
+                return response()->json([
+                    'ok'     => false,
+                    'reauth' => true,
+                    'error'  => 'Ese correo ya está registrado. Entra con tu código para abrir la incidencia.',
+                ], 401);
+            }
+        }
+
         [$ok, $error, $code] = $this->portal->createTicket($email, [
             'subject'     => $request->input('subject'),
             'body'        => $request->input('body'),

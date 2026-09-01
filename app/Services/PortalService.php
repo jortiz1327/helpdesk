@@ -142,6 +142,13 @@ class PortalService
      * cuando nunca vuelve a ver el código. El pase solo muere si se está 90 días
      * sin aparecer —ahí sí conviene volver a confirmar que sigue siendo su buzón—.
      */
+    /** ¿Ese correo ya está registrado como contacto? (para exigir código al crear en su nombre). */
+    public function contactoExiste(string $email): bool
+    {
+        $email = mb_strtolower(trim($email));
+        return $email !== '' && DB::table('contacts')->whereRaw('LOWER(email) = ?', [$email])->exists();
+    }
+
     public function emailFromToken(?string $token): ?string
     {
         if (!$token) return null;
