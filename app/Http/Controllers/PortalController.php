@@ -232,30 +232,42 @@ class PortalController extends Controller
      */
     public function ratePage(Request $request, int $ticket)
     {
-        $score   = (($s = (int) $request->query('score')) >= 1 && $s <= 5) ? $s : null;
-        $comment = $request->isMethod('post') ? (string) $request->input('comment', '') : null;
+        // SOLO el POST (un clic HUMANO) guarda. El ?score de un GET es únicamente una
+        // PRE-SELECCIÓN visual: así los prefetchers de antivirus de correo (SafeLinks,
+        // Mimecast…), que cargan todos los enlaces, NO falsean la valoración.
+        $hint = (($h = (int) $request->query('score')) >= 1 && $h <= 5) ? $h : null;
 
         $aviso = null;
-        if ($score !== null || $comment !== null) {
-            [$ok, $err] = $this->portal->setRating($ticket, $score, $comment);
-            if (!$ok) $aviso = $err;
+        $comentado = false;
+        if ($request->isMethod('post')) {
+            $score   = (($s = (int) $request->input('score')) >= 1 && $s <= 5) ? $s : null;
+            $comment = $request->has('comment') ? (string) $request->input('comment', '') : null;
+            if ($score !== null || $comment !== null) {
+                [$ok, $err] = $this->portal->setRating($ticket, $score, $comment);
+                if (!$ok) $aviso = $err;
+            }
+            $comentado = $comment !== null;
         }
 
         $r    = \Illuminate\Support\Facades\DB::table('ticket_ratings')->where('ticket_id', $ticket)->first(['score', 'comment']);
         $code = (string) (\Illuminate\Support\Facades\DB::table('tickets')->where('id', $ticket)->value('code') ?? '');
         $nota = (int) ($r->score ?? 0);
+        $pintar = $nota > 0 ? $nota : (int) ($hint ?? 0);   // qué estrellas van doradas al pintar
 
-        // Estrellas clicables (cada una re-valora con su nota) + acción firmada del comentario.
-        $exp = now()->addDays(30);
+        // Estrellas como FORMULARIOS POST (un clic = guarda), a la misma acción firmada.
+        $exp    = now()->addDays(30);
+        $accion = \Illuminate\Support\Facades\URL::signedRoute('portal.rate', ['ticket' => $ticket], $exp, false);
+        $act    = e($accion);
         $estrellas = '';
         for ($n = 1; $n <= 5; $n++) {
-            $url = e(\Illuminate\Support\Facades\URL::signedRoute('portal.rate', ['ticket' => $ticket, 'score' => $n], $exp, false));
-            $estrellas .= '<a href="' . $url . '" title="' . $n . '" style="text-decoration:none;font-size:36px;line-height:1;color:'
-                . ($n <= $nota ? '#e0a63a' : '#d5dae2') . ';">&#9733;</a>';
+            $estrellas .= '<form method="post" action="' . $act . '" style="display:inline;margin:0;padding:0;">'
+                . '<input type="hidden" name="score" value="' . $n . '">'
+                . '<button type="submit" title="' . $n . ' de 5" style="border:0;background:none;cursor:pointer;padding:0 3px;font-size:36px;line-height:1;color:'
+                . ($n <= $pintar ? '#e0a63a' : '#d5dae2') . ';">&#9733;</button>'
+                . '</form>';
         }
-        $accion = \Illuminate\Support\Facades\URL::signedRoute('portal.rate', ['ticket' => $ticket], $exp, false);
 
-        return response($this->csatHtml($code, $nota, (string) ($r->comment ?? ''), $comment !== null, $aviso, $estrellas, $accion))
+        return response($this->csatHtml($code, $nota, (string) ($r->comment ?? ''), $comentado, $aviso, $estrellas, $accion))
             ->header('Content-Type', 'text/html; charset=utf-8');
     }
 
@@ -266,6 +278,7 @@ class PortalController extends Controller
         $com = e($comment);
         $act = e($accion);
         $titulo   = $nota > 0 ? '¡Gracias por tu valoración!' : '¿Cómo valorarías nuestra atención?';
+        $cta      = $nota === 0 ? '<p style="font-size:13px;color:#4a5a72;margin:10px 0 0;">Pulsa una estrella para enviar tu valoración.</p>' : '';
         $avisoH   = $aviso ? '<p style="color:#c0392b;font-size:13px;margin:8px 0 0;">' . e($aviso) . '</p>' : '';
         $graciasC = $comentado && $aviso === null ? '<p style="color:#0f9d6b;font-size:13px;margin:8px 0 0;">Comentario guardado, ¡gracias!</p>' : '';
 
@@ -278,6 +291,7 @@ class PortalController extends Controller
   <h2 style="margin:6px 0 12px;font-size:20px;">$titulo</h2>
   <div style="display:flex;justify-content:center;gap:6px;">$estrellas</div>
   <div style="font-size:12px;color:#8494a8;margin-top:6px;">1 = muy insatisfecho · 5 = muy satisfecho</div>
+  $cta
   $avisoH
   $graciasC
   <form method="post" action="$act" style="margin-top:16px;text-align:left;">
