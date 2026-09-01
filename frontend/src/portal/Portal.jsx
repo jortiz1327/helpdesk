@@ -1084,7 +1084,7 @@ function Detalle({ code, back, onExpire }) {
 
       {/* ENCUESTA DE SATISFACCIÓN (CSAT). El backend solo la manda cuando aplica
           (incidencia del portal, resuelta y con la encuesta activada). */}
-      {t.csat && <Csat code={code} csat={t.csat} />}
+      {t.csat && <Csat code={code} csat={t.csat} onExpire={onExpire} />}
 
       {/* CONVERSACIÓN + HITOS como línea de tiempo (una columna, con espina). */}
       <div className="tl">
@@ -1149,7 +1149,7 @@ function Detalle({ code, back, onExpire }) {
  * instante (un clic y listo) y aparece el comentario opcional. La nota se puede
  * cambiar durante unos días; el backend actualiza sin duplicar.
  */
-function Csat({ code, csat }) {
+function Csat({ code, csat, onExpire }) {
   const { t } = useLang()
   const [score, setScore] = useState(csat.score || 0)
   const [hover, setHover] = useState(0)
@@ -1167,6 +1167,7 @@ function Csat({ code, csat }) {
     // un comentario que ya hubiera dejado).
     const r = await portal.rate(code, n)
     setBusy(false)
+    if (r.reauth) return onExpire?.()   // token caducado: pedir el código en vez de fallar en silencio
     if (r.ok) setRated(true)
   }
 
@@ -1174,6 +1175,7 @@ function Csat({ code, csat }) {
     setBusy(true)
     const r = await portal.rate(code, score, comment)   // aquí sí manda el comentario
     setBusy(false)
+    if (r.reauth) return onExpire?.()
     if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2600) }
   }
 
