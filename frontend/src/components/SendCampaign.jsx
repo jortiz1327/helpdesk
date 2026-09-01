@@ -117,7 +117,7 @@ export default function SendCampaign({ onDone }) {
     setSending(false)
     if (!r.ok) { toast(r.error || 'No se pudo crear la campaña', 'err'); return }
     const exc = r.excluded ? ` · ${r.excluded} excluido${r.excluded > 1 ? 's' : ''} por baja` : ''
-    if (r.immediate) toast(`Campaña lanzada · ${r.stats.sent} enviados${r.stats.failed ? `, ${r.stats.failed} fallidos` : ''}${r.stats.pending ? `, ${r.stats.pending} en cola` : ''}${exc}`)
+    if (r.immediate) toast(`Campaña lanzada · ${r.stats?.sent ?? 0} enviados${r.stats?.failed ? `, ${r.stats.failed} fallidos` : ''}${r.stats?.pending ? `, ${r.stats.pending} en cola` : ''}${exc}`)
     else toast(`Campaña programada${exc}`)
     onDone?.()
   }

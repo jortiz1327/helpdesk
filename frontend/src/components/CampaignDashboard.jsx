@@ -48,7 +48,7 @@ function Detail({ id, onBack, onChange }) {
   )
   if (!c) return <div className="center-load"><div className="spinner" /></div>
   const st = STATUS[c.status] || STATUS.draft
-  const cnt = (...s) => c.recipients.filter((r) => s.includes(r.status)).length
+  const cnt = (...s) => (c.recipients || []).filter((r) => s.includes(r.status)).length
   const pending = cnt('pending')
   const delivered = cnt('delivered', 'read')
   const read = cnt('read')
@@ -74,7 +74,7 @@ function Detail({ id, onBack, onChange }) {
           </div>
           <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>Plantilla <b>{c.template_name}</b> · Destino <b>{c.source_name || '—'}</b> · {fmt(c.scheduled_at)}</div>
           <div className="card" style={{ padding: 0 }}>
-            {c.recipients.map((r, i) => {
+            {(c.recipients || []).map((r, i) => {
               const rs = RSTATUS[r.status] || RSTATUS.pending
               return (
                 <div key={i} className="pb-row">

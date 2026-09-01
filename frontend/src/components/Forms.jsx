@@ -84,6 +84,7 @@ function Builder({ form, onClose, onSaved }) {
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i]
       const t = TYPES[f.type]
+      if (!t) continue   // tipo desconocido/legacy: no se valida (evita crash)
       const n = i + 1
       if (t.content) {
         if (!String(f.label || '').trim()) return { id: f.id, msg: `El bloque #${n} (${t.label}) no puede estar vacío` }

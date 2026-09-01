@@ -70,7 +70,7 @@ export default function ChatInfo({ contact, messages, onClose, onUpdated, onSend
   const lastIn = [...messages].reverse().find((m) => m.direction === 'in')
   let win = { open: false, text: 'Expirada', detail: 'Tiempo agotado para responder sin plantilla' }
   if (lastIn) {
-    const ms = 24 * 3600 * 1000 - (Date.now() - parseDate(lastIn.created_at).getTime())
+    const ms = 24 * 3600 * 1000 - (Date.now() - parseDate(lastIn.created_at)?.getTime())
     if (ms > 0) {
       const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000)
       win = { open: true, text: `${h}h ${m}m`, detail: 'Tiempo restante para responder sin plantilla' }
