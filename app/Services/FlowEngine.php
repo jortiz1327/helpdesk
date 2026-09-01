@@ -232,8 +232,17 @@ class FlowEngine
         if ($mode === 'sql') {
             $sql = trim($d['query'] ?? '');
             if (!preg_match('/^select\s/i', $sql)) return;
+            // Los {{{vars}}} vienen del CLIENTE: NUNCA se interpolan en el SQL. Cada uno se
+            // sustituye por un marcador «?» y su valor va como PARÁMETRO (evita inyección).
+            // Vale tanto '{{{var}}}' (entre comillas del admin) como {{{var}}} suelto: cada
+            // uno queda como un único «?». Para «contiene» (LIKE %..%) usar el modo constructor.
+            $params = [];
+            $safe = preg_replace_callback('/([\'"]?)\{\{\{(\w+)\}\}\}\1/', function ($m) use (&$params, $vars) {
+                $params[] = $vars[$m[2]] ?? '';
+                return '?';
+            }, $sql);
             try {
-                $row = DB::selectOne($this->vars($sql, $vars));
+                $row = DB::selectOne($safe, $params);
                 if ($row && !empty($d['saveTo'])) $vars[$d['saveTo']] = implode(', ', (array) $row);
             } catch (\Throwable $e) { /* ignora */ }
             return;
