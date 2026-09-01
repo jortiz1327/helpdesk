@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
+import LoadError from './LoadError.jsx'
 
 /* ---------------------------------------------------------------------------
  * GESTIÓN DE AGENTES — carga de trabajo del equipo.
@@ -29,11 +30,14 @@ const loadOf = (n) => LOADS.find((l) => n >= l.min && n <= l.max) || LOADS[0]
 
 export default function Agents({ onSeeTickets }) {
   const [d, setD] = useState(null)
+  const [err, setErr] = useState(false)
   const [filter, setFilter] = useState('all')
   const [history, setHistory] = useState(null)   // agente cuyo historial se está viendo
 
-  useEffect(() => { api.listTicketAgents().then(setD) }, [])
+  const load = () => { setErr(false); api.listTicketAgents().then(setD).catch(() => setErr(true)) }
+  useEffect(() => { load() }, [])
 
+  if (err && !d) return <LoadError onRetry={load} msg="No se pudo cargar el equipo de agentes" />
   if (!d) return <div className="center-load"><div className="spinner" /></div>
 
   const agents = (d.agents || [])
@@ -144,8 +148,10 @@ const fmtDate = (s) => (s ? new Date(s.replace(' ', 'T')).toLocaleString('es-ES'
 
 function HistoryModal({ agent, onClose }) {
   const [d, setD] = useState(null)
+  const [err, setErr] = useState(false)
 
-  useEffect(() => { api.agentHistory(agent.id).then(setD) }, [agent.id])
+  const load = () => { setErr(false); api.agentHistory(agent.id).then(setD).catch(() => setErr(true)) }
+  useEffect(() => { load() }, [agent.id])
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose()
     document.addEventListener('keydown', h)
@@ -177,7 +183,8 @@ function HistoryModal({ agent, onClose }) {
 
           <div className="fb-set-t" style={{ marginBottom: 10 }}>Historial de tickets cerrados</div>
 
-          {!d ? <div className="center-load"><div className="spinner" /></div> : rows.length === 0 ? (
+          {err && !d ? <LoadError onRetry={load} msg="No se pudo cargar el historial" />
+          : !d ? <div className="center-load"><div className="spinner" /></div> : rows.length === 0 ? (
             <div className="tk-empty" style={{ padding: '40px 20px' }}>
               <div className="e-ic"><Icon.check style={{ width: 24, height: 24, fill: 'var(--ink-2)' }} /></div>
               <h3>Sin tickets cerrados</h3>
