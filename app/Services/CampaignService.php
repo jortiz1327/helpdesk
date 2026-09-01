@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /** Lógica de envío de campañas. Portado de includes/campaign_send.php. */
@@ -66,6 +67,17 @@ class CampaignService
             return [0, 0, $pending];
         }
 
+        // CANDADO por campaña: solo un proceso la envía a la vez, venga del cron o de un
+        // envío inmediato (o un doble clic). Sin esto, dos procesos leen los mismos
+        // 'pending' y envían —y PAGAN— dos veces. TTL 300s: si el proceso muere, el candado
+        // caduca solo y la campaña se reanuda en el siguiente tick.
+        $lock = Cache::lock("campaign:send:{$campaignId}", 300);
+        if (!$lock->get()) {
+            $pending = DB::table('campaign_recipients')->where('campaign_id', $campaignId)->where('status', 'pending')->count();
+            return [0, 0, $pending];   // otro proceso ya la está enviando
+        }
+
+        try {
         $limit = max(1, $limit);
 
         /*
@@ -126,5 +138,8 @@ class CampaignService
             DB::table('campaigns')->where('id', $campaignId)->update(['status' => $okCount === 0 ? 'failed' : 'sent', 'updated_at' => now()]);
         }
         return [$sent, $failed, $pending];
+        } finally {
+            $lock->release();
+        }
     }
 }
