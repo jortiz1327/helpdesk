@@ -70,7 +70,10 @@ return [
     |
     */
 
-    'timezone' => env('APP_TIMEZONE', 'UTC'),
+    // App single-tenant de España: si el .env no fija APP_TIMEZONE, se usa Madrid (no UTC),
+    // para que las fechas no salgan 2h atrás. AppServiceProvider ajusta el offset de MySQL
+    // a partir de esto (DST-aware), así PHP y la BD guardan siempre la misma hora local.
+    'timezone' => env('APP_TIMEZONE', 'Europe/Madrid'),
 
     /*
     |--------------------------------------------------------------------------
