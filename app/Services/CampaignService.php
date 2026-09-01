@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\DB;
 /** Lógica de envío de campañas. Portado de includes/campaign_send.php. */
 class CampaignService
 {
+    /** Reintentos por destinatario ante errores transitorios de Meta (429 / 5xx). */
+    public const MAX_REINTENTOS = 5;
+
     public function __construct(protected WhatsAppService $wa) {}
 
     /** Recalcula sent/failed de una campaña a partir de sus destinatarios. */
@@ -125,8 +128,16 @@ class CampaignService
                 $sent++;
             } else {
                 $err = $res['error']['message'] ?? ('HTTP ' . $code);
-                DB::table('campaign_recipients')->where('id', $r->id)->update(['status' => 'failed', 'error' => $err, 'sent_at' => now()]);
-                $failed++;
+                // 429 (rate limit) o 5xx son TRANSITORIOS: se deja PENDING para reintentar
+                // en el siguiente tick (hasta MAX_REINTENTOS). Otros errores (4xx) → failed.
+                if (($code === 429 || $code >= 500) && (int) $r->retries < self::MAX_REINTENTOS) {
+                    DB::table('campaign_recipients')->where('id', $r->id)
+                        ->update(['error' => $err, 'retries' => (int) $r->retries + 1]);
+                    // sigue 'pending': no cuenta como enviado ni como fallido.
+                } else {
+                    DB::table('campaign_recipients')->where('id', $r->id)->update(['status' => 'failed', 'error' => $err, 'sent_at' => now()]);
+                    $failed++;
+                }
             }
         }
 
