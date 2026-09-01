@@ -78,13 +78,16 @@ class NotifyService
             ->unique()->values();
     }
 
+    /** Avisos INTERNOS (a agentes/admins, no al cliente): no llevan «responde a este correo». */
+    protected const AVISOS_INTERNOS = ['sla_warning', 'sla_breach', 'ticket_assigned'];
+
     /** Titular de la plantilla de marca según el tipo de aviso (envuelve el cuerpo). */
     protected function encabezado(string $key): string
     {
         return [
             'ticket_created'  => 'Hemos recibido tu incidencia',
             'ticket_closed'   => 'Tu incidencia se ha cerrado',
-            'ticket_assigned' => 'Tu incidencia ya tiene agente asignado',
+            'ticket_assigned' => 'Se te ha asignado un ticket',
             'sla_warning'     => 'Un ticket está por vencer',
             'sla_breach'      => 'Un ticket ha vencido su SLA',
             'csat_survey'     => '¿Cómo lo hemos hecho?',
@@ -94,10 +97,13 @@ class NotifyService
     /** Datos de la plantilla de marca para un aviso: titular + «código · asunto». */
     protected function marco(string $key, object $t): array
     {
-        return [
+        $m = [
             'heading' => $this->encabezado($key),
             'meta'    => trim(((string) $t->code) . ($t->subject ? ' · ' . (string) $t->subject : '')),
         ];
+        // Los avisos internos no invitan a «responder a este correo» (no es del cliente).
+        if (in_array($key, self::AVISOS_INTERNOS, true)) $m['note'] = '';
+        return $m;
     }
 
     /**
