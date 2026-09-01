@@ -315,8 +315,10 @@ class FlowEngine
         $guard = 0;
 
         // Todo lo que envíe el bot se guarda en el ticket del que vino el mensaje.
-        $t = ['channel' => 'whatsapp', 'status' => 'sent'];
-        if (!empty($contact['ticket_id'])) $t['ticket_id'] = $contact['ticket_id'];
+        // OJO: se llama $opts, NO $t: dentro del bucle $t es el TIPO de nodo (string),
+        // así que reutilizar $t aquí reventaría storeMessage con «string + array».
+        $opts = ['channel' => 'whatsapp', 'status' => 'sent'];
+        if (!empty($contact['ticket_id'])) $opts['ticket_id'] = $contact['ticket_id'];
 
         while ($cur && $guard++ < 60) {
             $node = $this->findNode($nodes, $cur);
@@ -329,7 +331,7 @@ class FlowEngine
                 if (trim($msg) !== '') {
                     [$code, $res] = $this->wa->sendText($contact['wa_id'], $msg);
                     if (!empty($res['messages'][0]['id'])) {
-                        ChatService::storeMessage($contact['id'], $contact['wa_id'], 'out', 'text', $msg, $t + ['wamid' => $res['messages'][0]['id']]);
+                        ChatService::storeMessage($contact['id'], $contact['wa_id'], 'out', 'text', $msg, $opts + ['wamid' => $res['messages'][0]['id']]);
                     }
                 }
             } elseif ($t === 'send_template') {
@@ -340,7 +342,7 @@ class FlowEngine
                 if (!$ix) { $cur = $this->next($edges, $cur); continue; }
                 [$c, $r] = $this->wa->sendInteractive($contact['wa_id'], $ix);
                 if (!empty($r['messages'][0]['id'])) {
-                    ChatService::storeMessage($contact['id'], $contact['wa_id'], 'out', 'interactive', $ix['body']['text'] ?? '', $t + ['wamid' => $r['messages'][0]['id'], 'payload' => json_encode($ix, JSON_UNESCAPED_UNICODE)]);
+                    ChatService::storeMessage($contact['id'], $contact['wa_id'], 'out', 'interactive', $ix['body']['text'] ?? '', $opts + ['wamid' => $r['messages'][0]['id'], 'payload' => json_encode($ix, JSON_UNESCAPED_UNICODE)]);
                 }
                 $s['current_node'] = $cur; $s['status'] = 'active'; $s['variables'] = json_encode($vars); $s['resume_at'] = null;
                 $this->saveSession($s);
@@ -350,7 +352,7 @@ class FlowEngine
                     $p = $this->vars($d['prompt'], $vars);
                     [$c, $r] = $this->wa->sendText($contact['wa_id'], $p);
                     if (!empty($r['messages'][0]['id'])) {
-                        ChatService::storeMessage($contact['id'], $contact['wa_id'], 'out', 'text', $p, $t + ['wamid' => $r['messages'][0]['id']]);
+                        ChatService::storeMessage($contact['id'], $contact['wa_id'], 'out', 'text', $p, $opts + ['wamid' => $r['messages'][0]['id']]);
                     }
                 }
                 $s['current_node'] = $cur; $s['status'] = 'active'; $s['variables'] = json_encode($vars); $s['resume_at'] = null;
@@ -379,7 +381,7 @@ class FlowEngine
                         $cta = mb_substr(trim($d['cta'] ?? '') ?: 'Ver formulario', 0, 30);
                         [$fc, $fr] = $this->flowsMeta->send($contact['wa_id'], $form->meta_flow_id, $ftoken, $bodyText, $cta);
                         if (!empty($fr['messages'][0]['id'])) {
-                            ChatService::storeMessage($contact['id'], $contact['wa_id'], 'out', 'interactive', '📋 Formulario: ' . $form->name, $t + ['wamid' => $fr['messages'][0]['id']]);
+                            ChatService::storeMessage($contact['id'], $contact['wa_id'], 'out', 'interactive', '📋 Formulario: ' . $form->name, $opts + ['wamid' => $fr['messages'][0]['id']]);
                         }
                     }
                 }
