@@ -149,6 +149,12 @@ class FlowEngine
     {
         $url = trim($this->vars($d['url'] ?? '', $vars));
         if (!preg_match('#^https?://#i', $url)) return;
+        // ANTI-SSRF: la URL puede llevar {{{vars}}} del cliente. No dejamos que apunte a
+        // servicios internos (loopback, metadata cloud 169.254.169.254, redes privadas…).
+        if (!$this->urlSegura($url)) {
+            logger()->warning('FlowEngine httpRequest: URL bloqueada por SSRF', ['url' => $url]);
+            return;
+        }
         $method = strtoupper($d['method'] ?? 'GET');
 
         $headers = [];
@@ -157,7 +163,15 @@ class FlowEngine
         }
 
         try {
-            $req = Http::withHeaders($headers)->timeout(20)->withOptions(['allow_redirects' => ['max' => 3]]);
+            // Cada redirección se valida también (un 302 podría llevar a una IP interna).
+            $req = Http::withHeaders($headers)->timeout(20)->withOptions(['allow_redirects' => [
+                'max'         => 3,
+                'on_redirect' => function ($request, $response, $uri) {
+                    if (!$this->urlSegura((string) $uri)) {
+                        throw new \RuntimeException('Redirección bloqueada (SSRF): ' . $uri);
+                    }
+                },
+            ]]);
             if (in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
                 $req = $req->withBody($this->vars($d['body'] ?? '', $vars), $headers['Content-Type'] ?? 'application/json');
             }
@@ -177,6 +191,34 @@ class FlowEngine
             $vars[$var] = is_scalar($val) ? (string) $val : json_encode($val, JSON_UNESCAPED_UNICODE);
         }
         $vars['_httpStatus'] = (string) $code;
+    }
+
+    /**
+     * ¿La URL apunta a un destino EXTERNO seguro? Bloquea SSRF: loopback, «localhost»,
+     * la IP de metadata de la nube (169.254.169.254) y todas las redes privadas/reservadas.
+     * Si es un nombre, se resuelve y se comprueban sus IPs. (No cubre DNS-rebinding; para
+     * blindaje total haría falta fijar la IP resuelta o una lista blanca de hosts.)
+     */
+    protected function urlSegura(string $url): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!$host) return false;
+        $host = trim($host, '[]');   // corchetes de IPv6
+
+        if (in_array(strtolower($host), ['localhost', 'localhost.localdomain'], true)) return false;
+
+        // IPs a comprobar: si el host ES una IP, esa; si es un nombre, se resuelve.
+        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (gethostbynamel($host) ?: []);
+        if (!$ips) return false;   // no resuelve → no arriesgamos
+
+        foreach ($ips as $ip) {
+            // Rechaza privadas + reservadas (loopback 127.*, link-local 169.254.* con la
+            // metadata, privadas 10/172.16/192.168, y las reservadas IPv6).
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                return false;
+            }
+        }
+        return true;
     }
 
     protected function assignAgent(int $contactId, array $d): void
