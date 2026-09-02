@@ -194,7 +194,7 @@ class MailService
             if (!$admins) return;
 
             $from    = (string) ($message->getFrom()[0]->mail ?? '?');
-            $subject = (string) $message->getSubject();
+            $subject = self::decodeSubject($message->getSubject());
             $msgId   = (string) $message->getMessageId();
 
             $cuerpo = '<p>Un correo entrante <b>no se ha podido convertir en ticket</b> tras '
@@ -248,7 +248,7 @@ class MailService
             return ['ticket_nuevo' => false, 'mensaje' => false, 'adjuntos' => 0];   // ya importado
         }
 
-        $subject = trim((string) $message->getSubject());
+        $subject = self::decodeSubject($message->getSubject());
 
         // Fecha REAL del correo (cabecera Date:), no la del sondeo. Así el hilo
         // muestra cuándo lo envió el cliente. getDate()->toDate() da el instante
@@ -576,6 +576,21 @@ class MailService
             if ($mail !== '' && filter_var($mail, FILTER_VALIDATE_EMAIL)) $out[] = $mail;
         }
         return array_values(array_unique($out));
+    }
+
+    /**
+     * Decodifica un asunto MIME («=?utf-8?B?…?=») a texto legible. Muchos clientes
+     * mandan así los asuntos con acentos o «RV:»; sin decodificar, el ticket saldría con
+     * el churro codificado Y `esReenvio()` no reconocería el reenvío (→ recorte de la cita
+     * → ticket casi vacío). Deja igual lo que no lleva encoded-words.
+     */
+    protected static function decodeSubject($raw): string
+    {
+        $s = trim((string) $raw);
+        if ($s === '' || stripos($s, '=?') === false) return $s;
+        $out = @iconv_mime_decode($s, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+        if ($out === false || trim((string) $out) === '') $out = @mb_decode_mimeheader($s);
+        return trim(($out !== false && $out !== null) ? (string) $out : $s);
     }
 
     /** ¿El asunto dice que es un reenvío? («RV:», «FW:», «Fwd:»…) */
