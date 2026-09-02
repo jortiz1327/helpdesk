@@ -761,11 +761,16 @@ export default function App() {
                           * selector de justo debajo.
                           */}
                         <div className="rail-top">
-                            {expanded ? (
-                                <img className="rail-logo" src={logo} alt="AEME Group" />
-                            ) : (
-                                <div className="logo" title="AEME Group" />
-                            )}
+                            {/* El logo abre el PORTAL PÚBLICO en otra pestaña (para verlo sin
+                                salir de la app de agentes). El portal vive en la raíz «/». */}
+                            <a className="rail-logo-link" href="/" target="_blank" rel="noopener"
+                               title="Ver el portal público (nueva pestaña)">
+                                {expanded ? (
+                                    <img className="rail-logo" src={logo} alt="AEME Group" />
+                                ) : (
+                                    <div className="logo" title="AEME Group" />
+                                )}
+                            </a>
                         </div>
 
                         {/* Selector de área: solo si el usuario puede entrar a más de una (superadmin). */}
