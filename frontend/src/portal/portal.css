@@ -20,19 +20,9 @@
     --font:'Lato',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     color-scheme:light;
   }
-  @media (prefers-color-scheme:dark){
-    :root{
-      --bg:#0b1220; --surface:#111a2b; --surface-2:#0e1626;
-      --ink:#eaf0f8; --ink-2:#9fb0c6; --ink-3:#7e90a8;
-      --brand:#4d84ff; --brand-deep:#6b99ff; --brand-soft:#17284a;
-      --line:#1d2942; --line-2:#283755;
-      --ok:#34d399; --ok-soft:#0f2c22;
-      --wait:#f2b24a; --wait-soft:#2e2410; --nuevo:#8f9bff; --nuevo-soft:#1c2140;
-      --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px -12px rgba(0,0,0,.5);
-      --shadow-lg:0 2px 6px rgba(0,0,0,.4), 0 24px 48px -20px rgba(0,0,0,.6);
-      color-scheme:dark;
-    }
-  }
+  /* El portal público es SIEMPRE claro por defecto: NO se sigue el modo oscuro del
+     sistema (antes un @media prefers-color-scheme:dark lo volvía oscuro). El bloque
+     [data-theme="dark"] se queda por si algún día se añade un selector de tema. */
   :root[data-theme="dark"]{
     --bg:#0b1220; --surface:#111a2b; --surface-2:#0e1626;
     --ink:#eaf0f8; --ink-2:#9fb0c6; --ink-3:#7e90a8;
@@ -103,7 +93,6 @@
   .hero{position:relative;text-align:center;padding:70px 0 34px;overflow:hidden}
   .hero-waves{position:absolute;top:-40px;left:50%;transform:translateX(-50%);width:640px;
     max-width:150%;opacity:.5;pointer-events:none;z-index:0}
-  @media(prefers-color-scheme:dark){.hero-waves{opacity:.32}}
   /* Estado en vivo: verde «atendiendo», gris «fuera de horario». El punto late
      cuando está abierto — señal de que hay alguien al otro lado. */
   .eyebrow{position:relative;z-index:1;display:inline-flex;align-items:center;gap:8px;

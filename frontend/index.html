@@ -2,6 +2,17 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Modo CLARO por defecto en TODAS las páginas, fijado antes de pintar (sin parpadeo).
+      // El portal público es SIEMPRE claro; la app de agentes respeta la elección guardada
+      // (por defecto, claro). Si algo falla, cae a claro.
+      try {
+        var esAgentes = location.pathname.replace(/\/+$/, '').indexOf('/agentes') === 0;
+        document.documentElement.setAttribute('data-theme', esAgentes ? (localStorage.getItem('theme') || 'light') : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    </script>
     <!-- La MARCA de AEME, no el logotipo entero: apaisado 4:1 a 16 px es una
          mancha. Sobre blanco, para que se vea igual en pestañas claras y oscuras. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
