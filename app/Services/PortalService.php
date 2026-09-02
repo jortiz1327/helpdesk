@@ -78,10 +78,10 @@ class PortalService
 
     protected function enviarCodigo(EmailAccount $acc, string $email, string $code): void
     {
-        $marca = $acc->from_name ?: 'Soporte';
         $html = <<<HTML
-            <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:440px;margin:0 auto;color:#0e1e33">
-              <p style="font-size:15px;color:#46586e">Tu código para acceder al soporte de {$marca}:</p>
+            <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;margin:0 auto;color:#0e1e33">
+              <p style="font-size:15px;color:#46586e">Para validar tu identidad y asegurarnos de que eres t&uacute;,
+                 introduce este c&oacute;digo en el portal de soporte:</p>
               <div style="font-size:34px;font-weight:700;letter-spacing:.18em;text-align:center;
                           background:#e8f0fe;color:#1a4fd0;padding:18px;border-radius:12px;margin:14px 0">{$code}</div>
               <p style="font-size:13px;color:#8496aa">Caduca en 10 minutos. Si no has sido tú, ignora este correo —
