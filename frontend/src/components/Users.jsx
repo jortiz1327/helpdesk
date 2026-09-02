@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
+import { parseDate } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
@@ -62,7 +63,7 @@ export default function Users() {
   // Estado «en línea» a partir de la última acción registrada (apartado Acciones).
   const presencia = (u) => {
     if (!u.last_activity) return 'off'
-    const m = (Date.now() - new Date(String(u.last_activity).replace(' ', 'T')).getTime()) / 60000
+    const m = (Date.now() - parseDate(u.last_activity).getTime()) / 60000
     return m < 6 ? 'on' : (m < 30 ? 'away' : 'off')
   }
   // Encender/apagar los avisos de SLA de un usuario sin abrir su ficha.

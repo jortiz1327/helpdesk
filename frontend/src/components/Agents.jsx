@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
 import LoadError from './LoadError.jsx'
+import { fmtDate as fmtD } from '../util.js'
 
 /* ---------------------------------------------------------------------------
  * GESTIÓN DE AGENTES — carga de trabajo del equipo.
@@ -144,7 +145,7 @@ export default function Agents({ onSeeTickets }) {
 
 /* --------------------- Historial: lo que este agente YA cerró -------------------- */
 
-const fmtDate = (s) => (s ? new Date(s.replace(' ', 'T')).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—')
+const fmtDate = (s) => fmtD(s, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 function HistoryModal({ agent, onClose }) {
   const [d, setD] = useState(null)

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
+import { fmtDate } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
@@ -570,7 +571,7 @@ function EmailBans() {
     const r = await api.deleteEmailBan(b.id)
     if (r.ok) { toast('Desbloqueado'); load() } else toast(r.error || 'Error', 'err')
   }
-  const fmt = (d) => d ? new Date(d.replace(' ', 'T')).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+  const fmt = (d) => fmtDate(d, { dateStyle: 'short', timeStyle: 'short' })
 
   return (
     <>
@@ -1201,7 +1202,7 @@ function CronStatus() {
   )
 }
 
-const fmtFecha = (s) => s ? new Date(s.replace(' ', 'T')).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+const fmtFecha = (s) => fmtDate(s, { dateStyle: 'short', timeStyle: 'short' })
 
 /* ------------------------------- Prioridades -------------------------------
  * Antes eran una lista fija en el código; ahora se configuran. La CLAVE de cada

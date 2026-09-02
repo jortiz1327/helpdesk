@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { portal, getPass, setPass, getSeen, markSeen } from './portalApi.js'
 import { LangProvider, useLang, LANGS, LOCALES } from './i18n.js'
+import { parseDate } from '../util.js'
 import logo from '../assets/logo.png'
 
 /* Banderas del selector de idioma en SVG en línea. Los emoji de bandera (🇪🇸…) NO se
@@ -180,8 +181,10 @@ function Adjuntos({ items }) {
 
 
 const mask = (m) => { const [u, d] = (m || '').split('@'); return (u?.[0] || '') + '***@' + (d || '') }
-const fmtDate = (iso, lang = 'es') => { try { return new Date(iso).toLocaleDateString(LOCALES[lang] || 'es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) } catch { return '' } }
-const fmtHora = (iso, lang = 'es') => { try { return new Date(iso).toLocaleString(LOCALES[lang] || 'es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
+// La incidencia se muestra en hora de Madrid (la del soporte), pase por donde pase el
+// cliente: el backend guarda hora de pared de Madrid y parseDate la convierte al instante.
+const fmtDate = (iso, lang = 'es') => { try { const d = parseDate(iso); return d ? d.toLocaleDateString(LOCALES[lang] || 'es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short', year: 'numeric' }) : '' } catch { return '' } }
+const fmtHora = (iso, lang = 'es') => { try { const d = parseDate(iso); return d ? d.toLocaleString(LOCALES[lang] || 'es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '' } catch { return '' } }
 /* «hace 3 días», «hoy», «ahora mismo»… en el idioma activo (recibe `t` y `lang`). */
 const relTime = (iso, t, lang = 'es') => {
   const s = (Date.now() - new Date(iso).getTime()) / 1000

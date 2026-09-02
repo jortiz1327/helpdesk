@@ -18,32 +18,63 @@ export function avatarBg(seed) {
   return `linear-gradient(135deg, ${a}, ${b})`
 }
 
-export function parseDate(s) {
-  if (!s) return null
-  return new Date(s.replace(' ', 'T'))
+/*
+ * ZONA HORARIA. La BD guarda la hora de pared de MADRID como texto sin zona
+ * («2026-09-01 14:00:00»). Para que se vea IGUAL en cualquier zona del navegador:
+ *   · parseDate() convierte ese texto al INSTANTE real (para duraciones y orden),
+ *   · y TODO se formatea/compara en Europe/Madrid (no en la zona del navegador).
+ */
+const TZ = 'Europe/Madrid'
+const ES = 'es-ES'
+
+// Offset (ms) UTC↔Madrid en ese instante (respeta el horario de verano).
+function madridOffset(date) {
+  const utc = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }))
+  const mad = new Date(date.toLocaleString('en-US', { timeZone: TZ }))
+  return mad - utc
 }
 
+export function parseDate(s) {
+  if (!s) return null
+  const asUtc = new Date(String(s).replace(' ', 'T') + 'Z')   // provisional: como si fuera UTC
+  if (isNaN(asUtc.getTime())) return null
+  return new Date(asUtc.getTime() - madridOffset(asUtc))       // corrige: el texto era Madrid
+}
+
+// YYYY-MM-DD de un instante, EN MADRID (para comparar días sin depender del navegador).
+const madDay = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+const esHoy = (d) => madDay(d) === madDay(new Date())
+const esAyer = (d) => madDay(d) === madDay(new Date(Date.now() - 86400000))
+
 export function relTime(s) {
-  const d = parseDate(s)
-  if (!d) return ''
-  const now = new Date()
-  if (d.toDateString() === now.toDateString())
-    return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-  const y = new Date(now); y.setDate(now.getDate() - 1)
-  if (d.toDateString() === y.toDateString()) return 'Ayer'
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })
+  const d = parseDate(s); if (!d) return ''
+  if (esHoy(d)) return d.toLocaleTimeString(ES, { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
+  if (esAyer(d)) return 'Ayer'
+  return d.toLocaleDateString(ES, { timeZone: TZ, day: '2-digit', month: '2-digit' })
 }
 
 export function clockTime(s) {
   const d = parseDate(s)
-  return d ? d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : ''
+  return d ? d.toLocaleTimeString(ES, { timeZone: TZ, hour: '2-digit', minute: '2-digit' }) : ''
 }
 
 export function dayLabel(s) {
   const d = parseDate(s); if (!d) return ''
-  const now = new Date()
-  if (d.toDateString() === now.toDateString()) return 'Hoy'
-  const y = new Date(now); y.setDate(now.getDate() - 1)
-  if (d.toDateString() === y.toDateString()) return 'Ayer'
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+  if (esHoy(d)) return 'Hoy'
+  if (esAyer(d)) return 'Ayer'
+  return d.toLocaleDateString(ES, { timeZone: TZ, day: '2-digit', month: 'long', year: 'numeric' })
+}
+
+/* Formateadores reutilizables, SIEMPRE en horario de Madrid (no el del navegador). */
+export function fmtTime(s) {
+  const d = parseDate(s)
+  return d ? d.toLocaleTimeString(ES, { timeZone: TZ, hour: '2-digit', minute: '2-digit' }) : ''
+}
+export function fmtDate(s, opts = { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) {
+  const d = parseDate(s)
+  return d ? d.toLocaleString(ES, { timeZone: TZ, ...opts }) : '—'
+}
+export function fmtDateShort(s) {
+  const d = parseDate(s)
+  return d ? d.toLocaleDateString(ES, { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
 }

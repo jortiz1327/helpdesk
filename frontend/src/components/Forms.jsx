@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
+import { fmtDate } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import LockTip from './LockTip.jsx'
@@ -340,7 +341,7 @@ export default function Forms() {
               <div className="card" style={{ padding: 0 }}>
                 {subs.map((s) => (
                   <div key={s.id} className="sub-row">
-                    <div><b>{s.contact_name || '+' + (s.wa_id || '?')}</b><span className="muted" style={{ display: 'block', fontSize: 12 }}>{s.form_name} · {new Date(s.created_at.replace(' ', 'T')).toLocaleString('es-ES')}</span></div>
+                    <div><b>{s.contact_name || '+' + (s.wa_id || '?')}</b><span className="muted" style={{ display: 'block', fontSize: 12 }}>{s.form_name} · {fmtDate(s.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
                     <div className="sub-data">{Object.entries(s.data || {}).map(([k, v]) => <span key={k} className="pill gray sm">{k}: {String(v)}</span>)}</div>
                   </div>
                 ))}

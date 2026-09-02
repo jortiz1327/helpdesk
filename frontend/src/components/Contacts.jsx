@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
-import { initials, avatarBg, parseDate } from '../util.js'
+import { initials, avatarBg, parseDate, fmtDateShort } from '../util.js'
 import LabelManager from './LabelManager.jsx'
 import Select from './Select.jsx'
 import SedeSelect from './SedeSelect.jsx'
@@ -189,7 +189,7 @@ export default function Contacts({ onOpen, area = '' }) {
                       {c.labels.length === 0 ? <span className="muted" style={{ fontSize: 12 }}>—</span> :
                         c.labels.map((l) => <span key={l.id} className="ct-tag" style={{ background: l.color + '22', color: l.color }}>{l.name}</span>)}
                     </span>
-                    <span className="ct-date muted">{c.last_time ? parseDate(c.last_time)?.toLocaleDateString('es-ES') : '—'}</span>
+                    <span className="ct-date muted">{fmtDateShort(c.last_time)}</span>
                     <span className="ct-edit">
                       {/* preventDefault: si no, el clic dentro del <label> marcaría el checkbox */}
                       <button className="icon-btn" title="Editar contacto"

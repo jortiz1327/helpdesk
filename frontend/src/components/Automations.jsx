@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, createContext, useContext, u
 import ReactFlow, { Background, Controls, MiniMap, Handle, Position, useNodesState, useEdgesState, addEdge, MarkerType } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { api } from '../api.js'
+import { fmtDateShort } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
@@ -932,7 +933,7 @@ export default function Automations() {
                 <div className="flow-card" key={fl.id} onClick={() => open(fl.id)}>
                   <div className="fc-top"><span className="fc-ic"><Icon.bolt /></span><span className={`pill ${fl.active == 1 ? 'ok' : 'gray'}`}><span className="dot" />{fl.active == 1 ? 'Chatbot activo' : 'Inactivo'}</span></div>
                   <div className="fc-name">{fl.name}</div>
-                  <div className="fc-foot"><span className="muted">Actualizado {new Date(fl.updated_at.replace(' ', 'T')).toLocaleDateString('es-ES')}</span>
+                  <div className="fc-foot"><span className="muted">Actualizado {fmtDateShort(fl.updated_at)}</span>
                     <button className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={(e) => { e.stopPropagation(); del(fl.id) }}><Icon.trash /></button>
                   </div>
                 </div>

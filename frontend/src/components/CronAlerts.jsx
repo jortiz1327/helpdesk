@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
+import { parseDate, fmtTime } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
 
@@ -16,11 +17,12 @@ import { useToast } from '../App.jsx'
 
 const fmt = (s) => {
   if (!s) return '—'
-  const d = new Date(String(s).replace(' ', 'T'))
-  const hoy = new Date()
-  const mismo = d.toDateString() === hoy.toDateString()
-  const hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-  return mismo ? `hoy ${hora}` : `${d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} ${hora}`
+  const hora = fmtTime(s)
+  // «s» es hora de pared de Madrid: su día es s.slice(0,10); hoy-en-Madrid con Intl.
+  const hoyMad = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date())
+  if (String(s).slice(0, 10) === hoyMad) return `hoy ${hora}`
+  const d = parseDate(s)
+  return `${d.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short' })} ${hora}`
 }
 
 /** Traduce la expresión de cron a algo legible en los casos habituales. */

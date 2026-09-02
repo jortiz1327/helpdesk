@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
-import { initials, avatarBg, parseDate } from '../util.js'
+import { initials, avatarBg, parseDate, fmtTime } from '../util.js'
 
 /* -------------------------------------------------------------------------
  * REGISTRO DE ACCIONES (auditoría). Solo el superadmin llega aquí (activity.view).
@@ -49,9 +49,9 @@ function tituloDia(fecha) {
   const dd = new Date(d); dd.setHours(0, 0, 0, 0)
   if (+dd === +hoy) return 'Hoy'
   if (+dd === +ayer) return 'Ayer'
-  return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })
+  return d.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'short' })
 }
-const hora = (s) => { const d = parseDate(s); return d ? d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '' }
+const hora = (s) => fmtTime(s)
 const diaDe = (s) => (s || '').slice(0, 10)
 
 export default function Activity() {

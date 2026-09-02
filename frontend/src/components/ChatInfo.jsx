@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { api, mediaUrl } from '../api.js'
 import { Icon } from '../icons.jsx'
-import { initials, avatarBg, parseDate } from '../util.js'
+import { initials, avatarBg, parseDate, fmtDateShort } from '../util.js'
 import { useToast } from '../App.jsx'
 import LabelManager from './LabelManager.jsx'
 import Select from './Select.jsx'
@@ -187,7 +187,7 @@ export default function ChatInfo({ contact, messages, onClose, onUpdated, onSend
           {/* Activity */}
           <div className="info-sec">
             <div className="sec-t"><Icon.info /> Actividad</div>
-            <div className="kv"><span className="k">Creado</span><span className="v">{contact.created_at ? parseDate(contact.created_at)?.toLocaleDateString('es-ES') : '—'}</span></div>
+            <div className="kv"><span className="k">Creado</span><span className="v">{fmtDateShort(contact.created_at)}</span></div>
             <div className="kv"><span className="k">Mensajes</span><span className="v">{messages.length}</span></div>
           </div>
         </div>

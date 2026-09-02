@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { api, mediaUrl } from '../api.js'
+import { parseDate, fmtDate, fmtTime } from '../util.js'
 import WaAudio from './WaAudio.jsx'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
@@ -58,8 +59,6 @@ function SkelRow({ canTimes }) {
  *  - Al abrir un ticket NO se cambia de página: se abre un MODAL grande.
  * ------------------------------------------------------------------------- */
 
-const fmtDate = (s) => (s ? new Date(s.replace(' ', 'T')).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—')
-const fmtTime = (s) => (s ? new Date(s.replace(' ', 'T')).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '')
 const fmtMins = (m) => (m === null || m === undefined ? '—' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`)
 /** Tamaño de un adjunto en algo legible (KB/MB). */
 const fmtSize = (b) => (!b ? '' : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
@@ -67,7 +66,7 @@ const fmtSize = (b) => (!b ? '' : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB
 /** "hace 3 min" — para ver de un vistazo qué se movió hace nada. */
 function ago(s) {
   if (!s) return '—'
-  const d = new Date(s.replace(' ', 'T'))
+  const d = parseDate(s)
   const min = Math.round((Date.now() - d.getTime()) / 60000)
   if (min < 1) return 'ahora mismo'
   if (min < 60) return `hace ${min} min`
@@ -267,7 +266,7 @@ function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
   }, [open, compact])
 
   const dormido = t.snoozed_at && (Number(t.snooze_wake_on_reply)
-    || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
+    || (t.snoozed_until && parseDate(t.snoozed_until) > new Date()))
 
   // En modo compacto la ficha se encarga del estado «dormido» (una línea aparte); aquí
   // solo el disparador de posponer. En modo normal se mantiene el banner completo.
@@ -933,11 +932,11 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                     : rows.map((t) => {
                     const waiting = t.last_direction === 'in'   // habló el cliente: nos toca
                     const sleeping = t.snoozed_at && (Number(t.snooze_wake_on_reply)
-                      || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
+                      || (t.snoozed_until && parseDate(t.snoozed_until) > new Date()))
                     // Presencia: otro agente lo tiene abierto AHORA (bloqueo vigente).
                     const lockMin = meta?.lock_minutes || 0
                     const viewing = (lockMin > 0 && t.locked_by && Number(t.locked_by) !== Number(user?.id)
-                      && t.locked_at && (Date.now() - new Date(t.locked_at).getTime()) < lockMin * 60000)
+                      && t.locked_at && (Date.now() - parseDate(t.locked_at).getTime()) < lockMin * 60000)
                       ? t.locked_name : null
                     return (
                       <tr key={t.id} className={`tk-row ${waiting ? 'wait' : ''} ${sleeping ? 'sleeping' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
@@ -1509,7 +1508,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
 
   // ¿Este ticket está dormido (pospuesto)? y ¿NO es mío? (para el panel de acciones).
   const dormido = t?.snoozed_at && (Number(t.snooze_wake_on_reply)
-    || (t.snoozed_until && new Date(t.snoozed_until) > new Date()))
+    || (t.snoozed_until && parseDate(t.snoozed_until) > new Date()))
   const masMio = Number(t?.assigned_to) !== Number(user?.id)
 
   // Hilo a pintar: los anteriores cargados + la página del detalle, sin duplicar y por id.

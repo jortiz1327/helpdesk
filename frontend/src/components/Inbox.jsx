@@ -200,7 +200,9 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
     return () => clearInterval(t)
   }, [active])
 
-  const nowStamp = () => new Date().toISOString().slice(0, 19).replace('T', ' ')
+  // Hora de pared de MADRID (como la guarda el backend), no UTC: si no, el mensaje
+  // optimista se vería 2h desviado hasta que llega el real.
+  const nowStamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Madrid' })
 
   // Añade un mensaje saliente al hilo usando su id real, y adelanta lastIdRef
   // para que el polling no lo vuelva a insertar (evita duplicados).

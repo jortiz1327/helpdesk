@@ -4,6 +4,7 @@ import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import LockTip from './LockTip.jsx'
 import LoadError from './LoadError.jsx'
+import { fmtDate } from '../util.js'
 
 const STATUS = {
   draft:     { t: 'Borrador', c: 'gray' },
@@ -21,7 +22,7 @@ const RSTATUS = {
   read:      { t: 'Leído', c: 'ok' },
   failed:    { t: 'Fallido', c: 'err' },
 }
-const fmt = (s) => (s ? new Date(s.replace(' ', 'T')).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—')
+const fmt = (s) => fmtDate(s, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // ---- Detalle (destinatarios) ----
 function Detail({ id, onBack, onChange }) {

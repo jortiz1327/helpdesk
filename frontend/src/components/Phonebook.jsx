@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
+import { fmtDateShort } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 
@@ -175,7 +176,7 @@ export default function Phonebook() {
                     <div className="fc-top"><span className="fc-ic"><Icon.user /></span><span className="pill ok"><span className="dot" />{p.contacts} contactos</span></div>
                     <div className="fc-name">{p.name}</div>
                     {p.description && <div className="muted" style={{ fontSize: 12.5 }}>{p.description}</div>}
-                    <div className="fc-foot"><span className="muted">{new Date(p.updated_at.replace(' ', 'T')).toLocaleDateString('es-ES')}</span><button className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={(e) => { e.stopPropagation(); del(p.id) }}><Icon.trash /></button></div>
+                    <div className="fc-foot"><span className="muted">{fmtDateShort(p.updated_at)}</span><button className="btn ghost sm" style={{ color: 'var(--danger)' }} onClick={(e) => { e.stopPropagation(); del(p.id) }}><Icon.trash /></button></div>
                   </div>
                 ))}
               </div>
