@@ -582,6 +582,16 @@
   .msg-file svg:last-child{color:var(--brand)}
   .msg-file-n{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .msg-file-s{color:var(--ink-3);font-size:12px}
+  /* Aviso «hay N mensajes nuevos» del refresco en vivo (píldora pegajosa al fondo). */
+  .tl-nuevos{display:inline-flex;align-items:center;gap:7px;border:0;cursor:pointer;
+    background:var(--brand);color:#fff;font-family:inherit;font-size:13.5px;font-weight:600;
+    padding:9px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(37,99,235,.35);
+    animation:tlNuevosIn .18s ease-out}
+  .tl-nuevos:hover{background:var(--brand-deep)}
+  .tl-nuevos svg{width:16px;height:16px;fill:currentColor}
+  @keyframes tlNuevosIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.tl-nuevos{animation:none}}
+
   .reply{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
   /* El textarea PARECE un campo: sin borde/fondo no se sabía que se podía escribir
      ahí. Ahora tiene recuadro, fondo y foco visible. */

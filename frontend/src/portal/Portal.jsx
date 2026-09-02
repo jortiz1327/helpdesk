@@ -1009,29 +1009,49 @@ function Detalle({ code, back, onExpire }) {
   const [files, setFiles] = useState([])
   const [busy, setBusy] = useState(false)
   const [marking, setMarking] = useState(false)
+  const [pendiente, setPendiente] = useState(null)   // versión fresca con mensajes nuevos, a la espera de que el cliente los pida
   const endRef = useRef(null)
+  const tRef = useRef(null)                           // el ticket mostrado, para que el sondeo compare sin cierre obsoleto
   // Solo bajamos al final tras ENVIAR algo; al abrir se ve la cabecera y el estado.
   const bajarAlFinal = useRef(false)
 
   const load = useCallback(() => {
-    portal.ticket(code).then((r) => { if (r.reauth) return onExpire(); setT(r.ok ? r.ticket : false) })
+    portal.ticket(code).then((r) => { if (r.reauth) return onExpire(); setPendiente(null); setT(r.ok ? r.ticket : false) })
   }, [code]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [load])
   useEffect(() => {
+    tRef.current = t
     if (bajarAlFinal.current) { endRef.current?.scrollIntoView({ behavior: 'smooth' }); bajarAlFinal.current = false }
   }, [t])
 
   // Refresco EN VIVO: mientras el cliente mira el ticket, si el técnico responde,
-  // aparece solo. Sondea cada 15 s (pausa si la pestaña está oculta y refresca al
-  // volver a ella). En el sondeo se ignoran los fallos: un 401 puntual no debe
-  // expulsar de la vista (si el token caducó de verdad, saltará al intentar responder).
+  // NO se reordena la conversación bajo sus ojos: se guarda aparte y se le avisa con
+  // «hay N mensajes nuevos» para que baje cuando quiera. Los cambios SIN mensajes nuevos
+  // (p. ej. un cambio de estado) sí se aplican al vuelo, que no descolocan lo que lee.
+  // Sondea cada 15 s (pausa si la pestaña está oculta y refresca al volver). Los fallos
+  // se ignoran: un 401 puntual no debe expulsar (saltará al intentar responder).
   useEffect(() => {
-    const tick = () => { if (!document.hidden) portal.ticket(code).then((r) => { if (r.ok && r.ticket) setT(r.ticket) }) }
+    const tick = () => {
+      if (document.hidden) return
+      portal.ticket(code).then((r) => {
+        if (!r.ok || !r.ticket) return
+        const actual = tRef.current
+        const antes = actual?.mensajes?.length || 0
+        const ahora = r.ticket.mensajes?.length || 0
+        // Solo se avisa si ya hay una conversación a la vista; si aún no (null/false), se aplica para recuperar.
+        if (actual && ahora > antes) setPendiente(r.ticket)   // avisar, sin tocar la conversación visible
+        else { setPendiente(null); setT(r.ticket) }
+      })
+    }
     const iv = setInterval(tick, 15000)
     const onVis = () => { if (!document.hidden) tick() }
     document.addEventListener('visibilitychange', onVis)
     return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis) }
   }, [code])
+
+  // El cliente pulsa «ver mensajes nuevos»: ahora sí se aplica la versión fresca y se baja.
+  const nuevos = pendiente ? Math.max(1, (pendiente.mensajes?.length || 0) - (t?.mensajes?.length || 0)) : 0
+  const verNuevos = () => { if (pendiente) { setT(pendiente); setPendiente(null); bajarAlFinal.current = true } }
 
   // Al ver el ticket, se marca como «visto» hasta su último mensaje: así deja de salir
   // como «respuesta nueva» en la lista.
@@ -1160,6 +1180,17 @@ function Detalle({ code, back, onExpire }) {
         })}
         <div ref={endRef} />
       </div>
+
+      {/* Aviso de mensajes nuevos: aparece cuando el técnico responde mientras el
+          cliente lee, en vez de reordenar la conversación bajo sus ojos. Pegajoso al
+          fondo para que se vea aunque esté leyendo más arriba; al pulsarlo baja. */}
+      {pendiente && (
+        <div style={{ position: 'sticky', bottom: 14, display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 5 }}>
+          <button type="button" className="tl-nuevos" onClick={verNuevos} style={{ pointerEvents: 'auto' }}>
+            {I.down} {tr(nuevos === 1 ? 'new_message_one' : 'new_message_many', { n: nuevos })}
+          </button>
+        </div>
+      )}
 
       {/* Responder. El recuadro está SIEMPRE: responder un ticket resuelto lo
           reabre, que es justo lo que quiere quien vuelve a escribir. */}
