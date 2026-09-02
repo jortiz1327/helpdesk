@@ -52,8 +52,14 @@ return [
             'perms' => ['support.config'], // encargado de soporte y superadmin
         ],
 
+        'cliente' => [
+            'title' => 'Guía del portal de soporte (cliente)',
+            'desc'  => 'La guía que ve el cliente en el portal: entrar, abrir y seguir incidencias. Para dársela a los clientes.',
+            'file'  => '04-cliente.pdf',
+            'perms' => ['support.config'], // interno: encargado y superadmin la descargan para el cliente
+        ],
+
         // Próximos (se activan al dejar su PDF en resources/manuals/ y añadirlos aquí):
-        //   cliente           → 04-cliente.pdf            · perms ['support.config']
         //   aplicacion        → 05-aplicacion.pdf         · perms ['*']
         //   potencialidad     → 06-potencialidad.pdf      · perms ['settings.manage']
     ],

@@ -45,6 +45,7 @@ class ManualsAccessTest extends TestCase
         $this->assertNotContains('usuario_campanas', $keys);
         $this->assertNotContains('roles', $keys);
         $this->assertNotContains('encargado_soporte', $keys); // manual de gestión, no de agente
+        $this->assertNotContains('cliente', $keys);           // el agente no gestiona el portal
     }
 
     public function test_el_encargado_de_soporte_ve_su_manual_de_gestion(): void
@@ -54,6 +55,7 @@ class ManualsAccessTest extends TestCase
         $keys = $this->claves($r->json());
 
         $this->assertContains('encargado_soporte', $keys); // tiene support.config
+        $this->assertContains('cliente', $keys);            // la descarga para dársela al cliente
         $this->assertContains('usuario_soporte', $keys);
         $this->assertContains('roles', $keys);
         $this->assertNotContains('usuario_campanas', $keys);
@@ -80,6 +82,7 @@ class ManualsAccessTest extends TestCase
         $this->assertContains('usuario_campanas', $keys);
         $this->assertContains('roles', $keys);
         $this->assertContains('encargado_soporte', $keys);
+        $this->assertContains('cliente', $keys);
     }
 
     public function test_la_descarga_respeta_el_permiso(): void
