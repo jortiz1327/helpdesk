@@ -69,11 +69,9 @@ class MailService
         return $totals;
     }
 
-    /** Sondea un buzón concreto (incremental por UID de IMAP). */
-    public function fetchAccount(EmailAccount $acc): array
+    /** Cliente IMAP conectado para una cuenta (compartido por el sondeo y el reintento). */
+    protected function conectar(EmailAccount $acc)
     {
-        $r = ['tickets_nuevos' => 0, 'mensajes' => 0, 'adjuntos' => 0, 'errores' => []];
-
         $client = (new ClientManager())->make([
             'host'          => $acc->imap_host,
             'port'          => (int) $acc->imap_port,
@@ -85,7 +83,15 @@ class MailService
             'timeout'       => 20,
         ]);
         $client->connect();
+        return $client;
+    }
 
+    /** Sondea un buzón concreto (incremental por UID de IMAP). */
+    public function fetchAccount(EmailAccount $acc): array
+    {
+        $r = ['tickets_nuevos' => 0, 'mensajes' => 0, 'adjuntos' => 0, 'errores' => []];
+
+        $client = $this->conectar($acc);
         $inbox   = $client->getFolder('INBOX');
         $lastUid = (int) ($acc->last_uid ?? 0);
 
@@ -133,13 +139,15 @@ class MailService
                 [$saltar, $newFailUid, $newFailCount] = self::decidirFallo($uid, $failUid, $failCount);
 
                 if ($saltar) {
-                    // Correo VENENOSO: falla siempre. Se SALTA para no bloquear el buzón;
-                    // queda registrado y se avisa al admin por correo para recuperarlo a mano.
+                    // Correo VENENOSO: falla siempre. Se SALTA para no bloquear el buzón,
+                    // pero NO se pierde: se guarda en CUARENTENA (visible para el admin, que
+                    // puede descartarlo o reintentarlo) y se avisa por correo.
                     Log::error('MailService: correo saltado tras N fallos (venenoso)', [
                         'email' => $acc->email, 'uid' => $uid, 'error' => $e->getMessage(),
                     ]);
+                    $this->cuarentena($acc, $message, $uid, $e);
                     $this->avisarVenenoso($acc, $message, $uid, $e);
-                    $maxSeen = $uid;   // avanza: lo damos por perdido
+                    $maxSeen = $uid;   // avanza: no bloquea el buzón (queda en cuarentena)
                     continue;          // sigue con los siguientes
                 }
 
@@ -215,6 +223,87 @@ class MailService
         } catch (\Throwable $ex) {
             Log::warning('MailService: no se pudo avisar del correo venenoso', ['error' => $ex->getMessage()]);
         }
+    }
+
+    /**
+     * Guarda un correo saltado en CUARENTENA (dead-letter). Idempotente por (cuenta, uid):
+     * si se reintenta y vuelve a fallar, se actualiza en vez de duplicar. Todo en try/catch:
+     * registrar el fallo nunca debe tumbar el sondeo.
+     */
+    protected function cuarentena(EmailAccount $acc, $message, int $uid, \Throwable $e): void
+    {
+        try {
+            $from = $message->getFrom()[0] ?? null;
+            // El cuerpo puede ser justo lo que falla al procesar: se intenta con cautela.
+            $preview = '';
+            try {
+                $txt = (string) ($message->getTextBody() ?: HtmlSanitizer::toText((string) $message->getHTMLBody()));
+                $preview = mb_substr(trim(preg_replace('/\s+/u', ' ', $txt) ?? ''), 0, 500);
+            } catch (\Throwable $ex) { /* sin preview */ }
+
+            DB::table('email_quarantine')->updateOrInsert(
+                ['email_account_id' => $acc->id, 'uid' => $uid],
+                [
+                    'message_id'   => mb_substr((string) $message->getMessageId(), 0, 512) ?: null,
+                    'from_email'   => mb_substr((string) ($from->mail ?? ''), 0, 255) ?: null,
+                    'from_name'    => mb_substr(trim((string) ($from->personal ?? '')), 0, 255) ?: null,
+                    'subject'      => mb_substr(self::decodeSubject($message->getSubject()), 0, 255) ?: null,
+                    'error'        => mb_substr($e->getMessage(), 0, 1000),
+                    'body_preview' => $preview ?: null,
+                    'received_at'  => $this->fechaMensaje($message),
+                    'created_at'   => now(),
+                    // Si estaba resuelto y vuelve a caer, se re-abre.
+                    'resolved_at'  => null, 'resolved_by' => null, 'resolution' => null,
+                ]
+            );
+        } catch (\Throwable $ex) {
+            Log::warning('MailService: no se pudo guardar el correo en cuarentena', ['uid' => $uid, 'error' => $ex->getMessage()]);
+        }
+    }
+
+    /** Fecha del propio correo (para la ficha de cuarentena), o null si no se puede leer. */
+    protected function fechaMensaje($message): ?string
+    {
+        try {
+            $d = $message->getDate();
+            return $d ? \Illuminate\Support\Carbon::parse((string) $d)->toDateTimeString() : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * REINTENTA procesar un correo en cuarentena: se vuelve a bajar por UID del buzón y se
+     * procesa. Si funciona (ya no es venenoso), se marca resuelto; si el correo ya no está
+     * en el servidor o vuelve a fallar, se devuelve el motivo y sigue en cuarentena.
+     * Devuelve [ok(bool), error(?string)].
+     */
+    public function reintentar(int $quarantineId, int $userId): array
+    {
+        $row = DB::table('email_quarantine')->where('id', $quarantineId)->first();
+        if (!$row) return [false, 'No encontrado'];
+        if ($row->resolved_at) return [false, 'Ese correo ya estaba resuelto'];
+
+        $acc = EmailAccount::find($row->email_account_id);
+        if (!$acc || !$acc->imap_host) return [false, 'La cuenta de correo ya no existe o no tiene IMAP'];
+
+        try {
+            $client  = $this->conectar($acc);
+            $message = $client->getFolder('INBOX')->query()->whereUid((int) $row->uid)->leaveUnread()->get()->first();
+            if (!$message) {
+                $client->disconnect();
+                return [false, 'El correo ya no está en el buzón (lo movieron o borraron)'];
+            }
+            $this->handleMessage($acc, $message);   // si vuelve a fallar, lanza y NO se resuelve
+            $client->disconnect();
+        } catch (\Throwable $e) {
+            return [false, 'Volvió a fallar al procesarlo: ' . mb_substr($e->getMessage(), 0, 200)];
+        }
+
+        DB::table('email_quarantine')->where('id', $quarantineId)->update([
+            'resolved_at' => now(), 'resolved_by' => $userId, 'resolution' => 'retried',
+        ]);
+        return [true, null];
     }
 
     /**

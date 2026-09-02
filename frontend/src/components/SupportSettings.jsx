@@ -1775,6 +1775,8 @@ function EmailChannel() {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState(null) // { imap, smtp }
+  const [quar, setQuar] = useState([])       // correos en cuarentena (dead-letter)
+  const [quarBusy, setQuarBusy] = useState(0) // id en proceso (reintentar/descartar)
 
   useEffect(() => {
     api.getEmailAccount().then((d) => {
@@ -1786,8 +1788,24 @@ function EmailChannel() {
         has_imap_password: !!a.has_imap_password, has_smtp_password: !!a.has_smtp_password,
         footer_active: !!d.footer?.active, footer_html: d.footer?.html || '',
       })
+      setQuar(d.quarantine || [])
     })
   }, [])
+
+  const recargarQuar = () => api.listQuarantine().then((d) => setQuar(d.items || []))
+  const descartar = async (id) => {
+    setQuarBusy(id)
+    const r = await api.quarantineDiscard(id)
+    setQuarBusy(0)
+    if (r.ok) { setQuar((s) => s.filter((x) => x.id !== id)) } else toast(r.error || 'No se pudo descartar', 'err')
+  }
+  const reintentar = async (id) => {
+    setQuarBusy(id)
+    const r = await api.quarantineRetry(id)
+    setQuarBusy(0)
+    if (r.ok) { toast('Correo reprocesado ✓'); setQuar((s) => s.filter((x) => x.id !== id)) }
+    else { toast(r.error || 'No se pudo reprocesar', 'err'); recargarQuar() }
+  }
 
   if (!f) return <div className="center-load"><div className="spinner" /></div>
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
@@ -1871,6 +1889,40 @@ function EmailChannel() {
           <span className="fb-req-label">{f.footer_active ? 'Activo · se añade a los correos' : 'Inactivo · no se añade nada'}</span>
         </label>
         <p className="ct-hint">Se guarda con el botón «Guardar cambios» de arriba.</p>
+      </div>
+
+      {/* CUARENTENA (dead-letter): correos que no se pudieron convertir en ticket. Da
+          visibilidad de QUÉ correo falla, en vez de perderlo con solo un aviso. */}
+      <div className="card em-card" style={{ marginTop: 18 }}>
+        <h2>Correos en cuarentena{quar.length > 0 && <span className="pill err sm" style={{ marginLeft: 8, verticalAlign: 'middle' }}>{quar.length}</span>}</h2>
+        <p className="em-desc">
+          Correos que <b>no se pudieron convertir en ticket</b> tras varios intentos: se saltaron para
+          no bloquear el buzón (siguen en el servidor de correo). Puedes <b>reintentar</b> el procesado
+          o <b>descartarlos</b>.
+        </p>
+        {quar.length === 0 ? (
+          <p className="ct-hint">No hay correos en cuarentena. 👍</p>
+        ) : (
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table className="tk-table">
+              <thead><tr><th>Remitente</th><th>Asunto</th><th>Error</th><th>Fecha</th><th style={{ width: 190 }}>Acción</th></tr></thead>
+              <tbody>
+                {quar.map((q) => (
+                  <tr key={q.id}>
+                    <td><b>{q.from_name || '—'}</b><small style={{ display: 'block', color: 'var(--ink-3)' }}>{q.from_email || ''}</small></td>
+                    <td>{q.subject || <i className="muted">(sin asunto)</i>}</td>
+                    <td className="muted" style={{ maxWidth: 260 }} title={q.error || ''}>{(q.error || '').slice(0, 80)}</td>
+                    <td className="tk-time">{fmtDate(q.received_at || q.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>
+                      <button className="btn ghost sm" disabled={quarBusy === q.id} onClick={() => reintentar(q.id)}>{quarBusy === q.id ? '…' : 'Reintentar'}</button>
+                      <button className="btn ghost sm" disabled={quarBusy === q.id} onClick={() => descartar(q.id)} style={{ marginLeft: 6 }}>Descartar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <MailDiagnostic from={f.email} />

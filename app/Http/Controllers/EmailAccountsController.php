@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Services\HtmlSanitizer;
 use App\Services\MailService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Webklex\PHPIMAP\ClientManager;
 
@@ -19,9 +20,17 @@ class EmailAccountsController extends Controller
 {
     public function handle(Request $request)
     {
-        if ($request->isMethod('post') && $request->query('action') === 'test') return $this->test($request);
-        if ($request->isMethod('post') && $request->query('action') === 'send_test') return $this->sendTest($request);
-        if ($request->isMethod('post')) return $this->save($request);
+        $action = (string) $request->query('action', '');
+        if ($request->isMethod('post')) {
+            return match ($action) {
+                'test'               => $this->test($request),
+                'send_test'          => $this->sendTest($request),
+                'quarantine_discard' => $this->quarantineDiscard($request),
+                'quarantine_retry'   => $this->quarantineRetry($request),
+                default              => $this->save($request),
+            };
+        }
+        if ($action === 'quarantine') return response()->json(['ok' => true, 'items' => $this->quarantineRows()]);
         return $this->get();
     }
 
@@ -74,7 +83,43 @@ class EmailAccountsController extends Controller
                 'active' => (string) Setting::get('email_footer_active', '0') === '1',
                 'html'   => (string) Setting::get('email_footer', ''),
             ],
+            // Correos en cuarentena (dead-letter): los que fallaron al convertirse en ticket.
+            'quarantine' => $this->quarantineRows(),
         ]);
+    }
+
+    /** Correos EN cuarentena (sin resolver), con el buzón al que pertenecen. */
+    protected function quarantineRows()
+    {
+        return DB::table('email_quarantine as q')
+            ->leftJoin('email_accounts as a', 'a.id', '=', 'q.email_account_id')
+            ->whereNull('q.resolved_at')
+            ->orderByDesc('q.id')
+            ->limit(200)
+            ->get(['q.id', 'q.uid', 'q.from_email', 'q.from_name', 'q.subject', 'q.error',
+                   'q.body_preview', 'q.received_at', 'q.created_at', 'a.email as account_email']);
+    }
+
+    /** Descarta un correo en cuarentena (se da por perdido; sigue en el servidor IMAP). */
+    protected function quarantineDiscard(Request $request)
+    {
+        $id = (int) $request->input('id');
+        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el id'], 400);
+        DB::table('email_quarantine')->where('id', $id)->whereNull('resolved_at')->update([
+            'resolved_at' => now(), 'resolved_by' => $request->user()->id, 'resolution' => 'discarded',
+        ]);
+        return response()->json(['ok' => true]);
+    }
+
+    /** Reintenta procesar un correo en cuarentena (lo vuelve a bajar por IMAP). */
+    protected function quarantineRetry(Request $request)
+    {
+        $id = (int) $request->input('id');
+        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el id'], 400);
+        [$ok, $err] = app(MailService::class)->reintentar($id, (int) $request->user()->id);
+        return $ok
+            ? response()->json(['ok' => true])
+            : response()->json(['ok' => false, 'error' => $err], 422);
     }
 
     protected function save(Request $request)

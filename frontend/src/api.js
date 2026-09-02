@@ -173,6 +173,14 @@ export const api = {
   supDeleteCanned: (id) => req(`support_settings.php?section=canned&id=${id}`, { method: 'DELETE' }),
   // Canal correo: config del buzón (IMAP/SMTP) + probar conexión
   getEmailAccount: () => req('email.php'),
+  // Cuarentena de correos (dead-letter): correos que fallaron al convertirse en ticket
+  listQuarantine: () => req('email.php?action=quarantine'),
+  quarantineDiscard: (id) => req('email.php?action=quarantine_discard', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+  quarantineRetry: (id) => req('email.php?action=quarantine_retry', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
   saveEmailAccount: (payload) => req('email.php', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
