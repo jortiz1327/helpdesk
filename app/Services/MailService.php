@@ -39,6 +39,10 @@ class MailService
     /** Fallos seguidos sobre el MISMO correo antes de saltarlo (evita bloquear el buzón). */
     public const MAX_MAIL_ATTEMPTS = 5;
 
+    /** Anti-bucle: más de LOOP_MAX tickets del mismo remitente en LOOP_VENTANA_MIN min = bucle. */
+    private const LOOP_MAX = 10;
+    private const LOOP_VENTANA_MIN = 10;
+
     public function __construct(
         protected TicketService $tickets,
         protected AttachmentService $attachments,
@@ -310,6 +314,52 @@ class MailService
      * Procesa un correo: contacto → ticket → mensaje → adjuntos.
      * Devuelve ['ticket_nuevo'=>bool, 'mensaje'=>bool, 'adjuntos'=>int].
      */
+    /** Lee una cabecera del correo de forma segura (Webklex). '' si no está o falla. */
+    protected static function cabecera($message, string $name): string
+    {
+        try {
+            return trim((string) ($message->getHeader()->get($name) ?? ''));
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    /**
+     * ¿Es un correo AUTOMÁTICO (autorespuesta, vacaciones, rebote, lista de correo)? Estos
+     * no son un cliente pidiendo ayuda y, sobre todo, cierran el bucle con nuestro propio
+     * acuse. Cabeceras estándar: Auto-Submitted (RFC 3834), X-Auto-Response-Suppress
+     * (Microsoft), List-Id (listas), Precedence: bulk/junk/list/auto_reply.
+     */
+    protected static function esAutomatico($message): bool
+    {
+        $auto = mb_strtolower(self::cabecera($message, 'auto-submitted'));
+        if ($auto !== '' && $auto !== 'no') return true;
+        if (self::cabecera($message, 'x-auto-response-suppress') !== '') return true;
+        if (self::cabecera($message, 'list-id') !== '') return true;
+        $prec = mb_strtolower(self::cabecera($message, 'precedence'));
+        return in_array($prec, ['bulk', 'junk', 'list', 'auto_reply'], true);
+    }
+
+    /** Avisa a los admins (una vez por hora y remitente) de un posible bucle de correo. */
+    protected function avisarBucle(EmailAccount $acc, string $from, int $recientes): void
+    {
+        $key = 'mail:loopwarn:' . sha1($from);
+        if (!\Illuminate\Support\Facades\Cache::add($key, 1, now()->addHour())) return;   // ya avisado
+        try {
+            $super  = config('rbac.super_role', 'superadmin');
+            $admins = User::role($super)->whereNotNull('email')->pluck('email')->all();
+            if (!$admins) return;
+            $cuerpo = '<p>Se han creado <b>' . $recientes . '</b> tickets del remitente <b>' . e($from)
+                . '</b> en pocos minutos: parece un <b>bucle de correo</b>. Se ha <b>dejado de crear</b> tickets de ese '
+                . 'remitente para no inundar la bandeja. Revisa si hay una regla de autoreenvío/autorespuesta.</p>';
+            foreach ($admins as $email) {
+                $this->sendMail($acc, mb_strtolower((string) $email), null, '⚠️ Posible bucle de correo entrante', $cuerpo);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('MailService: no se pudo avisar del bucle', ['error' => $e->getMessage()]);
+        }
+    }
+
     protected function handleMessage(EmailAccount $acc, $message): array
     {
         // --- Remitente ---
@@ -328,6 +378,14 @@ class MailService
         // Corta spam y bucles de MAILER-DAEMON (rebotes). Se marcará leído en el caller.
         if (EmailBan::isBanned($email)) {
             Log::info('MailService: correo descartado por banlist', ['from' => $email]);
+            return ['ticket_nuevo' => false, 'mensaje' => false, 'adjuntos' => 0];
+        }
+
+        // ANTI-BUCLE: los correos AUTOMÁTICOS (autorespuesta, vacaciones, rebote, lista)
+        // no son un cliente pidiendo ayuda y, sobre todo, cierran el bucle con nuestro
+        // propio acuse. No crean ticket (cabeceras estándar RFC 3834 / Microsoft).
+        if (self::esAutomatico($message)) {
+            Log::info('MailService: correo automático descartado (anti-bucle)', ['from' => $email]);
             return ['ticket_nuevo' => false, 'mensaje' => false, 'adjuntos' => 0];
         }
 
@@ -411,6 +469,17 @@ class MailService
                 $this->tickets->setStatus($ticketId, 'en_progreso');
             }
         } else {
+            // VÁLVULA ANTI-BUCLE: si de este remitente ya han entrado DEMASIADOS tickets en
+            // pocos minutos, algo está en bucle. Se corta (no se crea) y se avisa una vez, en
+            // vez de inundar la bandeja —esto habría parado la fuga a los 10, no a los 220—.
+            $recientes = DB::table('tickets')->where('contact_id', $contactId)->where('channel', 'email')
+                ->where('created_at', '>=', now()->subMinutes(self::LOOP_VENTANA_MIN))->count();
+            if ($recientes >= self::LOOP_MAX) {
+                Log::warning('MailService: posible BUCLE de correo, se deja de crear tickets', ['from' => $email, 'recientes' => $recientes]);
+                $this->avisarBucle($acc, $email, $recientes);
+                return ['ticket_nuevo' => false, 'mensaje' => false, 'adjuntos' => 0];
+            }
+            // notify:false → el acuse se manda ABAJO, solo si el mensaje se guarda bien.
             $ticketId  = $this->tickets->create([
                 'contact_id' => $contactId,
                 'channel'    => 'email',
@@ -418,10 +487,13 @@ class MailService
                 // Contexto para las reglas automáticas (asignar/categorizar solo).
                 'body'       => HtmlSanitizer::toText($rawHtml) ?: trim((string) $message->getTextBody()),
                 'email'      => $email,
-            ]);
+            ], notify: false);
             $ticketNew = true;
         }
 
+        // Si algo falla de aquí en adelante y ACABAMOS de crear el ticket, se REVIERTE: no
+        // dejar un ticket vacío (sin mensaje) —el fallo que generó los 220 huérfanos—.
+        try {
         // --- Adjuntos PRIMERO: los necesitamos para resolver las imágenes «cid:» ---
         // Se guardan sin message_id (aún no existe el mensaje); se les cuelga al final.
         $count    = 0;
@@ -507,6 +579,24 @@ class MailService
         // Ahora que existe el mensaje, se le cuelgan los adjuntos.
         if ($savedIds) {
             DB::table('attachments')->whereIn('id', $savedIds)->update(['message_id' => $messageId]);
+        }
+        } catch (\Throwable $e) {
+            // El mensaje no se pudo guardar: revertir el ticket recién creado (si lo era) para
+            // no dejarlo huérfano, y propagar el fallo (irá a reintento/cuarentena por UID).
+            if ($ticketNew && $ticketId) {
+                DB::table('attachments')->where('ticket_id', $ticketId)->delete();
+                DB::table('messages')->where('ticket_id', $ticketId)->delete();
+                DB::table('ticket_events')->where('ticket_id', $ticketId)->delete();
+                DB::table('tickets')->where('id', $ticketId)->delete();
+            }
+            throw $e;
+        }
+
+        // Acuse de recibo SOLO ahora, con ticket + mensaje ya guardados (antes iba dentro de
+        // create(); un ticket que luego se revierte no debe avisar al cliente).
+        if ($ticketNew) {
+            try { app(\App\Services\NotifyService::class)->ticket('ticket_created', $ticketId); }
+            catch (\Throwable $e) { Log::warning('MailService: acuse falló', ['ticket' => $ticketId, 'error' => $e->getMessage()]); }
         }
 
         return ['ticket_nuevo' => $ticketNew, 'mensaje' => true, 'adjuntos' => $count];
