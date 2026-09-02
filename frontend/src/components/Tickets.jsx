@@ -1376,6 +1376,34 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
      el id ANTERIOR, que es justo el que hay que soltar. */
   useEffect(() => () => { api.unlockTicket(id) }, [id])
 
+  /* LATIDO del candado: el bloqueo caduca solo a los pocos minutos; sin renovarlo, un
+     agente que tarda en redactar una respuesta larga lo perdería a media escritura y
+     otro podría colarse. Mientras el candado sea NUESTRO, la pestaña esté visible y el
+     agente siga activo (ha tecleado/clicado dentro del TTL), se renueva antes de que
+     caduque. Si deja de tocar nada durante todo el TTL —se fue—, se deja caducar solo. */
+  const lockMine = d?.lock?.mine
+  const lockMin = d?.lock?.minutes
+  useEffect(() => {
+    if (!lockMine || !lockMin) return
+    const ttl = lockMin * 60 * 1000
+    let ultima = Date.now()
+    const marca = () => { ultima = Date.now() }
+    window.addEventListener('keydown', marca)
+    window.addEventListener('pointerdown', marca)
+    const iv = setInterval(() => {
+      if (document.visibilityState !== 'visible') return   // en 2º plano: no renovar
+      if (Date.now() - ultima > ttl) return                // sin actividad: dejar caducar
+      api.heartbeatTicket(id).then((r) => {
+        if (r?.ok && r.lock) setD((prev) => (prev ? { ...prev, lock: r.lock } : prev))
+      }).catch(() => {})
+    }, Math.max(20000, Math.floor(ttl / 2)))
+    return () => {
+      clearInterval(iv)
+      window.removeEventListener('keydown', marca)
+      window.removeEventListener('pointerdown', marca)
+    }
+  }, [id, lockMine, lockMin])
+
   /*
    * Tickets del MISMO cliente. Se buscan por su CORREO, no por la ficha de
    * contacto: si el cliente escribió por correo y por WhatsApp tendrá dos fichas,

@@ -11,6 +11,7 @@ use App\Services\MailService;
 use App\Services\SlaService;
 use App\Services\TicketLockService;
 use App\Services\TicketService;
+use App\Support\TicketCounters;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -39,9 +40,14 @@ class TicketsController extends Controller
         protected AttachmentService $attachments,
     ) {}
 
+    /** Acciones que cambian el estado de los tickets y, con ello, los contadores. */
+    private const MUTA_CONTADORES = ['status', 'assign', 'snooze', 'unsnooze', 'category', 'bulk', 'create', 'reply', 'merge', 'delete'];
+
     public function handle(Request $request)
     {
-        return match ($request->query('action', 'list')) {
+        $action = $request->query('action', 'list');
+
+        $resp = match ($action) {
             'list'   => $this->list($request),
             'stats'  => $this->stats($request),
             'meta'   => $this->meta(),
@@ -65,6 +71,7 @@ class TicketsController extends Controller
             'export'  => $this->export($request),
             'reply'   => $this->reply($request),
             'unlock'  => $this->unlock($request),
+            'heartbeat' => $this->heartbeat($request),
             'delete'  => $this->delete($request),
             'pdf'     => $this->pdf($request),
             // Fusionar: primero se piden los candidatos, luego se ejecuta.
@@ -72,6 +79,18 @@ class TicketsController extends Controller
             'merge'     => $this->merge($request),
             default  => response()->json(['error' => 'Acción no válida'], 400),
         };
+
+        // Tras una acción que muta tickets (y solo si salió bien), invalida los
+        // contadores cacheados de TODOS los agentes subiendo la versión global: así el
+        // reload inmediato del frontend ve los números frescos, no los de hasta 15 s antes.
+        if (in_array($action, self::MUTA_CONTADORES, true)
+            && $resp instanceof \Illuminate\Http\JsonResponse
+            && $resp->getStatusCode() >= 200 && $resp->getStatusCode() < 300
+            && ($resp->getData(true)['ok'] ?? true) !== false) {
+            TicketCounters::bump();
+        }
+
+        return $resp;
     }
 
     /**
@@ -517,10 +536,11 @@ class TicketsController extends Controller
          * Se CACHEA 15 s por usuario. Los contadores son agregaciones sobre todo el
          * alcance (para un encargado con view_all, un barrido de ~50k) y se recalculaban
          * en CADA carga/filtro/refresco. Con la caché se cuentan como mucho una vez cada
-         * 15 s: un correo/mensaje nuevo se refleja en el siguiente recálculo (≤15 s) y las
-         * propias acciones también. Desfase asumido a cambio de no recontar sin parar.
+         * 15 s: un correo/mensaje nuevo se refleja en el siguiente recálculo (≤15 s). Y
+         * TRAS CADA ACCIÓN se sube la versión (TicketCounters::bump), así que el reload
+         * inmediato del propio agente ya ve el número fresco, no uno de hasta 15 s antes.
          */
-        return Cache::remember("tk.counts.{$me->id}", 15, fn () => $this->calcularCounts($me));
+        return Cache::remember(TicketCounters::key((int) $me->id), 15, fn () => $this->calcularCounts($me));
     }
 
     protected function calcularCounts(User $me): array
@@ -825,6 +845,20 @@ class TicketsController extends Controller
     {
         app(TicketLockService::class)->release((int) $request->input('id'), (int) $request->user()->id);
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * LATIDO del candado: mientras el agente sigue en el ticket (redactando una
+     * respuesta larga, p. ej.), el frontend llama a esto cada pocos segundos para
+     * RENOVAR el bloqueo antes de que caduque. Reaprovecha acquire(): renueva la marca
+     * de tiempo si el candado ya es suyo (o estaba libre/caducado), o devuelve quién lo
+     * tiene si lo perdió mientras tanto —así el editor se bloquea y avisa—.
+     */
+    protected function heartbeat(Request $request)
+    {
+        $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
+        $lock = app(TicketLockService::class)->acquire($id, (int) $request->user()->id);
+        return response()->json(['ok' => true, 'lock' => $lock]);
     }
 
     /**

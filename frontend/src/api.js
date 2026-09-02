@@ -149,6 +149,10 @@ export const api = {
   unlockTicket: (id) => req('tickets.php?action=unlock', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
+  // Latido del candado: renueva el bloqueo mientras el agente sigue en el ticket
+  heartbeatTicket: (id) => req('tickets.php?action=heartbeat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
   // Horario de atención y festivos (base del SLA)
   getBusinessHours: () => req('business_hours.php'),
   saveBusinessHours: (hours) => req('business_hours.php?action=save', {
