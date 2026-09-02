@@ -43,14 +43,16 @@ class FeaturesController extends Controller
     {
         $g = fn (string $k, string $d = '0') => (string) Setting::get($k, $d);
 
-        $buzon = EmailAccount::where('active', true)->whereNotNull('smtp_host')->exists();
+        // Solo el buzón de SOPORTE cuenta como «canal de correo del helpdesk». La cuenta de
+        // 'campanas' es solo un remitente de difusión, no un buzón de tickets.
+        $buzon = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->exists();
 
         // SALUD DE LA RECOGIDA (IMAP). El correo es el canal del helpdesk: aquí se ve de un
         // vistazo si de verdad está entrando. La señal es `last_check_at` (lo actualiza
         // email:fetch cada minuto). Si lleva rato parada, casi siempre es que el planificador
         // (schedule:run) no corre en el servidor — el fallo más típico y silencioso.
-        $imapActivas = EmailAccount::where('active', true)->whereNotNull('imap_host')->count();
-        $ultimaRaw   = EmailAccount::where('active', true)->whereNotNull('imap_host')->max('last_check_at');
+        $imapActivas = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('imap_host')->count();
+        $ultimaRaw   = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('imap_host')->max('last_check_at');
         $intake = $this->saludRecogida($imapActivas, $ultimaRaw);
 
         // El pie de los correos (texto + on/off) se configura en «Correo → Buzón y envío»,

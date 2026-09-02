@@ -23,7 +23,8 @@ class CronStatusController extends Controller
         // El planificador corre cada minuto: si lleva más de 5 sin dar señales, algo pasa.
         $vivo = $hace !== null && $hace < 300;
 
-        $acc = EmailAccount::query()->orderBy('id')->first(['last_check_at']);
+        // El sondeo IMAP es del buzón de SOPORTE (el de campañas no recibe correo).
+        $acc = EmailAccount::where('funcion', 'soporte')->orderBy('id')->first(['last_check_at']);
 
         return response()->json([
             'command'   => 'php ' . base_path('artisan') . ' schedule:run',

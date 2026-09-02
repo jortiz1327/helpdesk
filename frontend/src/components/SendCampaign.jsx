@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
 import Select from './Select.jsx'
+import RichInput from './RichInput.jsx'
 
 // Contacto de ejemplo para la vista previa de personalización
 const SAMPLE = { name: 'María García', wa_id: '34600112233' }
@@ -27,10 +28,43 @@ function varCount(text) {
 
 export default function SendCampaign({ onDone }) {
   const toast = useToast()
+  const [channel, setChannel] = useState('whatsapp')   // 'whatsapp' | 'email'
   const [step, setStep] = useState(1)
   const [gate, setGate] = useState(null)
   useEffect(() => { api.gating().then((d) => setGate(d?.ok ? d : null)) }, [])
   const waLocked = gate?.features?.wa_campaign
+
+  // --- Campaña por CORREO (canal 'email') ---
+  const [emailSubject, setEmailSubject] = useState('')
+  const emailBody = useRef(null)          // RichInput
+  const [emailLabelId, setEmailLabelId] = useState('')
+  const [emailTitle, setEmailTitle] = useState('')
+  const [emailImmediate, setEmailImmediate] = useState(true)
+  const [emailWhen, setEmailWhen] = useState('')
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailCfg, setEmailCfg] = useState(null)   // { ready } del remitente de campañas
+  useEffect(() => { api.getEmailAccount('campanas').then((d) => setEmailCfg({ ready: !!(d.account && d.account.active && d.account.smtp_host) })) }, [])
+
+  const sendEmail = async () => {
+    if (!emailTitle.trim()) { toast('Ponle un título a la campaña', 'err'); return }
+    if (!emailSubject.trim()) { toast('Ponle un asunto al correo', 'err'); return }
+    const body = emailBody.current?.getHtml() || ''
+    if (!body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()) { toast('Escribe el cuerpo del correo', 'err'); return }
+    if (!emailLabelId) { toast('Elige una etiqueta de destino', 'err'); return }
+    if (!emailImmediate && !emailWhen) { toast('Indica la fecha y hora de envío', 'err'); return }
+    setEmailSending(true)
+    const r = await api.createCampaign({
+      channel: 'email', title: emailTitle, subject: emailSubject, body_html: body,
+      label_id: Number(emailLabelId),
+      schedule: emailImmediate ? { mode: 'now' } : { mode: 'later', at: emailWhen },
+    })
+    setEmailSending(false)
+    if (!r.ok) { toast(r.error || 'No se pudo crear la campaña', 'err'); return }
+    const exc = r.excluded ? ` · ${r.excluded} excluido${r.excluded > 1 ? 's' : ''} por baja` : ''
+    if (r.immediate) toast(`Campaña lanzada · ${r.stats?.sent ?? 0} enviados${r.stats?.failed ? `, ${r.stats.failed} fallidos` : ''}${r.stats?.pending ? `, ${r.stats.pending} en cola` : ''}${exc}`)
+    else toast(`Campaña programada${exc}`)
+    onDone?.()
+  }
   const [templates, setTemplates] = useState(null)
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('APPROVED')
@@ -127,12 +161,74 @@ export default function SendCampaign({ onDone }) {
       <header className="page-head">
         <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.send style={{ width: 17, height: 17, fill: 'var(--primary)' }} /></span>
         <div><h1>Enviar campaña</h1></div>
-        <span className="sub">· Difusión masiva con plantillas de Meta</span>
+        <span className="sub">· {channel === 'email' ? 'Difusión por correo electrónico' : 'Difusión masiva con plantillas de Meta'}</span>
         <div className="spacer" />
       </header>
 
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1080 }}>
+          {/* Selector de canal */}
+          <div className="field" style={{ marginBottom: 16 }}>
+            <span className="lbl">Canal de la campaña</span>
+            <div className="seg" style={{ maxWidth: 420 }}>
+              <button type="button" className={channel === 'whatsapp' ? 'on' : ''} onClick={() => setChannel('whatsapp')}><Icon.whatsapp /> WhatsApp</button>
+              <button type="button" className={channel === 'email' ? 'on' : ''} onClick={() => setChannel('email')}><Icon.mail /> Correo</button>
+            </div>
+          </div>
+
+          {channel === 'email' && (
+            <>
+              {emailCfg && !emailCfg.ready && (
+                <div className="card" style={{ borderColor: 'var(--warn)', background: 'color-mix(in srgb, var(--warn) 8%, transparent)' }}>
+                  <p className="desc" style={{ margin: 0 }}>
+                    <b>Aún no hay un remitente de campañas por correo.</b> Configúralo en <b>Ajustes → Correo de campañas</b> antes de enviar.
+                    Es un correo <b>distinto</b> del de soporte, para que las respuestas no se conviertan en tickets.
+                  </p>
+                </div>
+              )}
+              <div className="card" style={{ padding: 18 }}>
+                <div className="fb-set-t" style={{ marginBottom: 14 }}>Redactar el correo</div>
+
+                <label className="field"><span className="lbl">Título de la campaña <span className="hint">(interno, para identificarla)</span></span>
+                  <input value={emailTitle} onChange={(e) => setEmailTitle(e.target.value)} placeholder="p. ej. Novedades septiembre" /></label>
+
+                <label className="field" style={{ marginTop: 14 }}><span className="lbl">Asunto del correo</span>
+                  <input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} placeholder="Lo que verá el destinatario en su bandeja" /></label>
+
+                <div className="field" style={{ marginTop: 14 }}>
+                  <span className="lbl">Cuerpo del correo</span>
+                  <RichInput ref={emailBody} minHeight={200} placeholder="Escribe el mensaje de la campaña…" />
+                  <span className="hint" style={{ marginTop: 6 }}>Se añade automáticamente un pie con el enlace de baja (obligatorio en comunicaciones comerciales).</span>
+                </div>
+
+                <div className="field" style={{ marginTop: 16 }}>
+                  <span className="lbl">Destino</span>
+                  <div style={{ marginTop: 4 }}>
+                    <Select block value={emailLabelId} onChange={setEmailLabelId} placeholder="Selecciona una etiqueta…"
+                      options={labels.map((l) => ({ value: l.id, label: l.name, color: l.color }))} />
+                  </div>
+                  <span className="hint" style={{ marginTop: 6 }}>Se enviará a los contactos con esta etiqueta que <b>tengan correo</b> y no estén dados de baja.{labels.length === 0 && ' No tienes etiquetas: créalas en Contactos.'}</span>
+                </div>
+
+                <div style={{ marginTop: 16 }}>
+                  <span className="lbl">Programación</span>
+                  <label className="fb-req-row" style={{ marginTop: 8 }}>
+                    <span className="fb-switch"><input type="checkbox" checked={emailImmediate} onChange={(e) => setEmailImmediate(e.target.checked)} /><span className={`fb-toggle ${emailImmediate ? 'on' : ''}`} /></span>
+                    <span className="fb-req-label">Enviar inmediatamente</span>
+                  </label>
+                  {!emailImmediate && <input className="cmp-var" type="datetime-local" value={emailWhen} onChange={(e) => setEmailWhen(e.target.value)} style={{ marginTop: 10, maxWidth: 280 }} />}
+                </div>
+
+                <div className="fb-actions">
+                  <button className="btn" disabled={emailSending || (emailCfg && !emailCfg.ready)} onClick={sendEmail}>
+                    <Icon.send /> {emailSending ? 'Enviando…' : (emailImmediate ? 'Enviar campaña' : 'Programar campaña')}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {channel === 'whatsapp' && (<>
           {/* Stepper */}
           <div className="cmp-steps">
             <div className={`cmp-step ${step >= 1 ? 'done' : ''}`}><span className="n">{step > 1 ? <Icon.check /> : '1'}</span> Elegir plantilla</div>
@@ -266,6 +362,7 @@ export default function SendCampaign({ onDone }) {
               </div>
             </>
           )}
+          </>)}
         </div>
       </div>
     </>

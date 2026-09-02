@@ -50,6 +50,7 @@ function Detail({ id, onBack, onChange }) {
   )
   if (!c) return <div className="center-load"><div className="spinner" /></div>
   const st = STATUS[c.status] || STATUS.draft
+  const isEmail = c.channel === 'email'
   const cnt = (...s) => (c.recipients || []).filter((r) => s.includes(r.status)).length
   const pending = cnt('pending')
   // delivered/read salen del BACKEND (misma subconsulta que la lista) para que lista y
@@ -71,26 +72,30 @@ function Detail({ id, onBack, onChange }) {
           <div className="stat-grid" style={{ marginBottom: 16 }}>
             <div className="stat-card"><div className="stat-num" style={{ color: 'var(--ink-3)', marginTop: 0 }}>{c.total}</div><div className="stat-sub">Destinatarios</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: 'var(--primary)', marginTop: 0 }}>{c.sent}</div><div className="stat-sub">Enviados</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--info)', marginTop: 0 }}>{delivered}</div><div className="stat-sub">Entregados</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--secondary)', marginTop: 0 }}>{read}</div><div className="stat-sub">Leídos</div></div>
+            {/* Entregado/Leído solo tienen sentido en WhatsApp (los reporta el webhook de Meta). */}
+            {!isEmail && <div className="stat-card"><div className="stat-num" style={{ color: 'var(--info)', marginTop: 0 }}>{delivered}</div><div className="stat-sub">Entregados</div></div>}
+            {!isEmail && <div className="stat-card"><div className="stat-num" style={{ color: 'var(--secondary)', marginTop: 0 }}>{read}</div><div className="stat-sub">Leídos</div></div>}
             <div className="stat-card"><div className="stat-num" style={{ color: 'var(--danger)', marginTop: 0 }}>{c.failed}</div><div className="stat-sub">Fallidos</div></div>
             {pending > 0 && <div className="stat-card"><div className="stat-num" style={{ color: 'var(--warn)', marginTop: 0 }}>{pending}</div><div className="stat-sub">En cola</div></div>}
           </div>
-          <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>Plantilla <b>{c.template_name}</b> · Destino <b>{c.source_name || '—'}</b> · {fmt(c.scheduled_at)}</div>
+          <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
+            {isEmail ? <>Correo · Asunto <b>{c.subject || '—'}</b></> : <>WhatsApp · Plantilla <b>{c.template_name}</b></>} · Destino <b>{c.source_name || '—'}</b> · {fmt(c.scheduled_at)}
+          </div>
           <div className="card" style={{ padding: 0 }}>
             {(c.recipients || []).map((r, i) => {
               const rs = RSTATUS[r.status] || RSTATUS.pending
+              const ident = isEmail ? (r.email || '—') : ('+' + r.wa_id)
               return (
                 <div key={i} className="pb-row">
-                  <span className="pb-avatar">{(r.name || r.wa_id).slice(0, 1).toUpperCase()}</span>
-                  <div className="pb-meta"><b>{r.name || '—'}</b><span className="muted">+{r.wa_id}</span></div>
+                  <span className="pb-avatar">{(r.name || ident).slice(0, 1).toUpperCase()}</span>
+                  <div className="pb-meta"><b>{r.name || '—'}</b><span className="muted">{ident}</span></div>
                   <span className={`pill sm ${rs.c}`} style={{ marginLeft: 'auto' }} title={r.error || ''}>{rs.t}</span>
                 </div>
               )
             })}
           </div>
           {c.recipients.some((r) => r.status === 'failed') && (
-            <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Pasa el ratón sobre «Fallido» para ver el motivo del error de Meta.</p>
+            <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Pasa el ratón sobre «Fallido» para ver el motivo del error.</p>
           )}
         </div>
       </div>
@@ -217,8 +222,14 @@ export default function CampaignDashboard({ onNew, user }) {
                   return (
                     <div key={c.id} className="camp-row" onClick={() => setOpenId(c.id)}>
                       <div className="camp-main">
-                        <div className="camp-title"><b>{c.title}</b><span className={`pill sm ${st.c}`}><span className="dot" />{st.t}</span></div>
-                        <span className="muted" style={{ fontSize: 12.5 }}>{c.template_name} · {c.source_name || '—'} · {fmt(c.scheduled_at || c.created_at)}</span>
+                        <div className="camp-title">
+                          <b>{c.title}</b>
+                          <span className="pill sm gray" title={c.channel === 'email' ? 'Campaña por correo' : 'Campaña por WhatsApp'}>
+                            {c.channel === 'email' ? <><Icon.mail style={{ width: 12, height: 12 }} /> Correo</> : <><Icon.whatsapp style={{ width: 12, height: 12 }} /> WhatsApp</>}
+                          </span>
+                          <span className={`pill sm ${st.c}`}><span className="dot" />{st.t}</span>
+                        </div>
+                        <span className="muted" style={{ fontSize: 12.5 }}>{(c.channel === 'email' ? c.subject : c.template_name) || '—'} · {c.source_name || '—'} · {fmt(c.scheduled_at || c.created_at)}</span>
                         <div className="camp-bar"><span style={{ width: pct + '%' }} /></div>
                       </div>
                       <div className="camp-nums">

@@ -82,6 +82,10 @@ Route::get('inline/{id}', [InlineImageController::class, 'serve'])
 Route::get('attachment_inline/{id}', [AttachmentController::class, 'serveInline'])
     ->middleware('signed:relative')->name('attachment.inline')->whereNumber('id');
 
+// --- Baja de campañas por CORREO: enlace FIRMADO en cada envío (sin login; la firma es la auth) ---
+Route::get('campaign_unsubscribe/{contact}', [CampaignsController::class, 'unsubscribe'])
+    ->middleware('signed:relative')->name('campaign.unsubscribe')->whereNumber('contact');
+
 
 /*
 | Rutas protegidas por token. Cada una declara el PERMISO que exige

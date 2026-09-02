@@ -50,7 +50,7 @@ class PortalService
             return [false, 'Has pedido demasiados códigos. Prueba de nuevo dentro de un rato.'];
         }
 
-        $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
+        $acc = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
         if (!$acc) return [false, 'El envío de correo no está configurado. Avisa a soporte.'];
 
         // Código de 6 dígitos. `random_int` es criptográfico: un código adivinable
@@ -125,7 +125,7 @@ class PortalService
             ->where('t.code', $code)->where('c.email', $email)->exists();
 
         if ($existe) {
-            $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
+            $acc = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
             if ($acc) {
                 $token = $this->makeTicketToken($email, $code);
                 $url   = rtrim((string) config('app.url'), '/') . '/?ver=' . rawurlencode($code) . '&t=' . rawurlencode($token);

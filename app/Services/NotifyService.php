@@ -166,7 +166,7 @@ class NotifyService
             $destinos = $this->destinatariosSla($tpl, $t);
             if (!$destinos) return false;   // nadie que reciba avisos de SLA
 
-            $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
+            $acc = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
             if (!$acc) return false;
 
             $vars = [
@@ -233,7 +233,7 @@ class NotifyService
             // No repetir si ya valoró.
             if (DB::table('ticket_ratings')->where('ticket_id', $ticketId)->exists()) return false;
 
-            $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
+            $acc = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
             if (!$acc) return false;
 
             $vars = [
@@ -295,7 +295,7 @@ class NotifyService
             $destinos = $this->destinatarios($tpl, $t, $ticketId);
             if (!$destinos) return false;   // nadie a quien avisar (p. ej. contacto solo de WhatsApp)
 
-            $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
+            $acc = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
             if (!$acc) return false;
 
             $vars = [

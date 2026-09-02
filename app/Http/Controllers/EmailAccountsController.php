@@ -31,7 +31,18 @@ class EmailAccountsController extends Controller
             };
         }
         if ($action === 'quarantine') return response()->json(['ok' => true, 'items' => $this->quarantineRows()]);
-        return $this->get();
+        return $this->get($request);
+    }
+
+    /** Cuenta que se gestiona: 'soporte' (buzón de tickets) o 'campanas' (remitente de campañas). */
+    protected function funcion(Request $request): string
+    {
+        return $request->query('funcion') === 'campanas' ? 'campanas' : 'soporte';
+    }
+
+    protected function cuenta(string $funcion): ?EmailAccount
+    {
+        return EmailAccount::where('funcion', $funcion)->orderBy('id')->first();
     }
 
     /**
@@ -41,7 +52,7 @@ class EmailAccountsController extends Controller
      */
     protected function sendTest(Request $request)
     {
-        $acc = EmailAccount::query()->whereNotNull('smtp_host')->orderBy('id')->first();
+        $acc = EmailAccount::where('funcion', $this->funcion($request))->whereNotNull('smtp_host')->orderBy('id')->first();
         if (!$acc || !$acc->smtp_host) {
             return response()->json(['ok' => false, 'error' => 'Configura y guarda antes el servidor SMTP'], 422);
         }
@@ -67,9 +78,11 @@ class EmailAccountsController extends Controller
         }
     }
 
-    protected function get()
+    protected function get(Request $request)
     {
-        $a = EmailAccount::query()->orderBy('id')->first();
+        $funcion = $this->funcion($request);
+        $a = $this->cuenta($funcion);
+        $esSoporte = $funcion === 'soporte';
         return response()->json(['account' => $a ? [
             'id' => $a->id, 'email' => $a->email, 'from_name' => $a->from_name, 'active' => (bool) $a->active,
             'imap_host' => $a->imap_host, 'imap_port' => $a->imap_port, 'imap_encryption' => $a->imap_encryption, 'imap_user' => $a->imap_user,
@@ -78,13 +91,12 @@ class EmailAccountsController extends Controller
             'has_smtp_password' => (bool) $a->smtp_password,
             'last_check_at' => $a->last_check_at,
         ] : null,
-            // Pie que se añade a los correos que salen (respuestas y avisos).
-            'footer' => [
+            // Pie, cuarentena e IMAP son cosa del buzón de SOPORTE. El de campañas es solo SMTP.
+            'footer' => $esSoporte ? [
                 'active' => (string) Setting::get('email_footer_active', '0') === '1',
                 'html'   => (string) Setting::get('email_footer', ''),
-            ],
-            // Correos en cuarentena (dead-letter): los que fallaron al convertirse en ticket.
-            'quarantine' => $this->quarantineRows(),
+            ] : null,
+            'quarantine' => $esSoporte ? $this->quarantineRows() : [],
         ]);
     }
 
@@ -129,7 +141,9 @@ class EmailAccountsController extends Controller
             return response()->json(['ok' => false, 'error' => 'La dirección de correo no es válida'], 400);
         }
 
-        $a = EmailAccount::query()->orderBy('id')->first() ?: new EmailAccount();
+        $funcion = $this->funcion($request);
+        $a = $this->cuenta($funcion) ?: new EmailAccount();
+        $a->funcion    = $funcion;
         $a->email      = $email;
         $a->from_name  = trim((string) $request->input('from_name')) ?: null;
         $a->active     = filter_var($request->input('active', true), FILTER_VALIDATE_BOOLEAN);
@@ -159,7 +173,7 @@ class EmailAccountsController extends Controller
     /** Prueba de conexión: intenta IMAP y SMTP con lo que hay (o lo que llega en la petición). */
     protected function test(Request $request)
     {
-        $a = EmailAccount::query()->orderBy('id')->first() ?: new EmailAccount();
+        $a = $this->cuenta($this->funcion($request)) ?: new EmailAccount();
         // Permite probar con datos aún sin guardar; la contraseña, si no viene, usa la guardada.
         $get = fn ($k, $def = null) => $request->filled($k) ? $request->input($k) : ($a->{$k} ?? $def);
         $imapPass = (string) ($request->input('imap_password') ?: $a->imap_password);

@@ -13,7 +13,7 @@ class EmailAccount extends Model
      * el cron por query builder, así que quedan FUERA a propósito: nunca por $request.
      */
     protected $fillable = [
-        'email', 'from_name', 'active',
+        'funcion', 'email', 'from_name', 'active',
         'imap_host', 'imap_port', 'imap_encryption', 'imap_user', 'imap_password',
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_user', 'smtp_password',
     ];

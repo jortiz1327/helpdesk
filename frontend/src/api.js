@@ -171,8 +171,9 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   supDeleteCanned: (id) => req(`support_settings.php?section=canned&id=${id}`, { method: 'DELETE' }),
-  // Canal correo: config del buzón (IMAP/SMTP) + probar conexión
-  getEmailAccount: () => req('email.php'),
+  // Canal correo: config del buzón (IMAP/SMTP) + probar conexión.
+  // `funcion` = 'soporte' (buzón de tickets, por defecto) o 'campanas' (remitente SMTP de campañas).
+  getEmailAccount: (funcion) => req('email.php' + (funcion ? `?funcion=${funcion}` : '')),
   // Cuarentena de correos (dead-letter): correos que fallaron al convertirse en ticket
   listQuarantine: () => req('email.php?action=quarantine'),
   quarantineDiscard: (id) => req('email.php?action=quarantine_discard', {
@@ -181,10 +182,10 @@ export const api = {
   quarantineRetry: (id) => req('email.php?action=quarantine_retry', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
-  saveEmailAccount: (payload) => req('email.php', {
+  saveEmailAccount: (payload, funcion) => req('email.php' + (funcion ? `?funcion=${funcion}` : ''), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
-  testEmailAccount: (payload) => req('email.php?action=test', {
+  testEmailAccount: (payload, funcion) => req('email.php?action=test' + (funcion ? `&funcion=${funcion}` : ''), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Suelta el bloqueo del ticket al cerrarlo (si no, caduca solo)
@@ -335,7 +336,7 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Diagnóstico: envía un correo real para comprobar la salida
-  sendTestEmail: (payload) => req('email.php?action=send_test', {
+  sendTestEmail: (payload, funcion) => req('email.php?action=send_test' + (funcion ? `&funcion=${funcion}` : ''), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Correos bloqueados (banlist)

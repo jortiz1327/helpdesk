@@ -56,7 +56,9 @@ class MailService
     {
         $totals = ['tickets_nuevos' => 0, 'mensajes' => 0, 'adjuntos' => 0, 'errores' => []];
 
-        foreach (EmailAccount::where('active', true)->orderBy('id')->get() as $acc) {
+        // SOLO cuentas de SOPORTE: la de campañas es solo saliente (SMTP); no se sondea, así
+        // sus respuestas no entran como tickets.
+        foreach (EmailAccount::where('active', true)->where('funcion', 'soporte')->orderBy('id')->get() as $acc) {
             if (!$acc->imap_host || !$acc->imap_user) continue;   // sin IMAP configurado
             try {
                 $r = $this->fetchAccount($acc);

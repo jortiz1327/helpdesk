@@ -29,6 +29,7 @@ import Reports from "./components/Reports.jsx";
 import Activity from "./components/Activity.jsx";
 import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
+import CampaignEmailSettings from "./components/CampaignEmailSettings.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
 import MorningBriefing from "./components/MorningBriefing.jsx";
@@ -306,6 +307,13 @@ const AREAS = [
                         icon: Icon.whatsappCfg,
                         perm: "support.config",
                         color: "#12925a",
+                    },
+                    {
+                        key: "campaign_email_cfg",
+                        label: "Correo de campañas",
+                        icon: Icon.mail,
+                        perm: "support.config",
+                        color: "#6c8cff",
                     },
                 ],
             },
@@ -1017,6 +1025,7 @@ export default function App() {
                         {view === "activity" && <Activity />}
                         {view === "support_cfg" && <SupportSettings user={auth.user} />}
                         {view === "wa_config" && <Settings />}
+                        {view === "campaign_email_cfg" && <CampaignEmailSettings />}
                         {view === "tickets" && (
                             <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
                         )}

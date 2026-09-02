@@ -38,7 +38,7 @@ class TicketReplyService
         if (!$t->contact_email) {
             return ['ok' => false, 'error' => 'El contacto no tiene dirección de correo', '_status' => 422];
         }
-        $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
+        $acc = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
         if (!$acc) {
             return ['ok' => false, 'error' => 'No hay un buzón SMTP configurado', '_status' => 422];
         }
