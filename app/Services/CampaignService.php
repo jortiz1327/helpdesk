@@ -114,9 +114,23 @@ class CampaignService
         }
         $recipients = DB::select("SELECT * FROM campaign_recipients WHERE campaign_id=? AND status='pending' ORDER BY id ASC LIMIT $limit", [$campaignId]);
 
+        // BAJAS al momento del ENVÍO: el filtro de opt-out se aplica al CREAR la campaña,
+        // pero entre crear y enviar (campañas PROGRAMADAS, o un envío en varias tandas) un
+        // contacto puede haberse dado de BAJA. A ese NO se le manda —cumplimiento— y su
+        // fila se marca 'skipped'. Se carga el conjunto una vez (no una consulta por fila).
+        $bajas = array_flip(
+            DB::table('contacts')->where('opted_out', 1)->pluck('wa_id')
+                ->map(fn ($w) => preg_replace('/\D/', '', (string) $w))->all()
+        );
+
         $sent = 0;
         $failed = 0;
         foreach ($recipients as $r) {
+            if (isset($bajas[preg_replace('/\D/', '', (string) $r->wa_id)])) {
+                DB::table('campaign_recipients')->where('id', $r->id)
+                    ->update(['status' => 'skipped', 'error' => 'Dado de baja', 'sent_at' => now()]);
+                continue;   // no se envía a quien se dio de baja tras crear la campaña
+            }
             $to = $r->wa_id;
             $components = $this->resolveComponents($spec, $r);
             [$code, $res] = $this->wa->sendTemplate($to, $name, $lang, $components);

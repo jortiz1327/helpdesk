@@ -21,6 +21,7 @@ const RSTATUS = {
   delivered: { t: 'Entregado', c: 'info' },
   read:      { t: 'Leído', c: 'ok' },
   failed:    { t: 'Fallido', c: 'err' },
+  skipped:   { t: 'Baja', c: 'gray' },   // se dio de baja tras crear la campaña: no se le envió
 }
 const fmt = (s) => fmtDate(s, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
