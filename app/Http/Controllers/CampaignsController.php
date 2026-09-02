@@ -37,8 +37,12 @@ class CampaignsController extends Controller
             if ($r = $this->exigir($request, 'campaigns.send')) return $r;
             $id = (int) ($request->query('id') ?? $request->input('id') ?? 0);
             if (!$id) return response()->json(['ok' => false, 'error' => 'Falta id'], 400);
-            DB::table('campaigns')->where('id', $id)->whereIn('status', ['scheduled', 'sending'])->update(['status' => 'canceled', 'updated_at' => now()]);
-            DB::table('campaign_recipients')->where('campaign_id', $id)->where('status', 'pending')->delete();
+            // Cancelar la campaña y borrar sus pendientes van JUNTOS (transacción): que no
+            // quede «cancelada» pero con destinatarios en cola, ni al revés.
+            DB::transaction(function () use ($id) {
+                DB::table('campaigns')->where('id', $id)->whereIn('status', ['scheduled', 'sending'])->update(['status' => 'canceled', 'updated_at' => now()]);
+                DB::table('campaign_recipients')->where('campaign_id', $id)->where('status', 'pending')->delete();
+            });
             return response()->json(['ok' => true]);
         }
 

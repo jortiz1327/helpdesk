@@ -1559,38 +1559,45 @@ class TicketsController extends Controller
         // hay teléfono, queda 'web' (interno, sin salida por correo).
         $channel = $email !== '' ? 'email' : 'web';
 
-        $ticketId = $this->tickets->create([
-            'contact_id'  => $contactId,
-            'channel'     => $channel,
-            'subject'     => $subject,
-            'category_id' => $request->input('category_id') ?: null,
-            'priority'    => in_array($request->input('priority'), array_keys(TicketService::priorities()), true)
-                                ? $request->input('priority') : 'media',
-            'assigned_to' => $assignee,
-            'user_id'     => (int) $me->id,
-            // Contexto para las reglas automáticas
-            'body'        => $plain,
-            'email'       => $email,
-        ]);
+        // Ticket + primer mensaje van JUNTOS en una transacción: nunca un ticket sin
+        // mensaje. El acuse (SMTP) y los adjuntos (disco) van FUERA, tras confirmar.
+        [$ticketId, $messageId] = DB::transaction(function () use ($contactId, $channel, $subject, $request, $assignee, $me, $plain, $email, $phone, $body) {
+            $tid = $this->tickets->create([
+                'contact_id'  => $contactId,
+                'channel'     => $channel,
+                'subject'     => $subject,
+                'category_id' => $request->input('category_id') ?: null,
+                'priority'    => in_array($request->input('priority'), array_keys(TicketService::priorities()), true)
+                                    ? $request->input('priority') : 'media',
+                'assigned_to' => $assignee,
+                'user_id'     => (int) $me->id,
+                // Contexto para las reglas automáticas
+                'body'        => $plain,
+                'email'       => $email,
+            ], notify: false);
 
-        // La descripción es el primer mensaje del hilo
-        $messageId = DB::table('messages')->insertGetId([
-            'contact_id' => $contactId,
-            'ticket_id'  => $ticketId,
-            'wa_id'      => $phone ?: null,
-            'direction'  => 'in',
-            'channel'    => $channel,
-            'type'       => 'text',
-            'body'       => $body,
-            'is_html'    => true,      // ya saneado arriba
-            'status'     => 'received',
-        ]);
+            // La descripción es el primer mensaje del hilo.
+            $mid = DB::table('messages')->insertGetId([
+                'contact_id' => $contactId,
+                'ticket_id'  => $tid,
+                'wa_id'      => $phone ?: null,
+                'direction'  => 'in',
+                'channel'    => $channel,
+                'type'       => 'text',
+                'body'       => $body,
+                'is_html'    => true,      // ya saneado arriba
+                'status'     => 'received',
+            ]);
 
-        // Este mensaje NO pasa por ChatService, así que hay que dejar el ticket con
-        // «quién habló el último» al día a mano (lo abre el cliente → 'in').
-        DB::table('tickets')->where('id', $ticketId)->update(['last_direction' => 'in']);
+            // Este mensaje NO pasa por ChatService: dejamos «quién habló el último» a mano.
+            DB::table('tickets')->where('id', $tid)->update(['last_direction' => 'in']);
 
-        // Adjuntos
+            return [$tid, $mid];
+        });
+
+        app(\App\Services\NotifyService::class)->ticket('ticket_created', $ticketId);   // acuse tras confirmar
+
+        // Adjuntos (best-effort, fuera de la transacción: escriben en disco).
         $errors = [];
         if ($files) {
             [, $errors] = $this->attachments->store($files, $ticketId, $messageId, (int) $me->id);

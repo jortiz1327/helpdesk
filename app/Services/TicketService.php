@@ -149,7 +149,7 @@ class TicketService
     }
 
     /** Crea un ticket y deja constancia en el historial. */
-    public function create(array $data): int
+    public function create(array $data, bool $notify = true): int
     {
         $id = $this->insertarConCodigo([
             'subject'         => mb_substr(trim($data['subject'] ?? '') ?: 'Sin asunto', 0, 200),
@@ -200,7 +200,9 @@ class TicketService
         $this->recalcularSla($id);
 
         $this->broadcast('created', $id);
-        app(NotifyService::class)->ticket('ticket_created', $id);   // acuse de recibo (si está activo)
+        // El acuse (SMTP) se puede aplazar: cuando el llamador envuelve create() en una
+        // transacción, pasa notify:false y lo manda ÉL tras confirmar (no dentro de la tx).
+        if ($notify) app(NotifyService::class)->ticket('ticket_created', $id);
 
         return $id;
     }

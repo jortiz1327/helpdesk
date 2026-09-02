@@ -371,26 +371,30 @@ class PortalService
             ->orderByDesc('id')->value('code');
         if ($dup) return [true, null, $dup];
 
-        // MISMO create() que el correo: reglas, reparto por turno, SLA y acuse de
-        // recibo salen gratis. El canal es 'email' para que el hilo se comporte como
-        // un correo (el cliente puede seguir por el portal o respondiendo al aviso).
-        $ticketId = app(TicketService::class)->create([
-            'contact_id'  => $contactId,
-            'channel'     => 'email',
-            'source'      => 'portal',   // nació en el portal (aunque el canal sea email): lo usa el CSAT
-            'subject'     => $subject,
-            'category_id' => $catId,
-            'body'        => $cuerpo,
-            'email'       => $email,
-        ]);
+        // Ticket + primer mensaje van JUNTOS en una transacción: nunca queda un ticket
+        // sin mensaje. El acuse (SMTP) y los adjuntos (disco) van FUERA, tras confirmar.
+        // MISMO create() que el correo (reglas, reparto por turno, SLA); canal 'email'
+        // para que el hilo se comporte como un correo.
+        [$ticketId, $mid] = DB::transaction(function () use ($contactId, $catId, $subject, $cuerpo, $email) {
+            $tid = app(TicketService::class)->create([
+                'contact_id'  => $contactId,
+                'channel'     => 'email',
+                'source'      => 'portal',   // nació en el portal (aunque el canal sea email): lo usa el CSAT
+                'subject'     => $subject,
+                'category_id' => $catId,
+                'body'        => $cuerpo,
+                'email'       => $email,
+            ], notify: false);
+            $m = ChatService::storeMessage($contactId, '', 'in', 'text', nl2br(e($cuerpo)), [
+                'ticket_id' => $tid,
+                'channel'   => 'email',
+                'is_html'   => true,
+            ]);
+            return [$tid, $m];
+        });
 
-        // El mensaje inicial del cliente, como entrante del hilo.
-        $mid = ChatService::storeMessage($contactId, '', 'in', 'text', nl2br(e($cuerpo)), [
-            'ticket_id' => $ticketId,
-            'channel'   => 'email',
-            'is_html'   => true,
-        ]);
-        $this->guardarAdjuntos($files, $ticketId, $mid);
+        $this->guardarAdjuntos($files, $ticketId, $mid);                     // best-effort, fuera de la tx
+        app(\App\Services\NotifyService::class)->ticket('ticket_created', $ticketId);   // acuse tras confirmar
 
         $code = DB::table('tickets')->where('id', $ticketId)->value('code');
         return [true, null, $code];
@@ -411,22 +415,27 @@ class PortalService
             ->first(['t.id', 't.contact_id', 't.status']);
         if (!$t) return [false, 'No encontramos esa incidencia'];
 
-        $mid = ChatService::storeMessage((int) $t->contact_id, '', 'in', 'text',
-            $cuerpo !== '' ? nl2br(e($cuerpo)) : '<i>(archivo adjunto)</i>', [
-                'ticket_id' => $t->id,
-                'channel'   => 'email',
-                'is_html'   => true,
-            ]);
-        $this->guardarAdjuntos($files, (int) $t->id, $mid);
+        // Mensaje + actualización del ticket (y reapertura si estaba resuelto) van JUNTOS
+        // en una transacción. Los adjuntos (disco) y el broadcast van FUERA, tras confirmar.
+        $mid = DB::transaction(function () use ($t, $cuerpo) {
+            $m = ChatService::storeMessage((int) $t->contact_id, '', 'in', 'text',
+                $cuerpo !== '' ? nl2br(e($cuerpo)) : '<i>(archivo adjunto)</i>', [
+                    'ticket_id' => $t->id,
+                    'channel'   => 'email',
+                    'is_html'   => true,
+                ]);
+            $svc = app(TicketService::class);
+            $svc->touch((int) $t->id);
+            DB::table('tickets')->where('id', $t->id)->update(['last_direction' => 'in']);
+            // Un ticket resuelto que el cliente reabre con una respuesta vuelve a la cola.
+            if (in_array($t->status, ['resuelto', 'cerrado'], true)) {
+                $svc->setStatus((int) $t->id, 'en_progreso');
+            }
+            return $m;
+        });
 
-        $svc = app(TicketService::class);
-        $svc->touch((int) $t->id);
-        DB::table('tickets')->where('id', $t->id)->update(['last_direction' => 'in']);
-        // Un ticket resuelto que el cliente reabre con una respuesta vuelve a la cola.
-        if (in_array($t->status, ['resuelto', 'cerrado'], true)) {
-            $svc->setStatus((int) $t->id, 'en_progreso');
-        }
-        $svc->broadcast('message', (int) $t->id);
+        $this->guardarAdjuntos($files, (int) $t->id, $mid);   // best-effort, fuera de la tx
+        app(TicketService::class)->broadcast('message', (int) $t->id);
 
         return [true, null];
     }
