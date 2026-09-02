@@ -1233,8 +1233,7 @@ class TicketsController extends Controller
         if (!$me->can('tickets.categorize')) {
             return response()->json(['ok' => false, 'error' => 'No tienes permiso para cambiar la categoría'], 403);
         }
-        $id = (int) $request->input('id');
-        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el ticket'], 400);
+        $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
 
         $catId = $request->input('category_id');
         $catId = $catId ? (int) $catId : null;
@@ -1254,8 +1253,7 @@ class TicketsController extends Controller
     protected function snoozeTicket(Request $request)
     {
         $me = $request->user();
-        $id = (int) $request->input('id');
-        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el ticket'], 400);
+        $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
         if (!(clone $this->baseQuery($me))->where('t.id', $id)->exists()) {
             return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
         }
@@ -1327,8 +1325,7 @@ class TicketsController extends Controller
     protected function unsnoozeTicket(Request $request)
     {
         $me = $request->user();
-        $id = (int) $request->input('id');
-        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el ticket'], 400);
+        $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
         if (!(clone $this->baseQuery($me))->where('t.id', $id)->exists()) {
             return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
         }
