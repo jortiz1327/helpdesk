@@ -17,6 +17,10 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        // La caché en memoria de Setting es estática: se vacía por caso para que un test
+        // no lea los ajustes de otro (la BD se remigra pero el estático persiste).
+        \App\Models\Setting::flushCache();
+
         $db = (string) DB::connection()->getDatabaseName();
         if (!str_ends_with($db, '_test') && $db !== ':memory:') {
             $this->fail("ABORTADO: los tests apuntan a la BD «{$db}», que no es de test. "
