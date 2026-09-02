@@ -94,7 +94,6 @@ return [
                 'tickets.categorize', 'tickets.close', 'tickets.delete',
                 'tickets.view_times', 'agents.view', 'tickets.export', 'support.config',
                 'contacts.access', 'contacts.edit',
-                'automations.access',
                 'shifts.access', 'shifts.manage',
                 'admin.access', 'analytics.view',
             ],
@@ -117,15 +116,14 @@ return [
 
         'encargado_campanas' => [
             'label'       => 'Encargado de campañas',
-            'description' => 'Gestiona plantillas, agendas, envío de campañas, chat en vivo, automatizaciones y sus analíticas. No accede al Helpdesk ni a la configuración de WhatsApp (eso es del superadmin).',
+            'description' => 'Gestiona plantillas, agendas, envío de campañas, chat en vivo y sus analíticas. No accede al Helpdesk, a la configuración de WhatsApp ni a los flujos de automatización (eso es del superadmin).',
             'permissions' => [
                 'campaigns.access', 'campaigns.send', 'campaigns.delete',
                 'templates.manage', 'forms.manage',
                 'contacts.access',
-                // Analíticas y automatizaciones del bot (decisión cliente, 15/07/2026).
-                // La configuración de WhatsApp (settings.manage) se deja SOLO al superadmin.
+                // La configuración de WhatsApp (settings.manage) y los FLUJOS DE AUTOMATIZACIÓN
+                // (automations.*) se dejan SOLO al superadmin.
                 'analytics.view',
-                'automations.access', 'automations.manage',
             ],
         ],
     ],
