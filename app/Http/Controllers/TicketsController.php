@@ -595,15 +595,14 @@ class TicketsController extends Controller
     {
         $me = $request->user();
 
-        /*
-         * Reparto por estado: UNA consulta agrupada, no una por estado. Eran seis
-         * recorridos completos de la tabla para pintar seis números.
-         */
-        $byStatus = array_fill_keys(array_keys(TicketService::STATUSES), 0);
-        foreach ($this->countQuery($me)->groupBy('t.status')
-            ->get([DB::raw('t.status'), DB::raw('COUNT(*) AS n')]) as $fila) {
-            if (array_key_exists($fila->status, $byStatus)) $byStatus[$fila->status] = (int) $fila->n;
-        }
+        // Reparto por estado GLOBAL (para las tarjetas KPI de arriba, que son «del sistema»).
+        $byStatusAll = $this->repartoPorEstado($me, null, null);
+
+        // Reparto por estado del RANGO pedido, para el gráfico «Tickets por estado»
+        // (por fecha de creación). Sin rango = global (comportamiento de siempre).
+        $from = $request->query('from');
+        $to   = $request->query('to');
+        $byStatus = ($from || $to) ? $this->repartoPorEstado($me, $from, $to) : $byStatusAll;
 
         // Últimos tickets (panel «Tickets recientes» del Centro de Soporte)
         $recent = (clone $this->baseQuery($me))
@@ -616,14 +615,29 @@ class TicketsController extends Controller
 
         return response()->json([
             'ok'        => true,
-            'total'     => array_sum($byStatus),
-            'open'      => array_sum(array_intersect_key($byStatus, array_flip(TicketService::OPEN_STATUSES))),
-            'resolved'  => $byStatus['resuelto'] + $byStatus['cerrado'],
+            // KPIs SIEMPRE globales (las tarjetas dicen «en el sistema»).
+            'total'     => array_sum($byStatusAll),
+            'open'      => array_sum(array_intersect_key($byStatusAll, array_flip(TicketService::OPEN_STATUSES))),
+            'resolved'  => $byStatusAll['resuelto'] + $byStatusAll['cerrado'],
             'urgent'    => (clone $this->baseQuery($me))->where('t.priority', TicketService::topPriorityKey() ?? 'urgente')
                                 ->whereIn('t.status', TicketService::OPEN_STATUSES)->count(),
+            // El gráfico «Tickets por estado» respeta el rango de fechas pedido.
             'by_status' => $byStatus,
             'recent'    => $recent,
         ]);
+    }
+
+    /** Reparto por estado (una consulta agrupada), opcionalmente por rango de creación. */
+    protected function repartoPorEstado(User $me, ?string $from, ?string $to): array
+    {
+        $byStatus = array_fill_keys(array_keys(TicketService::STATUSES), 0);
+        $q = $this->countQuery($me);
+        if ($from) $q->whereDate('t.created_at', '>=', $from);
+        if ($to)   $q->whereDate('t.created_at', '<=', $to);
+        foreach ($q->groupBy('t.status')->get([DB::raw('t.status'), DB::raw('COUNT(*) AS n')]) as $fila) {
+            if (array_key_exists($fila->status, $byStatus)) $byStatus[$fila->status] = (int) $fila->n;
+        }
+        return $byStatus;
     }
 
     /** Catálogos para los filtros y los selectores. */

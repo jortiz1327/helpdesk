@@ -24,10 +24,25 @@ export default function SupportCenter({ onGo, user }) {
 
   const [crones, setCrones] = useState(null)
 
+  // Rango de fechas del gráfico «Tickets por estado» (los KPIs de arriba siguen globales).
+  const [rango, setRango] = useState('all')   // all | today | 7d | 30d | custom
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
+  const rangoFechas = useCallback(() => {
+    const iso = (d) => d.toISOString().slice(0, 10)
+    const atras = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d) }
+    if (rango === 'today') return [iso(new Date()), '']
+    if (rango === '7d') return [atras(7), '']
+    if (rango === '30d') return [atras(30), '']
+    if (rango === 'custom') return [desde, hasta]
+    return ['', '']
+  }, [rango, desde, hasta])
+
   const load = useCallback(() => {
-    api.ticketStats().then(setS)
+    const [from, to] = rangoFechas()
+    api.ticketStats(from, to).then(setS)
     api.cronAlertCounts().then((r) => setCrones(r.counts || null))
-  }, [])
+  }, [rangoFechas])
   useEffect(() => { load() }, [load])
 
   // Tiempo real: las cifras y los tickets recientes se actualizan solos.
@@ -94,7 +109,21 @@ export default function SupportCenter({ onGo, user }) {
           <div className="sc-grid">
             {/* Tickets por estado */}
             <div className="card sc-panel">
-              <div className="sc-panel-h"><Icon.chart /> <b>Tickets por estado</b></div>
+              <div className="sc-panel-h">
+                <Icon.chart /> <b>Tickets por estado</b>
+                <span className="spacer" />
+                <div className="sc-range">
+                  {[['all', 'Todo'], ['today', 'Hoy'], ['7d', '7 días'], ['30d', '30 días'], ['custom', 'Fechas']].map(([k, lb]) => (
+                    <button key={k} className={rango === k ? 'on' : ''} onClick={() => setRango(k)}>{lb}</button>
+                  ))}
+                </div>
+              </div>
+              {rango === 'custom' && (
+                <div className="sc-range-custom">
+                  <label>Desde <input type="date" value={desde} max={hasta || undefined} onChange={(e) => setDesde(e.target.value)} /></label>
+                  <label>Hasta <input type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} /></label>
+                </div>
+              )}
               <div className="sc-bars">
                 {Object.entries(meta?.statuses || {}).map(([k, label]) => {
                   const n = s?.by_status?.[k] ?? 0

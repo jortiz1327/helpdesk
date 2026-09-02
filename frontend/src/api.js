@@ -129,7 +129,7 @@ export const api = {
 
   // --- Tickets (núcleo del helpdesk) ---
   listTickets: (f = {}) => req('tickets.php?action=list&' + new URLSearchParams(f)),
-  ticketStats: () => req('tickets.php?action=stats'),
+  ticketStats: (from = '', to = '') => req(`tickets.php?action=stats${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}`),
   ticketMeta: () => req('tickets.php?action=meta'),
   getTicket: (id) => req(`tickets.php?action=detail&id=${id}`),
   // Mensajes anteriores del hilo (paginación hacia atrás): los previos a `before`.

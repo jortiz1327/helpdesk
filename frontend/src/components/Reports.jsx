@@ -35,10 +35,11 @@ function Tabla({ rows, primeraCol, colorDot }) {
         </tr></thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={r.id ?? r.name ?? i}>
+            <tr key={r.id ?? r.name ?? i} className={r.active === false ? 'rep-row-off' : ''}>
               <td className="org-rep-name">
                 {colorDot && <span className="rep-dot" style={{ background: r.color || 'var(--ink-3)' }} />}
                 {r.name}
+                {r.active === false && <span className="rep-off-tag">deshabilitado</span>}
               </td>
               <td><b>{r.total}</b></td>
               <td>{r.resueltos}</td>
@@ -75,6 +76,9 @@ export default function Reports({ onGo }) {
   const sla = d?.sla_activo
   const canales = Object.entries(d?.by_channel || {})
   const totalCanal = canales.reduce((a, [, n]) => a + Number(n), 0) || 1
+  const maxStatus = Math.max(1, ...Object.values(d?.by_status || { x: 1 }))
+  // Por agente: primero los habilitados; los deshabilitados al final (se pintan en gris).
+  const agentes = [...(d?.by_agent || [])].sort((a, b) => (a.active === false) - (b.active === false))
 
   return (
     <>
@@ -86,15 +90,19 @@ export default function Reports({ onGo }) {
           <button onClick={() => onGo?.('support')}>Resumen</button>
           <button className="on"><Icon.chart /> Informes</button>
         </div>
-        <div className="spacer" />
-        <div className="kb-seg">
-          {PERIODS.map(([kk, l]) => (
-            <button key={kk} className={period === kk ? 'on' : ''} onClick={() => setPeriod(kk)}>{l}</button>
-          ))}
-        </div>
       </header>
 
       <div className="page-scroll"><div className="page" style={{ maxWidth: 1000 }}>
+        {/* Selector de periodo, bien visible (antes quedaba escondido arriba a la derecha). */}
+        <div className="rep-periodbar">
+          <span className="rep-periodbar-lbl"><Icon.clock /> Periodo del informe</span>
+          <div className="rep-periods">
+            {PERIODS.map(([kk, l]) => (
+              <button key={kk} className={period === kk ? 'on' : ''} onClick={() => setPeriod(kk)}>{l}</button>
+            ))}
+          </div>
+        </div>
+
         {err && d === null ? (
           <LoadError onRetry={load} msg="No se pudieron cargar los informes" />
         ) : d === null ? (
@@ -118,6 +126,24 @@ export default function Reports({ onGo }) {
             </div>
 
             {d.daily?.length > 0 && <TrendChart data={d.daily} />}
+
+            {d.by_status && (
+              <div className="card rep-status">
+                <div className="rep-ch-h"><Icon.chart /> Tickets por estado <span className="rep-hint">· en el periodo</span></div>
+                <div className="rep-status-bars">
+                  {Object.entries(d.by_status).map(([k, n]) => {
+                    const m = d.status_meta?.[k] || {}
+                    return (
+                      <div key={k} className="rep-status-row">
+                        <span className="rep-status-lb" style={{ color: m.color }}>{m.name || k}</span>
+                        <span className="rep-status-n">{n} {n === 1 ? 'ticket' : 'tickets'}</span>
+                        <span className="rep-status-bar"><i style={{ width: `${(n / maxStatus) * 100}%`, background: m.color || 'var(--primary)' }} /></span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {canales.length > 0 && (
               <div className="rep-channels card">
@@ -171,7 +197,7 @@ export default function Reports({ onGo }) {
             )}
 
             <h3 className="rep-sec">Por agente</h3>
-            <Tabla rows={d.by_agent} primeraCol="Agente" />
+            <Tabla rows={agentes} primeraCol="Agente" />
 
             <h3 className="rep-sec">Por categoría</h3>
             <Tabla rows={d.by_category} primeraCol="Categoría" colorDot />

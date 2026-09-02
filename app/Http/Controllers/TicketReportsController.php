@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\SlaService;
+use App\Services\TicketService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -63,10 +64,17 @@ class TicketReportsController extends Controller
         // KPIs globales
         $k = (clone $base())->selectRaw($metricas)->first();
 
-        // Por agente (incluye «Sin asignar»)
+        // Por agente (incluye «Sin asignar»). Se trae `active` para pintar en gris a los
+        // agentes deshabilitados y priorizar a los habilitados en la tabla.
         $byAgent = (clone $base())->leftJoin('users as u', 'u.id', '=', 't.assigned_to')
-            ->selectRaw("t.assigned_to AS id, COALESCE(u.name, u.email, 'Sin asignar') AS name, $metricas")
-            ->groupByRaw('t.assigned_to, u.name, u.email')->orderByDesc('total')->get();
+            ->selectRaw("t.assigned_to AS id, COALESCE(u.name, u.email, 'Sin asignar') AS name, COALESCE(u.active, 1) AS active, $metricas")
+            ->groupByRaw('t.assigned_to, u.name, u.email, u.active')->orderByDesc('total')->get();
+
+        // Reparto por estado del periodo (para el gráfico «Tickets por estado» de Informes).
+        $byStatus = array_fill_keys(array_keys(TicketService::STATUSES), 0);
+        foreach ((clone $base())->groupBy('t.status')->get([DB::raw('t.status'), DB::raw('COUNT(*) AS n')]) as $f) {
+            if (array_key_exists($f->status, $byStatus)) $byStatus[$f->status] = (int) $f->n;
+        }
 
         // Por categoría
         $byCat = (clone $base())->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
@@ -86,8 +94,10 @@ class TicketReportsController extends Controller
             'sla_activo' => SlaService::activo(),
             'kpis'       => $this->fila($k),
             'by_agent'   => $byAgent->map(fn ($r) => $this->fila($r, [
-                'id' => (int) $r->id, 'name' => $r->name,
+                'id' => (int) $r->id, 'name' => $r->name, 'active' => (bool) $r->active,
             ] + $this->csatFila($csatAg->get($r->id))))->all(),
+            'by_status'    => $byStatus,
+            'status_meta'  => TicketService::statusMeta(),   // etiqueta + color por estado
             'by_category' => $byCat->map(fn ($r) => $this->fila($r, [
                 'name' => $r->name, 'color' => $r->color,
             ] + $this->csatFila($csatCat->get($r->cat_id))))->all(),

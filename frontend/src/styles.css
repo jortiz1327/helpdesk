@@ -2016,6 +2016,15 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .lnk { background: none; border: 0; color: var(--primary); font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .lnk:hover { text-decoration: underline; }
 
+/* Selector de rango de fechas del gráfico «Tickets por estado». */
+.sc-range { display: inline-flex; gap: 2px; background: var(--hover); border-radius: 8px; padding: 2px; }
+.sc-range button { border: 0; background: none; color: var(--ink-2); font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 4px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.sc-range button:hover { color: var(--ink); }
+.sc-range button.on { background: var(--primary); color: #fff; }
+.sc-range-custom { display: flex; gap: 12px; flex-wrap: wrap; margin: -6px 0 14px; }
+.sc-range-custom label { font-size: 12px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.sc-range-custom input { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 5px 8px; font-family: inherit; font-size: 12.5px; }
+
 .sc-bars { display: flex; flex-direction: column; gap: 12px; }
 .sc-bar-row { display: grid; grid-template-columns: 165px 82px 1fr; align-items: center; gap: 12px; }
 .sc-bar-n { font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
@@ -2693,6 +2702,30 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 /* --- Informes del helpdesk --- */
 .rep-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .rep-hint { color: var(--ink-3); font-weight: 400; }
+
+/* Barra de periodo, destacada. */
+.rep-periodbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.rep-periodbar-lbl { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+.rep-periodbar-lbl svg { width: 16px; height: 16px; fill: var(--primary); }
+.rep-periods { display: inline-flex; gap: 4px; background: var(--hover); border-radius: 10px; padding: 3px; }
+.rep-periods button { border: 0; background: none; color: var(--ink-2); font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 15px; border-radius: 8px; cursor: pointer; }
+.rep-periods button:hover { color: var(--ink); }
+.rep-periods button.on { background: var(--primary); color: #fff; box-shadow: 0 2px 8px var(--primary-glow); }
+
+/* Gráfico «Tickets por estado» en Informes. */
+.rep-status { padding: 18px 20px; margin-bottom: 4px; }
+.rep-status-bars { display: flex; flex-direction: column; gap: 11px; }
+.rep-status-row { display: grid; grid-template-columns: 150px 92px 1fr; align-items: center; gap: 12px; }
+.rep-status-lb { font-weight: 700; font-size: 13px; }
+.rep-status-n { color: var(--ink-2); font-size: 12.5px; text-align: right; font-variant-numeric: tabular-nums; }
+.rep-status-bar { height: 9px; border-radius: 6px; background: var(--hover); overflow: hidden; }
+.rep-status-bar i { display: block; height: 100%; border-radius: 6px; min-width: 3px; }
+@media (max-width: 640px) { .rep-status-row { grid-template-columns: 110px 70px 1fr; } }
+
+/* Agente deshabilitado en la tabla «Por agente»: en gris, como readonly. */
+.rep-row-off td { color: var(--ink-3); opacity: 0.7; }
+.rep-row-off .org-rep-name { font-weight: 500; }
+.rep-off-tag { margin-left: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-3); background: var(--hover); border-radius: 6px; padding: 1px 6px; vertical-align: middle; }
 .rep-sec { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin: 26px 0 12px; }
 .rep-empty { color: var(--ink-3); font-size: 13.5px; padding: 16px 4px; }
 .rep-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
