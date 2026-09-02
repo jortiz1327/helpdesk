@@ -51,8 +51,10 @@ function Detail({ id, onBack, onChange }) {
   const st = STATUS[c.status] || STATUS.draft
   const cnt = (...s) => (c.recipients || []).filter((r) => s.includes(r.status)).length
   const pending = cnt('pending')
-  const delivered = cnt('delivered', 'read')
-  const read = cnt('read')
+  // delivered/read salen del BACKEND (misma subconsulta que la lista) para que lista y
+  // detalle NO muestren cifras distintas; antes se recontaban aquí desde los destinatarios.
+  const delivered = c.delivered ?? 0
+  const read = c.read_count ?? 0
 
   return (
     <>

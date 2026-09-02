@@ -11,6 +11,16 @@ use Illuminate\Support\Facades\DB;
 /** Portado de api/campaigns.php — campañas de difusión. Requiere token. */
 class CampaignsController extends Controller
 {
+    /*
+     * Entregados/leídos: UNA sola definición para la lista y el detalle. Antes la lista los
+     * sacaba con estas subconsultas y el detalle los recontaba en el frontend desde los
+     * destinatarios; al ser dos caminos distintos podían mostrar cifras distintas. Ahora
+     * los dos beben de aquí (alias `c` = campaigns en ambas consultas).
+     */
+    private const SQL_ENTREGA =
+        "(SELECT COUNT(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status IN ('delivered','read')) AS delivered,
+         (SELECT COUNT(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status = 'read') AS read_count";
+
     /** 403 si el usuario no tiene el permiso (el superadmin lo tiene por bypass); null si sí. */
     protected function exigir(Request $request, string $permiso)
     {
@@ -60,8 +70,7 @@ class CampaignsController extends Controller
             $rows = DB::select("
                 SELECT c.id, c.title, c.template_name, c.status, c.total, c.sent, c.failed, c.scheduled_at, c.created_at,
                        COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name,
-                       (SELECT COUNT(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status IN ('delivered','read')) AS delivered,
-                       (SELECT COUNT(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status = 'read') AS read_count
+                       " . self::SQL_ENTREGA . "
                 FROM campaigns c
                 LEFT JOIN phonebooks p ON p.id = c.phonebook_id
                 LEFT JOIN labels l ON l.id = c.label_id
@@ -160,7 +169,8 @@ class CampaignsController extends Controller
     protected function detail(int $id)
     {
         $c = DB::selectOne("SELECT c.*, p.name AS phonebook_name, l.name AS label_name,
-                COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name
+                COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name,
+                " . self::SQL_ENTREGA . "
             FROM campaigns c
             LEFT JOIN phonebooks p ON p.id = c.phonebook_id
             LEFT JOIN labels l ON l.id = c.label_id
