@@ -87,11 +87,23 @@ const humanSize = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.
  * de 5, igual que el backend. `compacta` la deja en una sola línea para el editor
  * de respuesta; en el formulario de crear va la zona grande.
  */
+const ADJ_MAX_BYTES = 10 * 1024 * 1024   // 10 MB por fichero (igual que AttachmentService::MAX_BYTES)
 function Adjuntar({ files, setFiles, compacta }) {
   const { t } = useLang()
   const ref = useRef(null)
   const [drag, setDrag] = useState(false)
-  const add = (nuevos) => setFiles((s) => [...s, ...nuevos.filter((f) => f && f.size)].slice(0, 5))
+  const [aviso, setAviso] = useState('')   // ficheros descartados por tamaño
+  // Se avisa en el CLIENTE de los que superan el tope antes de subir nada: el backend
+  // los rechazaría igual, pero así el cliente lo ve al instante y no pierde el envío.
+  const add = (nuevos) => {
+    const validos = [], grandes = []
+    for (const f of nuevos) {
+      if (!f || !f.size) continue
+      ;(f.size > ADJ_MAX_BYTES ? grandes : validos).push(f)
+    }
+    setAviso(grandes.length ? t('attach_too_big', { names: grandes.map((f) => f.name).join(', ') }) : '')
+    if (validos.length) setFiles((s) => [...s, ...validos].slice(0, 5))
+  }
   const soltar = (e) => { e.preventDefault(); setDrag(false); add([...e.dataTransfer.files]) }
   return (
     <div className="adj">
@@ -117,6 +129,7 @@ function Adjuntar({ files, setFiles, compacta }) {
           ))}
         </div>
       )}
+      {aviso && <p className="hint" role="alert" style={{ color: 'var(--danger)', marginTop: 6 }}>{aviso}</p>}
     </div>
   )
 }
@@ -604,6 +617,7 @@ function Acceso({ intent, go, onReady, caducado }) {
 
 /* Seis casillas con auto-avance. Al completarse, valida; si falla, se vacía. */
 function Otp({ onComplete, error, clearError }) {
+  const { t } = useLang()
   const [vals, setVals] = useState(['', '', '', '', '', ''])
   const refs = useRef([])
   const [checking, setChecking] = useState(false)
@@ -612,6 +626,19 @@ function Otp({ onComplete, error, clearError }) {
     v = v.replace(/\D/g, '').slice(-1)
     setVals((s) => { const n = [...s]; n[i] = v; return n })
     if (v && i < 5) refs.current[i + 1]?.focus()
+    clearError()
+  }
+
+  // Pegar el código de un tirón (del correo/SMS): reparte los dígitos por las casillas
+  // se pegue donde se pegue. Si son los 6, el efecto de abajo valida solo.
+  const pegar = (e) => {
+    const txt = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6)
+    if (!txt) return
+    e.preventDefault()
+    const n = ['', '', '', '', '', '']
+    for (let k = 0; k < txt.length; k++) n[k] = txt[k]
+    setVals(n)
+    refs.current[Math.min(txt.length, 5)]?.focus()
     clearError()
   }
   useEffect(() => {
@@ -630,8 +657,9 @@ function Otp({ onComplete, error, clearError }) {
       <div className="otp">
         {vals.map((v, i) => (
           <input key={i} ref={(el) => (refs.current[i] = el)} value={v} inputMode="numeric" autoFocus={i === 0}
+            aria-label={t('otp_box_aria', { n: i + 1 })} autoComplete={i === 0 ? 'one-time-code' : 'off'}
             className={v ? 'filled' : ''} disabled={checking}
-            onChange={(e) => set(i, e.target.value)}
+            onChange={(e) => set(i, e.target.value)} onPaste={pegar}
             onKeyDown={(e) => { if (e.key === 'Backspace' && !v && i > 0) refs.current[i - 1]?.focus() }} />
         ))}
       </div>
@@ -753,7 +781,10 @@ function Crear({ go, prefill, onOpen, onExpire }) {
       <label className="f"><span className="lab">{t('description')}</span>
         <textarea className="inp" rows={5} value={body} onChange={(e) => setBody(e.target.value)}
           placeholder={t('desc_placeholder')} />
-        {cortoDeMas && <span className="hint" style={{ color: 'var(--wait)' }}>{t('too_short')}</span>}</label>
+        <span className="f-foot" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          {cortoDeMas ? <span className="hint" style={{ margin: 0, color: 'var(--wait)' }}>{t('too_short')}</span> : <span />}
+          <span className="hint" style={{ margin: 0, fontVariantNumeric: 'tabular-nums' }}>{t('chars', { n: body.length })}</span>
+        </span></label>
 
       <div className="f"><span className="lab">{t('attach_label')} <span className="hint" style={{ fontWeight: 400 }}>{t('attach_optional')}</span></span>
         <Adjuntar files={files} setFiles={setFiles} /></div>
@@ -1139,6 +1170,7 @@ function Detalle({ code, back, onExpire }) {
           placeholder={resuelto ? tr('reply_ph_reopen') : tr('reply_ph')} />
         <Adjuntar files={files} setFiles={setFiles} compacta />
         <div className="reply-foot">
+          {txt.length > 0 && <span className="hint" style={{ margin: 0, fontVariantNumeric: 'tabular-nums' }}>{tr('chars', { n: txt.length })}</span>}
           <button className="btn" style={{ width: 'auto', marginLeft: 'auto', padding: '11px 22px' }}
             disabled={busy || (!txt.trim() && !files.length)} onClick={responder}>{busy ? tr('sending') : tr('reply_btn')}</button>
         </div>

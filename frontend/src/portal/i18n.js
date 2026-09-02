@@ -102,6 +102,9 @@ export const dict = {
     attach_short: 'Adjuntar',
     attach_a_file: 'Adjunta un archivo',
     attach_hint: 'o arrástralo aquí · imágenes, PDF o documentos (máx. 10 MB)',
+    attach_too_big: '«{names}» supera los 10 MB y no se ha añadido.',
+    otp_box_aria: 'Dígito {n} de 6',
+    chars: '{n} caracteres',
     remove: 'Quitar',
 
     /* ---- Correo (iframe) ---- */
@@ -289,6 +292,9 @@ export const dict = {
     attach_short: 'Attach',
     attach_a_file: 'Attach a file',
     attach_hint: 'or drag it here · images, PDF or documents (max. 10 MB)',
+    attach_too_big: '“{names}” exceeds 10 MB and was not added.',
+    otp_box_aria: 'Digit {n} of 6',
+    chars: '{n} characters',
     remove: 'Remove',
 
     email_frame_title: 'Message',
@@ -467,6 +473,9 @@ export const dict = {
     attach_short: 'Anexar',
     attach_a_file: 'Anexe um ficheiro',
     attach_hint: 'ou arraste-o para aqui · imagens, PDF ou documentos (máx. 10 MB)',
+    attach_too_big: '«{names}» excede os 10 MB e não foi adicionado.',
+    otp_box_aria: 'Dígito {n} de 6',
+    chars: '{n} caracteres',
     remove: 'Remover',
 
     email_frame_title: 'Mensagem',
