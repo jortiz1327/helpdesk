@@ -220,18 +220,23 @@ class PortalService
             ->get(['t.id', 't.code', 't.subject', 't.status', 't.created_at', 't.last_message_at', 't.last_direction']);
 
         // Un fragmento del último mensaje visible de cada ticket, para la tarjeta.
-        // Una sola consulta para todos (nada de N+1): el último id por ticket.
+        // Se saca en DOS pasos para NO traer todo el hilo: primero el id del último
+        // mensaje de cada ticket (MAX(id) por grupo, sin cuerpo, sobre el índice
+        // (ticket_id,id)), y luego SOLO esos ~100 cuerpos por clave primaria. Antes se
+        // traían TODOS los mensajes de hasta 100 tickets y se filtraba en PHP.
         $ids = $rows->pluck('id')->all();
         $previews = [];
         if ($ids) {
-            $ultimos = DB::table('messages')->whereIn('ticket_id', $ids)
+            $ultimoIds = DB::table('messages')->whereIn('ticket_id', $ids)
                 ->where('is_internal_note', 0)
-                ->select('ticket_id', 'body', 'is_html', 'created_at')
-                ->orderBy('ticket_id')->orderByDesc('id')->get()
-                ->unique('ticket_id');   // el primero de cada ticket = el más reciente
-            foreach ($ultimos as $m) {
-                $txt = trim(preg_replace('/\s+/', ' ', strip_tags((string) $m->body)));
-                $previews[$m->ticket_id] = mb_substr($txt, 0, 100);
+                ->groupBy('ticket_id')
+                ->select(DB::raw('MAX(id) AS mid'))
+                ->pluck('mid')->all();
+            if ($ultimoIds) {
+                foreach (DB::table('messages')->whereIn('id', $ultimoIds)->get(['ticket_id', 'body']) as $m) {
+                    $txt = trim(preg_replace('/\s+/', ' ', strip_tags((string) $m->body)));
+                    $previews[$m->ticket_id] = mb_substr($txt, 0, 100);
+                }
             }
         }
 
