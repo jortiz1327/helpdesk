@@ -86,15 +86,8 @@ class TicketsController extends Controller
      */
     protected function scope($query, User $me)
     {
-        if ($me->can('tickets.view_all')) return $query;
-
-        $cats = $me->categoryIds();
-        $query->where(function ($q) use ($cats, $me) {
-            if ($cats) $q->whereIn('t.category_id', $cats);
-            $q->orWhere('t.assigned_to', $me->id);
-            $q->orWhere('t.status', 'cerrado');   // los cerrados, para todos
-        });
-        return $query;
+        // Criterio de visibilidad ÚNICO (compartido con AttachmentController).
+        return \App\Support\TicketVisibility::scope($query, $me);
     }
 
     /**

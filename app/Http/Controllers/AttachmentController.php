@@ -30,21 +30,11 @@ class AttachmentController extends Controller
         }
         [$path, $row] = $found;
 
-        // ¿Puede este usuario ver el ticket del adjunto? MISMO criterio que la bandeja
-        // (scope): con view_all, todos; si no, los de SUS categorías o los asignados a él.
-        // Antes solo miraba `assigned_to`, así que un agente recibía 403 al abrir los
-        // adjuntos de un ticket de su área que no tuviera asignado (imágenes rotas).
-        if (!$me->can('tickets.view_all')) {
-            $t = DB::table('tickets')->where('id', $row->ticket_id)->first(['assigned_to', 'category_id', 'status']);
-            $cats = array_map('intval', $me->categoryIds());
-            $puede = $t && (
-                (int) $t->assigned_to === (int) $me->id
-                || ($t->category_id && in_array((int) $t->category_id, $cats, true))
-                || $t->status === 'cerrado'   // histórico compartido: los cerrados, para todos
-            );
-            if (!$puede) {
-                return response()->json(['error' => 'Sin acceso a este adjunto'], 403);
-            }
+        // ¿Puede este usuario ver el ticket del adjunto? MISMO criterio que la bandeja,
+        // en una ÚNICA fuente (TicketVisibility): con view_all todos; si no, los de sus
+        // categorías, los asignados a él, o los cerrados. Así no diverge de la lista.
+        if (!\App\Support\TicketVisibility::puedeVer($me, (int) $row->ticket_id)) {
+            return response()->json(['error' => 'Sin acceso a este adjunto'], 403);
         }
 
         // inline para las imágenes (se ven en el hilo), descarga para el resto
