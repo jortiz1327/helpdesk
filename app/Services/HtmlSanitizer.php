@@ -232,7 +232,11 @@ class HtmlSanitizer
     /** Versión en texto plano: para el resumen de la bandeja y las búsquedas. */
     public static function toText(?string $html): string
     {
-        $t = preg_replace('#<(br|/p|/div|/li|/tr|/h[1-6])[^>]*>#i', ' ', (string) $html);
+        $t = (string) $html;
+        // Quitar <script>/<style> ENTEROS (con su cuerpo): strip_tags borra la etiqueta
+        // pero dejaría el contenido (p. ej. «alert(1)») colándose en el texto/preview.
+        $t = preg_replace('#<(script|style)\b[^>]*>.*?</\1>#is', ' ', $t) ?? $t;
+        $t = preg_replace('#<(br|/p|/div|/li|/tr|/h[1-6])[^>]*>#i', ' ', $t);
         return trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($t), ENT_QUOTES, 'UTF-8')));
     }
 }
