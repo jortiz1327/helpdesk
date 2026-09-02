@@ -17,25 +17,59 @@ export const setToken = (t) => { t ? localStorage.setItem(TOKEN_KEY, t) : localS
 let unauthorizedHandler = null
 export function onUnauthorized(fn) { unauthorizedHandler = fn }
 
+// Lecturas que pueden tardar MUCHO de forma legítima (agregan sobre toda la tabla):
+// se excluyen del timeout para no cortarlas a media faena. (export y pdf ni pasan por
+// aquí: hacen fetch directo con su propio manejo de blob.)
+const SIN_TIMEOUT = /reports\.php|action=(?:export|pdf)/i
+
+/*
+ * Timeout POR LLAMADA con AbortController. Es de CLIENTE: cada navegador arranca su
+ * propio temporizador para SU petición; no bloquea el servidor ni a otros usuarios,
+ * solo evita que ESTA llamada deje el spinner girando para siempre si el servidor
+ * acepta pero no responde. Por defecto SOLO en lecturas (GET/HEAD, idempotentes): a las
+ * mutaciones (POST/PUT/DELETE) no se les pone, porque cortarlas no diría si el cambio
+ * llegó a aplicarse (riesgo de reintentar y duplicar). Se puede forzar por llamada con
+ * `opts.timeout` en ms (0 lo desactiva).
+ */
+function timeoutDe(path, opts) {
+  if (opts.timeout !== undefined) return opts.timeout
+  const method = (opts.method || 'GET').toUpperCase()
+  const esLectura = method === 'GET' || method === 'HEAD'
+  return esLectura && !SIN_TIMEOUT.test(path) ? 30000 : 0
+}
+
 async function req(path, opts = {}) {
   const headers = { ...(opts.headers || {}) }
   const tok = getToken()
   if (tok) headers['X-App-Token'] = tok
 
+  const ms = timeoutDe(path, opts)
+  let ctl, timer
+  if (ms > 0 && typeof AbortController !== 'undefined') {
+    ctl = new AbortController()
+    timer = setTimeout(() => ctl.abort(), ms)
+  }
+
   let r, text
   try {
-    r = await fetch(`${BASE}/${path}`, { ...opts, headers })
+    r = await fetch(`${BASE}/${path}`, { ...opts, headers, signal: ctl?.signal })
     text = await r.text()
   } catch (e) {
+    if (timer) clearTimeout(timer)
     /*
      * `fetch` RECHAZADO: red caída, timeout, servidor inaccesible. Antes esto
      * propagaba el rechazo y dejaba spinners y botones «Guardando…» bloqueados para
      * siempre (solo se recuperaba recargando). Ahora se resuelve como un error normal
      * ({ ok:false }), y cada llamada lo trata como cualquier otro fallo.
      */
+    if (e?.name === 'AbortError') {
+      // Nuestro propio timeout: el servidor aceptó pero no respondió a tiempo.
+      return { ok: false, error: 'La operación tardó demasiado. Inténtalo de nuevo.', _timeout: true }
+    }
     if (!import.meta.env.PROD) console.error(`Fallo de red en ${path}:`, e)
     return { ok: false, error: 'Sin conexión. Revisa tu red e inténtalo de nuevo.', _network: true }
   }
+  if (timer) clearTimeout(timer)
 
   let json
   try {
