@@ -71,6 +71,31 @@ class CampaignEmailChannelTest extends TestCase
         $this->assertSame('skipped', DB::table('campaign_recipients')->where('email', 'baja@x.com')->value('status'));
     }
 
+    public function test_incluye_la_cabecera_list_unsubscribe_y_el_pie_de_baja(): void
+    {
+        $this->remitenteCampanas();
+        $id = DB::table('contacts')->insertGetId(['name' => 'Ana', 'wa_id' => '1', 'email' => 'ana@x.com', 'opted_out' => 0]);
+        $cid = $this->campanaCorreo([['email' => 'ana@x.com', 'name' => 'Ana']]);
+
+        $capt = [];
+        $this->mock(MailService::class, function ($m) use (&$capt) {
+            $m->shouldReceive('sendMail')->andReturnUsing(function (...$args) use (&$capt) {
+                $capt['html']  = $args[4] ?? '';
+                $capt['extra'] = $args[12] ?? [];   // 13.º posicional = $extraHeaders
+                return 'mid';
+            });
+        });
+
+        app(CampaignService::class)->process($cid, 30);
+
+        // Cabecera List-Unsubscribe con el enlace firmado + one-click.
+        $this->assertArrayHasKey('List-Unsubscribe', $capt['extra']);
+        $this->assertStringContainsString('/api/campaign_unsubscribe/' . $id, $capt['extra']['List-Unsubscribe']);
+        $this->assertSame('List-Unsubscribe=One-Click', $capt['extra']['List-Unsubscribe-Post'] ?? null);
+        // Y el pie de baja en el propio cuerpo.
+        $this->assertStringContainsString('Cancelar la suscripción', $capt['html']);
+    }
+
     public function test_sin_remitente_de_campanas_no_envia_nada(): void
     {
         // No se crea la cuenta 'campanas'.

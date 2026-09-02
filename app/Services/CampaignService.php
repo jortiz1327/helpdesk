@@ -211,8 +211,13 @@ class CampaignService
                 continue;   // no se envía a quien se dio de baja tras crear la campaña
             }
             try {
-                $html  = $this->cuerpoCorreo((string) $camp->body_html, $c?->id);
-                $msgId = $mail->sendMail($acc, $email, $r->name, (string) $camp->subject, $html);
+                // Enlace de baja firmado (por contacto). Va TANTO en el pie del cuerpo COMO en
+                // la cabecera List-Unsubscribe, para que Gmail/Outlook muestren su propio botón
+                // «Cancelar suscripción» arriba del correo (RFC 2369 + one-click RFC 8058).
+                $url   = $c ? $this->enlaceBaja((int) $c->id) : null;
+                $html  = $this->cuerpoCorreo((string) $camp->body_html, $url);
+                $extra = $url ? ['List-Unsubscribe' => '<' . $url . '>', 'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click'] : [];
+                $msgId = $mail->sendMail($acc, $email, $r->name, (string) $camp->subject, $html, [], null, [], [], [], null, [], $extra);
                 DB::table('campaign_recipients')->where('id', $r->id)
                     ->update(['status' => 'sent', 'wamid' => $msgId, 'sent_at' => now(), 'error' => null]);
                 $sent++;
@@ -233,21 +238,28 @@ class CampaignService
         return [$sent, $failed];
     }
 
-    /**
-     * Añade al cuerpo de la campaña el pie de BAJA con enlace firmado (obligatorio en
-     * comunicaciones comerciales). Sin contacto conocido no se puede personalizar la baja,
-     * así que se devuelve el cuerpo tal cual.
-     */
-    protected function cuerpoCorreo(string $html, ?int $contactId): string
+    /** URL absoluta y FIRMADA de baja para un contacto (relativa firmada + base de la app). */
+    protected function enlaceBaja(int $contactId): string
     {
-        if (!$contactId) return $html;
         $base = rtrim((string) config('app.url'), '/');
-        $url  = $base . URL::signedRoute('campaign.unsubscribe', ['contact' => $contactId], null, false);
+        return $base . URL::signedRoute('campaign.unsubscribe', ['contact' => $contactId], null, false);
+    }
+
+    /**
+     * Añade al cuerpo de la campaña el pie de BAJA con el enlace firmado (obligatorio en
+     * comunicaciones comerciales). Sin enlace (contacto desconocido) se devuelve tal cual.
+     * El enlace se resalta —legible, no escondido— porque es el único mecanismo de baja
+     * del canal correo.
+     */
+    protected function cuerpoCorreo(string $html, ?string $url): string
+    {
+        if (!$url) return $html;
         return $html
-            . '<div style="margin-top:22px;padding-top:12px;border-top:1px solid #e2e6ea;'
-            . 'font-size:12px;color:#8a8f99;text-align:center">'
-            . 'Si no deseas recibir más comunicaciones, puedes '
-            . '<a href="' . e($url) . '" style="color:#8a8f99">darte de baja aquí</a>.'
+            . '<div style="margin-top:26px;padding-top:14px;border-top:1px solid #e2e6ea;'
+            . 'font-size:12.5px;color:#6b7280;text-align:center;line-height:1.6">'
+            . 'Recibes este correo porque estás en nuestra lista de comunicaciones.<br>'
+            . '<a href="' . e($url) . '" style="color:#2563eb;font-weight:600;text-decoration:underline">'
+            . 'Cancelar la suscripción</a>'
             . '</div>';
     }
 }

@@ -83,7 +83,9 @@ Route::get('attachment_inline/{id}', [AttachmentController::class, 'serveInline'
     ->middleware('signed:relative')->name('attachment.inline')->whereNumber('id');
 
 // --- Baja de campañas por CORREO: enlace FIRMADO en cada envío (sin login; la firma es la auth) ---
-Route::get('campaign_unsubscribe/{contact}', [CampaignsController::class, 'unsubscribe'])
+// GET = el destinatario pulsa el enlace del pie. POST = «one-click» de Gmail/Outlook desde su
+// botón nativo «Cancelar suscripción» (List-Unsubscribe-Post, RFC 8058).
+Route::match(['get', 'post'], 'campaign_unsubscribe/{contact}', [CampaignsController::class, 'unsubscribe'])
     ->middleware('signed:relative')->name('campaign.unsubscribe')->whereNumber('contact');
 
 

@@ -888,7 +888,7 @@ class MailService
      * @param array   $cc          copias visibles
      * @param array   $bcc         copias ocultas
      */
-    public function sendMail(EmailAccount $acc, string $toEmail, ?string $toName, string $subject, string $html, array $attachments = [], ?string $inReplyTo = null, array $references = [], array $cc = [], array $bcc = [], ?string $signature = null, array $layout = []): string
+    public function sendMail(EmailAccount $acc, string $toEmail, ?string $toName, string $subject, string $html, array $attachments = [], ?string $inReplyTo = null, array $references = [], array $cc = [], array $bcc = [], ?string $signature = null, array $layout = [], array $extraHeaders = []): string
     {
         $enc = $acc->smtp_encryption ?: 'ssl';
         // tls=true => TLS implícito (SSL, 465); null => STARTTLS/auto (587); false => sin cifrar.
@@ -951,6 +951,12 @@ class MailService
         $refs = array_values(array_filter(array_map($valid, $references)));
         if ($refs) {
             $headers->addIdHeader('References', $refs);
+        }
+
+        // Cabeceras extra (p. ej. List-Unsubscribe de las campañas). {clave => valor}. Se
+        // pasan tal cual como cabeceras de texto; el llamador es responsable de su formato.
+        foreach ($extraHeaders as $k => $v) {
+            if ($v !== null && $v !== '') $headers->addTextHeader((string) $k, (string) $v);
         }
 
         $transport->send($email);
