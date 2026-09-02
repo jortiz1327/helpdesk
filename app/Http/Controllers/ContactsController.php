@@ -163,10 +163,28 @@ class ContactsController extends Controller
 
         $sql = 'SELECT c.id, c.wa_id, c.country_code, c.email, c.name, c.last_message, c.last_time, c.opted_out, c.sede_id FROM contacts c';
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
-        // Tope de seguridad: el volumen real es ~1-2k contactos, 3000 da margen de sobra.
-        $sql .= ' ORDER BY c.last_time IS NULL, c.last_time DESC, c.id DESC LIMIT 3000';
+        $sql .= ' ORDER BY c.last_time IS NULL, c.last_time DESC, c.id DESC';
+
+        /*
+         * PAGINACIÓN OPT-IN: con `page` se sirve una página de 50 (para las listas con
+         * scroll, que antes traían hasta 3000 de golpe). Sin `page` se mantiene el
+         * comportamiento de siempre (todo, tope 3000) para el TABLERO Kanban, que
+         * necesita todas las tarjetas a la vez. Se pide una fila de más para saber si
+         * quedan más sin un COUNT aparte.
+         */
+        $pageRaw = $r->query('page', null);
+        $paginado = $pageRaw !== null && $pageRaw !== '';
+        $size = 50;
+        if ($paginado) {
+            $page = max(0, (int) $pageRaw);
+            $sql .= ' LIMIT ' . ($size + 1) . ' OFFSET ' . ($page * $size);
+        } else {
+            $sql .= ' LIMIT 3000';
+        }
 
         $contacts = DB::select($sql, $params);
+        $more = false;
+        if ($paginado && count($contacts) > $size) { $more = true; array_pop($contacts); }
 
         if ($contacts) {
             $ids = array_map(fn ($c) => $c->id, $contacts);
@@ -180,6 +198,6 @@ class ContactsController extends Controller
             }
             foreach ($contacts as $c) $c->labels = $byContact[$c->id] ?? [];
         }
-        return response()->json(['ok' => true, 'contacts' => $contacts]);
+        return response()->json(['ok' => true, 'contacts' => $contacts, 'more' => $more]);
     }
 }

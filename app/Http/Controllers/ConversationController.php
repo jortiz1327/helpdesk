@@ -101,10 +101,26 @@ class ConversationController extends Controller
         if ($assigned === 'me')   { $where[] = 'c.assigned_to = ?'; $params[] = $r->user()->id; }
         elseif ($assigned === 'none') { $where[] = 'c.assigned_to IS NULL'; }
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
-        // Tope de seguridad: el volumen real es ~1-2k, 3000 cubre lista/kanban/inbox con margen.
-        $sql .= ' ORDER BY (c.last_time IS NULL), c.last_time DESC, c.id DESC LIMIT 3000';
+        $sql .= ' ORDER BY (c.last_time IS NULL), c.last_time DESC, c.id DESC';
+
+        /*
+         * PAGINACIÓN OPT-IN (igual que Contactos): con `page` se sirve una página de 50
+         * para el inbox con scroll; sin `page`, todo (tope 3000) para el Kanban. Se pide
+         * una fila de más para saber si quedan más.
+         */
+        $pageRaw = $r->query('page', null);
+        $paginado = $pageRaw !== null && $pageRaw !== '';
+        $size = 50;
+        if ($paginado) {
+            $page = max(0, (int) $pageRaw);
+            $sql .= ' LIMIT ' . ($size + 1) . ' OFFSET ' . ($page * $size);
+        } else {
+            $sql .= ' LIMIT 3000';
+        }
 
         $rows = DB::select($sql, $params);
+        $more = false;
+        if ($paginado && count($rows) > $size) { $more = true; array_pop($rows); }
 
         // adjuntar etiquetas
         $byId = [];
@@ -120,7 +136,7 @@ class ConversationController extends Controller
                 }
             }
         }
-        return response()->json(['conversations' => $rows]);
+        return response()->json(['conversations' => $rows, 'more' => $more]);
     }
 
     protected function messages(Request $r)

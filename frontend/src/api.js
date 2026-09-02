@@ -94,7 +94,7 @@ async function req(path, opts = {}) {
 
 export const api = {
   // Conversaciones
-  listConversations: (q = '', assigned = '') => req(`conversations.php?action=list&q=${encodeURIComponent(q)}&assigned=${assigned}`),
+  listConversations: (q = '', assigned = '', page = null) => req(`conversations.php?action=list&q=${encodeURIComponent(q)}&assigned=${assigned}${page != null ? `&page=${page}` : ''}`),
   listAgents: () => req('conversations.php?action=agents'),
   getMessages: (id) => req(`conversations.php?action=messages&contact_id=${id}`),
   pollMessages: (id, after) => req(`conversations.php?action=poll&contact_id=${id}&after=${after}`),
@@ -483,7 +483,7 @@ export const api = {
 
   // Contactos (gestión + acciones en lote)
   // `area` separa por actividad: 'campaigns' (con WhatsApp) | 'helpdesk' (con tickets)
-  listContacts: (q = '', label = 0, optout = '', area = '') => req(`contacts.php?q=${encodeURIComponent(q)}&label=${label}&optout=${optout}&area=${area}`),
+  listContacts: (q = '', label = 0, optout = '', area = '', page = null) => req(`contacts.php?q=${encodeURIComponent(q)}&label=${label}&optout=${optout}&area=${area}${page != null ? `&page=${page}` : ''}`),
   setOptout: (contact_ids, value) => req('contacts.php?action=set_optout', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contact_ids, value }),
   }),

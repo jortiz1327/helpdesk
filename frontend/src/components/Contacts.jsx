@@ -28,13 +28,30 @@ export default function Contacts({ onOpen, area = '' }) {
   const [bulkLabelId, setBulkLabelId] = useState('')
   const [bulkPbId, setBulkPbId] = useState('')
 
-  const load = useCallback(() => {
+  // Paginación: la LISTA carga de 50 en 50 («cargar más»); el KANBAN necesita todas las
+  // tarjetas, así que pide sin página (todo). La página se reinicia al cambiar filtro/vista.
+  const [page, setPage] = useState(0)
+  const [more, setMore] = useState(false)
+  const paginado = mode === 'list'
+  useEffect(() => { setPage(0) }, [q, labelFilter, optoutFilter, area, mode])
+
+  const load = useCallback((pg = 0, append = false) => {
     setErr(false)
-    api.listContacts(q, labelFilter, optoutFilter, area)
-      .then((d) => d && Array.isArray(d.contacts) ? setContacts(d.contacts) : setErr(true))
+    api.listContacts(q, labelFilter, optoutFilter, area, paginado ? pg : null)
+      .then((d) => {
+        if (!d || !Array.isArray(d.contacts)) { setErr(true); return }
+        setMore(paginado ? !!d.more : false)
+        setContacts((prev) => {
+          if (!append) return d.contacts
+          // Añadir sin duplicar (por si algo se reordenó entre páginas).
+          const vistos = new Set((prev || []).map((c) => c.id))
+          return [...(prev || []), ...d.contacts.filter((c) => !vistos.has(c.id))]
+        })
+      })
       .catch(() => setErr(true))
-  }, [q, labelFilter, optoutFilter, area])
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [load])
+  }, [q, labelFilter, optoutFilter, area, paginado])
+  useEffect(() => { const t = setTimeout(() => load(0, false), 250); return () => clearTimeout(t) }, [load])
+  const loadMore = () => { const next = page + 1; setPage(next); load(next, true) }
   const loadAux = useCallback(() => {
     api.listLabels().then((d) => setLabels(d.labels || []))
     api.listPhonebooks().then((d) => setPhonebooks(d.phonebooks || []))
@@ -199,6 +216,11 @@ export default function Contacts({ onOpen, area = '' }) {
                     </span>
                   </label>
                 ))}
+                {more && (
+                  <div style={{ padding: 14, textAlign: 'center' }}>
+                    <button className="btn ghost sm" onClick={loadMore}>Cargar más contactos</button>
+                  </div>
+                )}
               </div>
             )}
         </div>
