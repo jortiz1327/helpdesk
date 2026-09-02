@@ -1651,21 +1651,35 @@ class TicketsController extends Controller
         // Prioridad más alta (configurable): la clave viene de la BD, se escapa igualmente.
         $top = DB::getPdo()->quote(TicketService::topPriorityKey() ?? 'urgente');
 
-        $stats = DB::table('tickets')
-            ->whereNotNull('assigned_to')
-            ->groupBy('assigned_to')
-            ->get([
-                'assigned_to',
-                DB::raw('COUNT(*) AS total'),
-                DB::raw("SUM(status IN ($open)) AS open_n"),
-                DB::raw("SUM(status IN ('resuelto','cerrado')) AS resolved_n"),
-                DB::raw("SUM(priority = $top AND status IN ($open)) AS urgent_n"),
-                DB::raw('AVG(CASE WHEN first_response_at IS NOT NULL
-                                  THEN TIMESTAMPDIFF(MINUTE, opened_at, first_response_at) END) AS avg_response'),
-                DB::raw('AVG(CASE WHEN resolved_at IS NOT NULL
-                                  THEN TIMESTAMPDIFF(MINUTE, opened_at, resolved_at) END) AS avg_resolve'),
-            ])
-            ->keyBy('assigned_to');
+        /*
+         * La agregación recorre TODO el histórico de tickets con AVG(TIMESTAMPDIFF), lo más
+         * caro de la pantalla. Se CACHEA 60 s (la carga del equipo no cambia por segundos) y
+         * se excluyen los avisos de CRON (channel='cron'), igual que la bandeja/informes: no
+         * son trabajo de agente y, sin filtrar, inflaban el «sin asignar».
+         */
+        [$stats, $unassigned] = Cache::remember('tk.agents.stats', 60, function () use ($open, $top) {
+            $filas = DB::table('tickets')
+                ->where('channel', '!=', 'cron')
+                ->whereNotNull('assigned_to')
+                ->groupBy('assigned_to')
+                ->get([
+                    'assigned_to',
+                    DB::raw('COUNT(*) AS total'),
+                    DB::raw("SUM(status IN ($open)) AS open_n"),
+                    DB::raw("SUM(status IN ('resuelto','cerrado')) AS resolved_n"),
+                    DB::raw("SUM(priority = $top AND status IN ($open)) AS urgent_n"),
+                    DB::raw('AVG(CASE WHEN first_response_at IS NOT NULL
+                                      THEN TIMESTAMPDIFF(MINUTE, opened_at, first_response_at) END) AS avg_response'),
+                    DB::raw('AVG(CASE WHEN resolved_at IS NOT NULL
+                                      THEN TIMESTAMPDIFF(MINUTE, opened_at, resolved_at) END) AS avg_resolve'),
+                ])
+                ->keyBy('assigned_to');
+
+            $sinAsignar = DB::table('tickets')->where('channel', '!=', 'cron')->whereNull('assigned_to')
+                ->whereIn('status', TicketService::OPEN_STATUSES)->count();
+
+            return [$filas, $sinAsignar];
+        });
 
         // Se listan TODOS los del helpdesk, incluidos los que aún no tienen ningún
         // ticket: un agente a cero es justo al que hay que darle trabajo.
@@ -1698,9 +1712,8 @@ class TicketsController extends Controller
         return response()->json([
             'ok'         => true,
             'agents'     => $agents,
-            // Trabajo que no tiene dueño: es lo primero que mira un encargado.
-            'unassigned' => DB::table('tickets')->whereNull('assigned_to')
-                                ->whereIn('status', TicketService::OPEN_STATUSES)->count(),
+            // Trabajo que no tiene dueño: es lo primero que mira un encargado (ya cacheado arriba).
+            'unassigned' => $unassigned,
         ]);
     }
 
@@ -1724,7 +1737,9 @@ class TicketsController extends Controller
             ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
             ->where('t.assigned_to', $uid)
             ->whereIn('t.status', ['resuelto', 'cerrado'])
-            ->orderByDesc(DB::raw('COALESCE(t.closed_at, t.resolved_at)'))
+            // ended_at = COALESCE(closed_at, resolved_at) materializada e indexada: ordena
+            // por índice (assigned_to, status, ended_at) en vez de con filesort.
+            ->orderByDesc('t.ended_at')
             ->limit(100)
             ->get([
                 't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel',
