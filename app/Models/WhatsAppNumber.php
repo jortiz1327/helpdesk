@@ -11,7 +11,13 @@ use Illuminate\Database\Eloquent\Model;
 class WhatsAppNumber extends Model
 {
     protected $table = 'whatsapp_numbers';
-    protected $guarded = [];
+
+    /** Columnas de negocio (todas las que edita el admin). id/timestamps quedan fuera. */
+    protected $fillable = [
+        'label', 'phone_number_id', 'funcion', 'entorno',
+        'token', 'app_secret', 'waba_id', 'app_id', 'display_number', 'active',
+    ];
+
     protected $casts = ['active' => 'boolean'];
 
     public const FUNCIONES = ['campanas'];   // WhatsApp solo alimenta Campañas (esta edición no usa WhatsApp de soporte)
