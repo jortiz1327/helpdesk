@@ -20,6 +20,7 @@ use App\Http\Controllers\FormsController;
 use App\Http\Controllers\GatingController;
 use App\Http\Controllers\InlineImageController;
 use App\Http\Controllers\LabelsController;
+use App\Http\Controllers\ManualsController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\OrganizationsController;
 use App\Http\Controllers\PhonebooksController;
@@ -100,6 +101,8 @@ Route::middleware('token')->group(function () {
     Route::get('stats.php', [StatsController::class, 'handle']);       // dashboard
     Route::get('gating.php', [GatingController::class, 'handle']);     // candados de Meta
     Route::get('media.php', [MediaController::class, 'handle']);       // proxy de multimedia
+    // Manuales descargables (apartado «Ayuda»): la lista se filtra por rol dentro del controlador.
+    Route::get('manuals.php', [ManualsController::class, 'handle']);
 
     /*
      * Autorización del WEBSOCKET. Laravel registra /broadcasting/auth con el

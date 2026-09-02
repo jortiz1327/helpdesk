@@ -30,6 +30,7 @@ import Activity from "./components/Activity.jsx";
 import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import CampaignEmailSettings from "./components/CampaignEmailSettings.jsx";
+import Manuals from "./components/Manuals.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
 import MorningBriefing from "./components/MorningBriefing.jsx";
@@ -345,7 +346,21 @@ const ADMIN_GROUP = {
     ],
 };
 
-const NAV = [...AREAS.flatMap((a) => a.groups), ADMIN_GROUP].flatMap(
+// Ayuda: transversal (aparece en todas las áreas). Sin `perm`: lo ve cualquier
+// usuario con sesión; los manuales que se ofrecen dentro ya se filtran por rol.
+const HELP_GROUP = {
+    title: "Ayuda",
+    items: [
+        {
+            key: "help",
+            label: "Manuales",
+            icon: Icon.doc,
+            color: "#8696a0",
+        },
+    ],
+};
+
+const NAV = [...AREAS.flatMap((a) => a.groups), HELP_GROUP, ADMIN_GROUP].flatMap(
     (g) => g.items,
 );
 
@@ -725,7 +740,7 @@ export default function App() {
         : myAreas[0]?.key || "helpdesk";
     const area = AREAS.find((a) => a.key === areaKey) || AREAS[0];
     // Menú del área activa + Administración (transversal), filtrado por permisos.
-    const navGroups = [...area.groups, ADMIN_GROUP]
+    const navGroups = [...area.groups, HELP_GROUP, ADMIN_GROUP]
         .map((g) => ({
             ...g,
             items: g.items.filter(
@@ -1026,6 +1041,7 @@ export default function App() {
                         {view === "support_cfg" && <SupportSettings user={auth.user} />}
                         {view === "wa_config" && <Settings />}
                         {view === "campaign_email_cfg" && <CampaignEmailSettings />}
+                        {view === "help" && <Manuals />}
                         {view === "tickets" && (
                             <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
                         )}

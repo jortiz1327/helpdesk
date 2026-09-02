@@ -3611,3 +3611,16 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
   /* El panel de notificaciones no cabe a la derecha del rail de 56px: se abre encima. */
   .notif-panel { left: 8px; right: 8px; width: auto; bottom: calc(100% + 8px); max-height: 70vh; }
 }
+
+/* --- Ayuda → Manuales --- */
+.man-grid { display: grid; gap: 12px; }
+.man-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+  background: var(--card, #fff); border: 1px solid var(--border, #e2e6ea); border-radius: 12px; }
+.man-ic { width: 42px; height: 42px; border-radius: 10px; background: var(--primary-soft);
+  display: grid; place-items: center; flex: 0 0 auto; }
+.man-ic svg { width: 22px; height: 22px; fill: var(--primary); }
+.man-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.man-meta b { font-size: 14.5px; }
+.man-desc { font-size: 12.5px; color: var(--ink-3, #6b7280); line-height: 1.4; }
+.man-sub { font-size: 11.5px; color: var(--ink-4, #9aa3af); margin-top: 1px; }
+.man-card .btn { flex: 0 0 auto; }

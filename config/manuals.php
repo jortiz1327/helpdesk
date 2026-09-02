@@ -1,0 +1,55 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Manuales descargables (apartado «Ayuda» de la app)
+|--------------------------------------------------------------------------
+| Catálogo de los PDF que el equipo puede descargar. Los ficheros viven en
+| resources/manuals/ (no son públicos: se sirven autenticados). Para AÑADIR
+| un manual: deja el PDF en esa carpeta y añade aquí una entrada.
+|
+| `perms`: quién lo ve. El usuario lo ve si tiene ALGUNO de esos permisos
+| (canAny). El superadministrador ve todos (bypass de Gate). El valor '*'
+| significa «cualquier usuario con sesión».
+|
+| Referencia rápida de permisos por rol (config/rbac.php):
+|   · helpdesk.access  → agente de soporte y encargado de soporte
+|   · campaigns.access → encargado de campañas
+|   · support.config   → encargado de soporte (config de soporte)
+|   · campaigns.delete → encargado de campañas
+|   · settings.manage  → solo superadministrador
+*/
+
+return [
+
+    'catalog' => [
+
+        'roles' => [
+            'title' => 'Roles y permisos',
+            'desc'  => 'Quién puede ver y hacer qué en el Helpdesk.',
+            'file'  => '01-roles-y-permisos.pdf',
+            'perms' => ['support.config', 'settings.manage', 'campaigns.delete'], // encargados y superadmin
+        ],
+
+        'usuario_soporte' => [
+            'title' => 'Manual de usuario · Agente de soporte',
+            'desc'  => 'El día a día atendiendo tickets: bandeja, respuestas, SLA y más.',
+            'file'  => '02a-usuario-soporte.pdf',
+            'perms' => ['helpdesk.access'],
+        ],
+
+        'usuario_campanas' => [
+            'title' => 'Manual de usuario · Campañas',
+            'desc'  => 'Difusiones por WhatsApp y correo, plantillas, formularios y chat en vivo.',
+            'file'  => '02b-usuario-campanas.pdf',
+            'perms' => ['campaigns.access'],
+        ],
+
+        // Próximos (se activan al dejar su PDF en resources/manuals/ y añadirlos aquí):
+        //   encargado_soporte → 03-encargado-soporte.pdf  · perms ['support.config']
+        //   cliente           → 04-cliente.pdf            · perms ['support.config']
+        //   aplicacion        → 05-aplicacion.pdf         · perms ['*']
+        //   potencialidad     → 06-potencialidad.pdf      · perms ['settings.manage']
+    ],
+
+];

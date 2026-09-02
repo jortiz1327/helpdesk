@@ -420,6 +420,22 @@ export const api = {
   }),
   // Subir imagen EN LÍNEA del editor -> devuelve { ok, url } (URL firmada). Sin Content-Type: multipart lo pone el navegador.
   uploadInlineImage: (file) => { const fd = new FormData(); fd.append('file', file); return req('inline_media.php', { method: 'POST', body: fd }) },
+  // Manuales (apartado «Ayuda»): lista filtrada por rol.
+  listManuals: () => req('manuals.php'),
+  // Descarga un manual: binaria (PDF), con el token en cabecera. Devuelve { ok, blob, filename }.
+  downloadManual: async (key) => {
+    try {
+      const r = await fetch(`${BASE}/manuals.php?action=download&key=${encodeURIComponent(key)}`, {
+        headers: { 'X-App-Token': getToken() },
+      })
+      if (!r.ok) return { ok: false }
+      const cd = r.headers.get('Content-Disposition') || ''
+      const filename = (cd.match(/filename="?([^"]+)"?/) || [])[1] || `${key}.pdf`
+      return { ok: true, blob: await r.blob(), filename }
+    } catch {
+      return { ok: false }
+    }
+  },
   // PDF del hilo del ticket. Devuelve { ok, blob }. opts: { notes, images, anon }
   ticketPdf: async (id, opts = {}) => {
     const r = await fetch(`${BASE}/tickets.php?action=pdf`, {
