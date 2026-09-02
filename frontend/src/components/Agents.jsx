@@ -35,7 +35,15 @@ export default function Agents({ onSeeTickets }) {
   const [filter, setFilter] = useState('all')
   const [history, setHistory] = useState(null)   // agente cuyo historial se está viendo
 
-  const load = () => { setErr(false); api.listTicketAgents().then(setD).catch(() => setErr(true)) }
+  // req() NO rechaza: en fallo de red/servidor RESUELVE con { ok:false }. Por eso hay
+  // que mirar el resultado, no fiar del .catch —si no, se guardaba ese objeto como datos
+  // y salía un «Ningún agente» engañoso en vez del error con reintentar—.
+  const load = () => {
+    setErr(false)
+    api.listTicketAgents()
+      .then((r) => { if (!r || r.ok === false) setErr(true); else setD(r) })
+      .catch(() => setErr(true))
+  }
   useEffect(() => { load() }, [])
 
   if (err && !d) return <LoadError onRetry={load} msg="No se pudo cargar el equipo de agentes" />
@@ -151,7 +159,14 @@ function HistoryModal({ agent, onClose }) {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(false)
 
-  const load = () => { setErr(false); api.agentHistory(agent.id).then(setD).catch(() => setErr(true)) }
+  // Igual que arriba: req() resuelve con { ok:false } en los fallos, así que se
+  // comprueba el resultado en vez de esperar un rechazo que no llega.
+  const load = () => {
+    setErr(false)
+    api.agentHistory(agent.id)
+      .then((r) => { if (!r || r.ok === false) setErr(true); else setD(r) })
+      .catch(() => setErr(true))
+  }
   useEffect(() => { load() }, [agent.id])
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose()
