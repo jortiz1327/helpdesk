@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { portal, getPass, setPass, getSeen, markSeen } from './portalApi.js'
+import { portal, getPass, setPass, setTicketToken, getSeen, markSeen } from './portalApi.js'
 import { LangProvider, useLang, LANGS, LOCALES } from './i18n.js'
 import { parseDate } from '../util.js'
 import logo from '../assets/logo.png'
@@ -230,6 +230,21 @@ function PortalApp() {
   const [openCode, setOpenCode] = useState(null)   // código del ticket abierto
   const [caducado, setCaducado] = useState(false)  // el pase dejó de valer: re-autenticar
   const [prefill, setPrefill] = useState(null)     // datos que precargan el formulario (CTA de una FAQ)
+
+  // ENTRADA POR ENLACE: el correo de «reenviar acceso» trae ?ver=CÓDIGO&t=TOKEN. Se
+  // guarda el token del ticket, se abre ese ticket y se LIMPIA la URL (no dejar el
+  // token en la barra ni en el historial).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    const code = (p.get('ver') || '').trim()
+    const tok = p.get('t') || ''
+    if (code && tok) {
+      setTicketToken(code, tok)
+      setOpenCode(code)
+      setView('ticket')
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
 
   // Al volver a la home se olvida cualquier pre-relleno de una FAQ, para que un
   // «Crear» genérico posterior salga en blanco.
@@ -808,6 +823,17 @@ function Estado({ go }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [data, setData] = useState(null)   // null = formulario · objeto = resultado
+  // Reenviar el enlace de acceso al correo del dueño (recupera el acceso de 24h).
+  const [resendMail, setResendMail] = useState('')
+  const [resendState, setResendState] = useState('idle')  // idle | bad | sending | sent
+
+  const reenviar = async () => {
+    const m = resendMail.trim()
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)) { setResendState('bad'); return }
+    setResendState('sending')
+    await portal.resendLink(m, data.code)
+    setResendState('sent')   // siempre «enviado» (el backend no revela si el ticket existía)
+  }
 
   const consultar = async () => {
     const c = code.trim()
@@ -861,7 +887,25 @@ function Estado({ go }) {
         <div className="est-foot">
           <p>{t('status_only_note')}</p>
           <button className="btn sec" onClick={() => go('mis')}>{I.lock} {t('enter_with_email')}</button>
-          <button className="linkbtn" onClick={() => { setData(null); setCode(''); setErr('') }}>{t('check_another')}</button>
+
+          {/* Reenviar el enlace de la incidencia al correo dueño (acceso de 24h perdido). */}
+          {resendState === 'sent' ? (
+            <p className="est-resend-ok">{I.check} {t('resend_sent')}</p>
+          ) : (
+            <div className="est-resend">
+              <p className="est-resend-lbl">{t('resend_prompt', { code: data.code })}</p>
+              <div className="est-resend-row">
+                <input type="email" value={resendMail} className={resendState === 'bad' ? 'bad' : ''}
+                  onChange={(e) => { setResendMail(e.target.value); if (resendState === 'bad') setResendState('idle') }}
+                  placeholder={t('email_placeholder')} />
+                <button className="btn sec" disabled={resendState === 'sending'} onClick={reenviar}>
+                  {resendState === 'sending' ? t('sending') : t('resend_btn')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button className="linkbtn" onClick={() => { setData(null); setCode(''); setErr(''); setResendState('idle'); setResendMail('') }}>{t('check_another')}</button>
         </div>
       </div></section>
     )
@@ -1009,6 +1053,7 @@ function Detalle({ code, back, onExpire }) {
   const [files, setFiles] = useState([])
   const [busy, setBusy] = useState(false)
   const [marking, setMarking] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState(false)
   const [pendiente, setPendiente] = useState(null)   // versión fresca con mensajes nuevos, a la espera de que el cliente los pida
   const endRef = useRef(null)
   const tRef = useRef(null)                           // el ticket mostrado, para que el sondeo compare sin cierre obsoleto
@@ -1099,9 +1144,25 @@ function Detalle({ code, back, onExpire }) {
     ? tr('resolved_sub', { time: relTime(t.resuelto_en, tr, lang) })
     : tr(fase.subKey)
 
+  // Descargar el hilo en PDF (siempre anónimo, generado en el servidor) como constancia.
+  const descargarPdf = async () => {
+    setPdfBusy(true)
+    const r = await portal.pdf(code)
+    setPdfBusy(false)
+    if (!r.ok) return
+    const url = URL.createObjectURL(r.blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `incidencia-${code}.pdf`
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <section className="screen on"><div className="wrap tdetail">
-      <button className="back" onClick={back}>{I.back}{tr('my_tickets_back')}</button>
+      <div className="tdet-bar">
+        <button className="back" onClick={back}>{I.back}{tr('my_tickets_back')}</button>
+        <button className="ghostlink" onClick={descargarPdf} disabled={pdfBusy}>{I.down} {pdfBusy ? tr('pdf_generating') : tr('pdf_download')}</button>
+      </div>
 
       {/* HERO del ticket: el estado es el protagonista. Todo el bloque se tiñe
           según la fase (azul recibida · ámbar en proceso · verde resuelta). */}

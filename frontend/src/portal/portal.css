@@ -497,6 +497,19 @@
   .est-foot{margin-top:24px;text-align:center}
   .est-foot p{font-size:14px;color:var(--ink-2);margin-bottom:12px}
   .est-foot .btn.sec{width:100%}
+  /* Reenviar el enlace de acceso al correo (recupera el acceso de 24h). */
+  .est-resend{margin-top:14px;text-align:left}
+  .est-resend-lbl{font-size:13px;color:var(--ink-3);margin-bottom:6px}
+  .est-resend-row{display:flex;gap:8px}
+  .est-resend-row input{flex:1;min-width:0;padding:11px 13px;border:1px solid var(--line);border-radius:10px;
+    font:inherit;font-size:14px;background:var(--surface);color:var(--ink)}
+  .est-resend-row input.bad{border-color:var(--danger)}
+  .est-resend-row .btn.sec{width:auto;white-space:nowrap}
+  .est-resend-ok{margin-top:12px;font-size:13.5px;color:var(--brand-deep);display:flex;align-items:center;gap:6px;justify-content:center}
+  .est-resend-ok svg{width:16px;height:16px}
+
+  /* Barra superior del detalle: volver + descargar PDF. */
+  .tdet-bar{display:flex;align-items:center;justify-content:space-between;gap:10px}
 
   /* ===== Conversación: línea de tiempo con espina ===== */
   .tl{display:flex;flex-direction:column;gap:4px}

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\EmailAccount;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -92,6 +93,66 @@ class PortalService
         // petición con una traza: el usuario ve «no se pudo enviar» y reintenta.
         try {
             app(MailService::class)->sendMail($acc, $email, null, "Tu código de acceso: {$code}", $html);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * Reenvía al correo DUEÑO un enlace de 24h para abrir el ticket (acceso perdido). El
+     * enlace va SIEMPRE al correo del contacto del ticket, no a uno tecleado por un tercero.
+     * Devuelve SIEMPRE [true, null] si la entrada es válida (no revela si el ticket existe);
+     * solo manda el correo cuando el ticket es de verdad de ese correo. Antispam por email.
+     */
+    public function resendTicketLink(string $email, string $code, ?string $ip = null): array
+    {
+        $email = mb_strtolower(trim($email));
+        $code  = strtoupper(trim($code));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $code === '') {
+            return [false, 'Indica tu correo y el número de la incidencia'];
+        }
+
+        // Límite por correo/hora: evita usar el portal para bombardear un buzón. Se cuenta
+        // ANTES de comprobar nada, para que el ritmo no delate si el ticket existe.
+        $key = 'portal:resend:' . sha1($email);
+        if ((int) Cache::get($key, 0) >= self::MAX_POR_HORA) {
+            return [false, 'Has pedido demasiados enlaces. Prueba de nuevo dentro de un rato.'];
+        }
+        Cache::put($key, (int) Cache::get($key, 0) + 1, now()->addHour());
+
+        // El ticket debe existir y ser de ESE correo (collation _ci, usa el índice).
+        $existe = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
+            ->where('t.code', $code)->where('c.email', $email)->exists();
+
+        if ($existe) {
+            $acc = EmailAccount::where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
+            if ($acc) {
+                $token = $this->makeTicketToken($email, $code);
+                $url   = rtrim((string) config('app.url'), '/') . '/?ver=' . rawurlencode($code) . '&t=' . rawurlencode($token);
+                dispatch(fn () => $this->enviarEnlace($acc, $email, $code, $url))->afterResponse();
+            }
+        }
+        return [true, null];
+    }
+
+    protected function enviarEnlace(EmailAccount $acc, string $email, string $code, string $url): void
+    {
+        $marca = $acc->from_name ?: 'Soporte';
+        $safeUrl = e($url);
+        $html = <<<HTML
+            <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;margin:0 auto;color:#0e1e33">
+              <p style="font-size:15px;color:#46586e">Aquí tienes de nuevo el acceso a tu incidencia <b>{$code}</b> en el soporte de {$marca}:</p>
+              <p style="text-align:center;margin:18px 0">
+                <a href="{$safeUrl}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;
+                   font-size:15px;font-weight:600;padding:13px 26px;border-radius:10px">Ver mi incidencia</a>
+              </p>
+              <p style="font-size:13px;color:#8496aa">El enlace caduca en 24 horas. Si no lo has pedido tú, ignora este correo:
+                 solo se puede abrir la incidencia <b>{$code}</b>, nada más.</p>
+            </div>
+        HTML;
+
+        try {
+            app(MailService::class)->sendMail($acc, $email, null, "Acceso a tu incidencia {$code}", $html);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -253,6 +314,37 @@ class PortalService
             'ultimo'   => in_array($t->status, ['resuelto', 'cerrado'], true) ? 'cerrado'
                         : ($t->last_direction === 'out' ? 'soporte' : 'cliente'),
         ])->all();
+    }
+
+    /**
+     * Ticket + mensajes (SIN notas internas) para el PDF del cliente, si el ticket es SUYO.
+     * Devuelve la forma que espera la plantilla `ticket-pdf` (compartida con el PDF de
+     * agente); el PDF del cliente se genera SIEMPRE con anon=true, así que los nombres de
+     * agente que trae el join salen como «Soporte» y nunca llegan al cliente.
+     */
+    public function ticketForPdf(string $email, string $code): ?array
+    {
+        $t = DB::table('tickets as t')
+            ->join('contacts as c', 'c.id', '=', 't.contact_id')
+            ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
+            ->leftJoin('users as u', 'u.id', '=', 't.assigned_to')
+            ->where('t.code', $code)
+            ->where('c.email', mb_strtolower($email))
+            ->first([
+                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.created_at', 't.resolved_at',
+                'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
+                'cat.name as category_name', 'u.name as agent_name',
+            ]);
+        if (!$t) return null;
+
+        $messages = DB::table('messages as m')
+            ->leftJoin('users as au', 'au.id', '=', 'm.author_user_id')
+            ->where('m.ticket_id', $t->id)
+            ->where('m.is_internal_note', 0)
+            ->orderBy('m.id')
+            ->get(['m.id', 'm.direction', 'm.body', 'm.is_html', 'm.is_internal_note', 'm.created_at', 'au.name as author_name']);
+
+        return ['ticket' => $t, 'messages' => $messages];
     }
 
     /* -------------------------------------------------------------------------

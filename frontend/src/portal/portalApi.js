@@ -91,6 +91,18 @@ export const portal = {
     if (r.ok && r.code && r.token) setTicketToken(r.code, r.token)
     return r
   },
+  // Reenviar al correo dueño el enlace de 24h del ticket (acceso perdido). Siempre «ok».
+  resendLink: (email, code) => call('resend-link', { method: 'POST', body: { email, code } }),
+  // Descargar el hilo en PDF (siempre anónimo). Devuelve { ok, blob }.
+  pdf: async (code) => {
+    const headers = {}
+    const pass = getPass(); if (pass) headers['X-Portal-Token'] = pass
+    const tt = getTicketToken(code); if (tt) headers['X-Ticket-Token'] = tt
+    try {
+      const res = await fetch(`/api/portal.php?action=pdf&code=${encodeURIComponent(code)}`, { headers })
+      return res.ok ? { ok: true, blob: await res.blob() } : { ok: false }
+    } catch { return { ok: false } }
+  },
   reply: async (code, body, files = []) => {
     let r
     if (!files.length) r = await call('reply', { method: 'POST', body: { code, body }, ttoken: getTicketToken(code) })

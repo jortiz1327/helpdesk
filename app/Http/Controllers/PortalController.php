@@ -46,6 +46,9 @@ class PortalController extends Controller
             'reply'        => $this->reply($request),
             'resolve'      => $this->resolve($request),
             'rate'         => $this->rate($request),
+            // Descargar el hilo en PDF (siempre anónimo) y recuperar el enlace de 24h.
+            'pdf'          => $this->pdf($request),
+            'resend-link'  => $this->resendLink($request),
             default        => response()->json(['ok' => false, 'error' => 'Acción no válida'], 400),
         };
     }
@@ -317,5 +320,47 @@ class PortalController extends Controller
   <div style="margin-top:16px;font-size:12px;color:#8494a8;">Atención al cliente · AEME Group</div>
 </div></body></html>
 HTML;
+    }
+
+    /**
+     * Descarga del hilo en PDF, para el CLIENTE. Autoriza igual que ver el ticket (token
+     * del ticket o pase). SIEMPRE anónimo (los agentes salen como «Soporte») y SIN notas
+     * internas: es un documento para el cliente, no la ficha interna.
+     */
+    protected function pdf(Request $request)
+    {
+        $code  = strtoupper(trim((string) $request->query('code', '')));
+        $email = $this->correoParaTicket($request, $code);
+        if (!$email) return response()->json(['ok' => false, 'error' => 'Necesitas verificar tu correo', 'reauth' => true], 401);
+
+        $data = $this->portal->ticketForPdf($email, $code);
+        if (!$data) return response()->json(['ok' => false, 'error' => 'Incidencia no encontrada'], 404);
+
+        $pdf = app(\App\Services\TicketPdfService::class)->generar($data['ticket'], $data['messages'], true, true);
+        return response($pdf, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="incidencia-' . $data['ticket']->code . '.pdf"',
+        ]);
+    }
+
+    /**
+     * Reenvía al CORREO DUEÑO un enlace de 24h para abrir el ticket (por si el cliente
+     * perdió el acceso). Se pide email + código; el enlace SIEMPRE va al correo del
+     * contacto del ticket (no a uno tecleado por un tercero). Respuesta siempre «ok» (no
+     * revela si existía) y con límite de envíos, como el correo del código.
+     */
+    protected function resendLink(Request $request)
+    {
+        if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+
+        $email = mb_strtolower(trim((string) $request->input('email')));
+        $code  = strtoupper(trim((string) $request->input('code')));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $code === '') {
+            return response()->json(['ok' => false, 'error' => 'Indica tu correo y el número de la incidencia'], 400);
+        }
+
+        [$ok, $error] = $this->portal->resendTicketLink($email, $code, $request->ip());
+        if (!$ok) return response()->json(['ok' => false, 'error' => $error], 429);
+        return response()->json(['ok' => true]);
     }
 }

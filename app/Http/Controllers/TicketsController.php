@@ -1184,41 +1184,12 @@ class TicketsController extends Controller
         if (!$withNotes) $q->where('m.is_internal_note', 0);
         $messages = $q->get(['m.id', 'm.direction', 'm.body', 'm.is_html', 'm.is_internal_note', 'm.created_at', 'au.name as author_name']);
 
-        // Cuerpo de cada mensaje ya listo para el PDF (HTML saneado con imágenes incrustadas, o texto escapado).
-        $bodies = [];
-        foreach ($messages as $m) {
-            $bodies[$m->id] = (int) $m->is_html === 1
-                ? $this->pdfImages((string) $m->body, $withImages)
-                : nl2br(e((string) $m->body));
-        }
+        $pdf = app(\App\Services\TicketPdfService::class)->generar($t, $messages, $withImages, $anon);
 
-        $html = view('ticket-pdf', [
-            't' => $t, 'messages' => $messages, 'bodies' => $bodies, 'anon' => $anon,
-            'statuses' => TicketService::STATUSES, 'priorities' => TicketService::priorities(),
-        ])->render();
-
-        $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => false, 'defaultFont' => 'DejaVu Sans']);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4');
-        $dompdf->render();
-
-        return response($dompdf->output(), 200, [
+        return response($pdf, 200, [
             'Content-Type'        => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="ticket-' . $t->code . '.pdf"',
         ]);
-    }
-
-    /** Para el PDF: incrusta las imágenes en línea como data URI, o las quita. */
-    protected function pdfImages(string $html, bool $withImages): string
-    {
-        if (!$withImages) return preg_replace('#<img[^>]*>#i', '', $html);
-
-        return preg_replace_callback('#<img([^>]*?)src="[^"]*?/api/inline/(\d+)\?[^"]*"([^>]*)>#i', function ($mm) {
-            $row = DB::table('inline_uploads')->find((int) $mm[2]);
-            if (!$row || !Storage::disk('local')->exists($row->path)) return '';
-            $data = base64_encode(Storage::disk('local')->get($row->path));
-            return '<img' . $mm[1] . 'src="data:' . $row->mime . ';base64,' . $data . '"' . $mm[3] . '>';
-        }, $html);
     }
 
     protected function status(Request $request)
