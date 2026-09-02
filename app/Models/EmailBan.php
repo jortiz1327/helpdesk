@@ -23,8 +23,10 @@ class EmailBan extends Model
 
         $domain = substr((string) strrchr($email, '@'), 1);
 
+        // Sin LOWER(): la columna es utf8mb4_unicode_ci (compara sin distinguir
+        // mayúsculas) y así entra el índice único en vez de escanearlo entero.
         return self::where('active', true)
-            ->whereRaw('LOWER(email) IN (?, ?, ?)', [$email, '@' . $domain, $domain])
+            ->whereIn('email', [$email, '@' . $domain, $domain])
             ->exists();
     }
 }
