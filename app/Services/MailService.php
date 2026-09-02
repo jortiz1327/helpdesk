@@ -523,8 +523,10 @@ class MailService
     {
         if (trim($html) === '') return $html;
 
-        // En un REENVÍO la cita ES el mensaje: recortarla deja el ticket en blanco.
-        if (self::esReenvio($subject)) return $html;
+        // En un REENVÍO la cita ES el mensaje: recortarla deja el ticket en blanco. Pero
+        // el hilo reenviado arrastra el MISMO bloque (firma, aviso legal…) repetido una vez
+        // por cada mensaje citado; se colapsan las copias de más y se deja la primera.
+        if (self::esReenvio($subject)) return self::colapsarRepetidos($html);
 
         $markers = [
             '/<div[^>]*id=["\']?(?:divRplyFwdMsg|appendonsend|appendonreply)["\']?/i',
@@ -609,12 +611,75 @@ class MailService
         return mb_strlen($t) >= 40;
     }
 
+    /**
+     * Colapsa BLOQUES IDÉNTICOS REPETIDOS de un hilo reenviado (HTML). Un reenvío
+     * conserva todo el hilo (si no, el ticket queda en blanco), y ahí el mismo bloque
+     * —típicamente la firma o el aviso legal— aparece una vez por cada mensaje citado.
+     * Se trocea por fronteras de bloque, se compara el TEXTO normalizado de cada trozo y
+     * se deja SOLO la primera aparición de cada uno; las siguientes se omiten.
+     *
+     * Conservador: solo dedup­lica trozos con sustancia (≥ 25 caracteres de texto, para
+     * no tocar líneas cortas que se repiten de forma legítima), y si el resultado se
+     * quedara sin mensaje, devuelve el original. El saneador posterior (cleanEmail)
+     * re-balancea por DOM cualquier etiqueta que quede suelta al omitir un trozo.
+     */
+    protected static function colapsarRepetidos(string $html): string
+    {
+        $trozos = preg_split(
+            '/(<br\s*\/?>\s*<br\s*\/?>|<\/p>|<\/div>|<\/blockquote>|<hr[^>]*>|\r\n|\r|\n)/i',
+            $html, -1, PREG_SPLIT_DELIM_CAPTURE
+        );
+        if (!$trozos || count($trozos) < 4) return $html;
+
+        $vistos = [];
+        $out = '';
+        $quitados = 0;
+        for ($i = 0, $n = count($trozos); $i < $n; $i += 2) {
+            $bloque = $trozos[$i] ?? '';
+            $sep    = $trozos[$i + 1] ?? '';
+            $clave  = self::claveBloque($bloque);
+            if ($clave !== '' && mb_strlen($clave) >= 25) {
+                if (isset($vistos[$clave])) { $quitados++; continue; }   // repetido: se omite (trozo + su separador)
+                $vistos[$clave] = true;
+            }
+            $out .= $bloque . $sep;
+        }
+
+        if ($quitados === 0) return $html;
+        return self::quedaMensaje($out) ? $out : $html;
+    }
+
+    /** Texto normalizado de un trozo HTML (para comparar bloques): sin etiquetas, sin dobles espacios, en minúsculas. */
+    protected static function claveBloque(string $htmlBloque): string
+    {
+        return trim(mb_strtolower(preg_replace('/\s+/u', ' ', HtmlSanitizer::toText($htmlBloque)) ?? ''));
+    }
+
+    /** Igual que colapsarRepetidos pero en TEXTO plano: dedup­lica LÍNEAS con sustancia. */
+    protected static function colapsarRepetidosText(string $text): string
+    {
+        $vistos = [];
+        $out = [];
+        $quitados = 0;
+        foreach (preg_split('/\r\n|\r|\n/', $text) as $ln) {
+            $clave = trim(mb_strtolower(preg_replace('/\s+/u', ' ', $ln) ?? ''));
+            if ($clave !== '' && mb_strlen($clave) >= 25) {
+                if (isset($vistos[$clave])) { $quitados++; continue; }
+                $vistos[$clave] = true;
+            }
+            $out[] = $ln;
+        }
+        if ($quitados === 0) return $text;
+        $res = rtrim(implode("\n", $out));
+        return mb_strlen(trim(preg_replace('/\s+/u', ' ', $res) ?? '')) >= 40 ? $res : $text;
+    }
+
     /** Versión en TEXTO plano del recorte de cita (para el cuerpo de respaldo). */
     protected static function stripQuotedText(string $text, string $subject = ''): string
     {
         if (trim($text) === '') return $text;
 
-        if (self::esReenvio($subject)) return $text;   // igual que en HTML: la cita es el mensaje
+        if (self::esReenvio($subject)) return self::colapsarRepetidosText($text);   // igual que en HTML: la cita es el mensaje, pero sin firmas repetidas
 
         $out = [];
         foreach (preg_split('/\r\n|\r|\n/', $text) as $ln) {
