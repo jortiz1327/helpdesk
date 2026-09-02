@@ -45,8 +45,14 @@ return [
             'perms' => ['campaigns.access'],
         ],
 
+        'encargado_soporte' => [
+            'title' => 'Manual del encargado de soporte',
+            'desc'  => 'Repartir el trabajo, medir con informes y configurar el soporte.',
+            'file'  => '03-encargado-soporte.pdf',
+            'perms' => ['support.config'], // encargado de soporte y superadmin
+        ],
+
         // Próximos (se activan al dejar su PDF en resources/manuals/ y añadirlos aquí):
-        //   encargado_soporte → 03-encargado-soporte.pdf  · perms ['support.config']
         //   cliente           → 04-cliente.pdf            · perms ['support.config']
         //   aplicacion        → 05-aplicacion.pdf         · perms ['*']
         //   potencialidad     → 06-potencialidad.pdf      · perms ['settings.manage']
