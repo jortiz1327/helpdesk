@@ -37,7 +37,7 @@
             &nbsp;·&nbsp; <b>Estado:</b> <span class="pill st">{{ $statuses[$t->status] ?? $t->status }}</span>
             &nbsp;·&nbsp; <b>Prioridad:</b> {{ $priorities[$t->priority] ?? $t->priority }}<br>
             <b>Categoría:</b> {{ $t->category_name ?: 'Sin categoría' }}
-            &nbsp;·&nbsp; <b>Agente:</b> {{ $t->agent_name ?: 'Sin asignar' }}<br>
+            &nbsp;·&nbsp; <b>Agente:</b> {{ ($anon ?? false) && $t->agent_name ? 'Soporte' : ($t->agent_name ?: 'Sin asignar') }}<br>
             <b>Creado:</b> {{ $t->created_at }}
             @if($t->resolved_at) &nbsp;·&nbsp; <b>Resuelto:</b> {{ $t->resolved_at }} @endif
         </div>
@@ -48,9 +48,9 @@
         <div class="msg {{ $cls }}">
             <div class="who">
                 @if($m->is_internal_note)
-                    <span class="tag">NOTA INTERNA</span> {{ $m->author_name ?: '—' }}
+                    <span class="tag">NOTA INTERNA</span> {{ ($anon ?? false) && $m->author_name ? 'Soporte' : ($m->author_name ?: '—') }}
                 @elseif($m->direction === 'out')
-                    {{ $m->author_name ?: 'Automático' }}
+                    {{ ($anon ?? false) && $m->author_name ? 'Soporte' : ($m->author_name ?: 'Automático') }}
                 @else
                     {{ $t->contact_name ?: 'Cliente' }}
                 @endif

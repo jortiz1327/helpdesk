@@ -1169,6 +1169,9 @@ class TicketsController extends Controller
         $id = (int) $request->input('id');
         $withNotes  = filter_var($request->input('notes', true), FILTER_VALIDATE_BOOLEAN);
         $withImages = filter_var($request->input('images', true), FILTER_VALIDATE_BOOLEAN);
+        // Anonimizar agentes: para compartir el PDF fuera sin exponer QUÉ agente atendió
+        // (los nombres de agente salen como «Soporte»; el cliente sí se muestra).
+        $anon       = filter_var($request->input('anon', false), FILTER_VALIDATE_BOOLEAN);
 
         $t = (clone $this->baseQuery($me))->where('t.id', $id)->first([
             't.*', 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
@@ -1190,7 +1193,7 @@ class TicketsController extends Controller
         }
 
         $html = view('ticket-pdf', [
-            't' => $t, 'messages' => $messages, 'bodies' => $bodies,
+            't' => $t, 'messages' => $messages, 'bodies' => $bodies, 'anon' => $anon,
             'statuses' => TicketService::STATUSES, 'priorities' => TicketService::priorities(),
         ])->render();
 

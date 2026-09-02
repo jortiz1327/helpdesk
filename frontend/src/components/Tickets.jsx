@@ -1521,7 +1521,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   const [motivo, setMotivo] = useState('')
   const genPdf = async () => {
     setPdfOpts((o) => ({ ...o, busy: true }))
-    const r = await api.ticketPdf(id, { notes: pdfOpts.notes, images: pdfOpts.images })
+    const r = await api.ticketPdf(id, { notes: pdfOpts.notes, images: pdfOpts.images, anon: pdfOpts.anon })
     if (r.ok) {
       const url = URL.createObjectURL(r.blob)
       const a = document.createElement('a')
@@ -1611,7 +1611,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                       <Icon.merge /><small>Fusionar</small>
                     </button>
                   )}
-                  <button className="tkm-q" onClick={() => setPdfOpts({ notes: true, images: true, busy: false })} title="Generar PDF">
+                  <button className="tkm-q" onClick={() => setPdfOpts({ notes: true, images: true, anon: false, busy: false })} title="Generar PDF">
                     <Icon.file /><small>PDF</small>
                   </button>
                   {(masMio || can('tickets.delete')) && (
@@ -2114,6 +2114,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
             <label className="pdf-opt">
               <span className="fb-switch"><input type="checkbox" checked={pdfOpts.images} onChange={(e) => setPdfOpts((o) => ({ ...o, images: e.target.checked }))} /><span className={`fb-toggle ${pdfOpts.images ? 'on' : ''}`} /></span>
               <span className="pdf-opt-tx"><b>Imágenes</b><small>Capturas incrustadas en el hilo</small></span>
+            </label>
+            <label className="pdf-opt">
+              <span className="fb-switch"><input type="checkbox" checked={pdfOpts.anon} onChange={(e) => setPdfOpts((o) => ({ ...o, anon: e.target.checked }))} /><span className={`fb-toggle ${pdfOpts.anon ? 'on' : ''}`} /></span>
+              <span className="pdf-opt-tx"><b>Agentes anónimos</b><small>Oculta qué agente atendió: sale como «Soporte» (el cliente sí se muestra)</small></span>
             </label>
             <div className="pdf-dialog-foot">
               <button className="btn ghost" onClick={() => setPdfOpts(null)} disabled={pdfOpts.busy}>Cancelar</button>

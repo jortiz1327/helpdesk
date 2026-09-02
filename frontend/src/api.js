@@ -419,11 +419,11 @@ export const api = {
   }),
   // Subir imagen EN LÍNEA del editor -> devuelve { ok, url } (URL firmada). Sin Content-Type: multipart lo pone el navegador.
   uploadInlineImage: (file) => { const fd = new FormData(); fd.append('file', file); return req('inline_media.php', { method: 'POST', body: fd }) },
-  // PDF del hilo del ticket. Devuelve { ok, blob }. opts: { notes, images }
+  // PDF del hilo del ticket. Devuelve { ok, blob }. opts: { notes, images, anon }
   ticketPdf: async (id, opts = {}) => {
     const r = await fetch(`${BASE}/tickets.php?action=pdf`, {
       method: 'POST', headers: { 'X-App-Token': getToken(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, notes: opts.notes ? 1 : 0, images: opts.images ? 1 : 0 }),
+      body: JSON.stringify({ id, notes: opts.notes ? 1 : 0, images: opts.images ? 1 : 0, anon: opts.anon ? 1 : 0 }),
     })
     return r.ok ? { ok: true, blob: await r.blob() } : { ok: false }
   },
