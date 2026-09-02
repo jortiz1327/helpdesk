@@ -1349,7 +1349,7 @@ class TicketsController extends Controller
         if ($email === '' && $phone === '') return response()->json(['ok' => true, 'tickets' => []]);
 
         $cid = DB::table('contacts')
-            ->when($email !== '', fn ($q) => $q->whereRaw('LOWER(email) = ?', [mb_strtolower($email)]),
+            ->when($email !== '', fn ($q) => $q->where('email', mb_strtolower($email)),   // _ci: usa el índice
                 fn ($q) => $q->where('wa_id', $phone))
             ->value('id');
         if (!$cid) return response()->json(['ok' => true, 'tickets' => []]);

@@ -146,7 +146,7 @@ class PortalService
     public function contactoExiste(string $email): bool
     {
         $email = mb_strtolower(trim($email));
-        return $email !== '' && DB::table('contacts')->whereRaw('LOWER(email) = ?', [$email])->exists();
+        return $email !== '' && DB::table('contacts')->where('email', $email)->exists();
     }
 
     public function emailFromToken(?string $token): ?string
@@ -212,7 +212,7 @@ class PortalService
     {
         $rows = DB::table('tickets as t')
             ->join('contacts as c', 'c.id', '=', 't.contact_id')
-            ->whereRaw('LOWER(c.email) = ?', [mb_strtolower($email)])
+            ->where('c.email', mb_strtolower($email))   // collation _ci → compara sin distinguir mayúsculas y USA el índice
             ->where('t.channel', '!=', 'cron')
             ->whereNull('t.merged_into_id')       // los fusionados viven en su destino
             ->orderByDesc('t.last_message_at')
@@ -257,7 +257,7 @@ class PortalService
     {
         $t = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
             ->where('t.code', $code)
-            ->whereRaw('LOWER(c.email) = ?', [mb_strtolower($email)])
+            ->where('c.email', mb_strtolower($email))   // collation _ci → compara sin distinguir mayúsculas y USA el índice
             ->first(['t.id', 't.code', 't.subject', 't.status', 't.source', 't.created_at', 't.resolved_at']);
         if (!$t) return null;   // no existe, o no es de este correo
 
@@ -411,7 +411,7 @@ class PortalService
 
         $t = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
             ->where('t.code', $code)
-            ->whereRaw('LOWER(c.email) = ?', [mb_strtolower($email)])
+            ->where('c.email', mb_strtolower($email))   // collation _ci → compara sin distinguir mayúsculas y USA el índice
             ->first(['t.id', 't.contact_id', 't.status']);
         if (!$t) return [false, 'No encontramos esa incidencia'];
 
@@ -465,7 +465,7 @@ class PortalService
     {
         $t = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
             ->where('t.code', $code)
-            ->whereRaw('LOWER(c.email) = ?', [mb_strtolower($email)])
+            ->where('c.email', mb_strtolower($email))   // collation _ci → compara sin distinguir mayúsculas y USA el índice
             ->first(['t.id', 't.status']);
         if (!$t) return [false, 'No encontramos esa incidencia'];
         if (in_array($t->status, ['resuelto', 'cerrado'], true)) return [true, null];   // ya lo estaba
@@ -520,7 +520,7 @@ class PortalService
 
         $t = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
             ->where('t.code', $code)
-            ->whereRaw('LOWER(c.email) = ?', [mb_strtolower($email)])
+            ->where('c.email', mb_strtolower($email))   // collation _ci → compara sin distinguir mayúsculas y USA el índice
             ->first(['t.id', 't.status', 't.source']);
         if (! $t) return [false, 'No encontramos esa incidencia'];
         if ($t->source !== 'portal' || ! in_array($t->status, self::CSAT_STATUSES, true)) {
