@@ -17,12 +17,14 @@ export default function Settings({ embedded = false }) {
   const [verified, setVerified] = useState(false)
   const [consentOn, setConsentOn] = useState(true)
   const [sigActive, setSigActive] = useState(false)
+  const [prices, setPrices] = useState(null)
 
   useEffect(() => {
     api.getSettings().then((d) => {
       const init = {}; FIELDS.forEach((k) => (init[k] = d[k] || ''))
       setF(init); setWebhook(d.webhook_url || ''); setVerified(!!d.account_verified); setConsentOn(!!d.consent_enabled)
       setSigActive(!!d.webhook_signature_active)
+      setPrices(d.wa_prices || { marketing: 0.06, utility: 0.0166, authentication: 0.0166, service: 0 })
     })
   }, [])
 
@@ -33,10 +35,11 @@ export default function Settings({ embedded = false }) {
   }
 
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
+  const setPrice = (k) => (e) => setPrices((s) => ({ ...s, [k]: e.target.value }))
 
   const save = async () => {
     setSaving(true)
-    const res = await api.saveSettings({ ...f, consent_enabled: consentOn ? 1 : 0 })
+    const res = await api.saveSettings({ ...f, consent_enabled: consentOn ? 1 : 0, wa_prices: prices })
     setSaving(false)
     // El estado de la firma lo decide el backend (App Secret de un número), no
     // un campo de este formulario: se refleja tal cual al cargar la pantalla.
@@ -111,6 +114,24 @@ export default function Settings({ embedded = false }) {
               <button className="btn" disabled={saving} onClick={save}><Icon.save /> {saving ? 'Guardando…' : 'Guardar cambios'}</button>
             </div>
           </div>
+
+          {prices && (
+            <div className="card">
+              <h2>Tarifas de WhatsApp</h2>
+              <p className="desc">Precio por mensaje (EUR) según la categoría de la plantilla. Se usa para el <b>coste estimado</b> al enviar campañas. Ajústalo con lo que veas en tu facturación real de Meta (varía por país). Marketing es el caro; los mensajes de servicio/utilidad dentro de la ventana de 24 h son gratis.</p>
+              <div className="grid2" style={{ gap: 12 }}>
+                {[['marketing', 'Marketing'], ['utility', 'Utilidad'], ['authentication', 'Autenticación'], ['service', 'Servicio']].map(([k, lbl]) => (
+                  <label className="field" key={k}>
+                    <span className="lbl">{lbl} <span className="hint" style={{ fontWeight: 400 }}>· €/mensaje</span></span>
+                    <input type="number" min="0" step="0.0001" value={prices[k]} onChange={setPrice(k)} />
+                  </label>
+                ))}
+              </div>
+              <div style={{ marginTop: 11 }}>
+                <button className="btn" disabled={saving} onClick={save}><Icon.save /> {saving ? 'Guardando…' : 'Guardar tarifas'}</button>
+              </div>
+            </div>
+          )}
 
           <div className="card">
             <h2>Verificación de Meta</h2>

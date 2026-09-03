@@ -14,6 +14,8 @@ const SOURCE_OPTS = [
 ]
 const langName = (c) => ({ es: 'Español', es_ES: 'Español', en: 'Inglés', en_US: 'Inglés (US)', pt_BR: 'Portugués' }[c] || c)
 const catColor = (c) => ({ MARKETING: 'var(--warn)', UTILITY: 'var(--primary)', AUTHENTICATION: 'var(--info)' }[c] || 'var(--secondary)')
+const ROW = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 14, gap: 12 }
+const eur = (n, d = 2) => '€' + Number(n).toFixed(d).replace('.', ',')
 
 // Extrae los textos de body/header de los componentes de Meta
 function templateText(t) {
@@ -81,6 +83,20 @@ export default function SendCampaign({ onDone }) {
   const [immediate, setImmediate] = useState(true)
   const [when, setWhen] = useState('')
   const [sending, setSending] = useState(false)
+  const [estimate, setEstimate] = useState(null)   // { recipients, excluded, rate, cost } | { loading }
+
+  // Estimación de coste al elegir plantilla + destino (destinatarios × tarifa categoría)
+  useEffect(() => {
+    if (step !== 2 || !picked) { setEstimate(null); return }
+    const dest = destType === 'label' ? { label_id: Number(labelId) } : { phonebook_id: Number(pbId) }
+    if (!dest.label_id && !dest.phonebook_id) { setEstimate(null); return }
+    let alive = true
+    setEstimate({ loading: true })
+    api.estimateCampaign({ category: picked.category, ...dest })
+      .then((d) => { if (alive) setEstimate(d?.ok ? d : null) })
+      .catch(() => { if (alive) setEstimate(null) })
+    return () => { alive = false }
+  }, [step, picked, destType, labelId, pbId])
 
   const loadTemplates = () => {
     setTemplates(null)
@@ -353,6 +369,23 @@ export default function SendCampaign({ onDone }) {
                   </label>
                   {!immediate && <input className="cmp-var" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} style={{ marginTop: 10, maxWidth: 280 }} />}
                 </div>
+
+                {estimate && !estimate.loading && (
+                  <div className="card" style={{ padding: 16, marginTop: 16, background: 'var(--primary-soft)', border: '1px solid var(--line)' }}>
+                    <div className="fb-set-t" style={{ marginBottom: 10 }}>Resumen del envío</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={ROW}><span>Destinatarios</span><b style={{ fontVariantNumeric: 'tabular-nums' }}>{estimate.recipients.toLocaleString('es-ES')}</b></div>
+                      {estimate.excluded > 0 && <div style={{ ...ROW, color: 'var(--ink-3, #888)', fontSize: 12.5 }}><span>Excluidos por baja</span><span>{estimate.excluded}</span></div>}
+                      <div style={ROW}><span>Plantilla</span><span>{picked.name}</span></div>
+                      <div style={ROW}><span>Categoría</span><span style={{ color: catColor(picked.category), fontWeight: 600 }}>{picked.category} · {estimate.rate > 0 ? `${eur(estimate.rate, 4)}/msg` : 'gratis'}</span></div>
+                      <div style={{ ...ROW, borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 2 }}>
+                        <span style={{ fontWeight: 700 }}>Coste estimado</span>
+                        <b style={{ fontSize: 18, color: estimate.cost > 0 ? 'var(--ink)' : 'var(--secondary)' }}>{estimate.cost > 0 ? `≈ ${eur(estimate.cost)}` : 'Gratis'}</b>
+                      </div>
+                    </div>
+                    <p className="hint" style={{ marginTop: 8 }}>Estimación orientativa. Meta cobra según país y ventana de 24 h; los mensajes de servicio/utilidad dentro de la ventana son gratis.</p>
+                  </div>
+                )}
 
                 <div className="fb-actions">
                   {waLocked

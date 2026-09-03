@@ -52,6 +52,13 @@ class SettingsController extends Controller
             // Red de seguridad de envíos
             'outbound_paused'    => (string) Setting::get('outbound_paused', '0') === '1',
             'daily_send_cap'     => (int) Setting::get('daily_send_cap', '0'),
+            // Tarifas de WhatsApp (EUR/mensaje) para la estimación de coste de campañas.
+            'wa_prices'          => [
+                'marketing'      => (float) Setting::get('wa_price_marketing', '0.06'),
+                'utility'        => (float) Setting::get('wa_price_utility', '0.0166'),
+                'authentication' => (float) Setting::get('wa_price_authentication', '0.0166'),
+                'service'        => (float) Setting::get('wa_price_service', '0'),
+            ],
             'sent_today'         => (int) DB::table('messages')
                 ->where('direction', 'out')->where('type', 'template')
                 ->where('created_at', '>=', now()->startOfDay())->count(),
@@ -79,6 +86,20 @@ class SettingsController extends Controller
         }
         if (array_key_exists('daily_send_cap', $in)) {
             Setting::put('daily_send_cap', (string) max(0, (int) $in['daily_send_cap']));
+        }
+        // Tarifas de WhatsApp por categoría (EUR/mensaje). No negativas.
+        if (array_key_exists('wa_prices', $in) && is_array($in['wa_prices'])) {
+            $mapa = [
+                'marketing'      => 'wa_price_marketing',
+                'utility'        => 'wa_price_utility',
+                'authentication' => 'wa_price_authentication',
+                'service'        => 'wa_price_service',
+            ];
+            foreach ($mapa as $campo => $clave) {
+                if (array_key_exists($campo, $in['wa_prices'])) {
+                    Setting::put($clave, (string) max(0, (float) $in['wa_prices'][$campo]));
+                }
+            }
         }
         return response()->json(['ok' => true]);
     }

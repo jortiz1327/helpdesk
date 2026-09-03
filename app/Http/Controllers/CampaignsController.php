@@ -66,6 +66,12 @@ class CampaignsController extends Controller
             return $this->create($request, $campaigns);
         }
 
+        // Estimación de coste ANTES de enviar (destinatarios × tarifa de la categoría).
+        // Solo lectura: basta con campaigns.access (ya lo exige la ruta).
+        if ($request->isMethod('get') && $action === 'estimate') {
+            return $this->estimate($request);
+        }
+
         if ($request->isMethod('get') && $request->query('id')) {
             return $this->detail((int) $request->query('id'));
         }
@@ -93,6 +99,55 @@ class CampaignsController extends Controller
         }
 
         return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+    }
+
+    /** Tarifa (EUR/mensaje) de una categoría de plantilla, configurable en Ajustes. */
+    public static function tarifaCategoria(string $category): float
+    {
+        return match (strtoupper($category)) {
+            'MARKETING'      => (float) Setting::get('wa_price_marketing', '0.06'),
+            'UTILITY'        => (float) Setting::get('wa_price_utility', '0.0166'),
+            'AUTHENTICATION' => (float) Setting::get('wa_price_authentication', '0.0166'),
+            default          => (float) Setting::get('wa_price_service', '0'),   // SERVICE u otras: gratis
+        };
+    }
+
+    /**
+     * Estima el coste de una campaña de WhatsApp antes de enviarla:
+     * destinatarios entregables (con teléfono y sin baja) × tarifa de la categoría.
+     * Mismo criterio de destinatarios que create() para que cuadre con lo real.
+     */
+    protected function estimate(Request $request)
+    {
+        $category = (string) $request->query('category', '');
+        $pbId     = (int) $request->query('phonebook_id');
+        $labelId  = (int) $request->query('label_id');
+
+        $recipients = 0; $excluded = 0;
+        if ($pbId || $labelId) {
+            $raw = $labelId
+                ? DB::select('SELECT c.wa_id FROM contacts c JOIN contact_labels cl ON cl.contact_id = c.id WHERE cl.label_id = ?', [$labelId])
+                : DB::select('SELECT wa_id FROM phonebook_contacts WHERE phonebook_id = ?', [$pbId]);
+            $outSet = array_flip(array_map(fn ($w) => preg_replace('/\D/', '', (string) $w),
+                DB::table('contacts')->where('opted_out', 1)->pluck('wa_id')->all()));
+            foreach ($raw as $r) {
+                $wa = preg_replace('/\D/', '', (string) $r->wa_id);
+                if ($wa === '') continue;
+                if (isset($outSet[$wa])) { $excluded++; continue; }
+                $recipients++;
+            }
+        }
+
+        $rate = self::tarifaCategoria($category);
+        return response()->json([
+            'ok'         => true,
+            'recipients' => $recipients,
+            'excluded'   => $excluded,
+            'category'   => strtoupper($category),
+            'rate'       => $rate,
+            'cost'       => round($recipients * $rate, 2),
+            'currency'   => 'EUR',
+        ]);
     }
 
     protected function create(Request $request, CampaignService $campaigns)
