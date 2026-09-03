@@ -68,7 +68,7 @@ return [
 
         'potencialidad' => [
             'title' => 'Potencialidad y hoja de ruta',
-            'desc'  => 'Documento estratégico: lo que ya está construido y hacia dónde puede crecer la plataforma.',
+            'desc'  => 'Documento estratégico: el estado real de hoy y las líneas de futuro a valorar.',
             'file'  => '06-potencialidad.pdf',
             'perms' => ['settings.manage'], // solo superadministrador
         ],
