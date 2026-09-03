@@ -25,6 +25,7 @@ export default function Contacts({ onOpen, area = '' }) {
   const [optoutFilter, setOptoutFilter] = useState('')
   const [sel, setSel] = useState(new Set())
   const [managing, setManaging] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkLabelId, setBulkLabelId] = useState('')
   const [bulkPbId, setBulkPbId] = useState('')
 
@@ -102,6 +103,8 @@ export default function Contacts({ onOpen, area = '' }) {
           <button className={mode === 'kanban' ? 'on' : ''} onClick={() => setMode('kanban')} title="Vista kanban"><Icon.kanban /> Kanban</button>
         </div>
         <button className="btn ghost" onClick={() => setManaging(true)}><Icon.tag /> Etiquetas de cliente</button>
+        <button className="btn ghost" onClick={() => setBulkOpen(true)}><Icon.download /> Agregar en masa</button>
+        <button className="btn" onClick={() => setEditing({})}><Icon.plus /> Agregar</button>
       </header>
 
       {mode === 'kanban' ? (
@@ -229,6 +232,7 @@ export default function Contacts({ onOpen, area = '' }) {
 
       {managing && <LabelManager labels={labels} onClose={() => setManaging(false)} onChanged={loadAux} />}
       {editing && <ContactEdit contact={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
+      {bulkOpen && <BulkAddContacts area={area} onClose={() => setBulkOpen(false)} onDone={() => { setBulkOpen(false); load() }} />}
       {merging && <ContactMerge pair={merging} onClose={() => setMerging(null)}
         onMerged={() => { setMerging(null); clearSel(); load() }} />}
     </>
@@ -328,14 +332,15 @@ function ContactEdit({ contact, onClose, onSaved }) {
     return () => document.removeEventListener('keydown', h)
   }, [onClose])
 
+  const isNew = !contact.id
+
   const save = async () => {
     if (!f.email.trim() && !f.phone.trim()) { toast('Indica al menos un correo o un teléfono', 'err'); return }
     setBusy(true)
-    const r = await api.saveContact(contact.id, {
-      name: f.name, email: f.email, country_code: f.country_code, phone: f.phone, sede_id: f.sede_id || '',
-    })
+    const fields = { name: f.name, email: f.email, country_code: f.country_code, phone: f.phone, sede_id: f.sede_id || '' }
+    const r = isNew ? await api.createContact(fields) : await api.saveContact(contact.id, fields)
     setBusy(false)
-    if (r.ok) { toast('Contacto actualizado'); onSaved() }
+    if (r.ok) { toast(isNew ? 'Contacto añadido' : 'Contacto actualizado'); onSaved() }
     else toast(r.error || 'No se pudo guardar', 'err')
   }
 
@@ -343,7 +348,7 @@ function ContactEdit({ contact, onClose, onSaved }) {
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 520 }}>
         <div className="modal-h">
-          <h3>Editar contacto</h3>
+          <h3>{isNew ? 'Nuevo contacto' : 'Editar contacto'}</h3>
           <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
         </div>
         <div className="modal-body">
@@ -365,6 +370,68 @@ function ContactEdit({ contact, onClose, onSaved }) {
         <div className="modal-foot">
           <button className="btn ghost" onClick={onClose}>Cancelar</button>
           <button className="btn" onClick={save} disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* --------------------- Alta masiva de contactos ---------------------
+ * Dos formatos según el canal: WhatsApp (número, nombre) o Correo
+ * (email;nombre), una entrada por línea. El backend salta los inválidos y
+ * los duplicados, y devuelve el recuento.
+ * ------------------------------------------------------------------- */
+function BulkAddContacts({ area, onClose, onDone }) {
+  const toast = useToast()
+  const [type, setType] = useState(area === 'helpdesk' ? 'email' : 'whatsapp')
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [onClose])
+
+  const add = async () => {
+    if (!text.trim()) { toast('Pega al menos una línea', 'err'); return }
+    setBusy(true)
+    const r = await api.bulkAddContacts(type, text)
+    setBusy(false)
+    if (!r.ok) { toast(r.error || 'No se pudo importar', 'err'); return }
+    const partes = [`${r.added} añadido${r.added === 1 ? '' : 's'}`]
+    if (r.dup) partes.push(`${r.dup} ya existía${r.dup === 1 ? '' : 'n'}`)
+    if (r.invalid) partes.push(`${r.invalid} inválido${r.invalid === 1 ? '' : 's'}`)
+    toast(partes.join(' · '))
+    onDone()
+  }
+
+  const ph = type === 'email'
+    ? 'cliente@dominio.com;Juan Pérez\nmaria@empresa.com;María'
+    : '34649786051, Juan Pérez\n34600111222, María'
+
+  return (
+    <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal" style={{ maxWidth: 560 }}>
+        <div className="modal-h">
+          <h3>Agregar contactos en masa</h3>
+          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="kb-seg" style={{ marginBottom: 12 }}>
+            <button className={type === 'whatsapp' ? 'on' : ''} onClick={() => setType('whatsapp')}>WhatsApp</button>
+            <button className={type === 'email' ? 'on' : ''} onClick={() => setType('email')}>Correo</button>
+          </div>
+          <p className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
+            {type === 'email'
+              ? 'Un contacto por línea: correo y, opcional, nombre tras un punto y coma.'
+              : 'Un contacto por línea: número con prefijo de país y, opcional, nombre tras una coma.'}
+          </p>
+          <textarea className="cmp-textarea" rows={8} placeholder={ph} value={text} onChange={(e) => setText(e.target.value)} />
+        </div>
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={add} disabled={busy}>{busy ? 'Añadiendo…' : 'Añadir'}</button>
         </div>
       </div>
     </div>

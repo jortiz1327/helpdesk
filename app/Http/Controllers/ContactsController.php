@@ -153,7 +153,12 @@ class ContactsController extends Controller
          */
         $area = $r->query('area', '');
         if ($area === 'campaigns') {
-            $where[] = "EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp')";
+            // Campañas = alcanzable por un canal de campaña: WhatsApp (tiene teléfono o
+            // mensajes) o correo AÑADIDO a mano (no de soporte, es decir, sin tickets).
+            // El correo de soporte (con tickets) se queda SOLO en Helpdesk.
+            $where[] = "(c.wa_id IS NOT NULL
+                OR EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp')
+                OR (c.email IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)))";
         } elseif ($area === 'helpdesk') {
             $where[] = 'EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)';
         }

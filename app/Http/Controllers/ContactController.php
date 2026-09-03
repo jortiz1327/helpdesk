@@ -11,6 +11,11 @@ class ContactController extends Controller
     public function handle(Request $request)
     {
         $action = $request->query('action', '');
+
+        // Alta de contactos a mano (no necesitan contact_id). El resto (save/labels) sí.
+        if ($action === 'create' && $request->isMethod('post')) return $this->create($request);
+        if ($action === 'bulk'   && $request->isMethod('post')) return $this->bulk($request);
+
         $id = (int) $request->input('contact_id', 0);
         if (!$id) return response()->json(['ok' => false, 'error' => 'Falta contact_id'], 400);
 
@@ -87,5 +92,91 @@ class ContactController extends Controller
         }
 
         return response()->json(['ok' => false, 'error' => 'Acción no válida'], 400);
+    }
+
+    /** Alta de UN contacto (correo y/o teléfono). Dedup por teléfono o correo. */
+    protected function create(Request $r)
+    {
+        $name  = trim((string) $r->input('name')) ?: null;
+        $email = mb_strtolower(trim((string) $r->input('email')));
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json(['ok' => false, 'error' => 'El correo no es válido'], 400);
+        }
+        $cc = preg_replace('/\D+/', '', (string) $r->input('country_code', ''));
+        $ph = preg_replace('/\D+/', '', (string) $r->input('phone', ''));
+        $wa = $ph === '' ? null : (($cc !== '' && str_starts_with($ph, $cc)) ? $ph : $cc . $ph);
+        if ($wa !== null && strlen($wa) > 20) {
+            return response()->json(['ok' => false, 'error' => 'El teléfono es demasiado largo'], 400);
+        }
+        if (!$email && !$wa) {
+            return response()->json(['ok' => false, 'error' => 'Indica al menos un correo o un teléfono'], 400);
+        }
+
+        // No duplicar: si ya existe por teléfono o correo, se avisa (y se devuelve su id).
+        $existe = null;
+        if ($wa) $existe = DB::table('contacts')->where('wa_id', $wa)->first(['id']);
+        if (!$existe && $email !== '') $existe = DB::table('contacts')->where('email', $email)->first(['id']);
+        if ($existe) {
+            return response()->json(['ok' => false, 'error' => 'Ya existe un contacto con ese teléfono o correo', 'id' => (int) $existe->id], 409);
+        }
+
+        $id = DB::table('contacts')->insertGetId([
+            'name'         => $name,
+            'email'        => $email ?: null,
+            'wa_id'        => $wa,
+            'country_code' => $cc ?: null,
+            'note'         => '[añadido a mano]',
+            'created_at'   => now(),
+        ]);
+        return response()->json(['ok' => true, 'id' => $id]);
+    }
+
+    /**
+     * Alta MASIVA. `type`: 'whatsapp' (número, nombre) o 'email' (email;nombre).
+     * Una entrada por línea. Salta las inválidas y las que ya existen (dedup).
+     */
+    protected function bulk(Request $r)
+    {
+        $tipo   = $r->input('type') === 'email' ? 'email' : 'whatsapp';
+        $lineas = preg_split('/\r\n|\r|\n/', (string) $r->input('text', ''));
+        $inval  = 0;
+        $cand   = [];   // clave (wa_id|email) => nombre (el último gana)
+
+        foreach ($lineas as $ln) {
+            $ln = trim($ln);
+            if ($ln === '') continue;
+            $partes = preg_split('/[;,]/', $ln, 2);
+            $name   = trim($partes[1] ?? '') ?: null;
+            if ($tipo === 'email') {
+                $email = mb_strtolower(trim($partes[0] ?? ''));
+                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { $inval++; continue; }
+                $cand[$email] = $name;
+            } else {
+                $wa = preg_replace('/\D+/', '', $partes[0] ?? '');
+                if (strlen($wa) < 7 || strlen($wa) > 20) { $inval++; continue; }
+                $cand[$wa] = $name;
+            }
+        }
+
+        $col    = $tipo === 'email' ? 'email' : 'wa_id';
+        $claves = array_map('strval', array_keys($cand));
+        $dup    = 0;
+        $rows   = [];
+        if ($claves) {
+            $ya    = DB::table('contacts')->whereIn($col, $claves)->pluck($col)->all();
+            $yaSet = array_flip(array_map('strval', $ya));
+            foreach ($cand as $clave => $name) {
+                if (isset($yaSet[(string) $clave])) { $dup++; continue; }
+                $rows[] = [
+                    $col         => (string) $clave,
+                    'name'       => $name,
+                    'note'       => '[añadido a mano]',
+                    'created_at' => now(),
+                ];
+            }
+            foreach (array_chunk($rows, 500) as $lote) DB::table('contacts')->insert($lote);
+        }
+
+        return response()->json(['ok' => true, 'added' => count($rows), 'dup' => $dup, 'invalid' => $inval]);
     }
 }

@@ -505,6 +505,13 @@ export const api = {
   setContactLabels: (contact_id, label_ids) => req('contact.php?action=labels', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contact_id, label_ids }),
   }),
+  // Alta a mano: uno (correo y/o teléfono) o en masa (type: 'whatsapp' | 'email')
+  createContact: (fields) => req('contact.php?action=create', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields),
+  }),
+  bulkAddContacts: (type, text) => req('contact.php?action=bulk', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, text }),
+  }),
 
   // Contactos (gestión + acciones en lote)
   // `area` separa por actividad: 'campaigns' (con WhatsApp) | 'helpdesk' (con tickets)
