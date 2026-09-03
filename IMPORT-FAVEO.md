@@ -53,13 +53,51 @@ asignaciones, ~170 fusiones. FAQs +11, respuestas +18.
    ```
    > Consejo: primero SIN `--apply` para ver el recuento (dry-run), y luego con `--apply`.
 
-5. **Verificar** (ver abajo).
+5. **Adjuntos** (ver la sección siguiente). Se hace ANTES de limpiar (necesita las tablas
+   `fav_*` cargadas).
 
-6. **Limpiar**: quita las tablas temporales y el fichero.
+6. **Verificar** (ver abajo).
+
+7. **Limpiar**: quita las tablas temporales y el fichero.
    ```bash
    php artisan faveo:load --drop        # borra las tablas fav_*
    ```
    Y borra el `faveo.sql` subido desde el Administrador de archivos.
+
+---
+
+## Adjuntos (solo SSH al servidor de Faveo)
+
+Solo ~260 adjuntos van como blob dentro del `.sql`; los **~8.500 restantes viven en el
+DISCO** de Faveo, todos en **una sola carpeta**: `/var/www/faveo/storage/app/attachments/`
+(cada fichero se llama por su `name`, p. ej. `4369_foto.png`). De ellos, **~8.160 son de
+tickets que sí se importan**.
+
+**1) En el servidor de Faveo (por SSH), empaquetar la carpeta:**
+```bash
+du -sh /var/www/faveo/storage/app/attachments                  # ver tamaño
+tar czf ~/faveo_attachments.tgz -C /var/www/faveo/storage/app attachments
+```
+
+**2) Llevar el `.tgz` al servidor del helpdesk:**
+- Si tienes SSH también al helpdesk: directo, sin pasar por tu PC:
+  ```bash
+  scp ~/faveo_attachments.tgz USUARIO@HOST_HELPDESK:/ruta/
+  ```
+- Si NO: descarga el `.tgz` a tu PC (`scp` desde Faveo) y súbelo al helpdesk con el
+  Administrador de archivos de Plesk.
+
+**3) En el servidor del helpdesk, extraer y colgar los adjuntos** (después de `faveo:import`,
+y con las tablas `fav_*` aún cargadas):
+```bash
+tar xzf faveo_attachments.tgz                                  # → carpeta attachments/
+php artisan faveo:attachments --prefix=fav_ --dir=/ruta/attachments --apply
+rm -rf attachments faveo_attachments.tgz                       # limpiar
+```
+
+El comando lee de la carpeta el fichero de cada adjunto (`{dir}/{name}`), lo cuelga del
+mensaje importado (enganche `wamid='fav:{thread_id}'`) y usa el blob de la BD si existe.
+Los adjuntos de crones/papelera se ignoran solos (su hilo no se importó).
 
 ### Alternativa con BD aparte (si prefieres no meter fav_* en la BD de producción)
 
