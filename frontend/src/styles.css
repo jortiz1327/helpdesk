@@ -1427,6 +1427,14 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .um-card.um-off:hover { opacity: .85; }
 .um-off-tag { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; color: var(--ink-3); background: var(--hover); text-transform: uppercase; letter-spacing: .03em; }
 .um-off-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+/* Cabeceras de sección (Activos / Ya no están) y bloque plegable de ex-empleados */
+.um-sech { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; margin: 4px 0 12px; }
+.um-sech-pill { font-size: 11.5px; font-weight: 700; color: var(--ink-2); background: var(--hover); border-radius: 999px; padding: 1px 9px; }
+.um-exwrap { margin-top: 22px; border-top: 1px dashed var(--line); padding-top: 14px; }
+.um-exhead { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: 13.5px; color: var(--ink-2); padding: 0; margin-bottom: 12px; text-align: left; }
+.um-exhead:hover { color: var(--ink); }
+.um-chev { width: 14px; height: 14px; fill: currentColor; transform: rotate(-90deg); transition: transform .15s; flex: none; }
+.um-exhead.open .um-chev { transform: rotate(0deg); }
 .um-areas { display: flex; flex-wrap: wrap; gap: 6px; margin: 13px 0 2px; align-items: center; }
 .um-areas-lbl { width: 100%; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 700; margin-bottom: -3px; }
 .um-area { font-size: 11.5px; font-weight: 600; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line); padding: 3px 9px; border-radius: 8px; }

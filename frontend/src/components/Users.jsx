@@ -13,10 +13,14 @@ export default function Users() {
   const [roles, setRoles] = useState([])       // catálogo de roles (del backend)
   const [modules, setModules] = useState({})
   const [perms, setPerms] = useState([])       // catálogo de permisos
-  const [form, setForm] = useState(null)       // null=lista, obj=editando/creando usuario
+  const [form, setForm] = useState(null)       // null=lista, obj=editando/creando usuario (MODAL)
   const [defRole, setDefRole] = useState('')   // rol por defecto (lo dice el backend)
   const [superRole, setSuperRole] = useState('superadmin')
-  const [roleForm, setRoleForm] = useState(null) // null=lista, obj=editando/creando rol
+  const [roleForm, setRoleForm] = useState(null) // null=lista, obj=editando/creando rol (MODAL)
+
+  // Pestañas (Usuarios / Roles) y plegado de la sección «Ya no están».
+  const [tab, setTab] = useState('users')
+  const [showEx, setShowEx] = useState(true)
 
   const load = useCallback(() => { api.listUsers().then((d) => { setUsers(d.users || []); setCats(d.categories || []) }) }, [])
   const loadRoles = useCallback(() => api.listRoles().then((d) => {
@@ -27,6 +31,13 @@ export default function Users() {
     setSuperRole(d.super_role || 'superadmin')
   }), [])
   useEffect(() => { load(); loadRoles() }, [load, loadRoles])
+
+  // Cerrar cualquier modal con Escape.
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') { setForm(null); setRoleForm(null) } }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [])
 
   const blank = { id: 0, name: '', email: '', role: defRole, password: '', category_ids: [], notify_sla: true, notify_assigned: true }
 
@@ -56,24 +67,19 @@ export default function Users() {
   const roleOf = (name) => roles.find((r) => r.name === name)
 
   // --- Ayudas del roster ---
-  // Color e identidad de la ficha según el rol: superadmin, encargado (ve todo) o agente.
   const grupoDe = (u) => roleOf(u.role)?.is_super ? 'super' : (u.view_all ? 'managers' : 'agents')
   const colorDe = (u) => roleOf(u.role)?.is_super ? 'var(--u-super)' : (u.view_all ? 'var(--u-mgr)' : 'var(--u-agent)')
   const inicial = (u) => (u.name || u.email || '?').trim().slice(0, 2).toUpperCase()
-  // Estado «en línea» a partir de la última acción registrada (apartado Acciones).
   const presencia = (u) => {
     if (!u.last_activity) return 'off'
     const m = (Date.now() - parseDate(u.last_activity).getTime()) / 60000
     return m < 6 ? 'on' : (m < 30 ? 'away' : 'off')
   }
-  // Encender/apagar los avisos de SLA de un usuario sin abrir su ficha.
   const toggleNotify = async (u) => {
     const r = await api.saveUser({ id: u.id, name: u.name || '', email: u.email, role: u.role,
       password: '', category_ids: u.category_ids || [], notify_sla: !u.notify_sla, notify_assigned: u.notify_assigned })
     if (r.ok) load(); else toast(r.error || 'Error', 'err')
   }
-  // Deshabilitar / habilitar un usuario (soft): un empleado que se va se marca «ya no está»
-  // sin borrarlo (conserva su histórico y atribución) y deja de salir en «asignar».
   const toggleActive = async (u) => {
     const habilitar = u.active === false
     if (!habilitar && !(await confirm({ title: 'Deshabilitar usuario', message: `¿Deshabilitar a «${u.name || u.email}»? Dejará de poder acceder y de recibir tickets nuevos, pero se conserva para el histórico. Podrás volver a habilitarlo.`, confirmText: 'Deshabilitar' }))) return
@@ -81,22 +87,22 @@ export default function Users() {
       password: '', category_ids: u.category_ids || [], notify_sla: u.notify_sla, notify_assigned: u.notify_assigned, active: habilitar })
     if (r.ok) { toast(habilitar ? 'Usuario habilitado' : 'Usuario deshabilitado'); load() } else toast(r.error || 'Error', 'err')
   }
+
   const visibles = (users || []).filter((u) => {
     if (grupo !== 'all' && grupoDe(u) !== grupo) return false
     if (q.trim() && !`${u.name || ''} ${u.email || ''}`.toLowerCase().includes(q.trim().toLowerCase())) return false
     return true
   })
+  const activos = visibles.filter((u) => u.active !== false)
+  const inactivos = visibles.filter((u) => u.active === false)
+
   // Permisos del rol abierto, agrupados por módulo (solo los que tiene)
   const permsByModule = (roleName) => {
     const has = new Set(roleOf(roleName)?.permissions || [])
     const out = {}
-    for (const p of perms) {
-      if (!has.has(p.name)) continue
-      ;(out[p.module] ||= []).push(p)
-    }
+    for (const p of perms) { if (!has.has(p.name)) continue; (out[p.module] ||= []).push(p) }
     return out
   }
-  // Catálogo COMPLETO de permisos agrupado por módulo (para el editor de rol)
   const permGroups = () => {
     const out = {}
     for (const p of perms) (out[p.module] ||= []).push(p)
@@ -126,6 +132,67 @@ export default function Users() {
     if (res.ok) { toast('Rol eliminado'); loadRoles() } else toast(res.error || 'Error', 'err')
   }
 
+  // Ficha de un usuario (activo o «ya no está»).
+  const renderCard = (u) => {
+    const verTodo = roleOf(u.role)?.is_super || u.view_all
+    const areas = (u.category_ids || []).map((id) => cats.find((c) => c.id === id)?.name).filter(Boolean)
+    const off = u.active === false
+    return (
+      <div key={u.id} className={`um-card ${off ? 'um-off' : ''}`} style={{ '--role': colorDe(u) }}>
+        <div className="um-accent" />
+        <div className="um-cbody">
+          <div className="um-head">
+            <span className="um-av">{inicial(u)}<span className={`um-dot ${presencia(u)}`} /></span>
+            <div className="um-who">
+              <div className="um-name">{u.name || u.email}</div>
+              <div className="um-email">{u.email}</div>
+            </div>
+            {off
+              ? <span className="um-off-tag" title="Ya no trabaja aquí — se conserva para el histórico">Ya no está</span>
+              : <span className="um-rolechip">{u.role_label || '—'}</span>}
+          </div>
+
+          <div className="um-areas">
+            {verTodo
+              ? <span className="um-area all">Todas las áreas</span>
+              : (areas.length
+                  ? <><span className="um-areas-lbl">Áreas que atiende</span>{areas.map((a) => <span key={a} className="um-area">{a}</span>)}</>
+                  : <span className="um-area none">Sin áreas asignadas</span>)}
+          </div>
+
+          {!off && (
+            <div className="um-stats">
+              <div className="s"><b>{u.assigned}</b><span>Asignados</span></div>
+              <div className="s"><b>{u.resolved_7d}</b><span>Resueltos 7d</span></div>
+              <div className="s"><b className={u.sla_late ? 'bad' : ''}>{u.sla_late}</b><span>SLA vencido</span></div>
+            </div>
+          )}
+        </div>
+
+        <div className="um-foot">
+          {off ? (
+            <>
+              <span className="muted" style={{ fontSize: 12 }}>Histórico conservado</span>
+              <span className="um-foot-sp" />
+              <button className="icon-btn" title="Habilitar de nuevo" style={{ color: 'var(--secondary)' }} onClick={() => toggleActive(u)}><Icon.check /></button>
+            </>
+          ) : (
+            <>
+              <button type="button" className={`um-notify ${u.notify_sla ? '' : 'off'}`} onClick={() => toggleNotify(u)} title="Recibir avisos de SLA por correo">
+                <Icon.bell /> {u.notify_sla ? 'Avisos SLA' : 'Sin avisos'}
+                <span className={`um-sw ${u.notify_sla ? 'on' : ''}`} />
+              </button>
+              <span className="um-foot-sp" />
+              <button className="icon-btn" title="Deshabilitar (marcar como que ya no está)" onClick={() => toggleActive(u)}><Icon.lock /></button>
+              <button className="icon-btn" title="Editar" onClick={() => setForm({ id: u.id, name: u.name || '', email: u.email || '', role: u.role || defRole, password: '', category_ids: u.category_ids || [], notify_sla: !!u.notify_sla, notify_assigned: !!u.notify_assigned })}><Icon.pencil /></button>
+              <button className="icon-btn" title="Eliminar" style={{ color: 'var(--danger)' }} onClick={() => del(u)}><Icon.trash /></button>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <header className="page-head">
@@ -133,93 +200,29 @@ export default function Users() {
         <div><h1>Usuarios</h1></div>
         <span className="sub">· Equipo, roles y permisos</span>
         <div className="spacer" />
-        <button className="btn" onClick={() => setForm({ ...blank })}><Icon.plus /> Nuevo usuario</button>
+        {tab === 'users'
+          ? <button className="btn" onClick={() => setForm({ ...blank })}><Icon.plus /> Nuevo usuario</button>
+          : <button className="btn" onClick={() => setRoleForm({ ...blankRole })}><Icon.plus /> Nuevo rol</button>}
       </header>
 
       <div className="page-scroll">
         <div className="page um" style={{ maxWidth: 1140 }}>
-          {form && (
-            <div className="card um-sheet">
-              <div className="um-form">
-                <div className="fb-set-t" style={{ marginBottom: 12 }}>{form.id ? 'Editar usuario' : 'Nuevo usuario'}</div>
-                <div className="grid2">
-                  <label className="field"><span className="lbl">Email <span className="hint">(inicio de sesión)</span></span><input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="maria@aemegroup.com" autoFocus /></label>
-                  <label className="field"><span className="lbl">Nombre <span className="hint">(visible en el chat)</span></span><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="María García" /></label>
-                </div>
-                <div className="grid2">
-                  <label className="field"><span className="lbl">Contraseña {form.id && <span className="hint">(dejar vacío para no cambiarla)</span>}</span><input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} placeholder={form.id ? '••••••' : 'mín. 8 caracteres'} /></label>
-                  <div className="field"><span className="lbl">Rol</span>
-                    <Select block value={form.role} onChange={(role) => setForm((f) => ({ ...f, role }))} options={roleOptions} />
-                    {roleOf(form.role) && (
-                      <span className="hint" style={{ marginTop: 6, display: 'block' }}>
-                        Módulos: {Object.keys(permsByModule(form.role)).map((m) => modules[m]?.label || m).join(' · ') || '—'}
-                      </span>
-                    )}
-                  </div>
-                </div>
+          {/* Pestañas: Usuarios / Roles (los roles ya no van al final de la lista) */}
+          <div className="kb-seg" style={{ marginBottom: 18 }}>
+            <button className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Usuarios ({users?.length ?? 0})</button>
+            <button className={tab === 'roles' ? 'on' : ''} onClick={() => setTab('roles')}>Roles y permisos ({roles.length})</button>
+          </div>
 
-                {/* Áreas (categorías) que atiende el agente. Solo importa a roles SIN
-                    «ver todos»: un encargado/superadmin ve todo igualmente. */}
-                {cats.length > 0 && (
-                  <div className="field" style={{ marginTop: 4, marginBottom: 0 }}>
-                    <span className="lbl">Áreas que atiende <span className="hint">(categorías cuyos tickets verá)</span></span>
-                    {roleOf(form.role)?.permissions?.includes('tickets.view_all') && (
-                      <span className="hint" style={{ display: 'block', marginBottom: 6 }}>
-                        Este rol ve <b>todos</b> los tickets; las áreas no le limitan.
-                      </span>
-                    )}
-                    <div className="cat-picker">
-                      {cats.map((c) => {
-                        const on = form.category_ids.includes(c.id)
-                        return (
-                          <button key={c.id} type="button" className={`cat-chip ${on ? 'on' : ''}`} onClick={() => toggleCat(c.id)}>
-                            <span className="cat-dot" style={{ background: c.color }} />
-                            {c.name}
-                            {on && <Icon.check style={{ width: 13, height: 13 }} />}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Preferencias de aviso por correo del usuario. */}
-              <div className="um-aside">
-                <div className="fb-set-t" style={{ marginBottom: 3 }}>Avisos por correo</div>
-                <p className="hint" style={{ margin: '0 0 14px' }}>Qué correos automáticos recibe este usuario.</p>
-
-                <button type="button" className={`um-pref ${form.notify_sla ? 'on' : ''}`} onClick={() => setForm((f) => ({ ...f, notify_sla: !f.notify_sla }))}>
-                  <span className="um-pref-ic amber"><Icon.bell /></span>
-                  <span className="um-pref-tx"><b>Avisos de SLA</b><small>Sus tickets por vencer o vencidos.</small></span>
-                  <span className={`um-sw lg ${form.notify_sla ? 'on' : ''}`} />
-                </button>
-
-                <button type="button" className={`um-pref ${form.notify_assigned ? 'on' : ''}`} onClick={() => setForm((f) => ({ ...f, notify_assigned: !f.notify_assigned }))}>
-                  <span className="um-pref-ic blue"><Icon.inbox /></span>
-                  <span className="um-pref-tx"><b>Ticket asignado a mí</b><small>Cuando se le asigna un ticket.</small></span>
-                  <span className={`um-sw lg ${form.notify_assigned ? 'on' : ''}`} />
-                </button>
-
-                <div className="add-row" style={{ marginTop: 16 }}>
-                  <button className="btn" onClick={save}><Icon.save /> Guardar</button>
-                  <button className="btn ghost" onClick={() => setForm(null)}>Cancelar</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {users === null ? <div className="center-load"><div className="spinner" /></div> : (
+          {/* ================= USUARIOS ================= */}
+          {tab === 'users' && (users === null ? <div className="center-load"><div className="spinner" /></div> : (
             <>
-              {/* Resumen del equipo */}
               <div className="um-tiles">
-                <div className="um-tile"><span className="k">Usuarios</span><span className="v">{users.length}</span></div>
-                <div className="um-tile"><span className="k">En línea</span><span className="v">{users.filter((u) => presencia(u) === 'on').length}<small>/ {users.length}</small></span></div>
+                <div className="um-tile"><span className="k">Activos</span><span className="v">{users.filter((u) => u.active !== false).length}</span></div>
+                <div className="um-tile"><span className="k">En línea</span><span className="v">{users.filter((u) => presencia(u) === 'on').length}<small>/ {users.filter((u) => u.active !== false).length}</small></span></div>
                 <div className="um-tile"><span className="k">Responsables</span><span className="v">{users.filter((u) => roleOf(u.role)?.is_super || u.view_all).length}</span></div>
-                <div className="um-tile"><span className="k">Reciben avisos SLA</span><span className="v">{users.filter((u) => u.notify_sla).length}</span></div>
+                <div className="um-tile"><span className="k">Ya no están</span><span className="v">{users.filter((u) => u.active === false).length}</span></div>
               </div>
 
-              {/* Buscador + filtro por rol */}
               <div className="um-toolbar">
                 <div className="um-search"><Icon.search /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre o correo…" /></div>
                 <div className="um-filters">
@@ -229,135 +232,166 @@ export default function Users() {
                 </div>
               </div>
 
-              {/* Rejilla de fichas */}
+              {/* Activos */}
+              <div className="um-sech"><span>Activos</span><span className="um-sech-pill">{activos.length}</span></div>
               <div className="um-grid">
-                {visibles.length === 0 && <div className="um-empty">Nadie coincide con la búsqueda.</div>}
-                {visibles.map((u) => {
-                  const verTodo = roleOf(u.role)?.is_super || u.view_all
-                  const areas = (u.category_ids || []).map((id) => cats.find((c) => c.id === id)?.name).filter(Boolean)
-                  return (
-                    <div key={u.id} className={`um-card ${u.active === false ? 'um-off' : ''}`} style={{ '--role': colorDe(u) }}>
-                      <div className="um-accent" />
-                      <div className="um-cbody">
-                        <div className="um-head">
-                          <span className="um-av">{inicial(u)}<span className={`um-dot ${presencia(u)}`} /></span>
-                          <div className="um-who">
-                            <div className="um-name">{u.name || u.email}</div>
-                            <div className="um-email">{u.email}</div>
-                          </div>
-                          {u.active === false
-                            ? <span className="um-off-tag" title="Ya no trabaja aquí — se conserva para el histórico">Ya no está</span>
-                            : <span className="um-rolechip">{u.role_label || '—'}</span>}
-                        </div>
-
-                        <div className="um-areas">
-                          {verTodo
-                            ? <span className="um-area all">Todas las áreas</span>
-                            : (areas.length
-                                ? <><span className="um-areas-lbl">Áreas que atiende</span>{areas.map((a) => <span key={a} className="um-area">{a}</span>)}</>
-                                : <span className="um-area none">Sin áreas asignadas</span>)}
-                        </div>
-
-                        <div className="um-stats">
-                          <div className="s"><b>{u.assigned}</b><span>Asignados</span></div>
-                          <div className="s"><b>{u.resolved_7d}</b><span>Resueltos 7d</span></div>
-                          <div className="s"><b className={u.sla_late ? 'bad' : ''}>{u.sla_late}</b><span>SLA vencido</span></div>
-                        </div>
-                      </div>
-
-                      <div className="um-foot">
-                        <button type="button" className={`um-notify ${u.notify_sla ? '' : 'off'}`} onClick={() => toggleNotify(u)} title="Recibir avisos de SLA por correo">
-                          <Icon.bell /> {u.notify_sla ? 'Avisos SLA' : 'Sin avisos'}
-                          <span className={`um-sw ${u.notify_sla ? 'on' : ''}`} />
-                        </button>
-                        <span className="um-foot-sp" />
-                        {u.active === false
-                          ? <button className="icon-btn" title="Habilitar de nuevo" style={{ color: 'var(--secondary)' }} onClick={() => toggleActive(u)}><Icon.check /></button>
-                          : <button className="icon-btn" title="Deshabilitar (marcar como que ya no está)" onClick={() => toggleActive(u)}><Icon.lock /></button>}
-                        <button className="icon-btn" title="Editar" onClick={() => setForm({ id: u.id, name: u.name || '', email: u.email || '', role: u.role || defRole, password: '', category_ids: u.category_ids || [], notify_sla: !!u.notify_sla, notify_assigned: !!u.notify_assigned })}><Icon.pencil /></button>
-                        <button className="icon-btn" title="Eliminar" style={{ color: 'var(--danger)' }} onClick={() => del(u)}><Icon.trash /></button>
-                      </div>
-                    </div>
-                  )
-                })}
+                {activos.length === 0 && <div className="um-empty">Nadie activo coincide con la búsqueda.</div>}
+                {activos.map(renderCard)}
               </div>
+
+              {/* Ya no están (plegable, separado de los activos) */}
+              {inactivos.length > 0 && (
+                <div className="um-exwrap">
+                  <button type="button" className={`um-exhead ${showEx ? 'open' : ''}`} onClick={() => setShowEx((v) => !v)}>
+                    <Icon.chevron className="um-chev" />
+                    <span>Ya no están</span>
+                    <span className="um-sech-pill">{inactivos.length}</span>
+                    <span className="hint" style={{ fontWeight: 400 }}>· se conservan para el histórico</span>
+                  </button>
+                  {showEx && <div className="um-grid">{inactivos.map(renderCard)}</div>}
+                </div>
+              )}
             </>
-          )}
+          ))}
 
-          {/* Roles y permisos: crear, editar, borrar y asignar permisos */}
-          {roles.length > 0 && (
-            <>
-              <div className="fb-set-t" style={{ margin: '24px 0 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span>Roles y permisos</span>
-                <span style={{ flex: 1 }} />
-                <button className="btn sm" onClick={() => setRoleForm({ ...blankRole })}><Icon.plus /> Nuevo rol</button>
+          {/* ================= ROLES ================= */}
+          {tab === 'roles' && (roles.length === 0 ? <div className="center-load"><div className="spinner" /></div> : (
+            <div className="card" style={{ padding: 0 }}>
+              {roles.map((r) => (
+                <div key={r.name} className="role-row">
+                  <div className="role-main">
+                    <b>{r.label}</b>
+                    <span className="muted">{r.description || '—'}</span>
+                  </div>
+                  <span className="role-count">{r.users_count} {r.users_count === 1 ? 'usuario' : 'usuarios'}</span>
+                  <span className="role-count perms">{r.is_super ? 'Todos' : `${r.permissions.length} permisos`}</span>
+                  <div className="role-actions">
+                    {r.is_super ? (
+                      <span className="pill ok sm">Acceso total</span>
+                    ) : (
+                      <>
+                        <button className="icon-btn" title="Editar rol y permisos" onClick={() => openEditRole(r)}><Icon.pencil /></button>
+                        <button className="icon-btn" title="Eliminar rol" style={{ color: 'var(--danger)' }} onClick={() => delRole(r)}><Icon.trash /></button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ================= MODAL: usuario ================= */}
+      {form && (
+        <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && setForm(null)}>
+          <div className="modal" style={{ maxWidth: 560 }}>
+            <div className="modal-h">
+              <h3>{form.id ? 'Editar usuario' : 'Nuevo usuario'}</h3>
+              <button className="icon-btn" onClick={() => setForm(null)} title="Cerrar (Esc)">✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="grid2">
+                <label className="field"><span className="lbl">Email <span className="hint">(inicio de sesión)</span></span><input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="maria@aemegroup.com" autoFocus /></label>
+                <label className="field"><span className="lbl">Nombre <span className="hint">(visible en el chat)</span></span><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="María García" /></label>
+              </div>
+              <div className="grid2">
+                <label className="field"><span className="lbl">Contraseña {form.id && <span className="hint">(vacío = no cambiar)</span>}</span><input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} placeholder={form.id ? '••••••' : 'mín. 8 caracteres'} /></label>
+                <div className="field"><span className="lbl">Rol</span>
+                  <Select block value={form.role} onChange={(role) => setForm((f) => ({ ...f, role }))} options={roleOptions} />
+                  {roleOf(form.role) && (
+                    <span className="hint" style={{ marginTop: 6, display: 'block' }}>Módulos: {Object.keys(permsByModule(form.role)).map((m) => modules[m]?.label || m).join(' · ') || '—'}</span>
+                  )}
+                </div>
               </div>
 
-              {roleForm && (
-                <div className="card" style={{ padding: 18, marginBottom: 14 }}>
-                  <div className="fb-set-t" style={{ marginBottom: 12 }}>{roleForm.name ? 'Editar rol' : 'Nuevo rol'}</div>
-                  <div className="grid2">
-                    <label className="field"><span className="lbl">Nombre del rol</span><input value={roleForm.label} onChange={(e) => setRoleForm((f) => ({ ...f, label: e.target.value }))} placeholder="p. ej. Supervisor de garantías" autoFocus /></label>
-                    <label className="field"><span className="lbl">Descripción <span className="hint">(opcional)</span></span><input value={roleForm.description} onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))} placeholder="Qué hace este rol" /></label>
-                  </div>
-                  <div className="field" style={{ marginTop: 6 }}>
-                    <span className="lbl">Permisos <span className="hint">({roleForm.permissions.length} marcados)</span></span>
-                    <div className="perm-grid">
-                      {Object.entries(permGroups()).map(([mod, list]) => {
-                        const allOn = list.every((p) => roleForm.permissions.includes(p.name))
-                        return (
-                          <div key={mod} className="perm-mod">
-                            <button type="button" className="perm-mod-h" onClick={() => toggleModule(list)}>
-                              <span>{modules[mod]?.label || mod}</span>
-                              <span className={`perm-all ${allOn ? 'on' : ''}`}>{allOn ? 'Quitar' : 'Todo'}</span>
-                            </button>
-                            {list.map((p) => {
-                              const on = roleForm.permissions.includes(p.name)
-                              return (
-                                <button key={p.name} type="button" className={`perm-chk ${on ? 'on' : ''}`} onClick={() => toggleRolePerm(p.name)} title={p.name}>
-                                  <span className="perm-box">{on && <Icon.check />}</span>
-                                  <span>{p.label}</span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <div className="add-row" style={{ marginTop: 14 }}>
-                    <button className="btn" onClick={saveRole}><Icon.save /> Guardar rol</button>
-                    <button className="btn ghost" onClick={() => setRoleForm(null)}>Cancelar</button>
+              {cats.length > 0 && (
+                <div className="field">
+                  <span className="lbl">Áreas que atiende <span className="hint">(categorías cuyos tickets verá)</span></span>
+                  {roleOf(form.role)?.permissions?.includes('tickets.view_all') && (
+                    <span className="hint" style={{ display: 'block', marginBottom: 6 }}>Este rol ve <b>todos</b> los tickets; las áreas no le limitan.</span>
+                  )}
+                  <div className="cat-picker">
+                    {cats.map((c) => {
+                      const on = form.category_ids.includes(c.id)
+                      return (
+                        <button key={c.id} type="button" className={`cat-chip ${on ? 'on' : ''}`} onClick={() => toggleCat(c.id)}>
+                          <span className="cat-dot" style={{ background: c.color }} />{c.name}{on && <Icon.check style={{ width: 13, height: 13 }} />}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
 
-              <div className="card" style={{ padding: 0 }}>
-                {roles.map((r) => (
-                  <div key={r.name} className="role-row">
-                    <div className="role-main">
-                      <b>{r.label}</b>
-                      <span className="muted">{r.description || '—'}</span>
-                    </div>
-                    <span className="role-count">{r.users_count} {r.users_count === 1 ? 'usuario' : 'usuarios'}</span>
-                    <span className="role-count perms">{r.is_super ? 'Todos' : `${r.permissions.length} permisos`}</span>
-                    <div className="role-actions">
-                      {r.is_super ? (
-                        <span className="pill ok sm">Acceso total</span>
-                      ) : (
-                        <>
-                          <button className="icon-btn" title="Editar rol y permisos" onClick={() => openEditRole(r)}><Icon.pencil /></button>
-                          <button className="icon-btn" title="Eliminar rol" style={{ color: 'var(--danger)' }} onClick={() => delRole(r)}><Icon.trash /></button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="field" style={{ marginBottom: 0 }}>
+                <span className="lbl">Avisos por correo</span>
+                <button type="button" className={`um-pref ${form.notify_sla ? 'on' : ''}`} onClick={() => setForm((f) => ({ ...f, notify_sla: !f.notify_sla }))}>
+                  <span className="um-pref-ic amber"><Icon.bell /></span>
+                  <span className="um-pref-tx"><b>Avisos de SLA</b><small>Sus tickets por vencer o vencidos.</small></span>
+                  <span className={`um-sw lg ${form.notify_sla ? 'on' : ''}`} />
+                </button>
+                <button type="button" className={`um-pref ${form.notify_assigned ? 'on' : ''}`} onClick={() => setForm((f) => ({ ...f, notify_assigned: !f.notify_assigned }))} style={{ marginTop: 8 }}>
+                  <span className="um-pref-ic blue"><Icon.inbox /></span>
+                  <span className="um-pref-tx"><b>Ticket asignado a mí</b><small>Cuando se le asigna un ticket.</small></span>
+                  <span className={`um-sw lg ${form.notify_assigned ? 'on' : ''}`} />
+                </button>
               </div>
-            </>
-          )}
+            </div>
+            <div className="modal-foot">
+              <button className="btn ghost" onClick={() => setForm(null)}>Cancelar</button>
+              <button className="btn" onClick={save}><Icon.save /> Guardar</button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ================= MODAL: rol ================= */}
+      {roleForm && (
+        <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && setRoleForm(null)}>
+          <div className="modal" style={{ maxWidth: 640 }}>
+            <div className="modal-h">
+              <h3>{roleForm.name ? 'Editar rol' : 'Nuevo rol'}</h3>
+              <button className="icon-btn" onClick={() => setRoleForm(null)} title="Cerrar (Esc)">✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="grid2">
+                <label className="field"><span className="lbl">Nombre del rol</span><input value={roleForm.label} onChange={(e) => setRoleForm((f) => ({ ...f, label: e.target.value }))} placeholder="p. ej. Supervisor de garantías" autoFocus /></label>
+                <label className="field"><span className="lbl">Descripción <span className="hint">(opcional)</span></span><input value={roleForm.description} onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))} placeholder="Qué hace este rol" /></label>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <span className="lbl">Permisos <span className="hint">({roleForm.permissions.length} marcados)</span></span>
+                <div className="perm-grid">
+                  {Object.entries(permGroups()).map(([mod, list]) => {
+                    const allOn = list.every((p) => roleForm.permissions.includes(p.name))
+                    return (
+                      <div key={mod} className="perm-mod">
+                        <button type="button" className="perm-mod-h" onClick={() => toggleModule(list)}>
+                          <span>{modules[mod]?.label || mod}</span>
+                          <span className={`perm-all ${allOn ? 'on' : ''}`}>{allOn ? 'Quitar' : 'Todo'}</span>
+                        </button>
+                        {list.map((p) => {
+                          const on = roleForm.permissions.includes(p.name)
+                          return (
+                            <button key={p.name} type="button" className={`perm-chk ${on ? 'on' : ''}`} onClick={() => toggleRolePerm(p.name)} title={p.name}>
+                              <span className="perm-box">{on && <Icon.check />}</span>
+                              <span>{p.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn ghost" onClick={() => setRoleForm(null)}>Cancelar</button>
+              <button className="btn" onClick={saveRole}><Icon.save /> Guardar rol</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
