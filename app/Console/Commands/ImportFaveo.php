@@ -35,14 +35,19 @@ class ImportFaveo extends Command
         {--prefix= : Prefijo de las tablas de Faveo si están en la MISMA BD del helpdesk (p. ej. fav_) — sin BD puente}
         {--source=import-faveo : Marca en tickets.source, para revertir}
         {--fresh : Borra antes lo ya importado de ese source}
+        {--wipe : Borra TODOS los tickets y contactos actuales antes de importar (no solo lo del source)}
+        {--extras : Importa también FAQs (kb_article) y respuestas predefinidas (canned_response), sin borrar las que ya hay}
         {--limit=0 : Procesa solo N tickets (0=todos), para pruebas}';
 
     protected $description = 'Importa el histórico de Faveo (tickets de correo + contactos), separando los crones';
 
     private array $codeSeq = [];
     private array $agentIds = [];
-    private array $agentMap = [];      // id de agente en Faveo => id del mismo agente HOY (match por email)
-    private array $nameToAgent = [];   // nombre completo (lower) del agente Faveo => id HOY (para notas de sistema)
+    private array $agentMap = [];          // id de agente en Faveo => id del mismo agente HOY (match por email)
+    private array $nameToAgent = [];       // nombre completo (lower) del agente Faveo => id HOY (para eventos de sistema)
+    private array $userNameToAgent = [];   // user_name (lower) del agente Faveo => id HOY («now belongs to aportales»)
+    private array $agentEmails = [];       // correos de agente (lower) => true: NO se crean como contacto
+    private ?int $internoContactId = null; // contacto único para tickets cuyo solicitante es un agente
     private ?int $defaultAgente = null; // agente al que Faveo asignaba POR DEFECTO (jfajardo): sus tickets se reatribuyen
     private array $topicToCat = [];
     private array $priMap = [1 => 'baja', 2 => 'media', 3 => 'alta', 4 => 'urgente'];
@@ -72,6 +77,20 @@ class ImportFaveo extends Command
             return self::FAILURE;
         }
 
+        // BORRADO TOTAL: deja la BD limpia de tickets y contactos para cargar el histórico
+        // desde cero. Los tickets caen en cascada (messages, ticket_events, attachments,
+        // cron_alerts por FK). Los contactos se borran aparte (ya sin mensajes que los aten).
+        if ($this->option('wipe') && $apply) {
+            $nt = DB::table('tickets')->count();
+            $nc = DB::table('contacts')->count();
+            DB::table('tickets')->delete();          // cascada: messages, ticket_events, attachments, cron_alerts
+            DB::table('contact_labels')->delete();   // no tiene FK a contacts: se limpia a mano
+            DB::table('contacts')->delete();
+            $this->warn("WIPE: borrados $nt tickets y $nc contactos (todo).");
+        } elseif ($this->option('wipe')) {
+            $this->warn('WIPE en DRY-RUN: se BORRARÍAN ' . DB::table('tickets')->count() . ' tickets y ' . DB::table('contacts')->count() . ' contactos (con --apply).');
+        }
+
         if ($this->option('fresh') && $apply) {
             $ids = DB::table('tickets')->where('source', $source)->pluck('id');
             DB::table('cron_alerts')->whereIn('ticket_id', $ids)->delete();
@@ -93,10 +112,13 @@ class ImportFaveo extends Command
             $mail = mb_strtolower(trim((string) $u->email));
             if ($mail === '' || !filter_var($mail, FILTER_VALIDATE_EMAIL)) continue;
             $nombre = trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? '')) ?: ($u->user_name ?: $mail);
+            $this->agentEmails[$mail] = true;                                    // no se creará como contacto
+            $uname = mb_strtolower(trim((string) ($u->user_name ?? '')));
             if ($mail === 'jfajardo@aemegroup.com') $this->defaultAgente = (int) $u->id;   // el que Faveo asignaba por defecto
             if (isset($hoy[$mail])) {
                 $this->agentMap[(int) $u->id] = $hoy[$mail];
                 if ($nombre !== '') $this->nameToAgent[mb_strtolower($nombre)] = $hoy[$mail];
+                if ($uname !== '') $this->userNameToAgent[$uname] = $hoy[$mail];
                 $existentes++; continue;
             }
             if (!$apply) { $existentes++; continue; }                          // en dry-run no se crea
@@ -109,6 +131,7 @@ class ImportFaveo extends Command
             $hoy[$mail] = (int) $nuevo->id;
             $this->agentMap[(int) $u->id] = (int) $nuevo->id;
             if ($nombre !== '') $this->nameToAgent[mb_strtolower($nombre)] = (int) $nuevo->id;
+            if ($uname !== '') $this->userNameToAgent[$uname] = (int) $nuevo->id;
             $creados++;
         }
         $this->line("Agentes: $existentes ya existían · $creados creados (histórico, rol agente).");
@@ -122,10 +145,11 @@ class ImportFaveo extends Command
 
         $cron = app(CronAlertService::class);
 
-        // Tickets a mirar: todo menos Deleted (status 5) — es 98% papelera de crones.
+        // Tickets a mirar: TODOS, incluidos los Deleted (status 5). Los Deleted son papelera,
+        // pero en su mayoría son CRONES: se escanean para llevar esos al apartado «Crones».
+        // Un Deleted que NO es cron se descarta (papelera de verdad).
         $q = $fav->table('tickets as t')
             ->join('users as u', 'u.id', '=', 't.user_id')
-            ->where('t.status', '!=', 5)
             ->orderBy('t.id')
             ->select('t.*', 'u.email', 'u.first_name', 'u.last_name', 'u.user_name', 'u.phone_number', 'u.mobile', 'u.country_code');
         if ($limit > 0) $q->limit($limit);
@@ -133,7 +157,7 @@ class ImportFaveo extends Command
 
         $this->info(($apply ? '🖊  APLICANDO' : '👀 DRY-RUN') . ' · ' . $tickets->count() . ' tickets a clasificar (Deleted excluidos)');
 
-        $nReal = 0; $nCron = 0; $nBounce = 0; $nSinCorreo = 0;
+        $nReal = 0; $nCron = 0; $nBounce = 0; $nSinCorreo = 0; $nPapelera = 0;
         $cronGroups = []; $ejReal = []; $ejCron = [];
 
         foreach ($tickets as $t) {
@@ -157,6 +181,9 @@ class ImportFaveo extends Command
                 continue;
             }
 
+            // Deleted (status 5) que NO es cron: papelera de Faveo, se descarta.
+            if ((int) $t->status === 5) { $nPapelera++; continue; }
+
             // ---- Ticket REAL de cliente ----
             $nReal++;
             $nombre = trim(($t->first_name ?? '') . ' ' . ($t->last_name ?? '')) ?: ($t->user_name ?: null);
@@ -171,6 +198,9 @@ class ImportFaveo extends Command
             $this->line('Crones agrupados en ' . count($cronGroups) . ' tickets cerrados.');
         }
 
+        // Extras opcionales: FAQs y respuestas predefinidas (no dependen de los tickets).
+        if ($this->option('extras')) $this->importExtras($fav, $apply);
+
         // ---- Salida ----
         if ($ejReal) {
             $this->line("\n<info>Muestra de tickets REALES (estado · asunto):</info>");
@@ -181,15 +211,19 @@ class ImportFaveo extends Command
             foreach ($ejCron as $c) $this->line('  · ' . $c);
         }
         $this->line('');
-        $this->info("REALES: $nReal · CRONES: $nCron · Rebotes: $nBounce · Sin correo válido: $nSinCorreo");
+        $this->info("REALES: $nReal · CRONES: $nCron · Papelera (deleted no-cron): $nPapelera · Rebotes: $nBounce · Sin correo válido: $nSinCorreo");
         if (!$apply) $this->warn('DRY-RUN: no se ha escrito nada. Añade --apply para importar. (Adjuntos: Bloque 2, aún no)');
         return self::SUCCESS;
     }
 
-    /** Crea el ticket real + su hilo de mensajes. */
+    /** Crea el ticket real + su hilo de mensajes + su HISTORIAL de cambios (ticket_events). */
     private function crearReal($t, $threads, string $email, ?string $nombre, string $asunto, string $source, $catDefault): void
     {
-        $contactId = ChatService::upsertContactByEmail($email, $nombre);
+        // El solicitante NO se duplica si ya es un AGENTE: en ese caso el ticket cuelga de un
+        // contacto interno único (nunca un contacto con el mismo correo que un agente).
+        $contactId = isset($this->agentEmails[mb_strtolower(trim($email))])
+            ? $this->contactoInterno()
+            : ChatService::upsertContactByEmail($email, $nombre);
         $ini = self::fecha($t->created_at) ?? now()->toDateTimeString();
         $fin = self::fecha($t->last_message_at) ?? $ini;
         $estado = self::estadoTxt((int) $t->status);
@@ -214,11 +248,24 @@ class ImportFaveo extends Command
             'updated_at'      => $fin,
         ]);
 
+        // HISTORIAL: el ticket se creó al abrirse.
+        DB::table('ticket_events')->insert([
+            'ticket_id' => $ticketId, 'user_id' => null, 'type' => 'created',
+            'from_value' => null, 'to_value' => null, 'note' => null, 'created_at' => $ini,
+        ]);
+
+        $curStatus = 'abierto';   // se va reconstruyendo con los avisos de sistema, en orden
+        $curAssignee = null;
         $filas = [];
         foreach ($threads as $th) {
+            // AVISO DE SISTEMA (interno + poster NULL): asignación, cierre, reapertura, fusión…
+            // Va al HISTORIAL (ticket_events), NO como nota interna.
+            if ($th->is_internal && ($th->poster === null || $th->poster === '')) {
+                $this->eventoSistema($ticketId, $th, $curStatus, $curAssignee, $ini);
+                continue;
+            }
             $cuerpo = self::texto((string) $th->body);
             if ($cuerpo === '') continue;
-            if ($th->is_internal && self::esNotaSistema($cuerpo)) continue;   // ruido de auditoría de Faveo
             $esCliente = ($th->poster === 'client');
             $autor = $esCliente ? null : ($this->agentMap[(int) $th->user_id] ?? null);   // quién escribió, si sigue hoy
             $filas[] = [
@@ -231,13 +278,138 @@ class ImportFaveo extends Command
                 'type'             => 'text',
                 'body'             => self::cuerpoLimpio((string) $th->body),
                 'is_html'          => 1,
-                'is_internal_note' => $th->is_internal ? 1 : 0,
+                'is_internal_note' => $th->is_internal ? 1 : 0,   // notas REALES de agente (poster != null)
                 'status'           => 'sent',
                 'wamid'            => 'fav:' . $th->id,   // enlace al hilo de Faveo (para colgar adjuntos, Bloque 2)
                 'created_at'       => self::fecha($th->created_at) ?? $ini,
             ];
         }
         foreach (array_chunk($filas, 300) as $lote) DB::table('messages')->insert($lote);
+    }
+
+    /** Contacto único para tickets cuyo solicitante era un agente (no se duplica el correo). */
+    private function contactoInterno(): int
+    {
+        return $this->internoContactId ??= ChatService::upsertContactByEmail('equipo-interno@import.faveo', 'Equipo AEME (interno)');
+    }
+
+    /**
+     * Convierte un aviso de SISTEMA de Faveo (hilo interno con poster NULL) en un evento del
+     * HISTORIAL del ticket. Reconstruye estado y asignado en orden ($curStatus/$curAssignee).
+     */
+    private function eventoSistema(int $ticketId, $th, string &$curStatus, ?int &$curAssignee, string $ini): void
+    {
+        $txt  = self::texto((string) $th->body);
+        $when = self::fecha($th->created_at) ?? $ini;
+        $ev = function (string $type, ?string $from, ?string $to, ?int $uid = null, ?string $nota = null) use ($ticketId, $when) {
+            DB::table('ticket_events')->insert([
+                'ticket_id' => $ticketId, 'user_id' => $uid, 'type' => $type,
+                'from_value' => $from, 'to_value' => $to,
+                'note' => $nota !== null ? mb_substr($nota, 0, 300) : null, 'created_at' => $when,
+            ]);
+        };
+
+        // Asignación: «(ha sido) asignado a X» / «(has been) assigned to X»
+        if (preg_match('/(?:asignado a|assigned to)\s+(.+)$/iu', $txt, $m)) {
+            if ($to = $this->agentePorNombre($m[1])) { $ev('assign', $curAssignee ? (string) $curAssignee : null, (string) $to, null); $curAssignee = $to; }
+            return;
+        }
+        // «This ticket now belongs to <user_name>»
+        if (preg_match('/now belongs to\s+(\S+)/i', $txt, $m)) {
+            $to = $this->userNameToAgent[mb_strtolower(trim($m[1]))] ?? null;
+            if ($to) { $ev('assign', $curAssignee ? (string) $curAssignee : null, (string) $to, null); $curAssignee = $to; }
+            return;
+        }
+        // Estado: «Ticket have been Closed/Resolved/Reopened by X»
+        if (preg_match('/been\s+(Closed|Resolved|Reopened)\s+by\s+(.+)$/iu', $txt, $m)) {
+            $nuevo = ['closed' => 'cerrado', 'resolved' => 'resuelto', 'reopened' => 'abierto'][mb_strtolower($m[1])];
+            $actor = $this->agentePorNombre($m[2]);
+            if ($nuevo !== $curStatus) { $ev('status', $curStatus, $nuevo, $actor); $curStatus = $nuevo; }
+            return;
+        }
+        // Fusión: «Ticket #CODE Se ha fusionado con este ticket. Motivo de la fusión: …»
+        if (preg_match('/#([A-Z0-9\-]+).*?fusionado con este ticket\.?\s*(?:Motivo[^:]*:\s*(.*))?$/iu', $txt, $m)) {
+            $ev('merge_in', $m[1], null, null, $m[2] ?? null);
+            return;
+        }
+        // Otros avisos de sistema sin patrón conocido: se ignoran (no se pierden datos de cliente).
+    }
+
+    /** Resuelve un nombre de agente (de un aviso de sistema) al id de hoy. Tolera dobles espacios. */
+    private function agentePorNombre(string $nombre): ?int
+    {
+        $n = mb_strtolower(trim(preg_replace('/\s+/', ' ', $nombre)));
+        return $this->nameToAgent[$n] ?? null;
+    }
+
+    /**
+     * EXTRAS: base de conocimiento (kb_article → FAQs del portal) y respuestas predefinidas
+     * (canned_response → «/»). NO borra las que ya hay: solo añade las que no existan
+     * (dedup por pregunta / por título). Las FAQs entran como publicadas si en Faveo lo estaban.
+     */
+    private function importExtras($fav, bool $apply): void
+    {
+        // --- FAQs (kb_article → faqs) ---
+        $faqExist = array_flip(DB::table('faqs')->pluck('question')->map(fn ($q) => mb_strtolower(trim((string) $q)))->all());
+        $nFaq = 0;
+        foreach ($fav->table('kb_article')->orderBy('id')->get(['name', 'description', 'status']) as $a) {
+            $q = trim(self::texto((string) $a->name));
+            if ($q === '' || isset($faqExist[mb_strtolower($q)])) continue;
+            $faqExist[mb_strtolower($q)] = true; $nFaq++;
+            if (!$apply) continue;
+            DB::table('faqs')->insert([
+                'question'   => mb_substr($q, 0, 200),
+                'answer'     => self::cuerpoLimpio((string) $a->description) ?: $q,
+                'keywords'   => self::keywordsDe($q),
+                'category_id' => null,
+                'active'     => (int) $a->status === 1 ? 1 : 0,
+                'position'   => 100 + $nFaq,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        // --- Respuestas predefinidas (canned_response → canned_responses) ---
+        $used     = array_flip(DB::table('canned_responses')->pluck('shortcut')->all());
+        $titExist = array_flip(DB::table('canned_responses')->pluck('title')->map(fn ($t) => mb_strtolower(trim((string) $t)))->all());
+        $nCan = 0;
+        foreach ($fav->table('canned_response')->orderBy('id')->get(['title', 'message']) as $c) {
+            $tit = trim(self::texto((string) $c->title));
+            if ($tit === '' || isset($titExist[mb_strtolower($tit)])) continue;
+            $titExist[mb_strtolower($tit)] = true; $nCan++;
+            if (!$apply) continue;
+            DB::table('canned_responses')->insert([
+                'shortcut'   => $this->shortcutUnico($tit, $used),
+                'title'      => mb_substr($tit, 0, 120),
+                'body'       => self::cuerpoLimpio((string) $c->message) ?: $tit,
+                'position'   => 100 + $nCan, 'active' => 1, 'created_by' => null,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $this->info("Extras: FAQs +$nFaq · Respuestas predefinidas +$nCan" . ($apply ? '' : ' (dry-run)'));
+    }
+
+    /** Palabras clave para el buscador del portal, a partir de la pregunta (sin vacías/cortas). */
+    private static function keywordsDe(string $q): ?string
+    {
+        $q = mb_strtolower(strip_tags($q));
+        $q = preg_replace('/[¿?¡!.,;:()"\x27—–\-]/u', ' ', $q);
+        $stop = ['el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'que', 'como', 'cómo', 'en', 'no', 'si', 'sí', 'al', 'por', 'para', 'con', 'una', 'qué', 'han', 'hay', 'está', 'esta', 'este'];
+        $words = array_values(array_unique(array_filter(
+            preg_split('/\s+/', trim($q)),
+            fn ($w) => mb_strlen($w) >= 4 && !in_array($w, $stop, true)
+        )));
+        return $words ? mb_substr(implode(', ', array_slice($words, 0, 8)), 0, 500) : null;
+    }
+
+    /** Atajo «/» único a partir del título (slug, ≤36, sin choques). */
+    private function shortcutUnico(string $title, array &$used): string
+    {
+        $base = mb_substr(Str::slug($title, '-') ?: 'resp', 0, 36);
+        $s = $base; $i = 1;
+        while (isset($used[$s])) $s = mb_substr($base, 0, 33) . '-' . (++$i);
+        $used[$s] = true;
+        return $s;
     }
 
     /** Acumula una ejecución de cron en su grupo (por nombre+params). No escribe aún. */
