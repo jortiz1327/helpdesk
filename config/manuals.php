@@ -59,8 +59,14 @@ return [
             'perms' => ['support.config'], // interno: encargado y superadmin la descargan para el cliente
         ],
 
+        'aplicacion' => [
+            'title' => 'Guía general de la plataforma',
+            'desc'  => 'El mapa de todo el sistema: áreas, vocabulario y cómo encaja cada pieza.',
+            'file'  => '05-aplicacion.pdf',
+            'perms' => ['*'], // visión general: cualquier usuario con sesión
+        ],
+
         // Próximos (se activan al dejar su PDF en resources/manuals/ y añadirlos aquí):
-        //   aplicacion        → 05-aplicacion.pdf         · perms ['*']
         //   potencialidad     → 06-potencialidad.pdf      · perms ['settings.manage']
     ],
 

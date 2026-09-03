@@ -42,6 +42,7 @@ class ManualsAccessTest extends TestCase
         $keys = $this->claves($r->json());
 
         $this->assertContains('usuario_soporte', $keys);
+        $this->assertContains('aplicacion', $keys);           // la guía general la ve todo el mundo ('*')
         $this->assertNotContains('usuario_campanas', $keys);
         $this->assertNotContains('roles', $keys);
         $this->assertNotContains('encargado_soporte', $keys); // manual de gestión, no de agente
@@ -69,6 +70,7 @@ class ManualsAccessTest extends TestCase
 
         $this->assertContains('usuario_campanas', $keys);
         $this->assertContains('roles', $keys);          // tiene campaigns.delete
+        $this->assertContains('aplicacion', $keys);     // guía general ('*')
         $this->assertNotContains('usuario_soporte', $keys);
     }
 
@@ -83,6 +85,7 @@ class ManualsAccessTest extends TestCase
         $this->assertContains('roles', $keys);
         $this->assertContains('encargado_soporte', $keys);
         $this->assertContains('cliente', $keys);
+        $this->assertContains('aplicacion', $keys);
     }
 
     public function test_la_descarga_respeta_el_permiso(): void
