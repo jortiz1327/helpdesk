@@ -72,6 +72,11 @@ class CampaignsController extends Controller
             return $this->estimate($request);
         }
 
+        // Historial/trazabilidad de campañas (con coste real). Solo lectura.
+        if ($request->isMethod('get') && $action === 'history') {
+            return $this->history($request);
+        }
+
         if ($request->isMethod('get') && $request->query('id')) {
             return $this->detail((int) $request->query('id'));
         }
@@ -138,15 +143,77 @@ class CampaignsController extends Controller
             }
         }
 
-        $rate = self::tarifaCategoria($category);
-        return response()->json([
+        // El COSTE solo se muestra al superadmin; al resto, el resumen sin importe.
+        $isSuper = (bool) $request->user()?->hasRole(config('rbac.super_role'));
+        $resp = [
             'ok'         => true,
             'recipients' => $recipients,
             'excluded'   => $excluded,
             'category'   => strtoupper($category),
-            'rate'       => $rate,
-            'cost'       => round($recipients * $rate, 2),
+            'show_cost'  => $isSuper,
             'currency'   => 'EUR',
+        ];
+        if ($isSuper) {
+            $rate = self::tarifaCategoria($category);
+            $resp['rate'] = $rate;
+            $resp['cost'] = round($recipients * $rate, 2);
+        }
+        return response()->json($resp);
+    }
+
+    /**
+     * Historial de campañas con trazabilidad y coste real:
+     * quién la lanzó, destino, plantilla, categoría, resultados (enviados/entregados/
+     * leídos/fallidos) y coste (entregados × tarifa aplicada). Más totales del mes.
+     */
+    protected function history(Request $request)
+    {
+        $rows = DB::select("
+            SELECT c.id, c.title, c.channel, c.template_name, c.category, c.unit_cost, c.status,
+                   c.total, c.sent, c.failed, c.scheduled_at, c.created_at,
+                   COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name,
+                   u.name AS by_name,
+                   (SELECT COUNT(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status IN ('delivered','read')) AS delivered,
+                   (SELECT COUNT(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status = 'read') AS read_count
+            FROM campaigns c
+            LEFT JOIN phonebooks p ON p.id = c.phonebook_id
+            LEFT JOIN labels l ON l.id = c.label_id
+            LEFT JOIN users u ON u.id = c.created_by
+            ORDER BY c.id DESC LIMIT 300
+        ");
+
+        // El COSTE (y la tarifa) solo se exponen al superadmin. El resto ve la
+        // trazabilidad completa (destino, plantilla, categoría, quién, resultados) sin importes.
+        $isSuper = (bool) $request->user()?->hasRole(config('rbac.super_role'));
+
+        $inicioMes = date('Y-m-01 00:00:00');
+        $costeMes = 0.0; $nMes = 0; $costeAll = 0.0;
+        foreach ($rows as $r) {
+            $r->delivered  = (int) $r->delivered;
+            $r->read_count = (int) $r->read_count;
+            $r->sent       = (int) $r->sent;
+            $r->failed     = (int) $r->failed;
+            $r->total      = (int) $r->total;
+            $unit = (float) $r->unit_cost;
+            // Coste real = entregados × tarifa (solo WhatsApp; el correo no lo cobra Meta).
+            $cost = $r->channel === 'whatsapp' ? round($r->delivered * $unit, 2) : 0.0;
+            $costeAll += $cost;
+            if ((string) $r->created_at >= $inicioMes) { $costeMes += $cost; $nMes++; }
+            if ($isSuper) { $r->cost = $cost; $r->unit_cost = $unit; }
+            else { unset($r->unit_cost); }   // no filtrar ni tarifa ni coste al usuario común
+        }
+
+        return response()->json([
+            'ok'        => true,
+            'show_cost' => $isSuper,
+            'campaigns' => $rows,
+            'totals'    => $isSuper ? [
+                'month_cost'  => round($costeMes, 2),
+                'month_count' => $nMes,
+                'all_cost'    => round($costeAll, 2),
+                'all_count'   => count($rows),
+                'currency'    => 'EUR',
+            ] : ['month_count' => $nMes, 'all_count' => count($rows)],
         ]);
     }
 
@@ -223,11 +290,15 @@ class CampaignsController extends Controller
             $excluded = count($raw) - count($recipients);
             if (!$recipients) return response()->json(['ok' => false, 'error' => 'Todos los contactos del destino están dados de baja'], 400);
 
+            // Trazabilidad/coste: categoría de la plantilla + tarifa aplicada AHORA (así el
+            // histórico no se recalcula si luego cambian las tarifas).
+            $cat = strtoupper((string) $request->input('category', ''));
             $campos = [
                 'channel' => 'whatsapp', 'template_name' => $template, 'language' => $lang,
                 'components' => json_encode($components, JSON_UNESCAPED_UNICODE),
                 'subject' => null, 'body_html' => null,
                 'phonebook_id' => $pbId ?: null, 'label_id' => $labelId ?: null,
+                'category' => $cat ?: null, 'unit_cost' => self::tarifaCategoria($cat),
             ];
         }
 
@@ -242,7 +313,8 @@ class CampaignsController extends Controller
 
         $campaignId = DB::table('campaigns')->insertGetId(array_merge([
             'title' => $title, 'status' => 'scheduled', 'scheduled_at' => $scheduledAt,
-            'total' => count($recipients), 'created_at' => now(), 'updated_at' => now(),
+            'total' => count($recipients), 'created_by' => $request->user()?->id,
+            'created_at' => now(), 'updated_at' => now(),
         ], $campos));
 
         $insert = array_map(fn ($r) => [

@@ -576,6 +576,8 @@ export const api = {
   // Estimación de coste antes de enviar: destinatarios × tarifa de la categoría
   estimateCampaign: ({ category = '', phonebook_id = 0, label_id = 0 }) =>
     req(`campaigns.php?action=estimate&category=${encodeURIComponent(category)}&phonebook_id=${phonebook_id || 0}&label_id=${label_id || 0}`),
+  // Historial/trazabilidad de campañas (con coste real)
+  campaignHistory: () => req('campaigns.php?action=history'),
   runCampaign: (id) => req(`campaigns.php?action=run&id=${id}`, { method: 'POST' }),
   cancelCampaign: (id) => req(`campaigns.php?action=cancel&id=${id}`, { method: 'POST' }),
   deleteCampaign: (id) => req(`campaigns.php?id=${id}`, { method: 'DELETE' }),

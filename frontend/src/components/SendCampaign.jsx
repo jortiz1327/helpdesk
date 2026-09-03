@@ -159,6 +159,7 @@ export default function SendCampaign({ onDone }) {
     setSending(true)
     const r = await api.createCampaign({
       title, template_name: picked.name, language: picked.language || 'es',
+      category: picked.category,
       components: buildComponents(),
       phonebook_id: destType === 'phonebook' ? Number(pbId) : 0,
       label_id: destType === 'label' ? Number(labelId) : 0,
@@ -377,13 +378,15 @@ export default function SendCampaign({ onDone }) {
                       <div style={ROW}><span>Destinatarios</span><b style={{ fontVariantNumeric: 'tabular-nums' }}>{estimate.recipients.toLocaleString('es-ES')}</b></div>
                       {estimate.excluded > 0 && <div style={{ ...ROW, color: 'var(--ink-3, #888)', fontSize: 12.5 }}><span>Excluidos por baja</span><span>{estimate.excluded}</span></div>}
                       <div style={ROW}><span>Plantilla</span><span>{picked.name}</span></div>
-                      <div style={ROW}><span>Categoría</span><span style={{ color: catColor(picked.category), fontWeight: 600 }}>{picked.category} · {estimate.rate > 0 ? `${eur(estimate.rate, 4)}/msg` : 'gratis'}</span></div>
-                      <div style={{ ...ROW, borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 2 }}>
-                        <span style={{ fontWeight: 700 }}>Coste estimado</span>
-                        <b style={{ fontSize: 18, color: estimate.cost > 0 ? 'var(--ink)' : 'var(--secondary)' }}>{estimate.cost > 0 ? `≈ ${eur(estimate.cost)}` : 'Gratis'}</b>
-                      </div>
+                      <div style={ROW}><span>Categoría</span><span style={{ color: catColor(picked.category), fontWeight: 600 }}>{picked.category}{estimate.show_cost ? ` · ${estimate.rate > 0 ? `${eur(estimate.rate, 4)}/msg` : 'gratis'}` : ''}</span></div>
+                      {estimate.show_cost && (
+                        <div style={{ ...ROW, borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 2 }}>
+                          <span style={{ fontWeight: 700 }}>Coste estimado</span>
+                          <b style={{ fontSize: 18, color: estimate.cost > 0 ? 'var(--ink)' : 'var(--secondary)' }}>{estimate.cost > 0 ? `≈ ${eur(estimate.cost)}` : 'Gratis'}</b>
+                        </div>
+                      )}
                     </div>
-                    <p className="hint" style={{ marginTop: 8 }}>Estimación orientativa. Meta cobra según país y ventana de 24 h; los mensajes de servicio/utilidad dentro de la ventana son gratis.</p>
+                    {estimate.show_cost && <p className="hint" style={{ marginTop: 8 }}>Estimación orientativa. Meta cobra según país y ventana de 24 h; los mensajes de servicio/utilidad dentro de la ventana son gratis.</p>}
                   </div>
                 )}
 

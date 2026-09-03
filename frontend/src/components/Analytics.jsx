@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
+import { fmtDateShort } from '../util.js'
 import LoadError from './LoadError.jsx'
+
+const eur = (n) => '€' + Number(n || 0).toFixed(2).replace('.', ',')
+const catColor = (c) => ({ MARKETING: 'var(--warn)', UTILITY: 'var(--primary)', AUTHENTICATION: 'var(--info)' }[c] || 'var(--secondary)')
+const ESTADO = { scheduled: 'Programada', sending: 'Enviando', sent: 'Enviada', done: 'Enviada', completed: 'Enviada', canceled: 'Cancelada' }
 
 const fmtDur = (s) => {
   if (s == null) return '—'
@@ -33,6 +38,7 @@ function Bars({ items, color }) {
 export default function Analytics() {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(false)
+  const [tab, setTab] = useState('resumen')          // 'resumen' | 'historial'
   const [allLabels, setAllLabels] = useState(false) // ver todas las etiquetas o solo el top
   const load = useCallback(() => { setErr(false); api.analytics().then((r) => r.ok ? setD(r) : setErr(true)).catch(() => setErr(true)) }, [])
   useEffect(() => { load() }, [load])
@@ -66,6 +72,12 @@ export default function Analytics() {
 
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1180 }}>
+          <div className="kb-seg" style={{ marginBottom: 16 }}>
+            <button className={tab === 'resumen' ? 'on' : ''} onClick={() => setTab('resumen')}>Resumen</button>
+            <button className={tab === 'historial' ? 'on' : ''} onClick={() => setTab('historial')}>Historial de campañas</button>
+          </div>
+
+          {tab === 'historial' ? <CampaignHistory /> : (<>
           <div className="stat-grid">
             {cards.map((c) => (
               <div className="stat-card" key={c.label}>
@@ -123,8 +135,88 @@ export default function Analytics() {
               <Bars items={d.by_agent.map((a) => ({ k: a.name, v: Number(a.n) }))} color="var(--primary)" />
             </div>
           </div>
+          </>)}
         </div>
       </div>
+    </>
+  )
+}
+
+/* -------------------- Historial / trazabilidad de campañas --------------------
+ * Cada campaña: quién la lanzó, cuándo, destino, plantilla, categoría, resultados
+ * (enviados/entregados/leídos/fallidos) y coste real (entregados × tarifa).
+ * ---------------------------------------------------------------------------- */
+const TD = { padding: '9px 12px', borderBottom: '1px solid var(--line)', fontSize: 13, whiteSpace: 'nowrap' }
+const TH = { ...TD, textAlign: 'left', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3, #8a94a3)', fontWeight: 700, position: 'sticky', top: 0, background: 'var(--surface)' }
+
+function CampaignHistory() {
+  const [d, setD] = useState(null)
+  const [err, setErr] = useState(false)
+  const load = useCallback(() => { setErr(false); api.campaignHistory().then((r) => r.ok ? setD(r) : setErr(true)).catch(() => setErr(true)) }, [])
+  useEffect(() => { load() }, [load])
+
+  if (err && !d) return <LoadError onRetry={load} msg="No se pudo cargar el historial" />
+  if (!d) return <div className="center-load"><div className="spinner" /></div>
+
+  const t = d.totals
+  const cards = d.show_cost ? [
+    { label: 'Gasto este mes', value: eur(t.month_cost), sub: `${t.month_count} campaña${t.month_count === 1 ? '' : 's'}`, color: 'var(--warn)' },
+    { label: 'Gasto (histórico)', value: eur(t.all_cost), sub: `${t.all_count} campañas`, color: 'var(--primary)' },
+  ] : [
+    { label: 'Campañas este mes', value: t.month_count, sub: 'lanzadas este mes', color: 'var(--primary)' },
+    { label: 'Campañas (histórico)', value: t.all_count, sub: 'en total', color: 'var(--info)' },
+  ]
+
+  return (
+    <>
+      <div className="stat-grid">
+        {cards.map((c) => (
+          <div className="stat-card" key={c.label}>
+            <div className="stat-num" style={{ color: c.color, marginTop: 0 }}>{c.value}</div>
+            <div className="stat-sub">{c.label}</div>
+            <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{c.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {d.campaigns.length === 0 ? (
+        <div className="empty"><div className="ico"><Icon.send /></div><p>Aún no hay campañas.</p></div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflowX: 'auto', marginTop: 16 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 980 }}>
+            <thead>
+              <tr>
+                <th style={TH}>Fecha</th><th style={TH}>Campaña</th><th style={TH}>Canal</th>
+                <th style={TH}>Destino</th><th style={TH}>Plantilla</th><th style={TH}>Categoría</th>
+                <th style={TH}>Lanzó</th><th style={{ ...TH, textAlign: 'right' }}>Dest.</th>
+                <th style={{ ...TH, textAlign: 'right' }}>Entreg.</th><th style={{ ...TH, textAlign: 'right' }}>Leídos</th>
+                <th style={{ ...TH, textAlign: 'right' }}>Fallidos</th><th style={TH}>Estado</th>
+                {d.show_cost && <th style={{ ...TH, textAlign: 'right' }}>Coste</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {d.campaigns.map((c) => (
+                <tr key={c.id}>
+                  <td style={TD}>{fmtDateShort(c.created_at)}</td>
+                  <td style={{ ...TD, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{c.title}</td>
+                  <td style={TD}>{c.channel === 'email' ? 'Correo' : 'WhatsApp'}</td>
+                  <td style={{ ...TD, whiteSpace: 'normal', maxWidth: 160 }}>{c.source_name || '—'}</td>
+                  <td style={TD}>{c.template_name || '—'}</td>
+                  <td style={TD}>{c.category ? <span className="pill gray sm" style={{ color: catColor(c.category) }}>{c.category}</span> : '—'}</td>
+                  <td style={TD}>{c.by_name || <span className="muted">—</span>}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.total}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.delivered}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.read_count}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: c.failed ? 'var(--danger)' : 'inherit' }}>{c.failed}</td>
+                  <td style={TD}><span className="pill gray sm">{ESTADO[c.status] || c.status}</span></td>
+                  {d.show_cost && <td style={{ ...TD, textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{c.channel === 'email' ? '—' : (c.cost > 0 ? eur(c.cost) : 'Gratis')}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {d.show_cost && <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Coste real = entregados × tarifa aplicada al lanzar. Las campañas anteriores a esta función no tienen tarifa guardada (coste €0,00).</p>}
     </>
   )
 }
