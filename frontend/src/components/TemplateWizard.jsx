@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
@@ -57,7 +57,8 @@ function fromTemplate(t) {
   const buttons = (btns?.buttons || []).map((x) =>
     x.type === 'URL' ? { type: 'URL', text: x.text, url: x.url }
       : x.type === 'PHONE_NUMBER' ? { type: 'PHONE_NUMBER', text: x.text, phone: x.phone_number }
-        : { type: 'QUICK_REPLY', text: x.text })
+        : x.type === 'FLOW' ? { type: 'FLOW', text: x.text, flow_id: x.flow_id, navigate_screen: x.navigate_screen || 'FORM' }
+          : { type: 'QUICK_REPLY', text: x.text })
   return { ...blank, type: 'STANDARD', name: t.name, language: t.language, category: t.category || 'UTILITY', header, body: { text: b?.text || '', examples }, footer: { text: foot?.text || '' }, buttons }
 }
 
@@ -171,10 +172,13 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
   const [showPreview, setShowPreview] = useState(true)
   const [btnMode, setBtnMode] = useState(() => {
     const bs = editing ? ((editing.components || []).find((c) => c.type === 'BUTTONS')?.buttons || []) : []
-    return bs.length ? (bs[0].type === 'QUICK_REPLY' ? 'QUICK_REPLY' : 'CTA') : 'NONE'
+    return bs.length ? (bs[0].type === 'QUICK_REPLY' ? 'QUICK_REPLY' : bs[0].type === 'FLOW' ? 'FLOW' : 'CTA') : 'NONE'
   })
   const [ctaKind, setCtaKind] = useState('URL')
-  const [draft, setDraft] = useState({ text: '', value: '' })
+  const [draft, setDraft] = useState({ text: '', value: '', flowId: '' })
+  // Formularios publicados (con Flow en Meta) para el botón de tipo Formulario
+  const [flows, setFlows] = useState([])
+  useEffect(() => { api.listForms().then((d) => setFlows((d.forms || []).filter((x) => x.status === 'published' && x.meta_flow_id))) }, [])
 
   const STEPS = STEP_DEFS[f.type]
   const upd = (patch) => setF((s) => ({ ...s, ...patch }))
@@ -208,13 +212,21 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
   }
 
   // ---- botones estándar ----
-  const setMode = (m) => { setBtnMode(m); upd({ buttons: [] }); setDraft({ text: '', value: '' }) }
+  const setMode = (m) => { setBtnMode(m); upd({ buttons: [] }); setDraft({ text: '', value: '', flowId: '' }) }
   const addDraft = () => {
     const text = draft.text.trim(); const cap = btnMode === 'QUICK_REPLY' ? 3 : 2
     if (!text || f.buttons.length >= cap) return
     if (btnMode === 'QUICK_REPLY') upd({ buttons: [...f.buttons, { type: 'QUICK_REPLY', text }] })
     else { const v = draft.value.trim(); if (!v) return; upd({ buttons: [...f.buttons, ctaKind === 'URL' ? { type: 'URL', text, url: v } : { type: 'PHONE_NUMBER', text, phone: v }] }) }
-    setDraft({ text: '', value: '' })
+    setDraft({ text: '', value: '', flowId: '' })
+  }
+  // Botón de Formulario (Flow): uno solo, enlazado a un formulario publicado.
+  const addFlow = () => {
+    const text = draft.text.trim()
+    if (!text || !draft.flowId || f.buttons.length >= 1) return
+    const form = flows.find((x) => String(x.meta_flow_id) === String(draft.flowId))
+    upd({ buttons: [{ type: 'FLOW', text, flow_id: draft.flowId, form_name: form?.name, navigate_screen: 'FORM' }] })
+    setDraft({ text: '', value: '', flowId: '' })
   }
   const delButton = (i) => upd({ buttons: f.buttons.filter((_, j) => j !== i) })
 
@@ -378,7 +390,7 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
               <>
                 <div className="lbl">Tipo de botón</div>
                 <div className="radio-row">
-                  {[['NONE', 'Ninguno'], ['QUICK_REPLY', 'Respuesta rápida'], ['CTA', 'Llamada a la acción']].map(([v, t]) => (
+                  {[['NONE', 'Ninguno'], ['QUICK_REPLY', 'Respuesta rápida'], ['CTA', 'Llamada a la acción'], ['FLOW', 'Formulario']].map(([v, t]) => (
                     <label key={v} className={`radio ${btnMode === v ? 'on' : ''}`} onClick={() => setMode(v)}><span className="rd" />{t}</label>
                   ))}
                 </div>
@@ -403,12 +415,30 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
                       </div><span className="hint">{draft.text.length}/20</span>
                     </div></>
                 )}
+                {btnMode === 'FLOW' && (
+                  <><div className="lbl" style={{ marginTop: 20 }}>Botón de formulario <span className="hint">(abre un formulario en WhatsApp · máx 1)</span></div>
+                    {flows.length === 0 ? (
+                      <div className="guide"><Icon.info /><div>No tienes formularios publicados. Créalos y publícalos en <b>Formularios</b> para poder enlazarlos aquí.</div></div>
+                    ) : (
+                      <div className="add-card">
+                        <div className="add-row" style={{ marginBottom: 12 }}>
+                          <Select block value={draft.flowId} onChange={(v) => setDraft({ ...draft, flowId: v })} placeholder="Elige un formulario…"
+                            options={flows.map((x) => ({ value: x.meta_flow_id, label: x.name }))} />
+                        </div>
+                        <div className="add-row">
+                          <input placeholder="Texto del botón…" maxLength={20} value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addFlow()} />
+                          <button className="btn" disabled={!draft.text.trim() || !draft.flowId || f.buttons.length >= 1} onClick={addFlow}>Añadir</button>
+                        </div><span className="hint">{draft.text.length}/20</span>
+                      </div>
+                    )}
+                  </>
+                )}
                 {btnMode !== 'NONE' && f.buttons.length > 0 && (
                   <div className="btn-list">{f.buttons.map((b, i) => (
-                    <div className="btn-item" key={i}><span className="pill gray">{b.type === 'URL' ? 'URL' : b.type === 'PHONE_NUMBER' ? 'Teléfono' : 'Respuesta'}</span><b>{b.text}</b><span className="bv">{b.url || b.phone || ''}</span><button className="icon-btn" onClick={() => delButton(i)} style={{ color: 'var(--danger)', marginLeft: 'auto' }}><Icon.trash /></button></div>
+                    <div className="btn-item" key={i}><span className="pill gray">{b.type === 'URL' ? 'URL' : b.type === 'PHONE_NUMBER' ? 'Teléfono' : b.type === 'FLOW' ? 'Formulario' : 'Respuesta'}</span><b>{b.text}</b><span className="bv">{b.url || b.phone || b.form_name || ''}</span><button className="icon-btn" onClick={() => delButton(i)} style={{ color: 'var(--danger)', marginLeft: 'auto' }}><Icon.trash /></button></div>
                   ))}</div>
                 )}
-                <div className="guide"><Icon.info /><div><b>Recomendaciones</b><ul><li>Máximo 3 botones de respuesta rápida.</li><li>Máximo 2 botones de llamada a la acción.</li><li>Texto del botón: máximo 20 caracteres.</li></ul></div></div>
+                <div className="guide"><Icon.info /><div><b>Recomendaciones</b><ul><li>Máximo 3 botones de respuesta rápida.</li><li>Máximo 2 botones de llamada a la acción.</li><li>El botón de <b>Formulario</b> va solo (1 por plantilla) y necesita un formulario publicado.</li><li>Texto del botón: máximo 20 caracteres.</li></ul></div></div>
               </>
             )}
 

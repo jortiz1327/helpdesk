@@ -137,6 +137,16 @@ class TemplatesController extends Controller
                 $btns[] = ['type' => 'URL', 'text' => $b['text'], 'url' => $b['url']];
             } elseif ($t === 'PHONE_NUMBER' && !empty($b['phone'])) {
                 $btns[] = ['type' => 'PHONE_NUMBER', 'text' => $b['text'], 'phone_number' => $b['phone']];
+            } elseif ($t === 'FLOW' && !empty($b['flow_id'])) {
+                // Botón que abre un formulario (WhatsApp Flow). Permite mandar el formulario
+                // en una plantilla (campaña), a diferencia del envío suelto por el chat.
+                $btns[] = [
+                    'type'            => 'FLOW',
+                    'text'            => $b['text'],
+                    'flow_id'         => (string) $b['flow_id'],
+                    'flow_action'     => 'navigate',
+                    'navigate_screen' => $b['navigate_screen'] ?? 'FORM',
+                ];
             } elseif (!empty($b['text'])) {
                 $btns[] = ['type' => 'QUICK_REPLY', 'text' => $b['text']];
             }
