@@ -357,7 +357,11 @@ class ImportFaveo extends Command
     private function importExtras($fav, bool $apply): void
     {
         // --- FAQs (kb_article → faqs) ---
-        $faqExist = array_flip(DB::table('faqs')->pluck('question')->map(fn ($q) => mb_strtolower(trim((string) $q)))->all());
+        // Se REEMPLAZAN: se borran las FAQs que hubiera y quedan SOLO las de Faveo (el
+        // usuario no quiere que convivan las antiguas con las importadas). Las respuestas
+        // predefinidas (más abajo) SÍ se añaden sin borrar (dedup).
+        if ($apply) DB::table('faqs')->delete();
+        $faqExist = [];   // tras el borrado no hay ninguna; solo se dedup entre las de Faveo
         $nFaq = 0;
         foreach ($fav->table('kb_article')->orderBy('id')->get(['name', 'description', 'status']) as $a) {
             $q = trim(self::texto((string) $a->name));

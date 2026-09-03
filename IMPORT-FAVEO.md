@@ -21,9 +21,10 @@ Toda la lógica vive en dos comandos artisan; **no hace falta SSH ni una BD apar
 - **Crones** (correos automáticos: «Cron Job Execution Log», etc.), estén cerrados o en la
   papelera → apartado **Crones**, agrupados y cerrados.
 - **Papelera** de Faveo que NO es cron y **rebotes** (MAILER-DAEMON) → se descartan.
-- **Extras** (`--extras`, sin borrar los que ya haya):
-  - `kb_article` → **FAQs** del portal (publicadas si lo estaban en Faveo).
-  - `canned_response` → **respuestas predefinidas** («/»).
+- **Extras** (`--extras`):
+  - `kb_article` → **FAQs** del portal. **Reemplazan**: se borran las FAQs que hubiera y
+    quedan solo las de Faveo (no conviven las antiguas con las nuevas).
+  - `canned_response` → **respuestas predefinidas** («/»). Se **añaden** sin borrar (dedup).
 
 Cifras de referencia (dump de sep-2026, 7.256 tickets): **2.818 reales**, **4.293 crones**,
 51 papelera, 91 rebotes, 3 sin correo. Historial: ~2.800 creados, ~2.800 estados, ~2.170
