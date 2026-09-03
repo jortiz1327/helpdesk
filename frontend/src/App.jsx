@@ -5,6 +5,7 @@ import {
     useCallback,
     useRef,
     useEffect,
+    useLayoutEffect,
 } from "react";
 import { Icon } from "./icons.jsx";
 import { api, onUnauthorized, setToken } from "./api.js";
@@ -628,14 +629,23 @@ export default function App() {
         };
     }, [auth.state]);
 
-    // Si el usuario no tiene permiso para la vista actual, se le lleva a la primera que sí pueda ver.
-    useEffect(() => {
+    // Si el usuario no tiene permiso para la vista actual, se le lleva a la HOME de su
+    // primera área accesible (no a un ítem cualquiera del menú). Antes se cogía «la primera
+    // vista que pasara el permiso», pero como `analytics.view` lo comparten las Analíticas de
+    // Campañas y los Informes de Soporte (vista `reports`, oculta y antes en el menú), un
+    // usuario de Campañas aterrizaba en los informes de SOPORTE. La home del área es lo suyo.
+    // useLayoutEffect (no useEffect) para corregir la vista ANTES del pintado: así no se ve ni
+    // un fotograma de la pantalla de soporte al entrar con un usuario que no es de soporte.
+    useLayoutEffect(() => {
         if (auth.state !== "in" || view === "account") return;
         const item = NAV.find((n) => n.key === view);
         if (item && !allows(auth.user, item)) {
+            const home = areasFor(auth.user)[0]?.home;
             setView(
-                (NAV.find((n) => allows(auth.user, n)) || { key: "dashboard" })
-                    .key,
+                home ||
+                    (NAV.find((n) => allows(auth.user, n) && !n.hidden) || {
+                        key: "dashboard",
+                    }).key,
             );
         }
     }, [auth.state, auth.user, view]);
