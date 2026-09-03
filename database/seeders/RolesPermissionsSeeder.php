@@ -47,6 +47,23 @@ class RolesPermissionsSeeder extends Seeder
             }
         }
 
+        // 2b. BACKFILL de permisos NUEVOS a roles YA existentes. Normalmente los permisos
+        //     solo se fijan al crear el rol (arriba), para no pisar lo editado en la UI; pero
+        //     un permiso recién añadido al código NO pudo editarse nunca, así que se concede
+        //     (additive) a los roles que la config dice que deben tenerlo. Evita que cambiar
+        //     el gateo de una función a un permiso nuevo deje sin acceso a los roles de siempre.
+        $nuevos = ['organizations.view', 'organizations.edit'];
+        foreach (config('rbac.roles') as $name => $def) {
+            if (($def['permissions'] ?? null) === '*') continue;
+            $role = Role::where(['name' => $name, 'guard_name' => 'web'])->first();
+            if (!$role) continue;
+            foreach ($nuevos as $p) {
+                if (in_array($p, $def['permissions'] ?? [], true) && !$role->hasPermissionTo($p)) {
+                    $role->givePermissionTo($p);
+                }
+            }
+        }
+
         // 3. Podar permisos que ya NO están en la config (los permisos SÍ están atados
         //    al código, así que su catálogo es fijo). Los roles NO se podan.
         Permission::whereNotIn('name', array_keys(config('rbac.permissions')))->delete();

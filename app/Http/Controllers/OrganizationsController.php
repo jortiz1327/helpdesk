@@ -218,10 +218,10 @@ class OrganizationsController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /** Crear/editar/borrar el árbol exige permiso de edición de contactos. */
+    /** Crear/editar/borrar el árbol exige el permiso de edición de organizaciones. */
     protected function soloEditores(Request $request)
     {
-        if (!$request->user()?->can('contacts.edit')) {
+        if (!$request->user()?->can('organizations.edit')) {
             return response()->json(['ok' => false, 'error' => 'No tienes permiso para gestionar la organización'], 403);
         }
         return null;

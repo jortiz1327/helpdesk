@@ -47,6 +47,8 @@ return [
         // --- Contactos ---
         'contacts.access'    => ['Ver contactos',                              'contacts'],
         'contacts.edit'      => ['Editar contactos y etiquetas',               'contacts'],
+        'organizations.view' => ['Ver organizaciones (grupos, marcas, sedes)', 'contacts'],
+        'organizations.edit' => ['Crear y editar organizaciones',              'contacts'],
 
         // --- Campañas / difusiones ---
         'campaigns.access'   => ['Acceder a Campañas',                         'campaigns'],
@@ -94,6 +96,7 @@ return [
                 'tickets.categorize', 'tickets.close', 'tickets.delete',
                 'tickets.view_times', 'agents.view', 'tickets.export', 'support.config',
                 'contacts.access', 'contacts.edit',
+                'organizations.view', 'organizations.edit',
                 'shifts.access', 'shifts.manage',
                 'admin.access', 'analytics.view',
             ],
@@ -110,6 +113,7 @@ return [
             'permissions' => [
                 'helpdesk.access', 'tickets.create', 'tickets.reply', 'tickets.categorize', 'tickets.close',
                 'contacts.access',
+                'organizations.view',
                 'shifts.access',
             ],
         ],

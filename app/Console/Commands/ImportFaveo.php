@@ -105,6 +105,15 @@ class ImportFaveo extends Command
             $this->warn("Borrados $n tickets previos (source=$source).");
         }
 
+        // SLA APAGADO por defecto tras traer el histórico: los tickets viejos (muchos
+        // abiertos desde hace años) no deben contar como «SLA vencido» ni disparar avisos.
+        // Se reactiva cuando el equipo quiera en Ajustes → Horario y SLA.
+        if ($apply) {
+            \App\Models\Setting::put('sla_active', '0');
+            \App\Models\Setting::put('sla_alerts_active', '0');
+            $this->warn('SLA DESACTIVADO por defecto (relojes y avisos). Reactívalo en Ajustes cuando estéis listos.');
+        }
+
         // Mapas: agentes (para dirección), categorías (por nombre, portable), prioridades.
         $this->agentIds = $fav->table('users')->whereIn('role', ['agent', 'admin'])->pluck('id')->all();
 
