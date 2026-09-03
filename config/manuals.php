@@ -66,8 +66,12 @@ return [
             'perms' => ['*'], // visión general: cualquier usuario con sesión
         ],
 
-        // Próximos (se activan al dejar su PDF en resources/manuals/ y añadirlos aquí):
-        //   potencialidad     → 06-potencialidad.pdf      · perms ['settings.manage']
+        'potencialidad' => [
+            'title' => 'Potencialidad y hoja de ruta',
+            'desc'  => 'Documento estratégico: lo que ya está construido y hacia dónde puede crecer la plataforma.',
+            'file'  => '06-potencialidad.pdf',
+            'perms' => ['settings.manage'], // solo superadministrador
+        ],
     ],
 
 ];

@@ -47,6 +47,7 @@ class ManualsAccessTest extends TestCase
         $this->assertNotContains('roles', $keys);
         $this->assertNotContains('encargado_soporte', $keys); // manual de gestión, no de agente
         $this->assertNotContains('cliente', $keys);           // el agente no gestiona el portal
+        $this->assertNotContains('potencialidad', $keys);     // hoja de ruta: solo superadmin
     }
 
     public function test_el_encargado_de_soporte_ve_su_manual_de_gestion(): void
@@ -60,6 +61,7 @@ class ManualsAccessTest extends TestCase
         $this->assertContains('usuario_soporte', $keys);
         $this->assertContains('roles', $keys);
         $this->assertNotContains('usuario_campanas', $keys);
+        $this->assertNotContains('potencialidad', $keys); // la hoja de ruta es solo del superadmin
     }
 
     public function test_el_encargado_de_campanas_ve_campanas_y_roles_pero_no_soporte(): void
@@ -86,6 +88,7 @@ class ManualsAccessTest extends TestCase
         $this->assertContains('encargado_soporte', $keys);
         $this->assertContains('cliente', $keys);
         $this->assertContains('aplicacion', $keys);
+        $this->assertContains('potencialidad', $keys); // solo el superadmin (settings.manage)
     }
 
     public function test_la_descarga_respeta_el_permiso(): void
