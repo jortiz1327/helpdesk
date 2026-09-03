@@ -35,5 +35,16 @@ class AppServiceProvider extends ServiceProvider
         Gate::before(function (User $user) {
             return $user->hasRole(config('rbac.super_role')) ? true : null;
         });
+
+        /*
+         * El «Chat en vivo» (conversaciones de WhatsApp) es un apartado de CAMPAÑAS,
+         * pero comparte endpoints con el Helpdesk (mismo controlador de conversaciones
+         * y de envío). Por eso se accede/opera con permisos de CUALQUIERA de las dos
+         * áreas: así un encargado de campañas (sin helpdesk.access ni tickets.reply)
+         * ve y responde su Chat en vivo, y el Helpdesk sigue exigiendo tickets.reply
+         * para responder tickets (campaigns.access es falso para sus roles).
+         */
+        Gate::define('inbox.access', fn (User $u) => $u->can('campaigns.access') || $u->can('helpdesk.access'));
+        Gate::define('inbox.reply',  fn (User $u) => $u->can('campaigns.access') || $u->can('tickets.reply'));
     }
 }

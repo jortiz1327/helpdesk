@@ -182,15 +182,18 @@ Route::middleware('token')->group(function () {
     Route::match(['get', 'post'], 'cron_alerts.php', [CronAlertsController::class, 'handle'])
         ->middleware('can:helpdesk.access');
 
-    // --- Helpdesk (bandeja / conversaciones) ---
+    // --- Bandeja / conversaciones (Helpdesk tickets Y Chat en vivo de Campañas) ---
+    // inbox.access = helpdesk.access O campaigns.access (ver AppServiceProvider): el
+    // Chat en vivo es de Campañas y comparte este controlador con el Helpdesk.
     Route::match(['get', 'post'], 'conversations.php', [ConversationController::class, 'handle'])
-        ->middleware('can:helpdesk.access');
+        ->middleware('can:inbox.access');
 
-    // Responder (texto/plantilla/interactivo y multimedia)
-    Route::post('send.php', [SendController::class, 'handle'])->middleware('can:tickets.reply');
-    Route::post('send_media.php', [SendMediaController::class, 'handle'])->middleware('can:tickets.reply');
+    // Responder (texto/plantilla/interactivo y multimedia). inbox.reply = campaigns.access
+    // O tickets.reply: campañas responde su Chat en vivo; el Helpdesk sigue con tickets.reply.
+    Route::post('send.php', [SendController::class, 'handle'])->middleware('can:inbox.reply');
+    Route::post('send_media.php', [SendMediaController::class, 'handle'])->middleware('can:inbox.reply');
     // Subir imagen en línea del editor (devuelve su URL firmada)
-    Route::post('inline_media.php', [InlineImageController::class, 'upload'])->middleware('can:tickets.reply');
+    Route::post('inline_media.php', [InlineImageController::class, 'upload'])->middleware('can:inbox.reply');
     // Memoria de respuestas efectivas: guardar ⭐ / sugerir parecidas / contar uso. Gestión
     // (listar/borrar) la filtra el controlador con support.config.
     Route::match(['get', 'post'], 'effective_responses.php', [\App\Http\Controllers\EffectiveResponsesController::class, 'handle'])
