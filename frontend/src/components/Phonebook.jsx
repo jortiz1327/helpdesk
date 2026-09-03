@@ -25,12 +25,30 @@ function Detail({ id, onBack }) {
   const [labels, setLabels] = useState([])
   const [raw, setRaw] = useState('')
   const [busy, setBusy] = useState(false)
+  const [search, setSearch] = useState('')
+  const [results, setResults] = useState([])
+  const [searching, setSearching] = useState(false)
+  const [addedWa, setAddedWa] = useState(new Set())
 
   const load = useCallback(() => {
     api.getPhonebook(id).then((d) => d.ok && setPb(d.phonebook))
     api.listLabels().then((d) => setLabels(d.labels || []))
   }, [id])
   useEffect(() => { load() }, [load])
+
+  // Buscar en los contactos (área Campañas) y ocultar los que ya están en la agenda.
+  useEffect(() => {
+    const q = search.trim()
+    if (!q) { setResults([]); setSearching(false); return }
+    setSearching(true)
+    const t = setTimeout(() => {
+      api.listContacts(q, 0, '', 'campaigns').then((d) => {
+        const enAgenda = new Set((pb?.contacts || []).map((x) => String(x.wa_id)))
+        setResults((d.contacts || []).filter((c) => !enAgenda.has(String(c.wa_id))).slice(0, 25))
+      }).catch(() => setResults([])).finally(() => setSearching(false))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [search, pb])
 
   const addManual = async () => {
     const contacts = parseContacts(raw)
@@ -58,6 +76,14 @@ function Detail({ id, onBack }) {
     else toast(r.error || 'Error al importar', 'err')
   }
 
+  const addOne = async (c) => {
+    setBusy(true)
+    const r = await api.addPhonebookContacts({ phonebook_id: id, contacts: [{ wa_id: c.wa_id, name: c.name }] })
+    setBusy(false)
+    if (r.ok) { setAddedWa((s) => new Set(s).add(String(c.wa_id))); toast('Añadido a la agenda'); load() }
+    else toast(r.error || 'Error al añadir', 'err')
+  }
+
   const delContact = async (cid) => { await api.deletePhonebookContact(cid); load() }
 
   if (!pb) return <div className="center-load"><div className="spinner" /></div>
@@ -78,8 +104,38 @@ function Detail({ id, onBack }) {
               <p className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>Un contacto por línea: número con prefijo de país y, opcional, nombre tras una coma.</p>
               <textarea className="cmp-textarea" rows={6} placeholder={'34649786051, Juan Pérez\n34600111222, María'} value={raw} onChange={(e) => setRaw(e.target.value)} />
               <button className="btn" disabled={busy} onClick={addManual} style={{ marginTop: 10 }}><Icon.plus /> Añadir</button>
+
               <div className="hr" style={{ margin: '16px 0' }} />
-              <div className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>O importar desde lo que ya tienes:</div>
+              <div className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>O buscar en tus contactos y añadirlos uno a uno:</div>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nombre o número…"
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--surface)', color: 'inherit', fontSize: 14 }}
+              />
+              {search.trim() !== '' && (
+                <div className="pb-list" style={{ marginTop: 8, maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 10 }}>
+                  {searching ? (
+                    <div className="muted" style={{ padding: 12, fontSize: 13 }}>Buscando…</div>
+                  ) : results.length === 0 ? (
+                    <div className="muted" style={{ padding: 12, fontSize: 13 }}>Sin resultados (o ya están todos en la agenda).</div>
+                  ) : results.map((c) => {
+                    const ya = addedWa.has(String(c.wa_id))
+                    return (
+                      <div key={c.id} className="pb-row">
+                        <span className="pb-avatar">{(c.name || c.wa_id).slice(0, 1).toUpperCase()}</span>
+                        <div className="pb-meta"><b>{c.name || '—'}</b><span className="muted">+{c.wa_id}</span></div>
+                        <button className="btn ghost sm" disabled={busy || ya} style={{ marginLeft: 'auto' }} onClick={() => addOne(c)}>
+                          {ya ? '✓ Añadido' : <><Icon.plus /> Añadir</>}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="hr" style={{ margin: '16px 0' }} />
+              <div className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>O importar en bloque:</div>
               <div className="add-row" style={{ flexWrap: 'wrap', gap: 8 }}>
                 <button className="btn ghost sm" disabled={busy} onClick={importContacts}><Icon.download /> Todos mis contactos</button>
                 {labels.map((l) => (
@@ -88,6 +144,9 @@ function Detail({ id, onBack }) {
                   </button>
                 ))}
               </div>
+              {labels.length === 0 && (
+                <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Crea etiquetas en <b>Contactos</b> para poder importar por segmento.</div>
+              )}
             </div>
 
             <div className="card" style={{ padding: 0 }}>
