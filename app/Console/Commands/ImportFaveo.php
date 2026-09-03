@@ -37,6 +37,7 @@ class ImportFaveo extends Command
         {--fresh : Borra antes lo ya importado de ese source}
         {--wipe : Borra TODOS los tickets y contactos actuales antes de importar (no solo lo del source)}
         {--extras : Importa también FAQs (kb_article) y respuestas predefinidas (canned_response), sin borrar las que ya hay}
+        {--only-extras : Importa SOLO los extras (FAQs + respuestas), sin tocar tickets ni contactos}
         {--limit=0 : Procesa solo N tickets (0=todos), para pruebas}';
 
     protected $description = 'Importa el histórico de Faveo (tickets de correo + contactos), separando los crones';
@@ -75,6 +76,12 @@ class ImportFaveo extends Command
         try { $fav->getPdo(); } catch (\Throwable $e) {
             $this->error('No conecto con la BD «' . $this->option('db') . '»: ' . $e->getMessage());
             return self::FAILURE;
+        }
+
+        // SOLO extras: ni wipe, ni agentes, ni tickets. Útil para rehacer FAQs/respuestas.
+        if ($this->option('only-extras')) {
+            $this->importExtras($fav, $apply);
+            return self::SUCCESS;
         }
 
         // BORRADO TOTAL: deja la BD limpia de tickets y contactos para cargar el histórico
@@ -359,7 +366,9 @@ class ImportFaveo extends Command
             if (!$apply) continue;
             DB::table('faqs')->insert([
                 'question'   => mb_substr($q, 0, 200),
-                'answer'     => self::cuerpoLimpio((string) $a->description) ?: $q,
+                // El campo answer se pinta como TEXTO (textarea + {answer}), no HTML: se
+                // convierte el HTML de Faveo a texto plano legible (conservando saltos).
+                'answer'     => mb_substr(self::htmlAtexto((string) $a->description) ?: $q, 0, 20000),
                 'keywords'   => self::keywordsDe($q),
                 'category_id' => null,
                 'active'     => (int) $a->status === 1 ? 1 : 0,
@@ -380,13 +389,33 @@ class ImportFaveo extends Command
             DB::table('canned_responses')->insert([
                 'shortcut'   => $this->shortcutUnico($tit, $used),
                 'title'      => mb_substr($tit, 0, 120),
-                'body'       => self::cuerpoLimpio((string) $c->message) ?: $tit,
+                // El body se inserta con execCommand('insertText'): TEXTO plano, no HTML.
+                'body'       => self::htmlAtexto((string) $c->message) ?: $tit,
                 'position'   => 100 + $nCan, 'active' => 1, 'created_by' => null,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
 
         $this->info("Extras: FAQs +$nFaq · Respuestas predefinidas +$nCan" . ($apply ? '' : ' (dry-run)'));
+    }
+
+    /**
+     * HTML de Faveo → TEXTO plano legible. Para campos que se pintan/insertan como texto
+     * (FAQ answer, canned body): quita la basura de Word/Outlook, convierte los bloques en
+     * saltos de línea y decodifica entidades. Sin etiquetas, pero conservando párrafos.
+     */
+    private static function htmlAtexto(string $html): string
+    {
+        $html = preg_replace('/<!--.*?-->/s', ' ', $html) ?? $html;                       // comentarios [if mso]
+        $html = preg_replace('#<(script|style|xml|head|title)\b[^>]*>.*?</\1>#is', ' ', $html) ?? $html;
+        $html = preg_replace('/<\/?[owvm]:[^>]*>/i', '', $html) ?? $html;                  // etiquetas Office
+        $html = preg_replace('#<(br|/p|/div|/li|/tr|/h[1-6])\b[^>]*>#i', "\n", $html) ?? $html;
+        $t = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $t = str_replace("\xC2\xA0", ' ', $t);                                            // &nbsp; residual
+        $t = preg_replace('/[ \t]+/', ' ', $t);                                           // espacios repetidos
+        $t = preg_replace('/ *\n */', "\n", $t);                                          // limpia alrededor del salto
+        $t = preg_replace('/\n{3,}/', "\n\n", $t);                                        // máx una línea en blanco
+        return trim((string) $t);
     }
 
     /** Palabras clave para el buscador del portal, a partir de la pregunta (sin vacías/cortas). */
