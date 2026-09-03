@@ -330,7 +330,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
     if (res.ok) {
       setConvs((cs) => cs.filter((x) => x.id !== c.id))
       if (active?.id === c.id) { setActive(null); setDetail(null); setMessages([]) }
-      toast('Conversación eliminada')
+      toast(res.suppressed ? 'Conversación eliminada · el contacto sigue de BAJA (no se le volverá a escribir)' : 'Conversación eliminada')
     } else toast(res.error || 'No se pudo eliminar', 'err')
   }
 

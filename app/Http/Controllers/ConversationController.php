@@ -72,8 +72,22 @@ class ConversationController extends Controller
     {
         $id = (int) $r->input('contact_id');
         if (!$id) return response()->json(['ok' => false, 'error' => 'Falta contact_id'], 400);
+
+        $optedOut = (int) DB::table('contacts')->where('id', $id)->value('opted_out');
+
         DB::delete('DELETE FROM messages WHERE contact_id = ?', [$id]);
         DB::delete('DELETE FROM contact_labels WHERE contact_id = ?', [$id]);
+
+        // RGPD: si el contacto se dio de BAJA, NO se borra aunque se limpie el chat —
+        // hay que seguir respetando la baja si vuelve a escribir. Se conserva como
+        // registro de supresión (número + opted_out); sin mensajes ya no aparece en el
+        // «Chat en vivo» (el inbox solo lista contactos con mensajes de campañas), y se
+        // vacía el resumen para que quede limpio. Si NO está de baja, se borra del todo.
+        if ($optedOut === 1) {
+            DB::update('UPDATE contacts SET last_message = NULL, last_time = NULL, unread = 0, assigned_to = NULL WHERE id = ?', [$id]);
+            return response()->json(['ok' => true, 'suppressed' => true]);
+        }
+
         DB::delete('DELETE FROM contacts WHERE id = ?', [$id]);
         return response()->json(['ok' => true]);
     }
