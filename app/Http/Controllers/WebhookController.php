@@ -7,6 +7,7 @@ use App\Models\WhatsAppNumber;
 use App\Services\CampaignService;
 use App\Services\ChatService;
 use App\Services\FlowEngine;
+use App\Services\FlowsMetaService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -163,7 +164,7 @@ class WebhookController extends Controller
             case 'interactive':
                 $i = $msg['interactive'] ?? [];
                 $body = ($i['type'] ?? '') === 'nfm_reply'
-                    ? '📋 Respuesta de formulario'
+                    ? $this->formatearRespuestaFormulario($i['nfm_reply']['response_json'] ?? '{}')
                     : ($i['button_reply']['title'] ?? $i['list_reply']['title'] ?? '');
                 $replyId = $i['button_reply']['id'] ?? $i['list_reply']['id'] ?? null;
                 break;
@@ -282,6 +283,19 @@ class WebhookController extends Controller
                 $this->flow->handle(['id' => $contactId, 'wa_id' => $from, 'ticket_id' => null], $body, $name, $type, $replyId);
             } catch (\Throwable $e) { /* no romper el webhook */ }
         }
+    }
+
+    /** Texto legible de una respuesta de formulario, para verlo en el propio chat. */
+    private function formatearRespuestaFormulario(string $json): string
+    {
+        $resp = json_decode($json, true) ?: [];
+        $token = (string) ($resp['flow_token'] ?? '');
+        unset($resp['flow_token']);
+        $formId = preg_match('/^f(\d+)_/', $token, $mm) ? (int) $mm[1] : 0;
+        $pares = ($formId && $resp) ? FlowsMetaService::etiquetar($formId, $resp) : [];
+        if (!$pares) return '📋 Respuesta de formulario';
+        $lineas = array_map(fn ($p) => '• ' . $p['label'] . ': ' . $p['value'], $pares);
+        return "📋 Respuesta del formulario:\n" . implode("\n", $lineas);
     }
 
     protected function handleStatuses(array $statuses): void

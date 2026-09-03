@@ -3,11 +3,52 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use Illuminate\Support\Facades\DB;
 
 /** WhatsApp Flows (formularios nativos de Meta). Portado de includes/flows_meta.php. */
 class FlowsMetaService
 {
     const FLOW_JSON_VERSION = '7.0';
+
+    /**
+     * Traduce una respuesta cruda de formulario a pares legibles.
+     * Meta devuelve las claves normalizadas y, en desplegables/radio/checkbox, el
+     * ID de la opción (índice), no su texto. Aquí lo mapeamos con la definición del
+     * formulario a [{label: pregunta, value: respuesta}] en el orden de los campos.
+     */
+    public static function etiquetar(int $formId, array $data): array
+    {
+        $fields = json_decode((string) (DB::table('forms')->where('id', $formId)->value('fields') ?: '[]'), true) ?: [];
+        $labels = [];   // name => etiqueta (pregunta)
+        $opts   = [];   // name => [id => texto de la opción]
+        $orden  = [];   // orden de aparición de los campos
+        foreach ($fields as $f) {
+            $name = preg_replace('/[^a-z0-9_]/', '_', strtolower($f['key'] ?? ''));
+            if ($name === '' || in_array(($f['type'] ?? 'text'), ['paragraph', 'caption'], true)) continue;
+            $labels[$name] = trim((string) ($f['label'] ?? $f['key'] ?? $name)) ?: $name;
+            $orden[] = $name;
+            foreach (($f['options'] ?? []) as $i => $opt) {   // mismo índice que buildFlowJson
+                $t = trim((string) $opt);
+                if ($t === '') continue;
+                $opts[$name][(string) $i] = $t;
+            }
+        }
+
+        // Recorre en el orden del formulario; los campos que no estén, al final.
+        $claves = array_values(array_unique(array_merge(array_intersect($orden, array_keys($data)), array_keys($data))));
+        $out = [];
+        foreach ($claves as $k) {
+            if (!array_key_exists($k, $data)) continue;
+            $v = $data[$k];
+            if (is_array($v)) {   // checkbox: varias opciones
+                $v = implode(', ', array_map(fn ($x) => $opts[$k][(string) $x] ?? (string) $x, $v));
+            } elseif (isset($opts[$k][(string) $v])) {
+                $v = $opts[$k][(string) $v];
+            }
+            $out[] = ['label' => $labels[$k] ?? $k, 'value' => (string) $v];
+        }
+        return $out;
+    }
 
     public function __construct(protected WhatsAppService $wa) {}
 

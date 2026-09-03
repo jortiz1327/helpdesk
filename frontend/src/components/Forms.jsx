@@ -342,7 +342,7 @@ export default function Forms() {
                 {subs.map((s) => (
                   <div key={s.id} className="sub-row">
                     <div><b>{s.contact_name || '+' + (s.wa_id || '?')}</b><span className="muted" style={{ display: 'block', fontSize: 12 }}>{s.form_name} · {fmtDate(s.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
-                    <div className="sub-data">{Object.entries(s.data || {}).map(([k, v]) => <span key={k} className="pill gray sm">{k}: {String(v)}</span>)}</div>
+                    <div className="sub-data">{(s.pretty?.length ? s.pretty : Object.entries(s.data || {}).map(([label, value]) => ({ label, value }))).map((p, i) => <span key={i} className="pill gray sm">{p.label}: {String(p.value)}</span>)}</div>
                   </div>
                 ))}
               </div>

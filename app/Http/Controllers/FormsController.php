@@ -31,7 +31,10 @@ class FormsController extends Controller
                 LEFT JOIN contacts c ON c.id = s.contact_id
                 ORDER BY s.id DESC LIMIT 200
             ");
-            foreach ($rows as $r) $r->data = json_decode($r->data ?: '{}', true);
+            foreach ($rows as $r) {
+                $r->data = json_decode($r->data ?: '{}', true) ?: [];
+                $r->pretty = FlowsMetaService::etiquetar((int) $r->form_id, $r->data);   // pregunta: respuesta
+            }
             return response()->json(['ok' => true, 'submissions' => $rows]);
         }
 
