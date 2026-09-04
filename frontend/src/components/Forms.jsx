@@ -341,8 +341,18 @@ export default function Forms() {
               <div className="card" style={{ padding: 0 }}>
                 {subs.map((s) => (
                   <div key={s.id} className="sub-row">
-                    <div><b>{s.contact_name || '+' + (s.wa_id || '?')}</b><span className="muted" style={{ display: 'block', fontSize: 12 }}>{s.form_name} · {fmtDate(s.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
-                    <div className="sub-data">{(s.pretty?.length ? s.pretty : Object.entries(s.data || {}).map(([label, value]) => ({ label, value }))).map((p, i) => <span key={i} className="pill gray sm">{p.label}: {String(p.value)}</span>)}</div>
+                    <div className="sub-head">
+                      <b>{s.contact_name || '+' + (s.wa_id || '?')}</b>
+                      <span className="muted">{s.form_name} · {fmtDate(s.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div className="sub-qa">
+                      {(s.pretty?.length ? s.pretty : Object.entries(s.data || {}).map(([label, value]) => ({ label, value }))).map((p, i) => (
+                        <div className="sub-qa-row" key={i}>
+                          <span className="sub-q">{p.label}</span>
+                          <span className="sub-a">{String(p.value)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

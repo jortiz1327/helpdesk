@@ -74,10 +74,13 @@ class AnalyticsController extends Controller
         $forms = [
             'published'   => (int) DB::table('forms')->where('status', 'published')->count(),
             'total'       => (int) DB::table('forms')->count(),
-            'sends'       => (int) DB::table('messages')->where('direction', 'out')->where('body', 'like', '📋 Formulario:%')->count(),
+            // Un envío de formulario deja un mensaje saliente interactivo «… Formulario: …»
+            // (sin depender del emoji exacto, que en LIKE no siempre casa por collation).
+            'sends'       => (int) DB::table('messages')->where('direction', 'out')
+                ->where('type', 'interactive')->where('body', 'like', '%Formulario:%')->count(),
             'submissions' => (int) DB::table('form_submissions')->count(),
         ];
-        $forms['response_rate'] = $forms['sends'] ? (int) round($forms['submissions'] / $forms['sends'] * 100) : 0;
+        $forms['response_rate'] = $forms['sends'] ? min(100, (int) round($forms['submissions'] / $forms['sends'] * 100)) : 0;
 
         // ---- Salud de la base de contactos (solo contactos de CAMPAÑAS, no soporte) ----
         $contacts = [
