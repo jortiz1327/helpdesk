@@ -35,14 +35,16 @@ class ConversationController extends Controller
     }
 
     /**
-     * Agentes a los que se puede asignar una conversación: los que tienen
-     * acceso al Helpdesk (permiso helpdesk.access), no cualquier usuario.
-     * Así un responsable de campañas no aparece como destinatario.
+     * Agentes a los que se puede asignar una conversación del Chat en vivo. Como el
+     * Chat en vivo es de CAMPAÑAS, se asigna a gente de Campañas (permiso
+     * campaigns.access), NO a los agentes de soporte. Y solo usuarios ACTIVOS: los
+     * ex-empleados (active=0) no deben salir como destinatarios.
      */
     protected function agents()
     {
-        $agents = User::orderByRaw('name IS NULL, name ASC, email ASC')->get()
-            ->filter(fn ($u) => $u->can('helpdesk.access'))
+        $agents = User::where(fn ($q) => $q->whereNull('active')->orWhere('active', true))
+            ->orderByRaw('name IS NULL, name ASC, email ASC')->get()
+            ->filter(fn ($u) => $u->can('campaigns.access'))
             ->map(fn ($u) => [
                 'id'       => (int) $u->id,
                 'name'     => $u->name,
