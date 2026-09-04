@@ -28,7 +28,7 @@ return [
             'title' => 'Roles y permisos',
             'desc'  => 'Quién puede ver y hacer qué en el Helpdesk.',
             'file'  => '01-roles-y-permisos.pdf',
-            'perms' => ['support.config', 'settings.manage', 'campaigns.delete'], // encargados y superadmin
+            'perms' => ['support.config', 'settings.manage'], // encargado de soporte y superadmin (no campañas)
         ],
 
         'usuario_soporte' => [
@@ -63,7 +63,7 @@ return [
             'title' => 'Guía general de la plataforma',
             'desc'  => 'El mapa de todo el sistema: áreas, vocabulario y cómo encaja cada pieza.',
             'file'  => '05-aplicacion.pdf',
-            'perms' => ['*'], // visión general: cualquier usuario con sesión
+            'perms' => ['helpdesk.access', 'settings.manage'], // soporte y superadmin (campañas solo ve su manual)
         ],
 
         'potencialidad' => [
