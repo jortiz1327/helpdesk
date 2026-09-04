@@ -153,7 +153,7 @@ const CONTACTS_GROUP = {
             key: "organizations",
             label: "Organización",
             icon: Icon.building,
-            perm: "contacts.access",
+            perm: "organizations.view",
             color: "#12925a",
         },
     ],
