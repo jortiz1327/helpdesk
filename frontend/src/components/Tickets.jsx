@@ -811,7 +811,8 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                     { value: 'all', label: 'Todos' },
                     { value: 'none', label: 'Sin asignar' },
                     { value: 'me', label: 'Yo' },
-                    ...(meta?.users || []).map((u) => ({ value: String(u.id), label: u.name })),
+                    // Solo agentes ACTIVOS: los ex-empleados no ensucian el filtro.
+                    ...(meta?.users || []).filter((u) => u.active !== false).map((u) => ({ value: String(u.id), label: u.name })),
                   ]} />
               </div>
             )}
