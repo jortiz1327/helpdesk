@@ -18,6 +18,12 @@ class AnalyticsController extends Controller
     {
         $mes = date('Y-m-01 00:00:00');
 
+        // Correo de CAMPAÑAS = con correo pero SIN tickets (el correo de soporte NO cuenta).
+        $emailCampanas = fn ($q) => $q->whereNotNull('email')->where('email', '<>', '')
+            ->whereNotExists(fn ($t) => $t->select(DB::raw(1))->from('tickets')->whereColumn('tickets.contact_id', 'contacts.id'));
+        // Contacto de CAMPAÑAS = alcanzable por WhatsApp (teléfono) o por correo no-soporte.
+        $esCampanas = fn ($q) => $q->whereNotNull('wa_id')->orWhere($emailCampanas);
+
         // ---- KPIs de campañas (destinatarios por estado) ----
         $r = DB::selectOne("
             SELECT SUM(status IN ('sent','delivered','read')) sent,
@@ -42,8 +48,8 @@ class AnalyticsController extends Controller
             'msgs_delivered'  => $delivered,
             'delivery_rate'   => $sent ? (int) round($delivered / $sent * 100) : 0,
             'read_rate'       => $sentWa ? (int) round($readWa / $sentWa * 100) : 0,
-            'optout_total'    => (int) DB::table('contacts')->where('opted_out', 1)->count(),
-            'optout_month'    => (int) DB::table('contacts')->where('opted_out', 1)->where('opted_out_at', '>=', $mes)->count(),
+            'optout_total'    => (int) DB::table('contacts')->where('opted_out', 1)->where($esCampanas)->count(),
+            'optout_month'    => (int) DB::table('contacts')->where('opted_out', 1)->where('opted_out_at', '>=', $mes)->where($esCampanas)->count(),
         ];
 
         // ---- Rendimiento por canal (WhatsApp vs Correo) ----
@@ -73,14 +79,13 @@ class AnalyticsController extends Controller
         ];
         $forms['response_rate'] = $forms['sends'] ? (int) round($forms['submissions'] / $forms['sends'] * 100) : 0;
 
-        // ---- Salud de la base de contactos ----
-        $conEmail = fn ($q) => $q->whereNotNull('email')->where('email', '<>', '');
+        // ---- Salud de la base de contactos (solo contactos de CAMPAÑAS, no soporte) ----
         $contacts = [
             'whatsapp'  => (int) DB::table('contacts')->whereNotNull('wa_id')->count(),
-            'email'     => (int) DB::table('contacts')->where($conEmail)->count(),
+            'email'     => (int) DB::table('contacts')->where($emailCampanas)->count(),
             'optout'    => $kpi['optout_total'],
-            'new_month' => (int) DB::table('contacts')->where('created_at', '>=', $mes)->count(),
-            'total'     => (int) DB::table('contacts')->where(fn ($q) => $q->whereNotNull('wa_id')->orWhere($conEmail))->count(),
+            'new_month' => (int) DB::table('contacts')->where('created_at', '>=', $mes)->where($esCampanas)->count(),
+            'total'     => (int) DB::table('contacts')->where($esCampanas)->count(),
         ];
 
         // ---- Contactos por etiqueta (segmentación) ----
