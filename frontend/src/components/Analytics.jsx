@@ -5,20 +5,16 @@ import { fmtDateShort } from '../util.js'
 import LoadError from './LoadError.jsx'
 
 const eur = (n) => '€' + Number(n || 0).toFixed(2).replace('.', ',')
+const nf = (n) => Number(n || 0).toLocaleString('es-ES')
+const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
 const catColor = (c) => ({ MARKETING: 'var(--warn)', UTILITY: 'var(--primary)', AUTHENTICATION: 'var(--info)' }[c] || 'var(--secondary)')
 const ESTADO = { scheduled: 'Programada', sending: 'Enviando', sent: 'Enviada', done: 'Enviada', completed: 'Enviada', canceled: 'Cancelada' }
 
-const fmtDur = (s) => {
-  if (s == null) return '—'
-  if (s < 60) return s + 's'
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ${s % 60}s`
-  const h = Math.floor(m / 60)
-  return `${h}h ${m % 60}m`
-}
-const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
+const MROW = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13.5, padding: '7px 0', borderBottom: '1px solid var(--line)' }
+const TD = { padding: '9px 12px', borderBottom: '1px solid var(--line)', fontSize: 13, whiteSpace: 'nowrap' }
+const TH = { ...TD, textAlign: 'left', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3, #8a94a3)', fontWeight: 700 }
 
-// Barras horizontales genéricas
+// Barras horizontales genéricas (para «contactos por etiqueta»)
 function Bars({ items, color }) {
   const max = Math.max(1, ...items.map((i) => i.v))
   if (!items.length) return <p className="muted" style={{ fontSize: 12.5 }}>Sin datos todavía.</p>
@@ -35,108 +31,147 @@ function Bars({ items, color }) {
   )
 }
 
+// Mini-panel de un canal (WhatsApp / Correo) con sus tasas.
+function ChanBox({ label, dot, c }) {
+  const line = { ...MROW, padding: '5px 0', border: 0, fontSize: 12.5, color: 'var(--ink-2)' }
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 11, padding: '12px 13px', background: 'var(--panel-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, fontSize: 13, marginBottom: 8 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: dot }} />{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800 }}>{nf(c.sent)}</div>
+      <div className="muted" style={{ fontSize: 12 }}>enviados</div>
+      <div style={line}><span>Entregados</span><b style={{ color: 'var(--secondary)' }}>{pct(c.delivered, c.sent)}%</b></div>
+      {label === 'WhatsApp'
+        ? <div style={line}><span>Leídos</span><b>{pct(c.read, c.sent)}%</b></div>
+        : <div style={line}><span>Fallidos</span><b style={{ color: c.failed ? 'var(--danger)' : 'inherit' }}>{c.failed}</b></div>}
+    </div>
+  )
+}
+
 export default function Analytics() {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(false)
   const [tab, setTab] = useState('resumen')          // 'resumen' | 'historial'
-  const [allLabels, setAllLabels] = useState(false) // ver todas las etiquetas o solo el top
   const load = useCallback(() => { setErr(false); api.analytics().then((r) => r.ok ? setD(r) : setErr(true)).catch(() => setErr(true)) }, [])
   useEffect(() => { load() }, [load])
 
-  if (err && !d) return <LoadError onRetry={load} msg="No se pudieron cargar las analíticas" />
-  if (!d) return <div className="center-load"><div className="spinner" /></div>
-
-  const c = d.campaigns
-  // Con muchas etiquetas (200 de sedes) esto sería un listado interminable: se ordena
-  // por nº de conversaciones y se muestra el top; el resto detrás de "Ver todas".
-  const LABELS_TOP = 10
-  const labelsSorted = [...(d.by_label || [])].sort((a, b) => Number(b.n) - Number(a.n))
-  const labelsShown = allLabels ? labelsSorted : labelsSorted.slice(0, LABELS_TOP)
-  const cards = [
-    { label: 'Tiempo 1ª respuesta', value: fmtDur(d.first_response.avg_seconds), sub: `media de ${d.first_response.count} conversaciones`, color: 'var(--primary)' },
-    { label: 'Conversaciones', value: d.funnel[1]?.v ?? 0, sub: `de ${d.funnel[0]?.v ?? 0} contactos`, color: 'var(--info)' },
-    { label: 'Tasa de lectura', value: pct(c.read, c.sent) + '%', sub: `${c.read} leídos de ${c.sent} enviados`, color: 'var(--secondary)' },
-    { label: 'Tasa de entrega', value: pct(c.delivered, c.sent) + '%', sub: `${c.delivered} entregados`, color: 'var(--warn)' },
-  ]
-  const funnelMax = Math.max(1, ...d.funnel.map((f) => f.v))
+  const tabs = (
+    <div className="kb-seg" style={{ marginBottom: 16 }}>
+      <button className={tab === 'resumen' ? 'on' : ''} onClick={() => setTab('resumen')}>Resumen</button>
+      <button className={tab === 'historial' ? 'on' : ''} onClick={() => setTab('historial')}>Historial de campañas</button>
+    </div>
+  )
 
   return (
     <>
       <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.bolt style={{ width: 17, height: 17, fill: 'var(--primary)' }} /></span>
+        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.chart style={{ width: 17, height: 17, fill: 'var(--primary)' }} /></span>
         <div><h1>Analíticas</h1></div>
-        <span className="sub">· Métricas del equipo y las campañas</span>
+        <span className="sub">· Campañas, difusiones y formularios</span>
         <div className="spacer" />
         <button className="icon-btn" title="Actualizar" onClick={load}><Icon.refresh /></button>
       </header>
 
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1180 }}>
-          <div className="kb-seg" style={{ marginBottom: 16 }}>
-            <button className={tab === 'resumen' ? 'on' : ''} onClick={() => setTab('resumen')}>Resumen</button>
-            <button className={tab === 'historial' ? 'on' : ''} onClick={() => setTab('historial')}>Historial de campañas</button>
-          </div>
+          {tabs}
 
-          {tab === 'historial' ? <CampaignHistory /> : (<>
-          <div className="stat-grid">
-            {cards.map((c) => (
-              <div className="stat-card" key={c.label}>
-                <div className="stat-num" style={{ color: c.color, marginTop: 0 }}>{c.value}</div>
-                <div className="stat-sub">{c.label}</div>
-                <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{c.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="an-grid">
-            {/* Embudo */}
-            <div className="card an-card">
-              <div className="an-h"><Icon.kanban /> Embudo de contactos</div>
-              <div className="an-funnel">
-                {d.funnel.map((f, i) => (
-                  <div className="an-funnel-row" key={i}>
-                    <span className="an-funnel-bar" style={{ width: Math.max(8, (f.v / funnelMax) * 100) + '%' }}>{f.v}</span>
-                    <span className="an-funnel-k">{f.k}{i > 0 && <span className="an-funnel-pct"> · {pct(f.v, d.funnel[0].v)}%</span>}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Conversaciones por etiqueta (top + "ver todas" con scroll) */}
-            <div className="card an-card">
-              <div className="an-h"><Icon.tag /> Conversaciones por etiqueta</div>
-              <div className={allLabels ? 'an-bars-scroll' : ''}>
-                <Bars items={labelsShown.map((l) => ({ k: l.name, v: Number(l.n), c: l.color }))} />
-              </div>
-              {labelsSorted.length > LABELS_TOP && (
-                <button className="link-btn" style={{ marginTop: 10 }} onClick={() => setAllLabels((v) => !v)}>
-                  {allLabels ? 'Ver menos' : `Ver todas (${labelsSorted.length})`}
-                </button>
-              )}
-            </div>
-
-            {/* Rendimiento de campañas */}
-            <div className="card an-card">
-              <div className="an-h"><Icon.send /> Rendimiento de campañas</div>
-              {c.recipients === 0 ? <p className="muted" style={{ fontSize: 12.5 }}>Aún no has lanzado campañas.</p> : (
-                <Bars items={[
-                  { k: 'Enviados', v: c.sent, c: 'var(--primary)' },
-                  { k: 'Entregados', v: c.delivered, c: 'var(--info)' },
-                  { k: 'Leídos', v: c.read, c: 'var(--secondary)' },
-                  { k: 'Fallidos', v: c.failed, c: 'var(--danger)' },
-                ]} />
-              )}
-              {c.recipients > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>{c.total} campañas · {c.recipients} destinatarios · entrega {pct(c.delivered, c.sent)}% · lectura {pct(c.read, c.sent)}%</div>}
-            </div>
-
-            {/* Mensajes por operador */}
-            <div className="card an-card">
-              <div className="an-h"><Icon.user /> Mensajes por operador</div>
-              <Bars items={d.by_agent.map((a) => ({ k: a.name, v: Number(a.n) }))} color="var(--primary)" />
-            </div>
-          </div>
-          </>)}
+          {tab === 'historial' ? <CampaignHistory /> : (
+            err && !d ? <LoadError onRetry={load} msg="No se pudieron cargar las analíticas" />
+              : !d ? <div className="center-load"><div className="spinner" /></div>
+                : <Resumen d={d} />
+          )}
         </div>
+      </div>
+    </>
+  )
+}
+
+/* --------------------------- Resumen (campañas) --------------------------- */
+function Resumen({ d }) {
+  const k = d.kpi
+  const cards = [
+    { label: 'Campañas lanzadas', value: nf(k.campaigns_total), sub: `${k.campaigns_month} este mes`, color: 'var(--primary)' },
+    { label: 'Mensajes enviados', value: nf(k.msgs_sent), sub: `${nf(k.msgs_delivered)} entregados`, color: 'var(--info)' },
+    { label: 'Tasa de entrega', value: k.delivery_rate + '%', sub: `${k.read_rate}% leídos (WhatsApp)`, color: 'var(--secondary)' },
+    { label: 'Bajas (opt-out)', value: nf(k.optout_total), sub: `+${k.optout_month} este mes`, color: 'var(--danger)' },
+  ]
+  const f = d.forms
+  const c = d.contacts
+  const labelsTop = [...(d.by_label || [])].sort((a, b) => Number(b.n) - Number(a.n)).slice(0, 8)
+
+  return (
+    <>
+      <div className="stat-grid">
+        {cards.map((c) => (
+          <div className="stat-card" key={c.label}>
+            <div className="stat-num" style={{ color: c.color, marginTop: 0 }}>{c.value}</div>
+            <div className="stat-sub">{c.label}</div>
+            <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{c.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="an-grid">
+        {/* Rendimiento por canal */}
+        <div className="card an-card">
+          <div className="an-h"><Icon.send /> Rendimiento por canal</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <ChanBox label="WhatsApp" dot="var(--secondary)" c={d.channels.whatsapp} />
+            <ChanBox label="Correo" dot="var(--info)" c={d.channels.email} />
+          </div>
+        </div>
+
+        {/* Formularios */}
+        <div className="card an-card">
+          <div className="an-h"><Icon.forms /> Formularios</div>
+          <div style={MROW}><span>Formularios publicados</span><b>{f.published}</b></div>
+          <div style={MROW}><span>Veces enviado</span><b>{nf(f.sends)}</b></div>
+          <div style={MROW}><span>Respuestas recibidas</span><b style={{ color: 'var(--secondary)' }}>{nf(f.submissions)}</b></div>
+          <div style={{ ...MROW, borderBottom: 0 }}><span>Tasa de respuesta</span><b style={{ color: 'var(--secondary)' }}>{f.response_rate}%</b></div>
+        </div>
+
+        {/* Base de contactos */}
+        <div className="card an-card">
+          <div className="an-h"><Icon.user /> Base de contactos</div>
+          <div style={MROW}><span>Alcanzables por WhatsApp</span><b>{nf(c.whatsapp)}</b></div>
+          <div style={MROW}><span>Alcanzables por correo</span><b>{nf(c.email)}</b></div>
+          <div style={{ ...MROW, borderBottom: 0 }}><span>Dados de baja</span><b style={{ color: c.optout ? 'var(--danger)' : 'inherit' }}>{nf(c.optout)}</b></div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>+{nf(c.new_month)} contactos nuevos este mes · {nf(c.total)} en total</p>
+        </div>
+
+        {/* Contactos por etiqueta */}
+        <div className="card an-card">
+          <div className="an-h"><Icon.tag /> Contactos por etiqueta</div>
+          <Bars items={labelsTop.map((l) => ({ k: l.name, v: Number(l.n), c: l.color }))} />
+        </div>
+      </div>
+
+      {/* Últimas campañas */}
+      <div className="card" style={{ padding: 0, marginTop: 14, overflowX: 'auto' }}>
+        <div className="an-h" style={{ padding: '14px 16px 0' }}><Icon.send /> Últimas campañas</div>
+        {(!d.recent || d.recent.length === 0) ? (
+          <p className="muted" style={{ padding: '10px 16px 16px', fontSize: 12.5 }}>Aún no has lanzado campañas.</p>
+        ) : (
+          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 640, marginTop: 8 }}>
+            <thead><tr>
+              <th style={TH}>Campaña</th><th style={TH}>Canal</th>
+              <th style={{ ...TH, textAlign: 'right' }}>Enviados</th>
+              <th style={{ ...TH, textAlign: 'right' }}>Entrega</th>
+              <th style={{ ...TH, textAlign: 'right' }}>Lectura</th>
+            </tr></thead>
+            <tbody>
+              {d.recent.map((c) => (
+                <tr key={c.id}>
+                  <td style={{ ...TD, fontWeight: 600, whiteSpace: 'normal', maxWidth: 240 }}>{c.title}</td>
+                  <td style={TD}><span className="pill gray sm" style={{ color: c.channel === 'email' ? 'var(--info)' : 'var(--secondary)' }}>{c.channel === 'email' ? 'Correo' : 'WhatsApp'}</span></td>
+                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{nf(c.sent)}</td>
+                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{pct(c.delivered, c.sent)}%</td>
+                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.channel === 'email' ? '—' : pct(c.read, c.sent) + '%'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </>
   )
@@ -145,10 +180,8 @@ export default function Analytics() {
 /* -------------------- Historial / trazabilidad de campañas --------------------
  * Cada campaña: quién la lanzó, cuándo, destino, plantilla, categoría, resultados
  * (enviados/entregados/leídos/fallidos) y coste real (entregados × tarifa).
+ * Coste solo si el backend lo autoriza (show_cost = superadmin).
  * ---------------------------------------------------------------------------- */
-const TD = { padding: '9px 12px', borderBottom: '1px solid var(--line)', fontSize: 13, whiteSpace: 'nowrap' }
-const TH = { ...TD, textAlign: 'left', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3, #8a94a3)', fontWeight: 700, position: 'sticky', top: 0, background: 'var(--surface)' }
-
 function CampaignHistory() {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(false)

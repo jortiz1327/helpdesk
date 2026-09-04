@@ -245,6 +245,27 @@ const AREAS = [
                     },
                 ],
             },
+            // A diferencia de Helpdesk, Campañas SÍ muestra el inbox de WhatsApp: aquí es
+            // «Chat en vivo». Va ANTES de Difusiones (lo más usado del día a día arriba).
+            {
+                title: "Conversaciones",
+                items: [
+                    {
+                        key: "inbox",
+                        label: "Chat en vivo",
+                        icon: Icon.message,
+                        perm: "campaigns.access",
+                        color: "#25d366",
+                    },
+                    {
+                        key: "automations",
+                        label: "Automatizaciones",
+                        icon: Icon.bolt,
+                        perm: "automations.manage",
+                        color: "#ff7ab6",
+                    },
+                ],
+            },
             {
                 title: "Difusiones",
                 items: [
@@ -275,26 +296,6 @@ const AREAS = [
                         icon: Icon.forms,
                         perm: "forms.manage",
                         color: "#e056fd",
-                    },
-                ],
-            },
-            // A diferencia de Helpdesk, Campañas SÍ muestra el inbox de WhatsApp: aquí es «Chat en vivo».
-            {
-                title: "Conversaciones",
-                items: [
-                    {
-                        key: "inbox",
-                        label: "Chat en vivo",
-                        icon: Icon.message,
-                        perm: "campaigns.access",
-                        color: "#25d366",
-                    },
-                    {
-                        key: "automations",
-                        label: "Automatizaciones",
-                        icon: Icon.bolt,
-                        perm: "automations.manage",
-                        color: "#ff7ab6",
                     },
                 ],
             },
