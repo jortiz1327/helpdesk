@@ -1986,8 +1986,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                     agente:  user?.name || '',
                     sede:    t.contact_sede_name || '',
                   }}
-                  // Agentes mencionables con «@» en la nota interna (excluye al propio).
-                  mentionUsers={(meta?.users || []).filter((u) => u.id !== user?.id)}
+                  // Agentes mencionables con «@» en la nota interna (excluye al propio y a los inactivos).
+                  mentionUsers={(meta?.users || []).filter((u) => u.id !== user?.id && u.active !== false)}
                   // Destinatarios solo en correo: en WhatsApp no hay copias que valgan.
                   to={d.ticket.channel === 'email' ? d.ticket.contact_email : null}
                   // Programar el envío: solo por correo (WhatsApp tiene ventana de 24h).

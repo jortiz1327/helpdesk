@@ -162,7 +162,7 @@ export default function NewTicket({ user, onCreated, onCancel, onOpenTicket }) {
                   <span className="lbl">Asignar a</span>
                   <Select block value={String(f.assigned_to)} onChange={set('assigned_to')}
                     options={[{ value: '', label: 'Sin asignar' },
-                      ...(meta?.users || []).map((u) => ({ value: String(u.id), label: u.name }))]} />
+                      ...(meta?.users || []).filter((u) => u.active !== false).map((u) => ({ value: String(u.id), label: u.name }))]} />
                 </div>
               )}
             </div>

@@ -32,7 +32,9 @@ class TicketRulesController extends Controller
             'channels'   => TicketRule::CHANNELS,
             'priorities' => TicketService::priorities(),
             'categories' => DB::table('ticket_categories')->orderBy('position')->get(['id', 'name']),
-            'agents'     => DB::table('users')->orderBy('name')->get(['id', 'name', 'email']),
+            // Solo agentes ACTIVOS: una regla no debe poder asignar a un ex-empleado.
+            'agents'     => DB::table('users')->where(fn ($q) => $q->whereNull('active')->orWhere('active', true))
+                ->orderBy('name')->get(['id', 'name', 'email']),
         ]);
     }
 
