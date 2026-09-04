@@ -37,14 +37,16 @@ class ConversationController extends Controller
     /**
      * Agentes a los que se puede asignar una conversación del Chat en vivo. Como el
      * Chat en vivo es de CAMPAÑAS, se asigna a gente de Campañas (permiso
-     * campaigns.access), NO a los agentes de soporte. Y solo usuarios ACTIVOS: los
-     * ex-empleados (active=0) no deben salir como destinatarios.
+     * campaigns.access), NO a los agentes de soporte. Solo usuarios ACTIVOS (los
+     * ex-empleados, active=0, no salen) y SIN el superadmin: no se le reparten chats,
+     * aunque por bypass tenga todos los permisos.
      */
     protected function agents()
     {
+        $super = config('rbac.super_role');
         $agents = User::where(fn ($q) => $q->whereNull('active')->orWhere('active', true))
             ->orderByRaw('name IS NULL, name ASC, email ASC')->get()
-            ->filter(fn ($u) => $u->can('campaigns.access'))
+            ->filter(fn ($u) => !$u->hasRole($super) && $u->can('campaigns.access'))
             ->map(fn ($u) => [
                 'id'       => (int) $u->id,
                 'name'     => $u->name,
