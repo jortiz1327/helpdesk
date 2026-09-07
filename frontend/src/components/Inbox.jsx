@@ -64,14 +64,14 @@ function InteractivePreview({ payload }) {
   )
 }
 
-function Bubble({ m }) {
+function Bubble({ m, onCtx }) {
   const isImg = ['image', 'sticker'].includes(m.type) && m.media_url
   const isVideo = m.type === 'video' && m.media_url
   const isAudio = m.type === 'audio' && m.media_url
   const isDoc = m.type === 'document' && m.media_url
   const ix = m.type === 'interactive' && m.payload
   return (
-    <div className={`bubble ${m.direction === 'in' ? 'in' : 'out'}`}>
+    <div className={`bubble ${m.direction === 'in' ? 'in' : 'out'}`} onContextMenu={onCtx ? (e) => onCtx(e, m) : undefined}>
       {m.direction === 'out' && m.sent_by_name && <span className="bubble-by">{m.sent_by_name}</span>}
       {isImg && <img className="media" src={mediaUrl(m.media_url)} loading="lazy" alt="" />}
       {isVideo && <video className="media" controls src={mediaUrl(m.media_url)} />}
@@ -105,6 +105,8 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [showInfo, setShowInfo] = useState(true)
   const [ctx, setCtx] = useState(null) // { x, y, conv }
+  const [msgCtx, setMsgCtx] = useState(null) // { x, y, m } menú del mensaje
+  const [toTicket, setToTicket] = useState(null) // { scope, msg, contact } | null
   const [assignFilter, setAssignFilter] = useState('all') // all | me | none
   const [agents, setAgents] = useState([])
   const [attachMenu, setAttachMenu] = useState(false)
@@ -316,6 +318,23 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
     }
   }, [ctx])
 
+  // Menú contextual de un MENSAJE (clic derecho) → crear ticket de soporte.
+  const openMsgCtx = (e, m) => {
+    e.preventDefault()
+    const x = Math.min(e.clientX, window.innerWidth - 230)
+    const y = Math.min(e.clientY, window.innerHeight - 70)
+    setMsgCtx({ x, y, m })
+  }
+  useEffect(() => {
+    if (!msgCtx) return
+    const close = () => setMsgCtx(null)
+    document.addEventListener('click', close)
+    document.addEventListener('scroll', close, true)
+    const esc = (e) => e.key === 'Escape' && close()
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('click', close); document.removeEventListener('scroll', close, true); document.removeEventListener('keydown', esc) }
+  }, [msgCtx])
+
   const markConv = async (c, read) => {
     setCtx(null)
     setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, unread: read ? 0 : 1 } : x)))
@@ -471,7 +490,11 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
                 </div>
               )}
               {!loadingMsgs && !msgsErr && messages.length === 0 && <div className="empty" style={{ margin: 'auto' }}><p>No hay mensajes todavía en esta conversación.</p></div>}
-              {rows.map((r) => r.sep ? <div className="day-sep" key={r.id}><span>{r.sep}</span></div> : <Bubble key={r.m.id} m={r.m} />)}
+              {rows.map((r) => r.sep
+                ? <div className="day-sep" key={r.id}><span>{r.sep}</span></div>
+                : Number(r.m.is_internal_note) === 1
+                  ? <div className="day-sep" key={r.m.id}><span style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>{r.m.body}</span></div>
+                  : <Bubble key={r.m.id} m={r.m} onCtx={openMsgCtx} />)}
             </div>
 
             {waLocked
@@ -573,9 +596,91 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
           {active?.id === ctx.conv.id && (
             <button onClick={() => { setCtx(null); cerrarChat() }}><Icon.x /> Cerrar chat</button>
           )}
+          <button onClick={() => { setToTicket({ scope: 'conversation', msg: null, contact: ctx.conv }); setCtx(null) }}><Icon.plus /> Crear ticket de soporte</button>
           <button className="danger" onClick={() => deleteConv(ctx.conv)}><Icon.trash /> Eliminar conversación</button>
         </div>
       )}
+
+      {msgCtx && (
+        <div className="ctx-menu" style={{ left: msgCtx.x, top: msgCtx.y }} onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => { setToTicket({ scope: 'message', msg: msgCtx.m, contact: detail || active }); setMsgCtx(null) }}><Icon.plus /> Crear ticket de soporte</button>
+        </div>
+      )}
+
+      {toTicket && (
+        <ToTicketModal contact={toTicket.contact} scope={toTicket.scope} msg={toTicket.msg}
+          onClose={() => setToTicket(null)}
+          onDone={() => { setToTicket(null); if (active) openChat(active) }} />
+      )}
+    </div>
+  )
+}
+
+/* ---------------- Crear ticket de soporte desde el Chat en vivo ----------------
+ * Convierte un mensaje o toda la conversación en un ticket del Helpdesk. Pide un
+ * correo (el soporte lo sigue por email). El backend crea el ticket y deja una
+ * nota en el chat con el código.
+ * ------------------------------------------------------------------------------ */
+function ToTicketModal({ contact, scope: scope0, msg, onClose, onDone }) {
+  const toast = useToast()
+  const [email, setEmail] = useState(contact?.email || '')
+  const [subject, setSubject] = useState((msg?.body || '').replace(/\s+/g, ' ').trim().slice(0, 120) || `Consulta de ${contact?.name || '+' + (contact?.wa_id || '')}`)
+  const [scope, setScope] = useState(msg ? (scope0 || 'message') : 'conversation')
+  const [catId, setCatId] = useState('')
+  const [cats, setCats] = useState([])
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { api.ticketCategories().then((d) => setCats(d.categories || [])).catch(() => {}) }, [])
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [onClose])
+
+  const crear = async () => {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { toast('Indica un correo válido para el ticket', 'err'); return }
+    setBusy(true)
+    const r = await api.conversationToTicket({
+      contact_id: contact.id, email: email.trim(), subject, scope,
+      message_id: msg?.id || 0, category_id: catId || 0,
+    })
+    setBusy(false)
+    if (!r.ok) { toast(r.error || 'No se pudo crear el ticket', 'err'); return }
+    toast(`Ticket ${r.code} creado`)
+    onDone?.()
+  }
+
+  return (
+    <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="modal-h"><h3>Crear ticket de soporte</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-body">
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Convierte esta conversación de WhatsApp en un ticket del Helpdesk. El soporte lo seguirá por correo.</p>
+          <label className="field"><span className="lbl">Correo del cliente <span className="hint">(para el ticket)</span></span>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cliente@dominio.com" autoFocus /></label>
+          <label className="field"><span className="lbl">Asunto</span>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
+          <div className="field">
+            <span className="lbl">Qué incluir</span>
+            <div className="seg" style={{ maxWidth: 360 }}>
+              <button type="button" className={scope === 'message' ? 'on' : ''} disabled={!msg} onClick={() => setScope('message')}>Solo este mensaje</button>
+              <button type="button" className={scope === 'conversation' ? 'on' : ''} onClick={() => setScope('conversation')}>Toda la conversación</button>
+            </div>
+            {!msg && <span className="hint" style={{ marginTop: 6 }}>Se incluirá toda la conversación.</span>}
+          </div>
+          {cats.length > 0 && (
+            <div className="field" style={{ marginBottom: 0 }}>
+              <span className="lbl">Categoría <span className="hint">(opcional)</span></span>
+              <Select block value={catId} onChange={setCatId} placeholder="Sin categoría (la asigna soporte)"
+                options={cats.map((c) => ({ value: c.id, label: c.name }))} />
+            </div>
+          )}
+        </div>
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={crear} disabled={busy}>{busy ? 'Creando…' : 'Crear ticket'}</button>
+        </div>
+      </div>
     </div>
   )
 }

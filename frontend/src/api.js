@@ -101,6 +101,11 @@ export const api = {
   markConversation: (contact_id, read) => req('conversations.php?action=mark', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contact_id, read }),
   }),
+  // Convertir una conversación de WhatsApp en un ticket de soporte
+  ticketCategories: () => req('conversations.php?action=ticket_cats'),
+  conversationToTicket: (payload) => req('conversations.php?action=to_ticket', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
   deleteConversation: (contact_id) => req('conversations.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contact_id }),
   }),

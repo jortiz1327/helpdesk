@@ -17,6 +17,8 @@ class ConversationController extends Controller
         return match (true) {
             $action === 'mark'   && $post => $this->mark($request),
             $action === 'agents'          => $this->agents(),
+            $action === 'ticket_cats'     => $this->ticketCats(),
+            $action === 'to_ticket' && $post => $this->toTicket($request),
             $action === 'assign' && $post => $this->assign($request),
             $action === 'delete' && $post => $this->delete($request),
             $action === 'list'            => $this->list($request),
@@ -56,6 +58,87 @@ class ConversationController extends Controller
             ->values();
 
         return response()->json(['ok' => true, 'agents' => $agents]);
+    }
+
+    /** Categorías de ticket (para el modal «Crear ticket» desde el Chat en vivo). */
+    protected function ticketCats()
+    {
+        return response()->json(['ok' => true, 'categories' => DB::table('ticket_categories')->orderBy('position')->get(['id', 'name'])]);
+    }
+
+    /**
+     * Convierte una conversación de WhatsApp (Campañas) en un TICKET de soporte.
+     * Se pide un correo (el soporte lo sigue por email). El contenido puede ser solo
+     * un mensaje o toda la conversación. Deja una nota en el chat con el código.
+     */
+    protected function toTicket(Request $r)
+    {
+        $id      = (int) $r->input('contact_id');
+        $email   = mb_strtolower(trim((string) $r->input('email')));
+        $subject = trim((string) $r->input('subject'));
+        $scope   = $r->input('scope') === 'message' ? 'message' : 'conversation';
+        $msgId   = (int) $r->input('message_id');
+        $catId   = (int) $r->input('category_id') ?: null;
+
+        if (!$id) return response()->json(['ok' => false, 'error' => 'Falta el contacto'], 400);
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json(['ok' => false, 'error' => 'Indica un correo válido para el ticket'], 400);
+        }
+        $contact = DB::table('contacts')->where('id', $id)->first();
+        if (!$contact) return response()->json(['ok' => false, 'error' => 'Contacto no encontrado'], 404);
+
+        // Si el contacto no tiene correo, se le pone el indicado (el ticket se sigue por email).
+        if (!($contact->email ?? '')) DB::table('contacts')->where('id', $id)->update(['email' => $email]);
+        $emailFinal = ($contact->email ?? '') ?: $email;
+
+        // Contenido del ticket: un mensaje o la transcripción de la conversación.
+        if ($scope === 'message' && $msgId) {
+            $m = DB::table('messages')->where('id', $msgId)->where('contact_id', $id)->first(['body', 'type']);
+            $cuerpo = $m ? (trim((string) $m->body) ?: '[' . $m->type . ']') : '';
+        } else {
+            $msgs = DB::table('messages')->where('contact_id', $id)->where('channel', 'whatsapp')
+                ->whereNull('ticket_id')->orderBy('created_at')->limit(200)->get(['direction', 'body', 'type', 'created_at']);
+            $lineas = [];
+            foreach ($msgs as $mm) {
+                $b = trim((string) $mm->body) ?: '[' . $mm->type . ']';
+                $lineas[] = ($mm->direction === 'in' ? 'Cliente' : 'Nosotros') . ' (' . $mm->created_at . '): ' . $b;
+            }
+            $cuerpo = implode("\n", $lineas);
+        }
+        if ($subject === '') {
+            $subject = mb_substr(trim(preg_replace('/\s+/', ' ', $cuerpo)) ?: ('Consulta de ' . ($contact->name ?: $contact->wa_id)), 0, 120);
+        }
+        $bodyTicket = "[Ticket creado desde una conversación de WhatsApp de Campañas]\n\n" . $cuerpo;
+
+        // Crea el ticket de soporte (canal correo: el soporte responde por email).
+        $ticketId = app(\App\Services\TicketService::class)->create([
+            'subject'     => $subject,
+            'category_id' => $catId,
+            'channel'     => 'email',
+            'source'      => 'campanas',
+            'contact_id'  => $id,
+            'body'        => $cuerpo,
+            'email'       => $emailFinal,
+            'user_id'     => $r->user()?->id,
+        ]);
+        $code = DB::table('tickets')->where('id', $ticketId)->value('code');
+
+        // Primer mensaje del ticket (lo que dijo el cliente).
+        DB::table('messages')->insert([
+            'ticket_id' => $ticketId, 'contact_id' => $id, 'wa_id' => $contact->wa_id,
+            'direction' => 'in', 'channel' => 'email', 'funcion' => 'soporte', 'type' => 'text',
+            'body' => $bodyTicket, 'is_internal_note' => 0, 'status' => 'received', 'created_at' => now(),
+        ]);
+
+        // Nota en el chat de WhatsApp para dejar constancia del ticket creado.
+        DB::table('messages')->insert([
+            'ticket_id' => null, 'contact_id' => $id, 'wa_id' => $contact->wa_id,
+            'direction' => 'out', 'channel' => 'whatsapp', 'funcion' => 'campanas', 'type' => 'text',
+            'body' => '🎫 Ticket de soporte ' . $code . ' creado a partir de esta conversación.',
+            'is_internal_note' => 1, 'status' => 'sent', 'created_at' => now(),
+        ]);
+
+        return response()->json(['ok' => true, 'code' => $code, 'ticket_id' => $ticketId]);
     }
 
     protected function assign(Request $r)
