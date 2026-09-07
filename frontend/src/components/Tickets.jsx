@@ -572,15 +572,30 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   const applyView = (v) => setF((s) => ({ ...s, sla: 'all', ...v.f }))
 
   // --- Vistas guardadas (personales) ---
-  const aplicarVista = (v) => setF({ ...BASE_F, ...v.filters })
+  // Se parte SIEMPRE de BASE_F y se aplican solo las claves válidas de la vista:
+  // se ignoran valores corruptos (null/'null'/undefined, que el backend traduce a un
+  // filtro que no casa con nada → 0 resultados) y el BUSCADOR (q/search_in), que es
+  // transitorio y no debe formar parte de una vista guardada.
+  const aplicarVista = (v) => {
+    const clean = { ...BASE_F }
+    for (const [k, val] of Object.entries(v.filters || {})) {
+      if (val === null || val === undefined || val === 'null') continue
+      if (k === 'q' || k === 'search_in') continue
+      clean[k] = val
+    }
+    setF(clean)
+  }
   // Activa si el filtro actual coincide con TODAS las claves guardadas de la vista.
   const vistaGuardadaOn = (v) => Object.entries(v.filters || {}).every(([k, val]) => String(f[k] ?? '') === String(val ?? ''))
   const guardarVista = async () => {
     const nombre = newName.trim()
     if (!nombre) return
-    // Se guarda la foto de los filtros finos + la vista base (estado/asignado/respuesta).
+    // Se guarda la foto de los filtros (estado/asignado/categoría/etiqueta/prioridad/
+    // organización…), PERO no el buscador de texto: una vista es un preajuste de filtros,
+    // no una búsqueda concreta (si se colara, la vista devolvería 0 al reusarla).
     const shared = canShare && shareNew
-    const r = await api.saveTicketView({ name: nombre, filters: f, shared })
+    const { q: _q, search_in: _si, ...persist } = f
+    const r = await api.saveTicketView({ name: nombre, filters: persist, shared })
     if (r.ok) {
       toast(shared ? 'Vista de equipo guardada' : 'Vista guardada')
       setNewName(''); setNaming(false); setShareNew(false); cargarVistas()

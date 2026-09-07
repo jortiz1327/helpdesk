@@ -2202,7 +2202,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 :root[data-theme="light"] .chip.answered { background: #ecfdf5; color: #047857; }
 
 /* --- MODAL del ticket: no se cambia de página --- */
-.tk-modal { position: relative; display: flex; width: min(1180px, 94vw); height: min(760px, 90vh); background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35); }
+.tk-modal { position: relative; display: flex; width: min(1800px, 97vw); height: 94vh; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35); }
 /* Cerrar: en la esquina superior derecha del MODAL entero, no del panel de chat. */
 .tk-close { position: absolute; top: 12px; right: 14px; z-index: 10; }
 
