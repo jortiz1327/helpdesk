@@ -512,6 +512,8 @@ export const api = {
   bulkAddContacts: (type, text) => req('contact.php?action=bulk', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, text }),
   }),
+  // Importar contactos desde un Excel/CSV (multipart; la cabecera la pone el navegador)
+  importContactsFile: (file) => { const fd = new FormData(); fd.append('file', file); return req('contact.php?action=import', { method: 'POST', body: fd }) },
 
   // Contactos (gestión + acciones en lote)
   // `area` separa por actividad: 'campaigns' (con WhatsApp) | 'helpdesk' (con tickets)

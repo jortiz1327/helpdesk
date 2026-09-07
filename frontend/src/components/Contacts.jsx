@@ -26,6 +26,7 @@ export default function Contacts({ onOpen, area = '' }) {
   const [sel, setSel] = useState(new Set())
   const [managing, setManaging] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [bulkLabelId, setBulkLabelId] = useState('')
   const [bulkPbId, setBulkPbId] = useState('')
 
@@ -103,6 +104,7 @@ export default function Contacts({ onOpen, area = '' }) {
           <button className={mode === 'kanban' ? 'on' : ''} onClick={() => setMode('kanban')} title="Vista kanban"><Icon.kanban /> Kanban</button>
         </div>
         <button className="btn ghost" onClick={() => setManaging(true)}><Icon.tag /> Etiquetas de cliente</button>
+        {esCampanas && <button className="btn ghost" onClick={() => setImportOpen(true)}><Icon.download /> Importar Excel/CSV</button>}
         <button className="btn ghost" onClick={() => setBulkOpen(true)}><Icon.download /> Agregar en masa</button>
         <button className="btn" onClick={() => setEditing({})}><Icon.plus /> Agregar</button>
       </header>
@@ -233,6 +235,7 @@ export default function Contacts({ onOpen, area = '' }) {
       {managing && <LabelManager labels={labels} onClose={() => setManaging(false)} onChanged={loadAux} />}
       {editing && <ContactEdit contact={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
       {bulkOpen && <BulkAddContacts area={area} onClose={() => setBulkOpen(false)} onDone={() => { setBulkOpen(false); load() }} />}
+      {importOpen && <ImportContacts onClose={() => setImportOpen(false)} onDone={() => { setImportOpen(false); load(); loadAux() }} />}
       {merging && <ContactMerge pair={merging} onClose={() => setMerging(null)}
         onMerged={() => { setMerging(null); clearSel(); load() }} />}
     </>
@@ -322,6 +325,11 @@ function ContactEdit({ contact, onClose, onSaved }) {
     country_code: cc0 || '34',
     phone: phone0,
     sede_id: contact.sede_id || null,
+    empresa: contact.empresa || '',
+    tienda: contact.tienda || '',
+    cargo: contact.cargo || '',
+    provincia: contact.provincia || '',
+    comentarios: contact.comentarios || '',
   })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
@@ -337,7 +345,8 @@ function ContactEdit({ contact, onClose, onSaved }) {
   const save = async () => {
     if (!f.email.trim() && !f.phone.trim()) { toast('Indica al menos un correo o un teléfono', 'err'); return }
     setBusy(true)
-    const fields = { name: f.name, email: f.email, country_code: f.country_code, phone: f.phone, sede_id: f.sede_id || '' }
+    const fields = { name: f.name, email: f.email, country_code: f.country_code, phone: f.phone, sede_id: f.sede_id || '',
+      empresa: f.empresa, tienda: f.tienda, cargo: f.cargo, provincia: f.provincia, comentarios: f.comentarios }
     const r = isNew ? await api.createContact(fields) : await api.saveContact(contact.id, fields)
     setBusy(false)
     if (r.ok) { toast(isNew ? 'Contacto añadido' : 'Contacto actualizado'); onSaved() }
@@ -364,6 +373,18 @@ function ContactEdit({ contact, onClose, onSaved }) {
               <input value={f.phone} onChange={set('phone')} placeholder="600123456" inputMode="numeric" /></label>
           </div>
           <p className="ct-hint">Puede tener correo, teléfono o ambos.</p>
+
+          <div className="grid2">
+            <label className="field"><span className="lbl">Empresa</span><input value={f.empresa} onChange={set('empresa')} placeholder="Nombre de la empresa" /></label>
+            <label className="field"><span className="lbl">Tienda</span><input value={f.tienda} onChange={set('tienda')} placeholder="Tienda / establecimiento" /></label>
+          </div>
+          <div className="grid2">
+            <label className="field"><span className="lbl">Cargo</span><input value={f.cargo} onChange={set('cargo')} placeholder="Puesto" /></label>
+            <label className="field"><span className="lbl">Provincia</span><input value={f.provincia} onChange={set('provincia')} placeholder="Provincia" /></label>
+          </div>
+          <label className="field"><span className="lbl">Comentarios</span>
+            <textarea rows={2} value={f.comentarios} onChange={set('comentarios')} placeholder="Notas comerciales" /></label>
+
           <div className="field"><span className="lbl">Sede <span className="hint" style={{ fontWeight: 400 }}>· organización del cliente</span></span>
             <SedeSelect value={f.sede_id} onChange={(v) => setF((s) => ({ ...s, sede_id: v }))} /></div>
         </div>
@@ -432,6 +453,69 @@ function BulkAddContacts({ area, onClose, onDone }) {
         <div className="modal-foot">
           <button className="btn ghost" onClick={onClose}>Cancelar</button>
           <button className="btn" onClick={add} disabled={busy}>{busy ? 'Añadiendo…' : 'Añadir'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- Importar contactos desde Excel/CSV ----------------
+ * Columnas por nombre de cabecera. «Sector» se convierte en etiqueta (se crea
+ * si no existe). Dedup por correo/teléfono: reutiliza, no duplica.
+ * ------------------------------------------------------------------- */
+const IMPORT_COLS = ['Empresa', 'Tienda', 'Email', 'Nombre', 'Apellido', 'Cargo', 'Teléfono', 'Comentarios', 'Provincia', 'Sector']
+
+function ImportContacts({ onClose, onDone }) {
+  const toast = useToast()
+  const [file, setFile] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [onClose])
+
+  const plantilla = () => {
+    const ej = ['Hotel Sol', 'Recepción', 'ana@hotelsol.com', 'Ana', 'García', 'Recepcionista', '600123456', 'Cliente VIP', 'Valencia', 'Hoteles']
+    const csv = '﻿' + [IMPORT_COLS, ej].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a'); a.href = url; a.download = 'plantilla-contactos.csv'; a.click(); URL.revokeObjectURL(url)
+  }
+
+  const subir = async () => {
+    if (!file) { toast('Elige un archivo', 'err'); return }
+    setBusy(true)
+    const r = await api.importContactsFile(file)
+    setBusy(false)
+    if (!r.ok) { toast(r.error || 'No se pudo importar', 'err'); return }
+    const p = [`${r.added} añadido${r.added === 1 ? '' : 's'}`]
+    if (r.reused) p.push(`${r.reused} actualizado${r.reused === 1 ? '' : 's'}`)
+    if (r.tags_new) p.push(`${r.tags_new} etiqueta${r.tags_new === 1 ? '' : 's'} creada${r.tags_new === 1 ? '' : 's'}`)
+    if (r.invalid) p.push(`${r.invalid} fila${r.invalid === 1 ? '' : 's'} sin correo ni teléfono`)
+    toast(p.join(' · '))
+    onDone()
+  }
+
+  return (
+    <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal" style={{ maxWidth: 560 }}>
+        <div className="modal-h">
+          <h3>Importar contactos de Excel/CSV</h3>
+          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
+        </div>
+        <div className="modal-body">
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Sube un <b>.xlsx</b> o <b>.csv</b> con estas columnas (por su nombre; el orden da igual). La columna <b>Sector</b> se convierte en <b>etiqueta</b> (se crea si no existe). Si un contacto ya existe (mismo correo o teléfono), se reutiliza y se le añade la etiqueta.</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '2px 0 14px' }}>
+            {IMPORT_COLS.map((c) => <span key={c} className={`pill sm ${c === 'Sector' ? 'ok' : 'gray'}`}>{c}</span>)}
+          </div>
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] || null)}
+            style={{ display: 'block', width: '100%', fontSize: 13.5, marginBottom: 8 }} />
+          <button className="link-btn" onClick={plantilla} style={{ fontSize: 12.5 }}>↓ Descargar plantilla de ejemplo</button>
+        </div>
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={subir} disabled={busy || !file}>{busy ? 'Importando…' : 'Importar'}</button>
         </div>
       </div>
     </div>

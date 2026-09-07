@@ -52,7 +52,7 @@ class RolesPermissionsSeeder extends Seeder
         //     un permiso recién añadido al código NO pudo editarse nunca, así que se concede
         //     (additive) a los roles que la config dice que deben tenerlo. Evita que cambiar
         //     el gateo de una función a un permiso nuevo deje sin acceso a los roles de siempre.
-        $nuevos = ['organizations.view', 'organizations.edit'];
+        $nuevos = ['organizations.view', 'organizations.edit', 'contacts.edit'];
         foreach (config('rbac.roles') as $name => $def) {
             if (($def['permissions'] ?? null) === '*') continue;
             $role = Role::where(['name' => $name, 'guard_name' => 'web'])->first();

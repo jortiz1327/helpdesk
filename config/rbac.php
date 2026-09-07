@@ -124,7 +124,7 @@ return [
             'permissions' => [
                 'campaigns.access', 'campaigns.send', 'campaigns.delete',
                 'templates.manage', 'forms.manage',
-                'contacts.access',
+                'contacts.access', 'contacts.edit',
                 // La configuración de WhatsApp (settings.manage) y los FLUJOS DE AUTOMATIZACIÓN
                 // (automations.*) se dejan SOLO al superadmin.
                 'analytics.view',
