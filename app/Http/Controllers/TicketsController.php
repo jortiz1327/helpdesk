@@ -450,6 +450,13 @@ class TicketsController extends Controller
         $labels = $this->labelsFor($rows->pluck('id')->all());
         foreach ($rows as $t) $t->labels = $labels[$t->id] ?? [];
 
+        // ¿Te han @mencionado (y aún no lo has abierto)? Una sola consulta para toda la página.
+        $ids = $rows->pluck('id')->all();
+        $mencion = $ids ? DB::table('notifications')
+            ->where('user_id', $me->id)->where('type', 'mention')->whereNull('read_at')
+            ->whereIn('ticket_id', $ids)->pluck('ticket_id')->flip()->all() : [];
+        foreach ($rows as $t) $t->mentioned = isset($mencion[$t->id]);
+
         // Los tiempos solo se calculan (y se envían) a quien tiene permiso para verlos.
         $canTimes = $me->can('tickets.view_times');
         $sla = app(SlaService::class);
@@ -772,6 +779,11 @@ class TicketsController extends Controller
         // Los anteriores se piden bajo demanda (acción `messages`).
         $totalMsg = DB::table('messages')->where('ticket_id', $id)->count();
         $messages = $this->cargarMensajes($id, null, self::MSG_PAGE);
+
+        // Al abrir el ticket, tus @menciones de aquí quedan vistas → desaparece el «TE HAN
+        // MENCIONADO» de la lista (y baja el contador de la campana).
+        DB::table('notifications')->where('user_id', $me->id)->where('type', 'mention')
+            ->where('ticket_id', $id)->whereNull('read_at')->update(['read_at' => now()]);
 
         $events = DB::table('ticket_events as e')
             ->leftJoin('users as u', 'u.id', '=', 'e.user_id')

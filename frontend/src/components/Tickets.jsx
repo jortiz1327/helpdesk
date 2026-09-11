@@ -967,6 +967,9 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         <td className="tk-subj">
                           {waiting && <span className="dot-wait" title="El cliente escribió lo último: sin responder" />}
                           {t.subject}
+                          {t.mentioned && (
+                            <span className="tk-mention-chip" title="Te han mencionado en una nota interna de este ticket">@ Te han mencionado</span>
+                          )}
                           {/* Solo se marca el SLA que pide atención (vencido o por vencer). */}
                           {(() => { const p = slaPeor(t.sla); return p ? slaChip(p[0], p[1]) : null })()}
                           {sleeping && (
