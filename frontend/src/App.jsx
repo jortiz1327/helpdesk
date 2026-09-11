@@ -535,14 +535,14 @@ export default function App() {
                 fireNotification(
                     `Nueva respuesta · ${e.code}`,
                     e.subject || "Un cliente ha escrito",
-                    () => setView("tickets"),
+                    () => { setTicketsTab("tickets"); setTicketAbierto(e.ticketId); setView("tickets"); },
                 );
             } else if (e.action === "created") {
                 toast(`🎫 Nuevo ticket ${e.code}`);
                 fireNotification(
                     `Nuevo ticket · ${e.code}`,
                     e.subject || "",
-                    () => setView("tickets"),
+                    () => { setTicketsTab("tickets"); setTicketAbierto(e.ticketId); setView("tickets"); },
                 );
             } else if (
                 e.action === "assigned" &&
@@ -558,7 +558,7 @@ export default function App() {
                 fireNotification(
                     `Te han asignado un ticket · ${e.code}`,
                     e.subject || "",
-                    () => setView("tickets"),
+                    () => { setTicketsTab("tickets"); setTicketAbierto(e.ticketId); setView("tickets"); },
                 );
             }
         });
