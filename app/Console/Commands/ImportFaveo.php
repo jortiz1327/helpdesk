@@ -203,6 +203,10 @@ class ImportFaveo extends Command
             // ---- Ticket REAL de cliente ----
             $nReal++;
             $nombre = trim(($t->first_name ?? '') . ' ' . ($t->last_name ?? '')) ?: ($t->user_name ?: null);
+            // Decodifica nombres MIME (=?utf-8?B?...?=) que Faveo guardó sin decodificar.
+            if ($nombre !== null && str_contains($nombre, '=?')) {
+                $nombre = trim(preg_replace('/\s+/', ' ', (string) mb_decode_mimeheader($nombre))) ?: $nombre;
+            }
             if (count($ejReal) < 20) $ejReal[] = [self::estadoTxt((int) $t->status), mb_strimwidth($asunto ?: '(sin asunto)', 0, 54, '…')];
             if ($apply) $this->crearReal($t, $threads, $email, $nombre, $asunto, $source, $catDefault);
         }
