@@ -301,6 +301,17 @@ class ImportFaveo extends Command
             ];
         }
         foreach (array_chunk($filas, 300) as $lote) DB::table('messages')->insert($lote);
+
+        // La ÚLTIMA ACTIVIDAD se calcula del último mensaje real del hilo, no del campo
+        // last_message_at del ticket de Faveo (que llega desfasado): así la bandeja ordena
+        // bien por respuesta reciente (un ticket viejo con respuesta de hoy sube arriba).
+        if ($filas) {
+            $ultimo = max(array_column($filas, 'created_at'));
+            if ($ultimo > $fin) {
+                DB::table('tickets')->where('id', $ticketId)
+                    ->update(['last_message_at' => $ultimo, 'updated_at' => $ultimo]);
+            }
+        }
     }
 
     /** Contacto único para tickets cuyo solicitante era un agente (no se duplica el correo). */
