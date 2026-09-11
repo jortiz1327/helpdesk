@@ -1587,6 +1587,8 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tk-bub:hover .tk-star { opacity: 1; }
 .tk-star:hover { background: rgba(244,183,64,0.18); color: var(--warn); }
 .tk-star svg { width: 14px; height: 14px; fill: currentColor; }
+/* Marcada: siempre visible y en color, para saber de un vistazo cuáles están guardadas. */
+.tk-star.on { opacity: 1; color: var(--warn); }
 
 /* Panel «respuestas parecidas que funcionaron» */
 .cmp-ef { position: relative; }

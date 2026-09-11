@@ -27,16 +27,32 @@ class EffectiveResponsesController extends Controller
         };
     }
 
-    /** Guarda una respuesta como efectiva (desde un mensaje enviado o un cuerpo suelto). */
+    /**
+     * Marca (o DESMARCA) una respuesta como efectiva. Funciona como INTERRUPTOR: si la ⭐ del
+     * mensaje ya estaba guardada, este mismo botón la quita. Vale también para un cuerpo suelto
+     * (sin message_id): ahí no hay interruptor, solo alta con control de duplicado.
+     */
     protected function save(Request $request)
     {
         $ticketId = (int) $request->input('ticket_id');
         $t = DB::table('tickets')->where('id', $ticketId)->first(['category_id', 'subject']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
+        $msgId = (int) $request->input('message_id', 0);
+
+        // INTERRUPTOR: si ese mensaje ya está marcado, se DESMARCA (se borra su respuesta efectiva).
+        if ($msgId) {
+            $ya = DB::table('effective_responses')
+                ->where('ticket_id', $ticketId)->where('message_id', $msgId)->first(['id']);
+            if ($ya) {
+                DB::table('effective_responses')->where('id', $ya->id)->delete();
+                return response()->json(['ok' => true, 'removed' => true]);
+            }
+        }
+
         // El cuerpo: de un mensaje concreto (por id) o del payload.
         $body = (string) $request->input('body', '');
-        if ($msgId = (int) $request->input('message_id', 0)) {
+        if ($msgId) {
             $m = DB::table('messages')->where('id', $msgId)->where('ticket_id', $ticketId)->first(['body']);
             if ($m) $body = (string) $m->body;
         }
@@ -51,13 +67,16 @@ class EffectiveResponsesController extends Controller
         $keywords = trim($this->plain((string) $t->subject) . ' ' . $this->plain((string) $lastIn) . ' ' . $this->plain($body));
         $title    = mb_substr($this->plain((string) $t->subject) ?: $this->plain($body), 0, 180);
 
-        // Evita duplicar exactamente la misma respuesta del mismo ticket.
-        $dup = DB::table('effective_responses')->where('ticket_id', $ticketId)
-            ->whereRaw('LEFT(body, 500) = ?', [mb_substr($body, 0, 500)])->exists();
-        if ($dup) return response()->json(['ok' => true, 'dup' => true]);
+        // Sin message_id (cuerpo suelto): evita duplicar exactamente la misma respuesta del mismo ticket.
+        if (!$msgId) {
+            $dup = DB::table('effective_responses')->where('ticket_id', $ticketId)
+                ->whereRaw('LEFT(body, 500) = ?', [mb_substr($body, 0, 500)])->exists();
+            if ($dup) return response()->json(['ok' => true, 'dup' => true]);
+        }
 
         $id = DB::table('effective_responses')->insertGetId([
             'ticket_id'   => $ticketId,
+            'message_id'  => $msgId ?: null,
             'category_id' => $t->category_id,
             'title'       => $title,
             'body'        => $body,
@@ -67,7 +86,7 @@ class EffectiveResponsesController extends Controller
             'created_at'  => now(),
         ]);
 
-        return response()->json(['ok' => true, 'id' => $id]);
+        return response()->json(['ok' => true, 'id' => $id, 'saved' => true]);
     }
 
     /** Respuestas efectivas parecidas a un ticket (misma categoría + coincidencia de texto). */

@@ -826,8 +826,13 @@ class TicketsController extends Controller
             ->reverse()->values();   // se leyó desc (para el LIMIT); se pinta asc
 
         $byMessage = $this->attachments->forTicket($id);
+        // Qué mensajes están marcados como «respuesta efectiva» (⭐), para pintar la estrella rellena.
+        $starred = $messages->isEmpty() ? [] : DB::table('effective_responses')
+            ->where('ticket_id', $id)->whereIn('message_id', $messages->pluck('id')->all())
+            ->pluck('message_id')->flip()->all();
         foreach ($messages as $m) {
             $m->attachments = $byMessage[$m->id] ?? [];
+            $m->starred = isset($starred[$m->id]);
             if ($m->payload && ($p = json_decode($m->payload, true)) && !empty($p['delivery_error'])) {
                 $m->delivery_error = $p['delivery_error'];
             }

@@ -1462,11 +1462,22 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
     return () => document.removeEventListener('keydown', h)
   }, [onClose])
 
-  // Guarda una respuesta SALIENTE como «respuesta efectiva» (memoria que se reutiliza).
-  const guardarEfectiva = async (messageId) => {
-    const r = await api.saveEffective(id, messageId)
-    if (r.ok) toast(r.dup ? 'Esa respuesta ya estaba guardada' : '⭐ Guardada como respuesta efectiva')
-    else toast(r.error || 'No se pudo guardar', 'err')
+  // ⭐ como INTERRUPTOR: guarda / quita una respuesta SALIENTE de la memoria de respuestas
+  // efectivas. starMap sobrescribe localmente el m.starred que viene del servidor.
+  const [starMap, setStarMap] = useState({})
+  const esEfectiva = (m) => (m.id in starMap ? starMap[m.id] : !!m.starred)
+  const guardarEfectiva = async (m) => {
+    const marcar = !esEfectiva(m)
+    setStarMap((s) => ({ ...s, [m.id]: marcar }))   // optimista
+    const r = await api.saveEffective(id, m.id)
+    if (!r.ok) {
+      setStarMap((s) => ({ ...s, [m.id]: !marcar }))
+      toast(r.error || 'No se pudo guardar', 'err')
+      return
+    }
+    const guardada = !r.removed
+    setStarMap((s) => ({ ...s, [m.id]: guardada }))
+    toast(guardada ? '⭐ Guardada como respuesta efectiva' : 'Quitada de respuestas efectivas')
   }
 
   const setStatus = async (status) => {
@@ -1854,10 +1865,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                             : out
                               ? (m.author_name || 'Automático')
                               : (t.contact_name || 'Cliente')}
-                          {/* Guardar una respuesta buena en la memoria de respuestas efectivas. */}
+                          {/* ⭐ interruptor: guardar/quitar en la memoria de respuestas efectivas. */}
                           {out && !Number(m.is_internal_note) && (m.body || m.type === 'text') && (
-                            <button type="button" className="tk-star" title="Guardar como respuesta efectiva"
-                              onClick={() => guardarEfectiva(m.id)}><Icon.star /></button>
+                            <button type="button" className={'tk-star' + (esEfectiva(m) ? ' on' : '')}
+                              title={esEfectiva(m) ? 'Quitar de respuestas efectivas' : 'Guardar como respuesta efectiva'}
+                              onClick={() => guardarEfectiva(m)}><Icon.star /></button>
                           )}
                         </div>
 
