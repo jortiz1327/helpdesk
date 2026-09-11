@@ -119,7 +119,7 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.1";
 
 /*
  * La plataforma tiene dos ÁREAS: Helpdesk y Campañas. El superadmin puede cambiar
