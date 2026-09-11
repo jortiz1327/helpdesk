@@ -112,7 +112,7 @@ return [
             'description' => 'Atiende los tickets de sus categorías asignadas. No ve los de otras áreas.',
             'permissions' => [
                 'helpdesk.access', 'tickets.create', 'tickets.reply', 'tickets.categorize', 'tickets.close',
-                'contacts.access',
+                'contacts.access', 'contacts.edit',
                 'organizations.view',
                 'shifts.access',
             ],
