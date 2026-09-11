@@ -490,6 +490,9 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   const [canTimes, setCanTimes] = useState(false)
   const [counts, setCounts] = useState({})
   const [open, setOpen] = useState(initialTicket)   // id del ticket abierto en el modal
+  // Si llega la orden de abrir un ticket (campana, aviso del navegador, recientes) estando YA
+  // en esta vista, initialTicket cambia y hay que abrir el modal (useState solo lo tomó al montar).
+  useEffect(() => { if (initialTicket) setOpen(initialTicket) }, [initialTicket])
   // Fusión lanzada DESDE LA LISTA (sin abrir ningún ticket): { id, preselect }
   const [openFusion, setOpenFusion] = useState(null)
   const [bulkMerge, setBulkMerge] = useState(null)   // null | { n } — motivo para fusión en lote (3+)
