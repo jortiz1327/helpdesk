@@ -120,6 +120,23 @@ function ConfirmDialog({ opts, onClose }) {
 }
 
 const APP_VERSION = "1.0.1";
+// Novedades de la versión actual (se muestran al pulsar «vX.Y.Z» en la barra lateral).
+// Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
+const APP_CHANGELOG = {
+    version: "1.0.1",
+    date: "11 sep 2026",
+    mejoras: [
+        ["Respuestas efectivas: la ⭐ es un interruptor", "Guarda y quita una respuesta buena de la memoria; se ve rellena cuando está guardada y mantiene el estado al recargar."],
+        ["«Te han mencionado» en la bandeja", "Si te @mencionan en una nota interna y aún no has abierto el ticket, su fila lo avisa. Al abrirlo, el aviso desaparece."],
+        ["Los avisos del navegador abren el ticket", "Al pulsar un aviso de escritorio (respuesta, ticket nuevo, asignación) se abre ese ticket, no solo la lista."],
+        ["Los agentes pueden editar contactos", "El rol Agente ya puede editar la ficha de un contacto (nombre, correo, teléfono…), antes solo los encargados."],
+    ],
+    arreglos: [
+        ["Notificaciones que no abrían el ticket", "Estando ya en la bandeja, pulsar una notificación no abría el ticket. Corregido."],
+        ["Orden por última actividad (histórico de Faveo)", "Un ticket antiguo con respuesta reciente no subía en la bandeja. Ahora se ordena por el último mensaje real."],
+        ["Nombres de contacto en código raro", "Nombres que llegaban como «=?utf-8?…» ahora se ven bien."],
+    ],
+};
 
 /*
  * La plataforma tiene dos ÁREAS: Helpdesk y Campañas. El superadmin puede cambiar
@@ -429,6 +446,54 @@ function initialsOf(user) {
  * más aire vertical y una sola zona de navegación en lugar de dos.
  */
 
+// Modal de novedades: se abre al pulsar la versión en la barra lateral.
+function VersionModal({ onClose }) {
+    useEffect(() => {
+        const h = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", h);
+        return () => document.removeEventListener("keydown", h);
+    }, [onClose]);
+    const c = APP_CHANGELOG;
+    return (
+        <div className="modal-bg" onClick={(e) => e.target.classList.contains("modal-bg") && onClose()}>
+            <div className="modal ver-modal">
+                <div className="ver-modal-h">
+                    <div>
+                        <h3>Novedades</h3>
+                        <span className="ver-modal-sub">v{c.version} · {c.date}</span>
+                    </div>
+                    <button className="ver-modal-x" onClick={onClose} aria-label="Cerrar">✕</button>
+                </div>
+                <div className="ver-modal-body">
+                    {c.mejoras?.length > 0 && (
+                        <section>
+                            <h4 className="ver-sec mejoras">Mejoras</h4>
+                            <ul>
+                                {c.mejoras.map(([t, d], i) => (
+                                    <li key={i}><b>{t}</b><span>{d}</span></li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
+                    {c.arreglos?.length > 0 && (
+                        <section>
+                            <h4 className="ver-sec arreglos">Arreglos</h4>
+                            <ul>
+                                {c.arreglos.map(([t, d], i) => (
+                                    <li key={i}><b>{t}</b><span>{d}</span></li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
+                </div>
+                <div className="ver-modal-foot">
+                    <button className="btn" onClick={onClose}>Entendido</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function App() {
     const [auth, setAuth] = useState({ state: "loading", user: null });
     const [view, setView] = useState(() => vistaDeUrl() || "support");
@@ -436,6 +501,7 @@ export default function App() {
     const [ticketsTab, setTicketsTab] = useState("tickets");
     // Ticket que hay que abrir nada más llegar (al pinchar uno de los recientes).
     const [ticketAbierto, setTicketAbierto] = useState(null);
+    const [verOpen, setVerOpen] = useState(false);   // modal de novedades de la versión
     // Filtro de organización preaplicado al saltar desde la pantalla de Organización.
     const [orgFiltro, setOrgFiltro] = useState(null);
     const [activeArea, setActiveArea] = useState(
@@ -980,7 +1046,7 @@ export default function App() {
                                 </button>
                             )}
                             {expanded && (
-                                <span className="ver">v{APP_VERSION}</span>
+                                <button className="ver" onClick={() => setVerOpen(true)} title="Ver novedades de esta versión">v{APP_VERSION}</button>
                             )}
                         </div>
 
@@ -1115,6 +1181,7 @@ export default function App() {
                     />
                 )}
             </ConfirmCtx.Provider>
+            {verOpen && <VersionModal onClose={() => setVerOpen(false)} />}
             <ToastHost toasts={toasts} onClose={cerrarToast} />
         </ToastCtx.Provider>
     );
