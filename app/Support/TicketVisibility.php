@@ -7,8 +7,9 @@ use App\Models\User;
 /**
  * ÚNICA fuente de verdad de «qué tickets ve un usuario»:
  *   · con `tickets.view_all` → todos;
- *   · si no → los de SUS categorías, los que tiene asignados, y los CERRADOS
- *     (histórico compartido por todos).
+ *   · si no → los de SUS categorías, los SIN CATEGORÍA (sin triar: visibles para
+ *     todos los agentes para que no queden en un limbo), los que tiene asignados, y
+ *     los CERRADOS (histórico compartido por todos).
  *
  * Se usa como filtro de consulta (la bandeja, acciones en lote) Y para comprobar el
  * acceso a un adjunto concreto (`AttachmentController`). Antes ese criterio estaba
@@ -27,6 +28,7 @@ class TicketVisibility
         $cats = $me->categoryIds();
         return $query->where(function ($q) use ($cats, $me) {
             if ($cats) $q->whereIn('t.category_id', $cats);
+            $q->orWhereNull('t.category_id');     // SIN categoría (sin triar): para todos
             $q->orWhere('t.assigned_to', $me->id);
             $q->orWhere('t.status', 'cerrado');   // los cerrados, para todos
         });

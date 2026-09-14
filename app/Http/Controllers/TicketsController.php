@@ -96,12 +96,12 @@ class TicketsController extends Controller
     /**
      * ¿Qué tickets ve este usuario?
      *  - Con `tickets.view_all` (encargado / superadmin): TODOS.
-     *  - Sin él (agente): los de SUS CATEGORÍAS (sus áreas) + los asignados a él +
-     *    CUALQUIER ticket ya CERRADO (histórico compartido: un caso cerrado de otro
-     *    departamento se puede consultar desde el que sea). En la bandeja del día no
-     *    molesta —por defecto solo se ven los abiertos de su área—; los cerrados de
-     *    otros departamentos afloran al buscar o filtrar «todos/cerrados».
-     * Los tickets sin categorizar y ABIERTOS solo los ve quien tiene view_all.
+     *  - Sin él (agente): los de SUS CATEGORÍAS (sus áreas) + los SIN CATEGORÍA (sin
+     *    triar: los ve cualquier agente para que no queden en un limbo hasta que un
+     *    encargado los clasifique) + los asignados a él + CUALQUIER ticket ya CERRADO
+     *    (histórico compartido: un caso cerrado de otro departamento se puede consultar
+     *    desde el que sea). En la bandeja del día no molesta —por defecto solo se ven
+     *    los abiertos de su área—; los cerrados de otros afloran al filtrar «todos».
      */
     protected function scope($query, User $me)
     {
