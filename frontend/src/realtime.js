@@ -58,8 +58,14 @@ function stopPolling() {
 export function connectRealtime() {
   if (echo) return
 
-  const key = import.meta.env.VITE_REVERB_APP_KEY
-  if (!key) { startPolling('sin configuración de websocket'); return }
+  const key  = import.meta.env.VITE_REVERB_APP_KEY
+  const host = import.meta.env.VITE_REVERB_HOST
+  // Sin clave → polling. Y si el host es LOCAL (127.0.0.1/localhost), tampoco se intenta:
+  // eso solo pasa cuando se cuela la config de desarrollo en un build de producción, y haría
+  // que el navegador del cliente pidiera permiso para «conectarse a un dispositivo de tu red
+  // local» (Private Network Access) por un websocket que nunca va a existir en su equipo.
+  const hostLocal = !host || /^(127\.0\.0\.1|localhost|0\.0\.0\.0|::1)$/i.test(host)
+  if (!key || hostLocal) { startPolling('sin websocket de producción'); return }
 
   try {
     echo = new Echo({
