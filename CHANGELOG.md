@@ -3,6 +3,17 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [Sin publicar]
+
+### Arreglos
+
+- **Nombres de remitente con acentos ilegibles en la bandeja.**
+  Los tickets de correo mostraban el contacto como
+  `=?UTF-8?Q?Fusi=C3=B3n_Ribera?=` en vez de «Fusión Ribera»: el nombre llegaba
+  codificado en MIME y se guardaba sin decodificar. Ahora se decodifica al entrar
+  el correo (también en la cuarentena), y una migración corrige los contactos que
+  ya estaban guardados así. Tras desplegar hay que ejecutar `php artisan migrate`.
+
 ## [1.0.1] — 2026-09-11
 
 ### Mejoras

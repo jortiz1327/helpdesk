@@ -208,7 +208,7 @@ class MailService
             if (!$admins) return;
 
             $from    = (string) ($message->getFrom()[0]->mail ?? '?');
-            $subject = self::decodeSubject($message->getSubject());
+            $subject = self::decodeHeader($message->getSubject());
             $msgId   = (string) $message->getMessageId();
 
             $cuerpo = '<p>Un correo entrante <b>no se ha podido convertir en ticket</b> tras '
@@ -252,8 +252,8 @@ class MailService
                 [
                     'message_id'   => mb_substr((string) $message->getMessageId(), 0, 512) ?: null,
                     'from_email'   => mb_substr((string) ($from->mail ?? ''), 0, 255) ?: null,
-                    'from_name'    => mb_substr(trim((string) ($from->personal ?? '')), 0, 255) ?: null,
-                    'subject'      => mb_substr(self::decodeSubject($message->getSubject()), 0, 255) ?: null,
+                    'from_name'    => mb_substr(self::decodeHeader($from->personal ?? ''), 0, 255) ?: null,
+                    'subject'      => mb_substr(self::decodeHeader($message->getSubject()), 0, 255) ?: null,
                     'error'        => mb_substr($e->getMessage(), 0, 1000),
                     'body_preview' => $preview ?: null,
                     'received_at'  => $this->fechaMensaje($message),
@@ -370,7 +370,9 @@ class MailService
         $from  = $message->getFrom();
         $addr  = $from[0] ?? null;
         $email = $addr->mail ?? null;
-        $name  = trim((string) ($addr->personal ?? '')) ?: null;
+        // El nombre puede venir codificado en MIME: sin decodificar, el contacto se
+        // guardaba como «=?UTF-8?Q?Fusi=C3=B3n_Ribera?=».
+        $name  = self::decodeHeader($addr->personal ?? '') ?: null;
 
         if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return ['ticket_nuevo' => false, 'mensaje' => false, 'adjuntos' => 0];   // sin remitente válido, se descarta
@@ -397,7 +399,7 @@ class MailService
             return ['ticket_nuevo' => false, 'mensaje' => false, 'adjuntos' => 0];   // ya importado
         }
 
-        $subject = self::decodeSubject($message->getSubject());
+        $subject = self::decodeHeader($message->getSubject());
 
         // Fecha REAL del correo (cabecera Date:), no la del sondeo. Así el hilo
         // muestra cuándo lo envió el cliente. getDate()->toDate() da el instante
@@ -762,12 +764,17 @@ class MailService
     }
 
     /**
-     * Decodifica un asunto MIME («=?utf-8?B?…?=») a texto legible. Muchos clientes
-     * mandan así los asuntos con acentos o «RV:»; sin decodificar, el ticket saldría con
-     * el churro codificado Y `esReenvio()` no reconocería el reenvío (→ recorte de la cita
-     * → ticket casi vacío). Deja igual lo que no lleva encoded-words.
+     * Decodifica una cabecera MIME («=?utf-8?B?…?=», «=?UTF-8?Q?Fusi=C3=B3n_Ribera?=»)
+     * a texto legible. Deja igual lo que no lleva encoded-words.
+     *
+     * Se usa para el ASUNTO y para el NOMBRE del remitente:
+     * - Asunto: muchos clientes lo mandan así con acentos o «RV:»; sin decodificar, el
+     *   ticket saldría con el churro codificado Y `esReenvio()` no reconocería el reenvío
+     *   (→ recorte de la cita → ticket casi vacío).
+     * - Nombre: Webklex no siempre decodifica el `personal` de la dirección, y el nombre
+     *   del contacto se guardaba tal cual («=?utf-8?Q?Miguel_Trav=C3=A9?=» en la bandeja).
      */
-    protected static function decodeSubject($raw): string
+    protected static function decodeHeader($raw): string
     {
         $s = trim((string) $raw);
         if ($s === '' || stripos($s, '=?') === false) return $s;
