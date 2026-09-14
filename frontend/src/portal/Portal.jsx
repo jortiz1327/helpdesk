@@ -209,6 +209,17 @@ const relTime = (iso, t, lang = 'es') => {
   if (d < 30) return t('rel_days', { n: d })
   return fmtDate(iso, lang)
 }
+// Pinta la respuesta de una FAQ respetando los saltos de línea y resaltando las listas
+// numeradas («1) …», «1. …») con el número dentro de un círculo de color.
+function renderAnswer(text) {
+  return String(text || '').split('\n').map((ln, i) => {
+    const m = ln.match(/^\s*(\d+)[.)]\s+(.*)$/)
+    if (m) return <div className="qa-li" key={i}><span className="qa-num">{m[1]}</span><span>{m[2]}</span></div>
+    if (ln.trim() === '') return <div className="qa-sp" key={i} aria-hidden="true" />
+    return <div className="qa-p" key={i}>{ln}</div>
+  })
+}
+
 const CHIP = { recibido: 'nuevo', en_proceso: 'proceso', resuelto: 'resuelto' }
 /* Estado del ticket → cómo se ve. El estado es el centro de la pantalla. Las
    etiquetas y subtítulos son CLAVES del diccionario (se resuelven con `t`). */
@@ -477,7 +488,7 @@ function Home({ go, irCrear }) {
               <div id={`qa-a-${f.id}`} className="qa-a" style={{ maxHeight: open === f.id ? '600px' : 0 }}
                 {...(open === f.id ? {} : { inert: '' })}>
                 <div className="qa-a-in">
-                  <div className="qa-answer">{f.answer}</div>{f.hint && <div className="tip">💡 {f.hint}</div>}
+                  <div className="qa-answer">{renderAnswer(f.answer)}</div>{f.hint && <div className="tip">💡 {f.hint}</div>}
                   {/* Pie de la respuesta: ¿te ha servido? + salida a incidencia. */}
                   <div className="qa-foot">
                     {voted[f.id]
