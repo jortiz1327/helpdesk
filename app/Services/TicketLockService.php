@@ -67,6 +67,32 @@ class TicketLockService
     }
 
     /**
+     * Estado del candado SIN tomarlo ni renovar la marca de tiempo. Para los refrescos
+     * de FONDO (sondeo, mensaje entrante): así un agente que abrió el ticket y se fue no
+     * mantiene el candado vivo eternamente por el mero hecho de tener el modal abierto —
+     * solo lo renueva el «latido», que va por actividad real. Misma forma que acquire().
+     */
+    public function status(int $ticketId, int $userId): ?array
+    {
+        if (!$this->enabled()) return null;
+
+        $t = DB::table('tickets')->where('id', $ticketId)->first(['locked_by', 'locked_at']);
+        if (!$t) return null;
+
+        // Solo se considera ocupado si el candado de OTRO sigue vigente.
+        if ($this->vigente($t->locked_by, $t->locked_at) && (int) $t->locked_by !== $userId) {
+            return [
+                'mine'      => false,
+                'user_id'   => (int) $t->locked_by,
+                'user_name' => DB::table('users')->where('id', $t->locked_by)->value('name'),
+                'minutes'   => $this->minutes(),
+            ];
+        }
+        // Libre, caducado o mío: se informa como «mío» pero NO se renueva locked_at.
+        return ['mine' => true, 'user_id' => $userId, 'user_name' => null, 'minutes' => $this->minutes()];
+    }
+
+    /**
      * ¿Puede este usuario escribir en el ticket? Devuelve null si sí, o el nombre
      * de quien lo tiene tomado si no.
      */

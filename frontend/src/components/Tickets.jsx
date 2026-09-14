@@ -1363,9 +1363,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
   // otra más nueva (se saltó de ticket), se descarta. Y si la petición falla (red/500),
   // se marca error en vez de dejar el spinner girando para siempre.
   const reqSeq = useRef(0)
-  const load = useCallback(() => {
+  // bg=true → refresco de FONDO: no renueva el candado (solo lo renueva el latido por
+  // actividad). Las recargas tras una acción del agente van sin bg (está activo).
+  const load = useCallback((bg = false) => {
     const seq = ++reqSeq.current
-    return api.getTicket(id).then((r) => {
+    return api.getTicket(id, bg).then((r) => {
       if (seq !== reqSeq.current) return          // llegó tarde: hay una carga más nueva
       if (r?.ok && r.ticket) { setD(r); setLoadErr(false) } else setLoadErr(true)
     })
@@ -1460,7 +1462,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
 
   // Si llega un mensaje AL TICKET QUE ESTOY MIRANDO, aparece solo en el hilo.
   useEffect(() => onTicketActivity((e) => {
-    if (!e.ticketId || Number(e.ticketId) === Number(id)) load()
+    if (!e.ticketId || Number(e.ticketId) === Number(id)) load(true)   // fondo: no renueva el candado
   }), [id, load])
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose()

@@ -805,7 +805,13 @@ class TicketsController extends Controller
 
         // Al abrir el ticket se TOMA para este agente (evita que dos contesten a la vez).
         // Si lo tiene otro y sigue vigente, se devuelve quién, para avisarlo en pantalla.
-        $lock = app(TicketLockService::class)->acquire($id, (int) $me->id);
+        // En un refresco de FONDO (bg=1: sondeo o mensaje entrante) NO se toma/renueva el
+        // candado, solo se informa; así un agente ausente lo deja caducar. Al ABRIR de
+        // verdad (sin bg) sí se toma. Renovarlo por actividad lo hace el «heartbeat».
+        $lockSvc = app(TicketLockService::class);
+        $lock = $request->boolean('bg')
+            ? $lockSvc->status($id, (int) $me->id)
+            : $lockSvc->acquire($id, (int) $me->id);
 
         return response()->json([
             'ok' => true, 'ticket' => $t, 'messages' => $messages, 'events' => $events, 'lock' => $lock,

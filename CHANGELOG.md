@@ -7,6 +7,15 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
 ### Arreglos
 
+- **El bloqueo de un ticket no se liberaba si el agente se iba.**
+  Al abrir un ticket se bloquea para que dos agentes no contesten a la vez, y
+  debe caducar solo si el agente deja de estar activo. Pero el refresco de fondo
+  (sondeo / mensaje entrante) volvía a tomar el candado en cada ciclo, así que un
+  agente con el modal abierto —aunque estuviera ausente— lo mantenía bloqueado
+  para todos hasta cerrarlo. Ahora el refresco de fondo solo informa del estado y
+  únicamente el «latido» por actividad real renueva el candado: si el agente se va
+  ~2 min sin tocar nada, el ticket se libera y otro puede contestar.
+
 - **Nombres de remitente con acentos ilegibles en la bandeja.**
   Los tickets de correo mostraban el contacto como
   `=?UTF-8?Q?Fusi=C3=B3n_Ribera?=` en vez de «Fusión Ribera»: el nombre llegaba
