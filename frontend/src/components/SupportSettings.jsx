@@ -491,6 +491,9 @@ function Faqs() {
 
       {form && (
         <Modal title={`${form.id ? 'Editar' : 'Nueva'} ${editando ? 'ficha' : 'pregunta'}`} onClose={() => setForm(null)} onSave={save} saveLabel={form.id ? 'Actualizar' : 'Crear'} width={620}>
+          <div className="field"><span className="lbl">Sección <span className="hint">· dónde la ve el cliente</span></span>
+            <Select block value={form.section} onChange={(v) => setForm((f) => ({ ...f, section: v }))}
+              options={[{ value: 'faq', label: 'Preguntas frecuentes' }, { value: 'info', label: 'Centro de atención' }]} /></div>
           <label className="field"><span className="lbl">{editando ? 'Título' : 'Pregunta'} <em>*</em></span>
             <input value={form.question} onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))} placeholder={editando ? 'p. ej. Horario de servicio' : 'p. ej. Hoy no cargan las etiquetas'} autoFocus /></label>
           <label className="field"><span className="lbl">{editando ? 'Contenido' : 'Respuesta'} <em>*</em></span>

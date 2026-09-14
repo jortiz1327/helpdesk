@@ -47,8 +47,9 @@ class FaqsController extends Controller
         $cur = $id ? Faq::find($id) : null;
         if ($id && !$cur) return response()->json(['ok' => false, 'error' => 'Artículo no encontrado'], 404);
 
-        // Sección: la del artículo existente (no se cambia al editar) o la del alta.
-        $section = $cur ? $cur->section : (string) $request->input('section', 'faq');
+        // Sección: se puede elegir tanto al crear como al EDITAR (para mover una ficha
+        // entre «Preguntas frecuentes» y «Centro de atención»). Por defecto, la actual.
+        $section = (string) $request->input('section', $cur ? $cur->section : 'faq');
         if (!in_array($section, self::SECCIONES, true)) $section = 'faq';
         $esInfo = $section === 'info';
 
@@ -71,6 +72,11 @@ class FaqsController extends Controller
         ];
 
         if ($cur) {
+            // Si se mueve de sección al editar, se recoloca al final de la nueva sección
+            // (cada sección tiene su propio orden y no deben mezclarse las posiciones).
+            if ($cur->section !== $section) {
+                $data['position'] = (int) (Faq::where('section', $section)->max('position') ?? 0) + 1;
+            }
             $cur->update($data);
         } else {
             // Nueva: al final de SU sección (cada sección tiene su propio orden).
