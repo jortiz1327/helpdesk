@@ -477,7 +477,7 @@ function Home({ go, irCrear }) {
               <div id={`qa-a-${f.id}`} className="qa-a" style={{ maxHeight: open === f.id ? '600px' : 0 }}
                 {...(open === f.id ? {} : { inert: '' })}>
                 <div className="qa-a-in">
-                  {f.answer}{f.hint && <div className="tip">💡 {f.hint}</div>}
+                  <div className="qa-answer">{f.answer}</div>{f.hint && <div className="tip">💡 {f.hint}</div>}
                   {/* Pie de la respuesta: ¿te ha servido? + salida a incidencia. */}
                   <div className="qa-foot">
                     {voted[f.id]
