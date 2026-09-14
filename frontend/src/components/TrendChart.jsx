@@ -5,7 +5,10 @@ import { useState, useRef } from 'react'
  * resto). Dos series con leyenda + etiqueta directa (la identidad no depende solo del
  * color) y tooltip con línea guía al pasar el ratón.
  */
-const CREADOS = 'var(--primary)'   // azul de marca
+// OJO: color FIJO (hex), NO `var(--primary)`. Una variable CSS dentro de un ATRIBUTO
+// SVG (fill=/stroke=) no la resuelven todos los navegadores → la pintaban NEGRA (el
+// gráfico salía con barras negras). En hex funciona en todos.
+const CREADOS = '#2563eb'          // azul de marca (= --primary)
 const RESUELTOS = '#10b981'        // verde (legible en claro y oscuro)
 const W = 760, H = 250, PADL = 34, PADR = 14, PADT = 14, PADB = 26
 
@@ -68,8 +71,8 @@ export default function TrendChart({ data }) {
         {d && (
           <g>
             <line x1={x(hi)} x2={x(hi)} y1={PADT} y2={H - PADB} className="trend-cross" />
-            <circle cx={x(hi)} cy={y(d.creados)} r="3.5" fill={CREADOS} stroke="var(--panel)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-            <circle cx={x(hi)} cy={y(d.resueltos)} r="3.5" fill={RESUELTOS} stroke="var(--panel)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            <circle cx={x(hi)} cy={y(d.creados)} r="3.5" fill={CREADOS} stroke="#fff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            <circle cx={x(hi)} cy={y(d.resueltos)} r="3.5" fill={RESUELTOS} stroke="#fff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
           </g>
         )}
       </svg>
