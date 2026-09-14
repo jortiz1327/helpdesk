@@ -243,6 +243,12 @@ function PortalApp() {
       setOpenCode(code)
       setView('ticket')
       window.history.replaceState(null, '', window.location.pathname)
+      return
+    }
+    // ENLACE DIRECTO al formulario de crear incidencia (para las redirecciones de las
+    // webs): quien entre en …/create-ticket ve el formulario abierto de una.
+    if (window.location.pathname.replace(/\/+$/, '').endsWith('/create-ticket')) {
+      setView('crear')
     }
   }, [])
 
