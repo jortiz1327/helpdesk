@@ -20,7 +20,12 @@ class ShiftsController extends Controller
     {
         $accion = $request->query('action', 'get');
 
-        if ($accion !== 'get' && !$request->user()->can('support.config')) {
+        // VER el cuadrante (get/month) lo puede cualquier agente; TOCARLO (asignar,
+        // sustituir, rotar, notas) es solo del encargado. Antes «month» —que es la vista
+        // principal, de solo lectura— caía en el bloque de escritura y a los agentes les
+        // devolvía 403 → «No se pudo cargar el cuadrante».
+        $soloLectura = in_array($accion, ['get', 'month'], true);
+        if (!$soloLectura && !$request->user()->can('support.config')) {
             return response()->json(['ok' => false, 'error' => 'Solo el encargado puede tocar el cuadrante'], 403);
         }
 
