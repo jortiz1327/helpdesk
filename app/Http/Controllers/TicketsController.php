@@ -722,6 +722,10 @@ class TicketsController extends Controller
     {
         $me = $request->user();
         $id = (int) $request->query('id');
+        // Enlace por CÓDIGO (p. ej. /agentes/tickets/TK-2609-0063): se resuelve al id real.
+        if (!$id && $request->filled('code')) {
+            $id = (int) DB::table('tickets')->where('code', trim((string) $request->query('code')))->value('id');
+        }
 
         $t = (clone $this->baseQuery($me))
             ->leftJoin('sedes as sede', 'sede.id', '=', 'c.sede_id')   // nombre de la sede para {{sede}}

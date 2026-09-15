@@ -414,10 +414,18 @@ const esVista = (k) => NAV.some((n) => n.key === k) || VISTAS_SUELTAS.includes(k
 const AG = "/agentes";
 const vistaDeUrl = () => {
     const k = window.location.pathname.replace(/^\/agentes/, "").replace(/^\/+|\/+$/g, "");
-    if (esVista(k)) return k;
+    // «tickets/TK-2609-0063» → la vista es «tickets» (el código se lee aparte).
+    const base = k.split("/")[0];
+    if (esVista(base)) return base;
     // Enlaces viejos con `#/shifts`: se aceptan una vez y se limpian solos.
     const viejo = (window.location.hash || "").replace(/^#\/?/, "");
     return esVista(viejo) ? viejo : null;
+};
+// Código de ticket incrustado en la URL: «/agentes/tickets/TK-2609-0063» → «TK-2609-0063».
+const codigoDeUrl = () => {
+    const k = window.location.pathname.replace(/^\/agentes/, "").replace(/^\/+|\/+$/g, "");
+    const [base, code] = k.split("/");
+    return base === "tickets" && code ? decodeURIComponent(code).trim().toUpperCase() : null;
 };
 
 // ¿Puede el usuario ver esta entrada del menú?
@@ -501,6 +509,10 @@ export default function App() {
     const [ticketsTab, setTicketsTab] = useState("tickets");
     // Ticket que hay que abrir nada más llegar (al pinchar uno de los recientes).
     const [ticketAbierto, setTicketAbierto] = useState(null);
+    // Código del ticket abierto REFLEJADO en la URL (para compartir el enlace).
+    const [ticketCode, setTicketCode] = useState(codigoDeUrl);
+    // Enlace directo por código al cargar: se resuelve UNA vez y abre el ticket.
+    const deepLink = useRef(codigoDeUrl());
     const [verOpen, setVerOpen] = useState(false);   // modal de novedades de la versión
     // Filtro de organización preaplicado al saltar desde la pantalla de Organización.
     const [orgFiltro, setOrgFiltro] = useState(null);
@@ -740,14 +752,16 @@ export default function App() {
     const urlPuesta = useRef(false);
     useEffect(() => {
         const actual = window.location.pathname.replace(/^\/agentes/, "").replace(/^\/+|\/+$/g, "");
+        // Con un ticket abierto la URL lleva su código: «tickets/TK-…», así se comparte.
+        const destino = view + (view === "tickets" && ticketCode ? "/" + ticketCode : "");
         // El `hash` se pisa siempre: así un enlace viejo `#/shifts` queda limpio.
-        if (actual !== view || window.location.hash) {
-            const url = AG + "/" + view;
+        if (actual !== destino || window.location.hash) {
+            const url = AG + "/" + destino;
             if (urlPuesta.current) window.history.pushState(null, "", url);
             else window.history.replaceState(null, "", url);
         }
         urlPuesta.current = true;
-    }, [view]);
+    }, [view, ticketCode]);
 
     /*
      * El ticket a abrir se olvida al salir de la pantalla. Si no, volver a «Gestión
@@ -755,14 +769,33 @@ export default function App() {
      * porque el dato seguiría guardado aquí.
      */
     useEffect(() => {
-        if (view !== "tickets") { setTicketAbierto(null); setOrgFiltro(null); }
+        if (view !== "tickets") { setTicketAbierto(null); setOrgFiltro(null); setTicketCode(null); }
     }, [view]);
+
+    /*
+     * Enlace directo por código (/agentes/tickets/TK-…): al entrar y estar dentro,
+     * se resuelve el código a su ticket y se abre. Solo una vez (deepLink ref).
+     */
+    useEffect(() => {
+        if (auth.state !== "in") return;
+        const code = deepLink.current;
+        if (!code) return;
+        deepLink.current = null;
+        api.getTicket(code).then((r) => {
+            if (r?.ok && r.ticket?.id) { setView("tickets"); setTicketsTab("tickets"); setTicketAbierto(r.ticket.id); }
+            else { setTicketCode(null); toast("No se encontró el ticket " + code, "err"); }
+        }).catch(() => {});
+    }, [auth.state]);
 
     // Y la vista sigue a la URL, que es lo que hace funcionar «atrás» y «adelante».
     useEffect(() => {
         const alCambiar = () => {
             const v = vistaDeUrl();
             if (v) setView(v);
+            // «Atrás/adelante» hacia un enlace de ticket: reabrirlo por su código.
+            const code = codigoDeUrl();
+            setTicketCode(code);
+            if (code) api.getTicket(code).then((r) => { if (r?.ok && r.ticket?.id) setTicketAbierto(r.ticket.id) }).catch(() => {});
         };
         window.addEventListener("popstate", alCambiar);
         return () => window.removeEventListener("popstate", alCambiar);
@@ -1120,7 +1153,7 @@ export default function App() {
                         {view === "campaign_email_cfg" && <CampaignEmailSettings />}
                         {view === "help" && <Manuals />}
                         {view === "tickets" && (
-                            <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} />
+                            <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} onTicketCode={setTicketCode} />
                         )}
                         {view === "kanban" && (
                             <Kanban onOpen={openConversation} />

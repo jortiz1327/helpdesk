@@ -486,7 +486,7 @@ function TicketCustomFields({ ticketId, initial, bare = false }) {
  * «tickets recientes» del Centro de Soporte) se abre ESE ticket directamente, en
  * vez de dejar al usuario delante de la lista buscándolo otra vez.
  */
-export default function Tickets({ user, onGo, initialTab = 'tickets', initialTicket = null, initialOrg = null }) {
+export default function Tickets({ user, onGo, initialTab = 'tickets', initialTicket = null, initialOrg = null, onTicketCode = null }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [tab, setTab] = useState(initialTab)   // tickets | agents | cron
@@ -1066,8 +1066,8 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
         </div>
       </div>
 
-      {open && <TicketModal id={open} meta={meta} user={user} onClose={() => { setOpen(null); load() }} onChange={load}
-        onOpenTicket={(tid) => setOpen(tid)} />}
+      {open && <TicketModal id={open} meta={meta} user={user} onClose={() => { setOpen(null); load(); onTicketCode?.(null) }} onChange={load}
+        onOpenTicket={(tid) => setOpen(tid)} onCode={onTicketCode} />}
 
       {/* Fusión lanzada desde la lista. Al terminar se limpia la selección: dejar
           marcados dos tickets que ya son uno solo invita a repetir la acción. */}
@@ -1343,7 +1343,7 @@ function ModalFusion({ id, preselect = null, meta, onClose, onDone }) {
   )
 }
 
-function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
+function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)
@@ -1369,6 +1369,17 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [masOpen])
+
+  // Reflejar el código del ticket abierto en la URL (App): así la barra del navegador
+  // ES el enlace para compartir. Se actualiza al cargar y al saltar a otro ticket.
+  useEffect(() => { if (onCode && d?.ticket?.code) onCode(d.ticket.code) }, [d?.ticket?.code])
+
+  // «Copiar enlace»: la URL directa al ticket por su código.
+  const copiarEnlace = async () => {
+    const url = `${window.location.origin}/agentes/tickets/${d?.ticket?.code}`
+    try { await navigator.clipboard.writeText(url); toast('🔗 Enlace copiado') }
+    catch { toast(url, 'err') }   // sin permiso de portapapeles: al menos se ve para copiarlo a mano
+  }
 
   // Guarda de VIGENCIA: cada carga lleva un número de secuencia; si al resolver ya hay
   // otra más nueva (se saltó de ticket), se descarta. Y si la petición falla (red/500),
@@ -1674,6 +1685,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                       <Icon.merge /><small>Fusionar</small>
                     </button>
                   )}
+                  <button className="tkm-q" onClick={copiarEnlace} title={`Copiar enlace directo al ticket (${t.code})`}>
+                    <Icon.link /><small>Enlace</small>
+                  </button>
                   <button className="tkm-q" onClick={() => setPdfOpts({ notes: true, images: true, anon: false, busy: false })} title="Generar PDF">
                     <Icon.file /><small>PDF</small>
                   </button>

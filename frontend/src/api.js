@@ -136,7 +136,11 @@ export const api = {
   listTickets: (f = {}) => req('tickets.php?action=list&' + new URLSearchParams(f)),
   ticketStats: (from = '', to = '') => req(`tickets.php?action=stats${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}`),
   ticketMeta: () => req('tickets.php?action=meta'),
-  getTicket: (id, bg = false) => req(`tickets.php?action=detail&id=${id}${bg ? '&bg=1' : ''}`),
+  // Acepta id numérico o CÓDIGO (TK-…): así un enlace por código abre el ticket.
+  getTicket: (idOrCode, bg = false) => {
+    const p = /^\d+$/.test(String(idOrCode)) ? `id=${idOrCode}` : `code=${encodeURIComponent(idOrCode)}`
+    return req(`tickets.php?action=detail&${p}${bg ? '&bg=1' : ''}`)
+  },
   // Mensajes anteriores del hilo (paginación hacia atrás): los previos a `before`.
   olderMessages: (id, before) => req(`tickets.php?action=messages&id=${id}&before=${before}`),
   // Se envía como multipart porque puede llevar adjuntos (JSON no transporta ficheros).
