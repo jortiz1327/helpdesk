@@ -5,6 +5,25 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
 ## [Sin publicar]
 
+### Mejoras
+
+- **Enlace directo a un ticket.** Cada ticket tiene una URL que lo abre:
+  `https://soporte.aemegroup.com/agentes/tickets/TK-2609-0063`. Si se la pasas a un
+  agente y la abre, se le abre ese ticket (respetando su visibilidad; si no existe
+  o no puede verlo, se le avisa). Con un ticket abierto la barra del navegador ya
+  muestra su código, y en la ficha hay un botón **«Enlace»** que lo copia.
+- **Triaje antes de trabajar.** Los tickets entran con prioridad «sin asignar» y
+  no se pueden responder, anotar ni asignar hasta ponerles una prioridad.
+- **Flujo de estados más simple.** Se retira «En progreso» (se fusiona en
+  «Abierto»). Al responder, se ofrece marcar «Esperando respuesta»; cuando el
+  cliente contesta, el ticket vuelve a «Abierto». Los tickets sin contestar llevan
+  una marca «Sin responder» bien visible.
+- **Fecha en cada mensaje del chat.** Junto a la hora se muestra el día
+  («19:58 - lunes 14/09/26»), y la hora y la estrella de «respuesta efectiva» se
+  ven mejor en modo claro y oscuro.
+- **«Parecidas» con vista previa.** Al pasar el ratón por una respuesta sugerida
+  se ve su texto completo en un tooltip.
+
 ### Arreglos
 
 - **El bloqueo de un ticket no se liberaba si el agente se iba.**
