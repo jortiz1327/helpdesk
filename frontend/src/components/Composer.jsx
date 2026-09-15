@@ -45,6 +45,13 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
     const tmp = document.createElement('div'); tmp.innerHTML = e.body || ''
     return (tmp.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90) || '(respuesta)'
   }
+  // Texto COMPLETO (para el tooltip): conserva los saltos de párrafo para que se lea
+  // como el mensaje original, no todo pegado en una línea.
+  const textoEf = (e) => {
+    const html = (e.body || '').replace(/<\/(p|div|li|tr)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n')
+    const tmp = document.createElement('div'); tmp.innerHTML = html
+    return (tmp.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() || '(respuesta)'
+  }
 
   const [cc, setCc] = useState([])
   const [bcc, setBcc] = useState([])
@@ -169,7 +176,8 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
               <div className="cmp-ef-menu">
                 <div className="cmp-ef-h">Respuestas que funcionaron en casos parecidos</div>
                 {efectivas.map((e) => (
-                  <button type="button" key={e.id} className="cmp-ef-item" onClick={() => insertarEfectiva(e)}>
+                  <button type="button" key={e.id} className="cmp-ef-item" onClick={() => insertarEfectiva(e)}
+                    title={textoEf(e)}>
                     <span className="cmp-ef-tx">{tituloEf(e)}</span>
                     {e.uses > 0 && <span className="cmp-ef-uses" title="veces reutilizada">{e.uses}×</span>}
                   </button>
