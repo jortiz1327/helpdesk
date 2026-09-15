@@ -654,9 +654,16 @@ class TicketsController extends Controller
         // Van TODOS (para resolver el nombre de un asignado que ya no está), con el flag
         // `active`: el frontend solo ofrece los activos en «asignar», pero sigue mostrando
         // el nombre del inactivo en los tickets históricos.
+        // Categorías («áreas») que atiende cada agente, en UNA consulta (sin N+1).
+        $catsByUser = DB::table('user_ticket_categories')->get()
+            ->groupBy('user_id')->map(fn ($g) => $g->pluck('category_id')->map('intval')->values()->all());
         $users = User::with('roles.permissions', 'permissions')->orderByRaw('name IS NULL, name ASC, email ASC')->get()
             ->filter(fn ($u) => $u->can('helpdesk.access'))
-            ->map(fn ($u) => ['id' => (int) $u->id, 'name' => $u->name ?: $u->email, 'active' => (bool) $u->active])
+            ->map(fn ($u) => [
+                'id' => (int) $u->id, 'name' => $u->name ?: $u->email, 'active' => (bool) $u->active,
+                // Sus áreas: el frontend las usa para mantener coherentes categoría↔asignado.
+                'category_ids' => $catsByUser->get($u->id, []),
+            ])
             ->values();
 
         return response()->json([

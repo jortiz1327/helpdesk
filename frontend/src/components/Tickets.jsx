@@ -482,6 +482,112 @@ function TicketCustomFields({ ticketId, initial, bare = false }) {
 }
 
 /*
+ * COHERENCIA ÁREA (categoría) ↔ AGENTE ASIGNADO.
+ * En este sistema, las «áreas» de un agente son las categorías que atiende
+ * (meta.users[].category_ids). Este hook mantiene el ticket y su asignado en la
+ * misma área, ofreciéndolo (nunca a la fuerza):
+ *  · Tras ASIGNAR: si el agente atiende VARIAS áreas y la categoría del ticket no
+ *    es ninguna de ellas → modal para elegir a cuál de sus áreas moverlo.
+ *  · Tras CAMBIAR de categoría: si el agente asignado no atiende la nueva → modal
+ *    para reasignar a alguien de esa área, quitar la asignación o dejarlo.
+ * Se usa igual desde la lista y desde la ficha (por eso es un hook con su JSX).
+ */
+function useCoherenciaArea(meta, onChanged) {
+  const [elegir, setElegir] = useState(null)   // { ticketId, agentName, cats:[{id,name}] }
+  const [reasig, setReasig] = useState(null)    // { ticketId, agentName, catName, cands:[{id,name}] }
+  const catName = (id) => (meta?.categories || []).find((c) => String(c.id) === String(id))?.name
+  const userById = (id) => (meta?.users || []).find((u) => Number(u.id) === Number(id))
+
+  // Llamar TRAS asignar con éxito. ticketCatId = categoría ACTUAL del ticket.
+  const trasAsignar = (ticketId, uid, ticketCatId) => {
+    const u = userById(uid); if (!u) return
+    const areas = (u.category_ids || []).map(String)
+    if (areas.length >= 2 && !areas.includes(String(ticketCatId ?? ''))) {
+      setElegir({ ticketId, agentName: u.name, cats: (u.category_ids || []).map((id) => ({ id, name: catName(id) })).filter((c) => c.name) })
+    }
+  }
+  // Llamar TRAS cambiar de categoría con éxito. assignedTo = agente asignado (o null).
+  const trasCategoria = (ticketId, newCatId, assignedTo) => {
+    if (!assignedTo || !newCatId) return
+    const u = userById(assignedTo); if (!u) return
+    if (!(u.category_ids || []).map(String).includes(String(newCatId))) {
+      const cands = (meta?.users || []).filter((x) => x.active !== false
+        && (x.category_ids || []).map(String).includes(String(newCatId)) && Number(x.id) !== Number(assignedTo))
+        .map((x) => ({ id: x.id, name: x.name }))
+      setReasig({ ticketId, agentName: u.name, catName: catName(newCatId), cands })
+    }
+  }
+
+  const modales = (
+    <>
+      {elegir && <ModalElegirArea data={elegir} onClose={() => setElegir(null)} onMoved={() => { setElegir(null); onChanged?.() }} />}
+      {reasig && <ModalReasignarArea data={reasig} onClose={() => setReasig(null)} onDone={() => { setReasig(null); onChanged?.() }} />}
+    </>
+  )
+  return { trasAsignar, trasCategoria, modales }
+}
+
+// Elegir a cuál de las áreas del agente (varias) mover el ticket.
+function ModalElegirArea({ data, onClose, onMoved }) {
+  const toast = useToast()
+  const mover = async (catId) => {
+    const r = await api.setTicketCategory(data.ticketId, catId)
+    if (r.ok) { toast('Categoría actualizada'); onMoved() } else toast(r.error || 'No se pudo mover', 'err')
+  }
+  return (
+    <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal" style={{ maxWidth: 420 }}>
+        <div className="modal-h"><h3>¿A qué categoría lo mueves?</h3>
+          <button className="icon-btn" onClick={onClose}>✕</button></div>
+        <div className="modal-body">
+          <p className="cfg-hint"><b>{data.agentName}</b> atiende varias áreas. Elige a cuál mover este ticket.</p>
+          <div className="area-choices">
+            {data.cats.map((c) => (
+              <button key={c.id} className="btn ghost" onClick={() => mover(c.id)}>{c.name}</button>
+            ))}
+          </div>
+        </div>
+        <div className="modal-foot"><button className="btn ghost" onClick={onClose}>Dejar la categoría actual</button></div>
+      </div>
+    </div>
+  )
+}
+
+// El agente asignado no atiende la nueva categoría: reasignar / quitar / dejarlo.
+function ModalReasignarArea({ data, onClose, onDone }) {
+  const toast = useToast()
+  const asignar = async (uid) => {
+    const r = await api.assignTicket(data.ticketId, uid)
+    if (r.ok) { toast(uid ? 'Ticket reasignado' : 'Asignación quitada'); onDone() } else toast(r.error || 'Error', 'err')
+  }
+  return (
+    <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-h"><h3>El agente no lleva esa área</h3>
+          <button className="icon-btn" onClick={onClose}>✕</button></div>
+        <div className="modal-body">
+          <p className="cfg-hint"><b>{data.agentName}</b> no atiende «{data.catName}». ¿Qué hacemos con la asignación?</p>
+          {data.cands.length > 0 ? (
+            <>
+              <div className="lbl" style={{ marginBottom: 6 }}>Reasignar a alguien de «{data.catName}»:</div>
+              <div className="area-choices">
+                {data.cands.map((c) => (
+                  <button key={c.id} className="btn ghost" onClick={() => asignar(c.id)}>{c.name}</button>
+                ))}
+              </div>
+            </>
+          ) : <p className="cfg-hint">No hay agentes de «{data.catName}» para reasignar.</p>}
+        </div>
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={() => asignar(null)}>Quitar la asignación</button>
+          <button className="btn" onClick={onClose}>Dejarlo con {data.agentName.split(' ')[0]}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/*
  * `initialTicket`: al llegar desde otra pantalla (p. ej. pinchando uno de los
  * «tickets recientes» del Centro de Soporte) se abre ESE ticket directamente, en
  * vez de dejar al usuario delante de la lista buscándolo otra vez.
@@ -618,14 +724,18 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
     if (r.ok) { toast('Vista borrada'); cargarVistas() } else toast(r.error || 'Error', 'err')
   }
 
+  // Mantener coherentes categoría del ticket ↔ áreas del agente asignado.
+  const coh = useCoherenciaArea(meta, load)
   /** Asignar desde la propia tabla, sin abrir el ticket. */
-  const quickAssign = async (id, uid) => {
-    const r = await api.assignTicket(id, uid || null)
-    if (r.ok) { toast('Ticket asignado'); load() } else toast(r.error || 'Error', 'err')
+  const quickAssign = async (t, uid) => {
+    const r = await api.assignTicket(t.id, uid || null)
+    if (r.ok) { toast('Ticket asignado'); load(); if (uid && can('tickets.categorize')) coh.trasAsignar(t.id, uid, t.category_id) }
+    else toast(r.error || 'Error', 'err')
   }
-  const quickCategory = async (id, catId) => {
-    const r = await api.setTicketCategory(id, catId || null)
-    if (r.ok) { toast('Categoría actualizada'); load() } else toast(r.error || 'Error', 'err')
+  const quickCategory = async (t, catId) => {
+    const r = await api.setTicketCategory(t.id, catId || null)
+    if (r.ok) { toast('Categoría actualizada'); load(); if (catId && can('tickets.assign')) coh.trasCategoria(t.id, catId, t.assigned_to) }
+    else toast(r.error || 'Error', 'err')
   }
 
   // --- Selección para acciones en lote ---
@@ -1015,7 +1125,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         <td onClick={(e) => e.stopPropagation()}>
                           {can('tickets.categorize') ? (
                             <Select sm block value={t.category_id ? String(t.category_id) : ''}
-                              onChange={(v) => quickCategory(t.id, v)}
+                              onChange={(v) => quickCategory(t, v)}
                               options={[{ value: '', label: 'Sin categoría' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
                           ) : (
                             (meta?.categories || []).find((c) => String(c.id) === String(t.category_id))?.name
@@ -1028,7 +1138,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         <td onClick={(e) => e.stopPropagation()}>
                           {can('tickets.assign') ? (
                             <Select sm block value={String(t.assigned_to || '')}
-                              onChange={(uid) => quickAssign(t.id, uid)}
+                              onChange={(uid) => quickAssign(t, uid)}
                               options={opcionesAsignar(meta?.users, t.assigned_to)} />
                           ) : (t.agent_name || <span className="tk-time">Sin asignar</span>)}
                         </td>
@@ -1068,6 +1178,9 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
 
       {open && <TicketModal id={open} meta={meta} user={user} onClose={() => { setOpen(null); load(); onTicketCode?.(null) }} onChange={load}
         onOpenTicket={(tid) => setOpen(tid)} onCode={onTicketCode} />}
+
+      {/* Coherencia área↔asignado al asignar/categorizar desde la propia lista. */}
+      {coh.modales}
 
       {/* Fusión lanzada desde la lista. Al terminar se limpia la selección: dejar
           marcados dos tickets que ya son uno solo invita a repetir la acción. */}
@@ -1540,13 +1653,21 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
     })
     if (ok) setStatus('esperando_respuesta')
   }
+  // Coherencia área↔asignado también desde la ficha.
+  const coh = useCoherenciaArea(meta, () => { load(); onChange?.() })
   const assign = async (user_id) => {
     const r = await api.assignTicket(id, user_id || null)
-    if (r.ok) { toast('Ticket asignado'); load(); onChange?.() } else toast(r.error || 'Error', 'err')
+    if (r.ok) {
+      toast('Ticket asignado'); load(); onChange?.()
+      if (user_id && can('tickets.categorize')) coh.trasAsignar(id, user_id, d?.ticket?.category_id)
+    } else toast(r.error || 'Error', 'err')
   }
   const cambiarCategoria = async (category_id) => {
     const r = await api.setTicketCategory(id, category_id || null)
-    if (r.ok) { toast('Categoría actualizada'); load(); onChange?.() } else toast(r.error || 'Error', 'err')
+    if (r.ok) {
+      toast('Categoría actualizada'); load(); onChange?.()
+      if (category_id && can('tickets.assign')) coh.trasCategoria(id, category_id, d?.ticket?.assigned_to)
+    } else toast(r.error || 'Error', 'err')
   }
   const cambiarPrioridad = async (priority) => {
     if (!priority) return
@@ -2128,6 +2249,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
           </>
         )}
       </div>
+
+      {/* Coherencia área↔asignado al asignar/categorizar desde la ficha. */}
+      {coh.modales}
 
       {/* Fusionar. El diálogo vive fuera (ModalFusion): se abre igual desde aquí,
           desde la lista con dos tickets marcados y desde la pestaña «Del cliente». */}
