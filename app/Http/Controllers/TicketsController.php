@@ -61,6 +61,7 @@ class TicketsController extends Controller
             'contact_open' => $this->contactOpen($request),
             'sched_cancel' => $this->cancelScheduled($request),
             'category' => $this->setCategory($request),
+            'priority' => $this->setPriorityAction($request),
             'bulk'   => $this->bulk($request),
             'create' => $this->create($request),
             'agents'  => $this->agents($request),
@@ -1287,6 +1288,24 @@ class TicketsController extends Controller
         }
 
         $this->tickets->setCategory($id, $catId, (int) $me->id);
+        return response()->json(['ok' => true]);
+    }
+
+    /** Cambia la PRIORIDAD de un ticket a mano (mismo permiso que la categoría). */
+    protected function setPriorityAction(Request $request)
+    {
+        $me = $request->user();
+        if (!$me->can('tickets.categorize')) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para cambiar la prioridad'], 403);
+        }
+        $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
+
+        $pr = (string) $request->input('priority');
+        if (!array_key_exists($pr, TicketService::priorities())) {
+            return response()->json(['ok' => false, 'error' => 'Prioridad no válida'], 400);
+        }
+
+        $this->tickets->setPriority($id, $pr, (int) $me->id);
         return response()->json(['ok' => true]);
     }
 

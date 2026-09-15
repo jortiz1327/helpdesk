@@ -367,6 +367,9 @@ export const api = {
   setTicketCategory: (id, category_id) => req('tickets.php?action=category', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, category_id }),
   }),
+  setTicketPriority: (id, priority) => req('tickets.php?action=priority', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, priority }),
+  }),
   // Posponer un ticket. payload: { preset:'later_today'|'tomorrow'|'monday'|'week'|'reply'|'custom', until?, reason? }
   snoozeTicket: (id, payload) => req('tickets.php?action=snooze', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...payload }),
