@@ -52,6 +52,13 @@ class TicketService
     public const OPEN_STATUSES = ['nuevo', 'abierto', 'en_progreso', 'esperando_respuesta'];
 
     /**
+     * Prioridad «sin asignar»: los tickets NACEN así (valor fuera del catálogo, para
+     * que no salga como opción del selector). Es un candado de TRIAJE: no se puede
+     * responder, anotar ni asignar hasta que el agente le ponga una prioridad real.
+     */
+    public const SIN_PRIORIDAD = 'sin_asignar';
+
+    /**
      * Estados en los que el RELOJ DEL SLA se para: la pelota no está en nuestro
      * tejado. Un ticket esperando al cliente tres días no es un incumplimiento
      * nuestro, y contarlo como tal vuelve inservible la vista de vencidos.
@@ -155,7 +162,7 @@ class TicketService
             'subject'         => mb_substr(trim($data['subject'] ?? '') ?: 'Sin asunto', 0, 200),
             'category_id'     => $data['category_id'] ?? null,
             'status'          => $data['status'] ?? self::defaultStatus(),
-            'priority'        => $data['priority'] ?? TicketPriority::porDefecto(),
+            'priority'        => $data['priority'] ?? self::SIN_PRIORIDAD,   // nace SIN prioridad (triaje obligatorio)
             'channel'         => $data['channel'] ?? 'whatsapp',
             'source'          => $data['source'] ?? null,
             'contact_id'      => $data['contact_id'],

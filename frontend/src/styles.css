@@ -3330,6 +3330,13 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tk-fusionado b { font-size: 13px; }
 .tk-fusionado small { font-size: 11.5px; color: var(--ink-3); }
 
+/* Candado de triaje: falta ponerle prioridad al ticket antes de trabajarlo. */
+.tk-triaje { display: flex; align-items: center; gap: 11px; margin: 12px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--warn) 8%, var(--panel-2)); }
+.tk-triaje svg { width: 18px; height: 18px; fill: var(--warn); flex: none; }
+.tk-triaje div { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tk-triaje b { font-size: 13px; }
+.tk-triaje small { font-size: 11.5px; color: var(--ink-3); }
+
 /* --- Varias personas en el mismo turno --- */
 .tn-l-t { flex-wrap: wrap; gap: 10px; }
 .tn-l-p { display: inline-flex; align-items: center; gap: 6px; }

@@ -126,6 +126,8 @@ function slaPeor(sla) {
    prioridades se configuran. Si no hay color (prioridad borrada), cae a la clase de
    siempre para no quedarse sin estilo. */
 function prChip(v, meta, small = false) {
+  // «Sin asignar»: el ticket aún no se ha triado (nace así). Chip gris.
+  if (!v || v === 'sin_asignar') return <span className={`chip ${small ? 'sm' : ''}`.trim()} style={{ background: '#e5e7eb', color: '#6b7280' }}>Sin asignar</span>
   const p = meta?.priority_meta?.[v]
   const cls = `chip ${p ? '' : `p-${v}`} ${small ? 'sm' : ''}`.trim()
   const style = p ? { background: p.color + '22', color: p.color } : undefined
@@ -1693,7 +1695,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                 <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} /></div>
                 <div className="tkm-row"><span>Prioridad</span>
                   {can('tickets.categorize') ? (
-                    <Select value={t.priority || ''} onChange={(v) => cambiarPrioridad(v)}
+                    <Select value={t.priority && t.priority !== 'sin_asignar' ? t.priority : ''}
+                      placeholder="Ponle prioridad…" onChange={(v) => cambiarPrioridad(v)}
                       options={Object.entries(meta?.priorities || {}).map(([value, label]) => ({ value, label }))} />
                   ) : prChip(t.priority, meta)}
                 </div>
@@ -2016,8 +2019,20 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                 </div>
               )}
 
+              {/* Triaje primero: hasta que no tenga prioridad no se contesta, ni se
+                  anota, ni se asigna (lo pidió el responsable de soporte). */}
+              {view === 'chat' && !t.merged_into_id && t.priority === 'sin_asignar' && (
+                <div className="tk-triaje">
+                  <Icon.warn />
+                  <div>
+                    <b>Ponle una prioridad para empezar</b>
+                    <small>Este ticket entró sin prioridad. Elígela arriba (en Prioridad) y podrás responder, añadir notas y asignarlo.</small>
+                  </div>
+                </div>
+              )}
+
               {/* El editor solo en la conversación (no en el historial). */}
-              {view === 'chat' && !t.merged_into_id && (
+              {view === 'chat' && !t.merged_into_id && t.priority !== 'sin_asignar' && (
                 <Composer
                   // Remonta al cambiar de ticket (si no, el borrador del anterior se
                   // quedaba en pantalla al saltar sin cerrar el modal) y al «Editar» una

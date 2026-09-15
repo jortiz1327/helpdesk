@@ -913,6 +913,7 @@ class TicketsController extends Controller
         // Solo se puede anotar en un ticket que el usuario VE (mismo alcance que el detalle).
         $t = (clone $this->baseQuery($me))->where('t.id', $id)->first(['t.id', 't.code', 't.contact_id', 'c.wa_id as contact_wa']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
+        if ($bloqueo = $this->exigePrioridad($id)) return $bloqueo;   // triaje: prioridad primero
 
         // Bloqueo: si lo está atendiendo otro agente, no se escribe encima.
         if ($quien = app(TicketLockService::class)->blockedBy((int) $t->id, (int) $me->id)) {
@@ -975,6 +976,7 @@ class TicketsController extends Controller
                      'c.email as contact_email', 'c.name as contact_name', 'c.wa_id as contact_wa',
                      'cat.signature as cat_signature', 'cat.name as category_name']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
+        if ($bloqueo = $this->exigePrioridad($id)) return $bloqueo;   // triaje: prioridad primero
 
         // Bloqueo: evita que dos agentes respondan a la vez al mismo cliente.
         if ($quien = app(TicketLockService::class)->blockedBy((int) $t->id, (int) $me->id)) {
@@ -1267,6 +1269,8 @@ class TicketsController extends Controller
         if (!$isSelfClaim && !$me->can('tickets.assign')) {
             return response()->json(['ok' => false, 'error' => 'Solo puedes cogerte tickets a ti mismo'], 403);
         }
+        // Desasignar (target null) sí se permite; asignar exige prioridad primero.
+        if ($target !== null && ($bloqueo = $this->exigePrioridad($id))) return $bloqueo;
 
         $this->tickets->assign($id, $target, (int) $me->id);
         return response()->json(['ok' => true]);
@@ -1307,6 +1311,20 @@ class TicketsController extends Controller
 
         $this->tickets->setPriority($id, $pr, (int) $me->id);
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Candado de TRIAJE: mientras el ticket no tenga una prioridad (nace «sin asignar»),
+     * NO se puede responder, anotar ni asignar. Devuelve la respuesta de error (422) o
+     * null si ya tiene prioridad. El flag `needs_priority` lo usa el frontend.
+     */
+    private function exigePrioridad(int $ticketId)
+    {
+        if (DB::table('tickets')->where('id', $ticketId)->value('priority') === TicketService::SIN_PRIORIDAD) {
+            return response()->json(['ok' => false, 'needs_priority' => true,
+                'error' => 'Ponle una prioridad al ticket antes de responder, asignarlo o añadir notas.'], 422);
+        }
+        return null;
     }
 
     /**
