@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { api, mediaUrl } from '../api.js'
-import { parseDate, fmtDate, fmtTime } from '../util.js'
+import { parseDate, fmtDate, fmtTime, fmtDiaLegible } from '../util.js'
 import WaAudio from './WaAudio.jsx'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
@@ -1979,7 +1979,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                           </div>
                         )}
 
-                        <div className="b-t">{fmtTime(m.created_at)}
+                        <div className="b-t">
+                          <span className="b-hora">{fmtTime(m.created_at)}</span>
+                          <span className="b-fecha"> - {fmtDiaLegible(m.created_at)}</span>
                           {/* Estado de entrega del WhatsApp saliente: enviado/entregado/leído/fallido */}
                           {out && m.channel === 'whatsapp' && !Number(m.is_internal_note) && m.status && (
                             m.status === 'failed'

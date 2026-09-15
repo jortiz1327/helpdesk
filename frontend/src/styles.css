@@ -1603,12 +1603,19 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cmp-similar svg { width: 14px; height: 14px; fill: currentColor; }
 
 /* Estrella para guardar una respuesta enviada como «efectiva» */
-.tk-star { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 6px; border: 0; background: transparent; color: var(--ink-3); cursor: pointer; border-radius: 6px; vertical-align: middle; opacity: 0; transition: 0.14s; }
-.tk-bub:hover .tk-star { opacity: 1; }
-.tk-star:hover { background: rgba(244,183,64,0.18); color: var(--warn); }
-.tk-star svg { width: 14px; height: 14px; fill: currentColor; }
-/* Marcada: siempre visible y en color, para saber de un vistazo cuáles están guardadas. */
-.tk-star.on { opacity: 1; color: var(--warn); }
+/* Sin guardar: apenas insinuada (para no ensuciar), pero YA visible sin tener que
+   descubrirla; se realza al pasar por encima del mensaje. */
+.tk-star { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 6px; border: 0; background: transparent; color: var(--ink-3); cursor: pointer; border-radius: 6px; vertical-align: middle; opacity: 0.4; transition: 0.14s; }
+.tk-bub:hover .tk-star { opacity: 0.85; }
+.tk-star:hover { background: rgba(244,183,64,0.22); color: #f59e0b; opacity: 1; }
+.tk-star svg { width: 16px; height: 16px; fill: currentColor; }
+/* Marcada: siempre visible y en dorado fuerte, para saber de un vistazo cuáles están
+   guardadas. Se le añade un contorno suave para que resalte también sobre burbuja verde. */
+.tk-star.on { opacity: 1; color: #f59e0b; }
+.tk-star.on svg { filter: drop-shadow(0 0 1px rgba(0,0,0,0.35)); }
+:root[data-theme="light"] .tk-star.on,
+:root[data-theme="light"] .tk-star:hover { color: #d97706; }
+:root[data-theme="light"] .tk-star.on svg { filter: drop-shadow(0 0 1px rgba(255,255,255,0.6)); }
 
 /* Aviso «te han mencionado» en la fila (mención sin leer; desaparece al abrir el ticket). */
 .tk-mention-chip { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; background: var(--primary-soft); color: var(--primary); vertical-align: middle; white-space: nowrap; }
@@ -1970,7 +1977,9 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tk-msg.in  .tk-bub { background: var(--panel-2); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
 .tk-msg.out .tk-bub { background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
 .tk-bub .b-who { font-size: 11px; font-weight: 700; opacity: 0.75; margin-bottom: 3px; }
-.tk-bub .b-t { font-size: 10.5px; opacity: 0.6; margin-top: 4px; text-align: right; }
+.tk-bub .b-t { font-size: 11px; opacity: 0.82; margin-top: 4px; text-align: right; }
+.tk-bub .b-t .b-hora { font-weight: 700; }
+.tk-bub .b-t .b-fecha { font-weight: 500; }
 /* --- NOTA INTERNA: banda a TODO EL ANCHO (no izquierda/derecha) para que cante que es interna --- */
 .tk-msg.note { align-self: stretch; max-width: 100%; flex-direction: row; }
 .tk-msg.note .tk-av { background: rgba(245, 158, 11, 0.2); color: #e8920c; }

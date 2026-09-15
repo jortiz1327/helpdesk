@@ -78,3 +78,9 @@ export function fmtDateShort(s) {
   const d = parseDate(s)
   return d ? d.toLocaleDateString(ES, { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
 }
+// Día legible con nombre de semana: «lunes 14/09/26» (para la hora de cada mensaje).
+// es-ES mete una coma tras el día de la semana; se quita para que quede como el ejemplo.
+export function fmtDiaLegible(s) {
+  const d = parseDate(s); if (!d) return ''
+  return d.toLocaleDateString(ES, { timeZone: TZ, weekday: 'long', day: '2-digit', month: '2-digit', year: '2-digit' }).replace(',', '')
+}
