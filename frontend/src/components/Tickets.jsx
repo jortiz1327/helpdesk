@@ -1508,6 +1508,18 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
      */
     if (tarde) setJustificar(true)
   }
+  // Tras responder por correo, se ofrece pasar el ticket a «Esperando respuesta»:
+  // la pelota queda en el cliente y el reloj del SLA se pausa. No molesta si ya
+  // estaba en ese estado, ni cuando la respuesta iba programada para más tarde.
+  const ofrecerEsperandoRespuesta = async () => {
+    if (d?.ticket?.status === 'esperando_respuesta') return
+    const ok = await confirm({
+      title: '¿Marcar como «Esperando respuesta»?',
+      message: 'Respondiste al cliente. ¿Dejas el ticket a la espera de su respuesta? Mientras tanto el reloj del SLA se pausa.',
+      confirmText: 'Sí, esperando respuesta', cancelText: 'No hace falta',
+    })
+    if (ok) setStatus('esperando_respuesta')
+  }
   const assign = async (user_id) => {
     const r = await api.assignTicket(id, user_id || null)
     if (r.ok) { toast('Ticket asignado'); load(); onChange?.() } else toast(r.error || 'Error', 'err')
@@ -2078,6 +2090,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket }) {
                         if (r.reopened) toast('El ticket estaba cerrado y se ha reabierto')
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()
+                        // Envío real (no programado): preguntar si pasa a «Esperando respuesta».
+                        // Sin await para no dejar el compositor bloqueado mientras se decide.
+                        if (!r.scheduled) ofrecerEsperandoRespuesta()
                       } else toast(r.error || 'No se pudo enviar la respuesta', 'err')
                       return r.ok
                     }
