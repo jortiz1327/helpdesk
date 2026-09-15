@@ -1017,7 +1017,7 @@ class TicketsController extends Controller
         // Responder a un ticket resuelto/cerrado lo REABRE (la pelota vuelve a nuestro
         // tejado): si no, el correo sale pero el ticket queda invisible en la bandeja.
         if (($r['ok'] ?? false) && in_array($t->status, ['resuelto', 'cerrado'], true)) {
-            app(\App\Services\TicketService::class)->setStatus($id, 'en_progreso', (int) $me->id);
+            app(\App\Services\TicketService::class)->setStatus($id, 'abierto', (int) $me->id);
             $r['reopened'] = true;
         }
 

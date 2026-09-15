@@ -2225,6 +2225,9 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .dot-wait { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-right: 7px; vertical-align: middle; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
 .chip.answered { background: rgba(16, 185, 129, 0.16); color: #6fdcb0; margin-left: 5px; padding: 3px 7px; }
 :root[data-theme="light"] .chip.answered { background: #ecfdf5; color: #047857; }
+/* «Sin responder»: la pelota está en nuestro tejado. Ámbar, marcado para que salte. */
+.chip.sinresp { background: rgba(245, 158, 11, 0.18); color: #fbbf24; margin-left: 5px; padding: 3px 7px; font-weight: 600; }
+:root[data-theme="light"] .chip.sinresp { background: #fff7ec; color: #b45309; }
 
 /* --- MODAL del ticket: no se cambia de página --- */
 .tk-modal { position: relative; display: flex; width: min(1800px, 97vw); height: 94vh; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35); }

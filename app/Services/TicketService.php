@@ -17,7 +17,6 @@ class TicketService
     public const STATUSES = [
         'nuevo'               => 'Nuevo',
         'abierto'             => 'Abierto',
-        'en_progreso'         => 'En progreso',
         'esperando_respuesta' => 'Esperando respuesta',
         'resuelto'            => 'Resuelto',
         'cerrado'             => 'Cerrado',
@@ -32,7 +31,6 @@ class TicketService
     public const STATUS_COLORS = [
         'nuevo'               => '#2563eb',
         'abierto'             => '#10b981',
-        'en_progreso'         => '#f59e0b',
         'esperando_respuesta' => '#f97316',
         'resuelto'            => '#8b5cf6',
         'cerrado'             => '#94a3b8',
@@ -49,7 +47,7 @@ class TicketService
     }
 
     /** Estados en los que un ticket sigue VIVO (y por tanto admite mensajes nuevos). */
-    public const OPEN_STATUSES = ['nuevo', 'abierto', 'en_progreso', 'esperando_respuesta'];
+    public const OPEN_STATUSES = ['nuevo', 'abierto', 'esperando_respuesta'];
 
     /**
      * Prioridad «sin asignar»: los tickets NACEN así (valor fuera del catálogo, para
@@ -559,7 +557,7 @@ class TicketService
 
     /**
      * Marca la primera respuesta de soporte (para el SLA). Solo la primera cuenta.
-     * Además, un ticket 'nuevo' pasa a 'en_proceso' en cuanto alguien contesta.
+     * Además, un ticket 'nuevo' pasa a 'abierto' en cuanto alguien contesta.
      */
     public function markFirstResponse(int $ticketId, ?int $userId = null): void
     {
@@ -569,8 +567,8 @@ class TicketService
         if ($t->first_response_at === null) {
             DB::table('tickets')->where('id', $ticketId)->update(['first_response_at' => now()]);
         }
-        if (in_array($t->status, ['nuevo', 'abierto'], true)) {
-            $this->setStatus($ticketId, 'en_progreso', $userId);
+        if ($t->status === 'nuevo') {
+            $this->setStatus($ticketId, 'abierto', $userId);
         }
     }
 

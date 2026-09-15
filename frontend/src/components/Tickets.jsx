@@ -134,19 +134,24 @@ function prChip(v, meta, small = false) {
   return <span className={cls} style={style}>{p?.name || meta?.priorities?.[v] || v}</span>
 }
 
+/* Estados retirados que aún pueden aparecer en el HISTORIAL de tickets antiguos:
+   ya no se pueden elegir, pero hay que saber pintarlos con su nombre de siempre.
+   «En progreso» se fusionó en «Abierto» (sep-2026). */
+const LEGACY_STATUS = { en_progreso: 'En progreso' }
+
 /* Chip de ESTADO con color desde meta.status_meta (misma idea que prChip): así no
    depende del nombre de clase CSS. Si falta meta, cae a la clase `.chip.{estado}`. */
 export function stChip(v, meta, small = false) {
   const s = meta?.status_meta?.[v]
   const cls = `chip ${s ? '' : v} ${small ? 'sm' : ''}`.trim()
   const style = s ? { background: s.color + '22', color: s.color } : undefined
-  return <span className={cls} style={style}>{s?.name || meta?.statuses?.[v] || v}</span>
+  return <span className={cls} style={style}>{s?.name || meta?.statuses?.[v] || LEGACY_STATUS[v] || v}</span>
 }
 
 // Historial de movimientos: icono + frase legible por tipo de evento.
 const EV_ICON = { created: '🎫', status: '🔄', assign: '👤', category: '🏷️', priority: '⚑', merge_in: '🔗', merge_out: '🔗', requester: '✉️' }
 function describeEvent(e, meta) {
-  const st = (v) => meta?.statuses?.[v] || v
+  const st = (v) => meta?.statuses?.[v] || LEGACY_STATUS[v] || v
   const pr = (v) => meta?.priorities?.[v] || v
 
   switch (e.type) {
@@ -1030,7 +1035,11 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         <td>{prChip(t.priority, meta)}</td>
                         <td>
                           {stChip(t.status, meta)}
-                          {!waiting && t.last_direction === 'out' && <span className="chip answered" title="Ya hemos respondido">✓</span>}
+                          {/* «Sin responder»: el cliente escribió lo último y el ticket sigue
+                              abierto. Se marca aparte del estado para que salte a la vista. */}
+                          {waiting && !['resuelto', 'cerrado'].includes(t.status)
+                            ? <span className="chip sinresp" title="El cliente escribió lo último: sin responder">Sin responder</span>
+                            : (t.last_direction === 'out' && <span className="chip answered" title="Ya hemos respondido">✓</span>)}
                         </td>
                         {canTimes && <>
                           <td className="tk-time">{fmtMins(t.response_mins)}</td>
