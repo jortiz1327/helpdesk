@@ -662,6 +662,14 @@ class MailService
         $metaHtml = $meta !== '' ? '<div style="font-size:13px;color:#8a94a6;margin-top:5px">' . e($meta) . '</div>' : '';
         $noteHtml = $note !== '' ? '<tr><td style="padding:16px 28px 0"><div style="font-size:13px;color:#8a94a6;line-height:1.5">' . e($note) . '</div></td></tr>' : '';
 
+        // Botón directo al ticket (solo en avisos internos que lo traen en $o['cta']).
+        $cta = $o['cta'] ?? null;
+        $ctaHtml = (is_array($cta) && !empty($cta['url']))
+            ? '<tr><td style="padding:20px 28px 0;">'
+                . '<a href="' . e($cta['url']) . '" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 24px;border-radius:8px;">'
+                . e($cta['label'] ?? 'Abrir el ticket') . '</a></td></tr>'
+            : '';
+
         $ff = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
         return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
@@ -682,6 +690,7 @@ class MailService
             . '<tr><td style="padding:18px 28px 4px;">'
             . '<div style="border-left:3px solid #2563eb;background:#f7f9fc;border-radius:0 8px 8px 0;padding:14px 16px;font-size:15px;line-height:1.6;color:#20272f;">' . $contentHtml . '</div>'
             . '</td></tr>'
+            . $ctaHtml
             . $firma
             . $noteHtml
             // Pie

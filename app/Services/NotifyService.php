@@ -98,6 +98,9 @@ class NotifyService
         ][$key] ?? 'Aviso de soporte';
     }
 
+    /** Avisos INTERNOS (van a un agente, no al cliente): llevan botón «Abrir el ticket». */
+    protected const AVISOS_INTERNOS = ['ticket_assigned', 'sla_warning', 'sla_breach'];
+
     /** Datos de la plantilla de marca para un aviso: titular + «código · asunto». */
     protected function marco(string $key, object $t): array
     {
@@ -106,6 +109,11 @@ class NotifyService
             'meta'    => trim(((string) $t->code) . ($t->subject ? ' · ' . (string) $t->subject : '')),
         ];
         if (in_array($key, self::SIN_NOTA_RESPONDER, true)) $m['note'] = '';
+        // Botón directo al ticket, SOLO en avisos internos (el cliente no debe ver /agentes).
+        if (in_array($key, self::AVISOS_INTERNOS, true) && !empty($t->code)) {
+            $base = rtrim((string) config('app.url'), '/');
+            $m['cta'] = ['url' => $base . '/agentes/tickets/' . rawurlencode((string) $t->code), 'label' => 'Abrir el ticket'];
+        }
         return $m;
     }
 
