@@ -620,11 +620,6 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
     const r = await api.setTicketCategory(id, catId || null)
     if (r.ok) { toast('Categoría actualizada'); load() } else toast(r.error || 'Error', 'err')
   }
-  const quickPriority = async (id, pr) => {
-    if (!pr) return
-    const r = await api.setTicketPriority(id, pr)
-    if (r.ok) { toast('Prioridad actualizada'); load() } else toast(r.error || 'Error', 'err')
-  }
 
   // --- Selección para acciones en lote ---
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -1030,14 +1025,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                               options={opcionesAsignar(meta?.users, t.assigned_to)} />
                           ) : (t.agent_name || <span className="tk-time">Sin asignar</span>)}
                         </td>
-                        {/* Prioridad editable en la tabla. stopPropagation para no abrir el modal. */}
-                        <td onClick={(e) => e.stopPropagation()}>
-                          {can('tickets.categorize') ? (
-                            <Select sm block value={t.priority || ''}
-                              onChange={(v) => quickPriority(t.id, v)}
-                              options={Object.entries(meta?.priorities || {}).map(([value, label]) => ({ value, label }))} />
-                          ) : prChip(t.priority, meta)}
-                        </td>
+                        <td>{prChip(t.priority, meta)}</td>
                         <td>
                           {stChip(t.status, meta)}
                           {!waiting && t.last_direction === 'out' && <span className="chip answered" title="Ya hemos respondido">✓</span>}
