@@ -524,9 +524,11 @@ class PortalService
             $svc = app(TicketService::class);
             $svc->touch((int) $t->id);
             DB::table('tickets')->where('id', $t->id)->update(['last_direction' => 'in']);
-            // Un ticket resuelto que el cliente reabre con una respuesta vuelve a la cola.
-            if (in_array($t->status, ['resuelto', 'cerrado'], true)) {
-                $svc->setStatus((int) $t->id, 'en_progreso');
+            // Respuesta del cliente → «Abierto»: la pelota vuelve a nuestro tejado.
+            // Reabre resueltos/cerrados y saca de «Esperando respuesta»; no pisa
+            // «En progreso» (ahí ya hay un agente con el ticket).
+            if (!in_array($t->status, ['abierto', 'en_progreso'], true)) {
+                $svc->setStatus((int) $t->id, 'abierto');
             }
             return $m;
         });

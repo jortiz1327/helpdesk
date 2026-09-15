@@ -465,12 +465,14 @@ class MailService
         $ticketNew = false;
         if ($ticketId) {
             $this->tickets->touch($ticketId);
-            // Una respuesta del cliente a un ticket RESUELTO/CERRADO lo REABRE (igual que
-            // el portal y WhatsApp). Sin esto, su correo entra pero el ticket sigue fuera
-            // de «Abiertos» y el mensaje queda invisible para el equipo.
+            // Respuesta del cliente: la pelota vuelve a nuestro tejado, así que el ticket
+            // pasa a «Abierto». Esto reabre los RESUELTOS/CERRADOS (si no, su correo entra
+            // pero el ticket sigue fuera de «Abiertos» y el mensaje queda invisible) y saca
+            // de «Esperando respuesta». No se pisa «En progreso»: ahí ya hay un agente
+            // trabajándolo y reanuda el SLA por sí solo.
             $estado = DB::table('tickets')->where('id', $ticketId)->value('status');
-            if (in_array($estado, ['resuelto', 'cerrado'], true)) {
-                $this->tickets->setStatus($ticketId, 'en_progreso');
+            if (!in_array($estado, ['abierto', 'en_progreso'], true)) {
+                $this->tickets->setStatus($ticketId, 'abierto');
             }
         } else {
             // VÁLVULA ANTI-BUCLE: si de este remitente ya han entrado DEMASIADOS tickets en
