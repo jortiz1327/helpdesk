@@ -7,6 +7,12 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
 ### Mejoras
 
+- **Coherencia entre categoría y agente.** Las «áreas» de un agente son las
+  categorías que atiende. Al asignar un ticket a un agente de **varias** áreas cuya
+  categoría no coincide con ninguna, un modal pregunta a cuál moverlo. Y al cambiar
+  la categoría a una que el agente asignado no lleva, se ofrece reasignar a alguien
+  de esa área, quitar la asignación o dejarlo. Nunca obliga.
+
 - **Enlace directo a un ticket.** Cada ticket tiene una URL que lo abre:
   `https://soporte.aemegroup.com/agentes/tickets/TK-2609-0063`. Si se la pasas a un
   agente y la abre, se le abre ese ticket (respetando su visibilidad; si no existe
