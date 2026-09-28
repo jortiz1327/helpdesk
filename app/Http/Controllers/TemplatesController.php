@@ -32,7 +32,16 @@ class TemplatesController extends Controller
                 'fields' => 'name,status,category,language,components,id',
             ]);
             if ($code >= 200 && $code < 300) {
-                return response()->json(['ok' => true, 'templates' => $res['data'] ?? []]);
+                // Plantillas de MUESTRA de Meta que NO se pueden borrar (p. ej. hello_world):
+                // se ocultan para que no sean usables en la app (ni enviar ni editar). Como
+                // todas las pantallas (gestión, envío, campañas, automatizaciones) tiran de
+                // esta lista, con quitarlas aquí desaparecen de todos los sitios.
+                $ocultas = ['hello_world'];
+                $templates = array_values(array_filter(
+                    $res['data'] ?? [],
+                    fn ($t) => !in_array(strtolower((string) ($t['name'] ?? '')), $ocultas, true)
+                ));
+                return response()->json(['ok' => true, 'templates' => $templates]);
             }
             return response()->json(['ok' => false, 'error' => $res['error']['message'] ?? 'Error al listar'], $code ?: 500);
         }
