@@ -24,6 +24,7 @@ class EmailTemplate extends Model
         'ticket_created'  => ['Ticket creado',   'Acuse de recibo al CLIENTE cuando se abre su ticket.'],
         'ticket_closed'   => ['Ticket cerrado',  'Aviso al CLIENTE cuando su ticket se resuelve o se cierra.'],
         'ticket_assigned' => ['Ticket asignado', 'Aviso al AGENTE cuando se le asigna un ticket.'],
+        'ticket_reply'    => ['Respuesta del cliente', 'Aviso al AGENTE asignado cuando el cliente responde su ticket.'],
         'sla_warning'     => ['SLA por vencer',  'Aviso al AGENTE cuando un ticket suyo está a punto de incumplir el SLA.'],
         'sla_breach'      => ['SLA vencido',     'Aviso al AGENTE (y a los administradores) cuando un ticket incumple el SLA.'],
         'csat_survey'     => ['Encuesta de satisfacción', 'Encuesta al CLIENTE al resolver su ticket. Usa {{valoracion}} para las estrellas clicables.'],

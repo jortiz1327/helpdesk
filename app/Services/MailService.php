@@ -604,6 +604,11 @@ class MailService
         if ($ticketNew) {
             try { app(\App\Services\NotifyService::class)->ticket('ticket_created', $ticketId); }
             catch (\Throwable $e) { Log::warning('MailService: acuse falló', ['ticket' => $ticketId, 'error' => $e->getMessage()]); }
+        } else {
+            // Respuesta del cliente a un ticket que ya existía: avisar al agente asignado
+            // (la plantilla ticket_reply decide destinatarios; si no hay agente, no envía).
+            try { app(\App\Services\NotifyService::class)->ticket('ticket_reply', $ticketId); }
+            catch (\Throwable $e) { Log::warning('MailService: aviso de respuesta falló', ['ticket' => $ticketId, 'error' => $e->getMessage()]); }
         }
 
         return ['ticket_nuevo' => $ticketNew, 'mensaje' => true, 'adjuntos' => $count];

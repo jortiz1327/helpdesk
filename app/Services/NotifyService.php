@@ -83,7 +83,7 @@ class NotifyService
      * agentes/admins) y el CSAT (se valora con las estrellas, no respondiendo; un «3»
      * de respuesta reabriría la incidencia resuelta).
      */
-    protected const SIN_NOTA_RESPONDER = ['sla_warning', 'sla_breach', 'ticket_assigned', 'csat_survey'];
+    protected const SIN_NOTA_RESPONDER = ['sla_warning', 'sla_breach', 'ticket_assigned', 'ticket_reply', 'csat_survey'];
 
     /** Titular de la plantilla de marca según el tipo de aviso (envuelve el cuerpo). */
     protected function encabezado(string $key): string
@@ -92,6 +92,7 @@ class NotifyService
             'ticket_created'  => 'Hemos recibido tu incidencia',
             'ticket_closed'   => 'Tu incidencia se ha cerrado',
             'ticket_assigned' => 'Se te ha asignado un ticket',
+            'ticket_reply'    => 'El cliente ha respondido',
             'sla_warning'     => 'Un ticket está por vencer',
             'sla_breach'      => 'Un ticket ha vencido su SLA',
             'csat_survey'     => '¿Cómo lo hemos hecho?',
@@ -99,7 +100,7 @@ class NotifyService
     }
 
     /** Avisos INTERNOS (van a un agente, no al cliente): llevan botón «Abrir el ticket». */
-    protected const AVISOS_INTERNOS = ['ticket_assigned', 'sla_warning', 'sla_breach'];
+    protected const AVISOS_INTERNOS = ['ticket_assigned', 'ticket_reply', 'sla_warning', 'sla_breach'];
 
     /** Datos de la plantilla de marca para un aviso: titular + «código · asunto». */
     protected function marco(string $key, object $t): array
@@ -283,7 +284,7 @@ class NotifyService
 
     /**
      * Envía el aviso de un evento sobre un ticket. Devuelve true si se llegó a enviar.
-     * $key: ticket_created | ticket_closed | ticket_assigned
+     * $key: ticket_created | ticket_closed | ticket_assigned | ticket_reply
      */
     public function ticket(string $key, int $ticketId): bool
     {

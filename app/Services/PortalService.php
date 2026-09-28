@@ -536,6 +536,10 @@ class PortalService
         $this->guardarAdjuntos($files, (int) $t->id, $mid);   // best-effort, fuera de la tx
         app(TicketService::class)->broadcast('message', (int) $t->id);
 
+        // Aviso al agente asignado: el cliente ha respondido (misma plantilla que el correo).
+        try { app(\App\Services\NotifyService::class)->ticket('ticket_reply', (int) $t->id); }
+        catch (\Throwable $e) { /* el aviso no debe tumbar la respuesta del cliente */ }
+
         return [true, null];
     }
 
