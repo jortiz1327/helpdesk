@@ -32,6 +32,13 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
 ### Arreglos
 
+- **Las fotos grandes de los clientes no llegaban a la incidencia.**
+  Un correo con una foto de móvil (15-20 MB) creaba el ticket pero **sin la
+  imagen**: se descartaba en silencio por el límite de 10 MB por adjunto. Ahora el
+  correo entrante admite hasta 30 MB por archivo (la subida del agente sigue en 10
+  MB). Además, las imágenes incrustadas que llegan sin nombre de fichero ya no se
+  pierden (se reconoce el tipo por su MIME).
+
 - **El bloqueo de un ticket no se liberaba si el agente se iba.**
   Al abrir un ticket se bloquea para que dos agentes no contesten a la vez, y
   debe caducar solo si el agente deja de estar activo. Pero el refresco de fondo
