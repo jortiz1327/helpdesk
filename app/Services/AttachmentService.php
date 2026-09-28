@@ -10,8 +10,19 @@ use Illuminate\Support\Str;
 /** Guarda y sirve los adjuntos de los tickets. */
 class AttachmentService
 {
-    public const MAX_BYTES = 10 * 1024 * 1024;   // 10 MB por fichero
+    public const MAX_BYTES = 10 * 1024 * 1024;   // 10 MB por fichero (subida del agente/portal)
+    // Correo ENTRANTE: no controlamos lo que manda el cliente (fotos de móvil de 15-20 MB).
+    // Antes se descartaban en silencio y la incidencia llegaba sin la imagen.
+    public const MAX_BYTES_INBOUND = 30 * 1024 * 1024;   // 30 MB para adjuntos recibidos por correo
     public const MAX_FILES = 10;
+
+    /** Extensión deducida del tipo MIME cuando el adjunto llega SIN nombre (imágenes en línea). */
+    protected const EXT_POR_MIME = [
+        'image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/pjpeg' => 'jpg',
+        'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp',
+        'image/bmp' => 'bmp', 'image/heic' => 'heic', 'image/heif' => 'heic',
+        'application/pdf' => 'pdf',
+    ];
 
     /**
      * Extensiones PERMITIDAS (lista blanca). Un adjunto de soporte es una captura,
@@ -81,13 +92,21 @@ class AttachmentService
      * Lo usa el canal de correo: los adjuntos IMAP no son UploadedFile.
      * Aplica la misma lista blanca y límite de tamaño. Devuelve el id o null si se descarta.
      */
-    public function storeRaw(string $name, string $content, ?string $mime, int $ticketId, ?int $messageId, ?int $userId = null, ?string $contentId = null, bool $inline = false): ?int
+    public function storeRaw(string $name, string $content, ?string $mime, int $ticketId, ?int $messageId, ?int $userId = null, ?string $contentId = null, bool $inline = false, ?int $maxBytes = null): ?int
     {
+        $maxBytes = $maxBytes ?: self::MAX_BYTES;
         $ext  = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         $size = strlen($content);
 
+        // Sin extensión válida en el nombre (típico de imágenes en línea que llegan solo
+        // con Content-ID): se intenta deducir del tipo MIME antes de descartar.
+        if ($ext === '' || !in_array($ext, self::ALLOWED_EXT, true)) {
+            $porMime = self::EXT_POR_MIME[strtolower(trim((string) $mime))] ?? null;
+            if ($porMime) $ext = $porMime;
+        }
+
         if ($ext === '' || !in_array($ext, self::ALLOWED_EXT, true)) return null;
-        if ($size <= 0 || $size > self::MAX_BYTES) return null;
+        if ($size <= 0 || $size > $maxBytes) return null;
 
         // Nombre en disco aleatorio (mismo criterio que store()): el nombre original
         // nunca se usa como ruta.

@@ -516,6 +516,7 @@ class MailService
                 null,                       // uploaded_by
                 $contentId ?: null,
                 false,                      // inline: se marca tras reescribir el cuerpo
+                AttachmentService::MAX_BYTES_INBOUND,   // el cliente puede mandar fotos grandes
             );
             if ($saved) {
                 $count++;
