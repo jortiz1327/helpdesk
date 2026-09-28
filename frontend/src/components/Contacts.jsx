@@ -205,6 +205,13 @@ export default function Contacts({ onOpen, area = '' }) {
                           {c.email || ''}
                           {!c.wa_id && !c.email ? '—' : ''}
                         </span>
+                        {/* Tienda / empresa del cliente (si se ha rellenado en su ficha). */}
+                        {(c.empresa || c.tienda) && (
+                          <span className="ct-empresa muted" title="Empresa · Tienda">
+                            <Icon.building />
+                            {[c.empresa, c.tienda].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
                       </span>
                     </span>
                     <span className="ct-labels">

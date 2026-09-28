@@ -1775,6 +1775,8 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ct-meta { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
 .ct-meta b { font-size: 13.5px; }
 .ct-meta .muted { font-size: 12px; }
+.ct-meta .ct-empresa { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; margin-top: 1px; }
+.ct-meta .ct-empresa svg { width: 12px; height: 12px; fill: currentColor; opacity: 0.7; flex: none; }
 .ct-labels { display: flex; flex-wrap: wrap; gap: 5px; }
 .ct-tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
 .ct-date { font-size: 12.5px; text-align: right; }
