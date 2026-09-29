@@ -41,7 +41,15 @@ class ChatService
             }
             return (int) $c->id;
         }
-        return (int) Contact::create(['email' => $email, 'name' => $name ?: $email])->id;
+        // Crear el nuevo. Si dos altas coinciden a la vez con el MISMO correo, el índice
+        // único evita el duplicado: la 2ª falla y aquí se recupera el contacto ya creado.
+        try {
+            return (int) Contact::create(['email' => $email, 'name' => $name ?: $email])->id;
+        } catch (\Illuminate\Database\QueryException $e) {
+            $c = Contact::where('email', $email)->first();
+            if ($c) return (int) $c->id;
+            throw $e;
+        }
     }
 
     /** Inserta un mensaje y actualiza el resumen del contacto. Devuelve el id. */

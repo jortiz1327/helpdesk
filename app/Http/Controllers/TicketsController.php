@@ -1703,11 +1703,20 @@ class TicketsController extends Controller
         $contactId = $q->value('id');
 
         if (!$contactId) {
-            $contactId = DB::table('contacts')->insertGetId([
-                'name'  => $name,
-                'email' => $email ?: null,
-                'wa_id' => $phone ?: null,
-            ]);
+            // Alta del contacto. Si dos altas coinciden a la vez con el MISMO correo, el
+            // índice único lo evita: la 2ª falla y aquí se recupera el ya creado.
+            try {
+                $contactId = DB::table('contacts')->insertGetId([
+                    'name'  => $name,
+                    'email' => $email ?: null,
+                    'wa_id' => $phone ?: null,
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                $q2 = DB::table('contacts');
+                $email !== '' ? $q2->where('email', $email) : $q2->where('wa_id', $phone);
+                $contactId = $q2->value('id');
+                if (!$contactId) throw $e;
+            }
         } elseif ($phone !== '') {
             // El contacto ya existía: si NO tenía teléfono, se le pone el que ha apuntado el
             // cliente al crear (sin pisar uno ya guardado, y solo si ese número está libre —

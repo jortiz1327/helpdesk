@@ -185,7 +185,9 @@ class ContactController extends Controller
                     'created_at' => now(),
                 ];
             }
-            foreach (array_chunk($rows, 500) as $lote) DB::table('contacts')->insert($lote);
+            // insertOrIgnore: ya se han filtrado los existentes; esto solo evita que una
+            // carrera (dos altas del mismo correo a la vez) tumbe el lote por el índice único.
+            foreach (array_chunk($rows, 500) as $lote) DB::table('contacts')->insertOrIgnore($lote);
         }
 
         return response()->json(['ok' => true, 'added' => count($rows), 'dup' => $dup, 'invalid' => $inval]);
