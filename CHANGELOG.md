@@ -7,6 +7,20 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
 ### Mejoras
 
+- **Estados nuevos: Nuevo · Abierto · Planificado · Resuelto · Cerrado.** «Planificado»
+  para peticiones que se gestionan a días/semanas (activo, pero sin que corra el SLA).
+  «Esperando respuesta» deja de ser estado y pasa a un indicador redondo en la columna
+  de estado (amarillo «!» sin responder · verde «✓» respondido). El reloj del SLA se
+  pausa solo mientras esperas al cliente.
+
+- **Filtro de categoría múltiple.** Se pueden elegir varias categorías a la vez (útil
+  para quien lleva varias áreas). Al filtrar por categoría se muestran siempre también
+  los tickets **sin categoría** (los nuevos sin gestionar), para que no se escapen.
+
+- **Columnas de tiempos ocultas por defecto.** Los tiempos de atención y resolución no
+  se muestran salvo que pulses «Tiempos» en la barra (se recuerda por usuario). La
+  bandeja queda más limpia para el día a día.
+
 - **La bandeja: los contadores cuadran con la lista, y se puede salir de una vista.**
   Los números de arriba (Activos, Sin responder, Míos…) se calculaban sobre TODO lo
   visible e ignoraban el filtro aplicado (categoría, vista guardada), así que no
