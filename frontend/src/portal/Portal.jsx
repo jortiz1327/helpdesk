@@ -705,6 +705,7 @@ function Crear({ go, prefill, onOpen, onExpire }) {
   const { t } = useLang()
   const [cats, setCats] = useState([])
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [subject, setSubject] = useState(prefill?.subject || '')
   const [catId, setCatId] = useState('')
   const [body, setBody] = useState('')
@@ -740,7 +741,7 @@ function Crear({ go, prefill, onOpen, onExpire }) {
 
   const enviar = async () => {
     setBusy(true); setErr('')
-    const r = await portal.create({ email: email.trim(), subject, category_id: catId || null, body, files })
+    const r = await portal.create({ email: email.trim(), phone: phone.trim(), subject, category_id: catId || null, body, files })
     setBusy(false)
     if (r.reauth) return onExpire()
     if (r.ok) setOkCode(r.code); else setErr(r.error || t('err_create'))
@@ -796,6 +797,11 @@ function Crear({ go, prefill, onOpen, onExpire }) {
         <input className="inp" type="email" value={email} autoFocus autoComplete="email"
           onChange={(e) => setEmail(e.target.value)} placeholder={t('email_placeholder')} />
         <span className="hint">{t('email_hint')}</span></label>
+
+      <label className="f"><span className="lab">{t('phone')} <span className="hint" style={{ fontWeight: 400 }}>{t('phone_optional')}</span></span>
+        <input className="inp" type="tel" value={phone} autoComplete="tel" inputMode="tel"
+          onChange={(e) => setPhone(e.target.value)} placeholder={t('phone_placeholder')} />
+        <span className="hint">{t('phone_hint')}</span></label>
 
       <label className="f"><span className="lab">{t('subject')}</span>
         <input className="inp" value={subject} onChange={(e) => setSubject(e.target.value)}

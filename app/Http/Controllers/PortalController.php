@@ -171,6 +171,7 @@ class PortalController extends Controller
             'body'        => $request->input('body'),
             'category_id' => $request->input('category_id'),
             'name'        => $request->input('name'),
+            'phone'       => $request->input('phone'),
         ], (array) $request->file('files', []));
         if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
 
