@@ -3,17 +3,6 @@
 // se genera al vuelo y se cambia el href del <link rel="icon">.
 
 const BASE_SVG = '/favicon.svg'
-let baseImg = null
-
-function cargarBase() {
-  return new Promise((resolve) => {
-    if (baseImg) return resolve(baseImg)
-    const img = new Image()
-    img.onload = () => { baseImg = img; resolve(img) }
-    img.onerror = () => resolve(null)
-    img.src = BASE_SVG
-  })
-}
 
 function iconLink() {
   let link = document.querySelector("link[rel='icon']")
@@ -32,24 +21,23 @@ export async function setFaviconBadge(count) {
   const link = iconLink()
   if (count === 0) { link.type = 'image/svg+xml'; link.href = BASE_SVG; return }
 
+  // A 16px un icono + badge diminuto no se lee: mejor un círculo rojo limpio que
+  // OCUPA todo el favicon con el número centrado (cuando no hay avisos, el icono normal).
   const S = 64
   const canvas = document.createElement('canvas')
   canvas.width = S; canvas.height = S
   const cx = canvas.getContext('2d')
-  const img = await cargarBase()
   cx.clearRect(0, 0, S, S)
-  if (img) cx.drawImage(img, 0, 0, S, S)
+
+  const c = S / 2
+  cx.beginPath(); cx.arc(c, c, c - 2, 0, Math.PI * 2)
+  cx.fillStyle = '#ef4444'; cx.fill()
 
   const label = count > 99 ? '99+' : String(count)
-  const r = label.length > 2 ? 24 : 21
-  const bx = S - r, by = r
-  // Aro blanco + círculo rojo, para que resalte sobre cualquier icono.
-  cx.beginPath(); cx.arc(bx, by, r, 0, Math.PI * 2)
-  cx.fillStyle = '#ef4444'; cx.fill()
-  cx.lineWidth = 4; cx.strokeStyle = '#ffffff'; cx.stroke()
+  const fs = label.length >= 3 ? 30 : label.length === 2 ? 40 : 46
   cx.fillStyle = '#ffffff'; cx.textAlign = 'center'; cx.textBaseline = 'middle'
-  cx.font = `700 ${label.length > 2 ? 22 : 30}px -apple-system, "Segoe UI", Arial, sans-serif`
-  cx.fillText(label, bx, by + 1)
+  cx.font = `700 ${fs}px -apple-system, "Segoe UI", Roboto, Arial, sans-serif`
+  cx.fillText(label, c, c + 3)
 
   link.type = 'image/png'
   link.href = canvas.toDataURL('image/png')
