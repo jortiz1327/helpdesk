@@ -6,8 +6,10 @@ import { Icon } from '../icons.jsx'
  * Campana del centro de notificaciones. Muestra el nº de no leídas (sondeo cada 45s)
  * y, al abrir, el historial; al pulsar una, la marca leída y salta a su ticket.
  */
-export default function NotificationBell({ onOpenTicket, expanded }) {
+export default function NotificationBell({ onOpenTicket, expanded, onCount }) {
   const [unread, setUnread] = useState(0)
+  // Avisa al padre del número de notificaciones (para el badge del favicon).
+  useEffect(() => { onCount?.(unread) }, [unread, onCount])
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState(null)
   const [pos, setPos] = useState(null)       // posición fija del panel (ver colocar())

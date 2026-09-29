@@ -39,6 +39,7 @@ import AreaChooser from "./components/AreaChooser.jsx";
 import Users from "./components/Users.jsx";
 import Analytics from "./components/Analytics.jsx";
 import { notifyActive, getNotify, fireNotification } from "./notify.js";
+import { setFaviconBadge } from "./favicon.js";
 import {
     connectRealtime,
     disconnectRealtime,
@@ -525,6 +526,9 @@ export default function App() {
         () => localStorage.getItem("chooser_done") === "1",
     );
     const [unread, setUnread] = useState(0);
+    // Nº de notificaciones (campana) para pintarlo sobre el favicon de la pestaña.
+    const [notifCount, setNotifCount] = useState(0);
+    useEffect(() => { setFaviconBadge(auth.state === "in" ? notifCount : 0); }, [notifCount, auth.state]);
     const [toasts, setToasts] = useState([]);
     const [expanded, setExpanded] = useState(
         () => localStorage.getItem("rail_expanded") === "1",
@@ -1002,6 +1006,7 @@ export default function App() {
                         {can("helpdesk.access") && (
                             <NotificationBell
                                 expanded={expanded}
+                                onCount={setNotifCount}
                                 onOpenTicket={(id) => {
                                     setTicketsTab("tickets");
                                     setTicketAbierto(id);
