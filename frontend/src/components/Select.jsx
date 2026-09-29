@@ -8,7 +8,7 @@ import { Icon } from '../icons.jsx'
  * recorta ningún contenedor con overflow (tarjetas, nodos de React Flow…).
  * Con muchas opciones (p. ej. 200 etiquetas) muestra un BUSCADOR para filtrar.
  */
-export default function Select({ value, onChange, options = [], placeholder = 'Selecciona…', sm = false, block = false, disabled = false, searchable }) {
+export default function Select({ value, onChange, options = [], placeholder = 'Selecciona…', sm = false, block = false, disabled = false, searchable, multiple = false }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState(null) // { left, top, width, up }
   const [q, setQ] = useState('')
@@ -34,7 +34,16 @@ export default function Select({ value, onChange, options = [], placeholder = 'S
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onEsc); window.removeEventListener('resize', close) }
   }, [open, canSearch])
 
-  const sel = options.find((o) => String(o.value) === String(value))
+  // En modo múltiple, `value` es un array; en simple, un valor suelto.
+  const arr = multiple ? (Array.isArray(value) ? value.map(String) : []) : []
+  const isOn = (v) => (multiple ? arr.includes(String(v)) : String(v) === String(value))
+  const sel = multiple ? null : options.find((o) => String(o.value) === String(value))
+  const isPh = multiple ? arr.length === 0 : !sel
+  const triggerLabel = multiple
+    ? (arr.length === 0 ? placeholder
+        : arr.length === 1 ? (options.find((o) => String(o.value) === arr[0])?.label || '1 seleccionada')
+        : `${arr.length} seleccionadas`)
+    : (sel ? sel.label : placeholder)
   const needle = q.trim().toLowerCase()
   const filtered = needle
     ? options.filter((o) => (o.label || '').toLowerCase().includes(needle) || (o.sub || '').toLowerCase().includes(needle))
@@ -59,7 +68,15 @@ export default function Select({ value, onChange, options = [], placeholder = 'S
     if (pos.left > maxLeft) setPos((p) => ({ ...p, left: Math.max(12, maxLeft) }))
   }, [open, pos])
 
-  const pick = (o) => { onChange(o.value); setOpen(false); setQ('') }
+  const pick = (o) => {
+    if (multiple) {
+      // Alterna la opción y MANTIENE el menú abierto (se eligen varias de una vez).
+      const v = String(o.value)
+      onChange(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+      return
+    }
+    onChange(o.value); setOpen(false); setQ('')
+  }
   const onSearchKey = (e) => {
     if (e.key === 'Enter' && filtered.length) { e.preventDefault(); pick(filtered[0]) }
   }
@@ -68,7 +85,7 @@ export default function Select({ value, onChange, options = [], placeholder = 'S
     <div className={`sel ${sm ? 'sm' : ''} ${block ? 'block' : ''} ${open ? 'open' : ''} ${disabled ? 'disabled' : ''}`} ref={ref}>
       <button type="button" className="sel-trigger" onClick={toggle} disabled={disabled}>
         {sel?.color && <span className="sel-dot" style={{ background: sel.color }} />}
-        <span className={`sel-val ${sel ? '' : 'ph'}`}>{sel ? sel.label : placeholder}</span>
+        <span className={`sel-val ${isPh ? 'ph' : ''}`}>{triggerLabel}</span>
         <Icon.chevron className="sel-caret" />
       </button>
       {open && pos && createPortal(
@@ -83,10 +100,10 @@ export default function Select({ value, onChange, options = [], placeholder = 'S
             {filtered.length === 0 ? (
               <div className="sel-empty">Sin resultados</div>
             ) : filtered.map((o) => (
-              <button type="button" key={String(o.value)} className={`sel-opt ${String(o.value) === String(value) ? 'on' : ''}`} onClick={() => pick(o)}>
+              <button type="button" key={String(o.value)} className={`sel-opt ${isOn(o.value) ? 'on' : ''}`} onClick={() => pick(o)}>
                 {o.color && <span className="sel-dot" style={{ background: o.color }} />}
                 <span className="sel-opt-t">{o.label}{o.sub && <span className="sel-opt-sub">{o.sub}</span>}</span>
-                {String(o.value) === String(value) && <Icon.check className="sel-check" />}
+                {isOn(o.value) && <Icon.check className="sel-check" />}
               </button>
             ))}
           </div>

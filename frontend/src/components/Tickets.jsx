@@ -636,12 +636,18 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   // pantalla y su forma de trabajar.
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(() => Number(localStorage.getItem('tk_per_page')) || 25)
+  // Columnas de tiempos (atención/resolución): OCULTAS por defecto (no sirven en el día a
+  // día); se muestran con un botón. Deja más aire a la columna de estado.
+  const [showTimes, setShowTimes] = useState(() => localStorage.getItem('tk_show_times') === '1')
+  const toggleTimes = () => { const v = !showTimes; localStorage.setItem('tk_show_times', v ? '1' : '0'); setShowTimes(v) }
   // Densidad de la tabla: «cómoda» (por defecto) o «compacta» para barrer más cola de un vistazo.
   const [density, setDensity] = useState(() => localStorage.getItem('tk_density') || 'comoda')
   const toggleDensity = () => {
     const d = density === 'compacta' ? 'comoda' : 'compacta'
     localStorage.setItem('tk_density', d); setDensity(d)
   }
+  // ¿Se ven las columnas de tiempos? Solo si el usuario tiene permiso Y las ha activado.
+  const verTiempos = canTimes && showTimes
   const [pag, setPag] = useState({ total: 0, pages: 1 })
 
   // Vistas guardadas: personales de cada agente + COMPARTIDAS del equipo.
@@ -844,6 +850,12 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             <Icon.list /> {density === 'compacta' ? 'Cómoda' : 'Compacta'}
           </button>
         )}
+        {tab === 'tickets' && canTimes && (
+          <button className={`btn ghost ${showTimes ? 'on' : ''}`} onClick={toggleTimes}
+            title={showTimes ? 'Ocultar los tiempos de atención y resolución' : 'Mostrar los tiempos de atención y resolución'}>
+            <Icon.clock /> {showTimes ? 'Ocultar tiempos' : 'Tiempos'}
+          </button>
+        )}
         {can('tickets.export') && (
           <button className="btn ghost" disabled={exporting} onClick={exportar}
             title="Descargar en Excel lo que ves con los filtros actuales">
@@ -944,9 +956,14 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             <div className="field"><span className="lbl">Prioridad</span>
               <Select block value={f.priority} onChange={(v) => setF((s) => ({ ...s, priority: v }))} options={opts(meta?.priorities, 'Todas')} />
             </div>
+            {/* Multiselect: útil a quien lleva varias áreas (elige varias categorías a la
+                vez). Filtrar por categoría muestra SIEMPRE también los «sin categoría»
+                (los nuevos sin gestionar) — lo aplica el backend. */}
             <div className="field"><span className="lbl">Categoría</span>
-              <Select block value={f.category} onChange={(v) => setF((s) => ({ ...s, category: v }))}
-                options={[{ value: 'all', label: 'Todas' }, ...(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))]} />
+              <Select block multiple placeholder="Todas"
+                value={!f.category || f.category === 'all' ? [] : String(f.category).split(',')}
+                onChange={(vals) => setF((s) => ({ ...s, category: vals.length ? vals.join(',') : 'all' }))}
+                options={(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))} />
             </div>
             {/* Filtro por etiqueta. Solo si hay catálogo de etiquetas. */}
             {meta?.labels?.length > 0 && (
@@ -1079,13 +1096,13 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                     </th>
                     <th>Ticket</th><th>Canal</th><th>Cliente</th><th>Asunto</th><th>Categoría</th><th>Asignado</th>
                     <th>Prioridad</th><th>Estado</th>
-                    {canTimes && <><th>T. atención</th><th>T. resolución</th></>}
+                    {verTiempos && <><th>T. atención</th><th>T. resolución</th></>}
                     <th>Última actividad</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows === null
-                    ? Array.from({ length: 8 }).map((_, i) => <SkelRow key={i} canTimes={canTimes} />)
+                    ? Array.from({ length: 8 }).map((_, i) => <SkelRow key={i} canTimes={verTiempos} />)
                     : rows.map((t) => {
                     const waiting = t.last_direction === 'in'   // habló el cliente: nos toca
                     const sleeping = t.snoozed_at && (Number(t.snooze_wake_on_reply)
@@ -1175,7 +1192,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                               : (t.last_direction === 'out' && <span className="st-ind resp" title="Respondido: ya hemos contestado y esperamos al cliente">✓</span>)
                           )}
                         </td>
-                        {canTimes && <>
+                        {verTiempos && <>
                           <td className="tk-time">{fmtMins(t.response_mins)}</td>
                           <td className="tk-time">{fmtMins(t.resolve_mins)}</td>
                         </>}

@@ -312,12 +312,20 @@ class TicketsController extends Controller
 
         foreach ([
             'priority'      => 't.priority',
-            'category'      => 't.category_id',
             'channel'       => 't.channel',
             'contact'       => 't.contact_id',
             'contact_email' => 'c.email',
         ] as $param => $col) {
             if (($v = $request->query($param, '')) !== '' && $v !== 'all') $q->where($col, $v);
+        }
+
+        // CATEGORÍA: acepta VARIAS (lista separada por comas, para quien lleva varias áreas)
+        // y muestra SIEMPRE también los «sin categoría» (los nuevos sin gestionar), para que
+        // no se le escapen a nadie al filtrar por su área.
+        $cat = (string) $request->query('category', '');
+        if ($cat !== '' && $cat !== 'all') {
+            $ids = array_values(array_filter(array_map('intval', explode(',', $cat))));
+            if ($ids) $q->where(fn ($w) => $w->whereIn('t.category_id', $ids)->orWhereNull('t.category_id'));
         }
         if (!$soloEstructural && ($a = $request->query('assigned', '')) !== '' && $a !== 'all') {
             match (true) {
