@@ -59,7 +59,7 @@ function SkelRow({ canTimes }) {
  *  - Al abrir un ticket NO se cambia de página: se abre un MODAL grande.
  * ------------------------------------------------------------------------- */
 
-const fmtMins = (m) => (m === null || m === undefined ? '—' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`)
+const fmtMins = (m) => (m === null || m === undefined ? '—' : m <= 0 ? '<1m' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`)
 /** Tamaño de un adjunto en algo legible (KB/MB). */
 const fmtSize = (b) => (!b ? '' : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
 
