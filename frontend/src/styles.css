@@ -2154,12 +2154,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .chip.ch-web      { background: rgba(99, 102, 241, 0.16); color: #a5b4fc; }
 .chip.ch-email    { background: rgba(14, 165, 233, 0.16); color: #7dd3fc; }
 .chip.ch-whatsapp { background: rgba(37, 211, 102, 0.16); color: #6ee7a8; }
-.chip.ch-manual   { background: rgba(148, 163, 184, 0.20); color: #cbd5e1; }
 
 :root[data-theme="light"] .chip.ch-web      { background: #eef2ff; color: #4338ca; }
 :root[data-theme="light"] .chip.ch-email    { background: #e0f2fe; color: #0369a1; }
 :root[data-theme="light"] .chip.ch-whatsapp { background: #e7f9ee; color: #0f7a3d; }
-:root[data-theme="light"] .chip.ch-manual   { background: #f1f5f9; color: #475569; }
 
 /* --- Nuevo ticket --- */
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
