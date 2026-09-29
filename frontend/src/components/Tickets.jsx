@@ -1747,6 +1747,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   const [pdfOpts, setPdfOpts] = useState(null)   // null | { notes, images, busy }
   const [editReq, setEditReq] = useState(null)   // null | { email, name } — cambiar solicitante
   const [justificar, setJustificar] = useState(false)   // se cerró fuera de plazo
+  const [notaEstado, setNotaEstado] = useState(false)   // tras una nota: ¿cambiar estado?
   const [motivo, setMotivo] = useState('')
   const genPdf = async () => {
     setPdfOpts((o) => ({ ...o, busy: true }))
@@ -2280,6 +2281,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                       if (r.ok) {
                         toast(mentions?.length ? `📝 Nota guardada · avisados ${mentions.length}` : '📝 Nota interna guardada')
                         load(); onChange?.()
+                        // Tras la nota, ofrecer cambiar el estado (p. ej. «gestionado por
+                        // teléfono» → Resuelto). Solo si puede cerrar y el ticket sigue vivo.
+                        if (can('tickets.close') && !['resuelto', 'cerrado'].includes(d?.ticket?.status)) setNotaEstado(true)
                       }
                       else toast(r.error || 'No se pudo guardar la nota', 'err')
                       return r.ok
@@ -2309,6 +2313,27 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
 
       {/* Coherencia área↔asignado al asignar/categorizar desde la ficha. */}
       {coh.modales}
+
+      {/* Tras añadir una nota: ofrecer cambiar el estado (p. ej. gestionado por teléfono). */}
+      {notaEstado && (
+        <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setNotaEstado(false)}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-h"><h3>¿Cambiar el estado del ticket?</h3>
+              <button className="icon-btn" onClick={() => setNotaEstado(false)}>✕</button></div>
+            <div className="modal-body">
+              <p className="cfg-hint">Acabas de añadir una nota. ¿Quieres marcar el ticket como…?</p>
+              <div className="area-choices">
+                {[['resuelto', 'Resuelto'], ['planificado', 'Planificado'], ['cerrado', 'Cerrado']]
+                  .filter(([k]) => k !== t.status)
+                  .map(([k, label]) => (
+                    <button key={k} className="btn ghost" onClick={() => { setNotaEstado(false); setStatus(k) }}>{label}</button>
+                  ))}
+              </div>
+            </div>
+            <div className="modal-foot"><button className="btn ghost" onClick={() => setNotaEstado(false)}>Dejar como está</button></div>
+          </div>
+        </div>
+      )}
 
       {/* Fusionar. El diálogo vive fuera (ModalFusion): se abre igual desde aquí,
           desde la lista con dos tickets marcados y desde la pestaña «Del cliente». */}
