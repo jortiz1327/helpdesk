@@ -1960,6 +1960,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
             {/* --- Panel derecho: la conversación --- */}
             <section className="tkm-main">
               <div className="tkm-main-h">
+                {/* Asunto del ticket, bien visible arriba de la conversación. */}
+                <h2 className="tkm-subject" title={t.subject || 'Sin asunto'}>{t.subject || 'Sin asunto'}</h2>
                 <div className="tkm-tabs">
                   <button className={view === 'chat' ? 'on' : ''} onClick={() => setView('chat')}>Conversación</button>
                   <button className={view === 'history' ? 'on' : ''} onClick={() => setView('history')}>

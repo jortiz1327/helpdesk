@@ -2286,8 +2286,11 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 :root[data-theme="light"] .tkm-time.green { background: #ecfdf5; }
 
 .tkm-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.tkm-main-h { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.tkm-main-h { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 14px 20px 0; border-bottom: 1px solid var(--line); }
 .tkm-main-h h2 { font-size: 15.5px; margin: 0 0 2px; }
+/* Asunto del ticket: título arriba del panel, recortado con «…» si es largo (completo
+   al pasar el ratón). El padding-right deja hueco al botón de cerrar (✕). */
+.tkm-subject { font-size: 16px; font-weight: 600; line-height: 1.3; margin: 0; padding-right: 42px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tkm-thread { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; background: var(--panel-2); }
 .tk-loadmore { align-self: center; margin-bottom: 2px; padding: 7px 16px; border-radius: 20px; font-size: 12.5px;
   font-weight: 600; color: var(--primary); background: var(--panel); border: 1px solid var(--line); cursor: pointer; }
