@@ -1795,7 +1795,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                 <span className="tkm-av">{(t.contact_name || '?').slice(0, 1).toUpperCase()}</span>
                 <div className="tkm-cli-tx">
                   <b>{t.contact_name || 'Sin nombre'}</b>
-                  <small>{t.contact_email || (t.contact_wa ? '+' + t.contact_wa : 'Sin datos de contacto')}</small>
+                  <small>{t.contact_email || 'Sin correo'}</small>
                 </div>
                 {can('tickets.reply') && (
                   <button className="tkm-cli-edit" title="Cambiar solicitante (corregir el correo)"
@@ -1804,8 +1804,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   </button>
                 )}
               </div>
-              {t.contact_email && t.contact_wa && (
-                <div className="tkm-extra"><Icon.phone /> +{t.contact_wa}</div>
+              {/* Teléfono del cliente: dato de contacto, bien visible y clicable. */}
+              {t.contact_wa && (
+                <a className="tkm-tel" href={`tel:+${t.contact_wa}`} title="Llamar al cliente">
+                  <Icon.phone /> +{t.contact_wa}
+                </a>
               )}
 
               {/* ACCIONES ARRIBA: lo que más se usa, a la vista y sin scroll. */}

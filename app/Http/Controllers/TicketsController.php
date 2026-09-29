@@ -1690,6 +1690,13 @@ class TicketsController extends Controller
                 'email' => $email ?: null,
                 'wa_id' => $phone ?: null,
             ]);
+        } elseif ($phone !== '') {
+            // El contacto ya existía: si NO tenía teléfono, se le pone el que ha apuntado el
+            // cliente al crear (sin pisar uno ya guardado, y solo si ese número está libre —
+            // wa_id es único). Así el teléfono deja de perderse y se ve luego en la ficha.
+            $sinTel = !DB::table('contacts')->where('id', $contactId)->whereNotNull('wa_id')->where('wa_id', '<>', '')->exists();
+            $libre  = !DB::table('contacts')->where('wa_id', $phone)->where('id', '<>', $contactId)->exists();
+            if ($sinTel && $libre) DB::table('contacts')->where('id', $contactId)->update(['wa_id' => $phone]);
         }
 
         // Solo quien tiene permiso puede asignar a otro; el resto crea sin asignar.
