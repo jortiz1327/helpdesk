@@ -1103,7 +1103,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                           <input type="checkbox" checked={sel.has(t.id)} onChange={() => toggleSel(t.id)} />
                         </td>
                         <td className="tk-code">{t.code}</td>
-                        <td><ChannelBadge channel={t.channel} /></td>
+                        <td><ChannelBadge channel={t.channel} source={t.source} /></td>
                         <td className="tk-cli"><b>{t.contact_name || 'Sin nombre'}</b><small>{t.contact_email || (t.contact_wa ? '+' + t.contact_wa : '—')}</small></td>
                         <td className="tk-subj">
                           {waiting && <span className="dot-wait" title="El cliente escribió lo último: sin responder" />}
@@ -1869,7 +1869,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
               {/* PROPIEDADES compactas: una línea cada una. */}
               <div className="tkm-props">
                 <div className="tkm-row"><span>Referencia</span><b className="tk-code">{t.code}</b></div>
-                <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} /></div>
+                <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} source={t.source} /></div>
                 <div className="tkm-row"><span>Prioridad</span>
                   {can('tickets.categorize') ? (
                     <Select value={t.priority && t.priority !== 'sin_asignar' ? t.priority : ''}

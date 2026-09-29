@@ -175,7 +175,7 @@ class TicketsController extends Controller
         $rows  = $q->orderByDesc('t.last_message_at')->orderByDesc('t.id')
             ->limit($cap)
             ->get([
-                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel',
+                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.source',
                 't.created_at', 't.first_response_at', 't.resolved_at',
                 't.sla_response_due_at', 't.sla_resolve_due_at',
                 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
@@ -419,7 +419,7 @@ class TicketsController extends Controller
                                     // hora pueden bailar entre páginas y salir repetidos
             ->forPage($pagina, $porPagina)
             ->get([
-                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel',
+                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.source',
                 't.created_at', 't.last_message_at', 't.first_response_at', 't.resolved_at', 't.opened_at',
                 't.assigned_to',
                 // `contact_id` y `merged_into_id`: la lista necesita saber si dos
@@ -666,7 +666,7 @@ class TicketsController extends Controller
             ->orderByDesc('t.last_message_at')
             ->limit(5)
             ->get([
-                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel',
+                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.source',
                 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
             ]);
 
@@ -1697,6 +1697,10 @@ class TicketsController extends Controller
             $tid = $this->tickets->create([
                 'contact_id'  => $contactId,
                 'channel'     => $channel,
+                // Creado A MANO por un agente en la plataforma (no llegó por correo): lo usa
+                // el badge para mostrar «Manual» en vez de «Correo», aunque el canal sea email
+                // (para poder responder por SMTP). El portal usa source='portal' (→ «Web»).
+                'source'      => 'manual',
                 'subject'     => $subject,
                 'category_id' => $request->input('category_id') ?: null,
                 'priority'    => in_array($request->input('priority'), array_keys(TicketService::priorities()), true)
@@ -1850,7 +1854,7 @@ class TicketsController extends Controller
             ->orderByDesc('t.ended_at')
             ->limit(100)
             ->get([
-                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel',
+                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.source',
                 't.opened_at', 't.resolved_at', 't.closed_at',
                 'c.name as contact_name', 'c.email as contact_email',
                 'cat.name as category_name',

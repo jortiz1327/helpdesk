@@ -157,7 +157,7 @@ export default function SupportCenter({ onGo, user }) {
                         <b>{t.subject}</b>
                         <small>{t.code} · {t.contact_email || t.contact_name || '—'}</small>
                       </div>
-                      <ChannelBadge channel={t.channel} />
+                      <ChannelBadge channel={t.channel} source={t.source} />
                       <span className="chip" style={meta?.priority_meta?.[t.priority]
                         ? { background: meta.priority_meta[t.priority].color + '22', color: meta.priority_meta[t.priority].color }
                         : undefined}>{meta?.priorities?.[t.priority] || t.priority}</span>
