@@ -17,7 +17,6 @@ function Toggle({ on, onChange, disabled }) {
 const MAIL_PREFS = [
   ['notify_assigned', 'Se te asigna un ticket', 'Cuando un ticket pasa a estar a tu nombre'],
   ['notify_reply', 'El cliente responde tu ticket', 'Cuando el cliente contesta un ticket que tienes asignado'],
-  ['notify_sla', 'Avisos de SLA', 'Cuando un ticket tuyo está por vencer o ha vencido su plazo'],
 ]
 
 export default function WebNotifications({ user, onUser }) {
