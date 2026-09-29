@@ -7,6 +7,18 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
 ### Mejoras
 
+- **La bandeja: los contadores cuadran con la lista, y se puede salir de una vista.**
+  Los números de arriba (Activos, Sin responder, Míos…) se calculaban sobre TODO lo
+  visible e ignoraban el filtro aplicado (categoría, vista guardada), así que no
+  coincidían con lo que mostraba la lista. Ahora se ciñen a los mismos filtros. Y
+  pulsar una vista guardada que ya está activa **sale** de ella (vuelve a todos los
+  activos) sin recargar; volver a pulsarla la reactiva.
+
+- **Aviso al agente cuando el cliente responde.** Nueva plantilla *«Respuesta del
+  cliente»* (Configuración → Avisos automáticos): cuando el cliente contesta —por
+  correo o por el portal— un ticket con agente asignado, ese agente recibe el aviso
+  con botón «Abrir el ticket».
+
 - **Coherencia entre categoría y agente.** Las «áreas» de un agente son las
   categorías que atiende. Al asignar un ticket a un agente de **varias** áreas cuya
   categoría no coincide con ninguna, un modal pregunta a cuál moverlo. Y al cambiar
