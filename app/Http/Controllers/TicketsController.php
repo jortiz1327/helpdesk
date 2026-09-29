@@ -1051,12 +1051,12 @@ class TicketsController extends Controller
         if ($bloqueo = $this->exigePrioridad($id)) return $bloqueo;   // triaje: prioridad primero
 
         /*
-         * REGLA DE ASIGNACIÓN al responder (los que reparten —tickets.assign: encargados y
-         * superadmin— se la saltan): un agente no contesta un ticket que no es suyo.
+         * REGLA DE ASIGNACIÓN al responder. Se la saltan los MANDOS (superadmin y
+         * encargados, que tienen tickets.view_all); los agentes normales la cumplen.
          *  · Asignado a OTRO agente → bloqueado; debe cogérselo primero («Asignármelo»).
          *  · Sin asignar            → se lo AUTOASIGNA al responder (lo coge al contestar).
          */
-        if (!$me->can('tickets.assign')) {
+        if (!$me->can('tickets.view_all')) {
             $asignado = (int) ($t->assigned_to ?? 0);
             if ($asignado === 0) {
                 $this->tickets->assign($id, (int) $me->id, (int) $me->id, notify: false);

@@ -1767,9 +1767,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   const dormido = t?.snoozed_at && (Number(t.snooze_wake_on_reply)
     || (t.snoozed_until && parseDate(t.snoozed_until) > new Date()))
   const masMio = Number(t?.assigned_to) !== Number(user?.id)
-  // Regla: un agente no responde un ticket asignado a OTRO (los que reparten —tickets.assign—
-  // se la saltan). Sin asignar se puede responder (el backend lo autoasigna al enviar).
-  const asignadoAOtro = !can('tickets.assign') && !!t?.assigned_to && Number(t.assigned_to) !== Number(user?.id)
+  // Regla: un agente no responde un ticket asignado a OTRO. Se la saltan los mandos
+  // (superadmin/encargados = tickets.view_all). Sin asignar sí se puede responder (el
+  // backend lo autoasigna al enviar).
+  const asignadoAOtro = !can('tickets.view_all') && !!t?.assigned_to && Number(t.assigned_to) !== Number(user?.id)
 
   // Hilo a pintar: los anteriores cargados + la página del detalle, sin duplicar y por id.
   const mensajes = (() => {
