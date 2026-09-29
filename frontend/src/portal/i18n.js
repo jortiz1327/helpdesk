@@ -76,6 +76,8 @@ export const dict = {
 
     /* ---- Crear ---- */
     err_create: 'No se pudo crear la incidencia',
+    reauth_create: 'Este correo ya está registrado. Entra con tu código para abrir una incidencia (es tu protección: así nadie abre incidencias en tu nombre).',
+    reauth_btn: 'Entrar con mi código',
     created_title: '¡Incidencia creada!',
     created_desc: 'Guarda este número: con él y tu correo puedes seguir su estado cuando quieras.',
     your_ticket_number: 'Tu número de incidencia',
@@ -278,6 +280,8 @@ export const dict = {
     err_bad_code: 'Incorrect code',
 
     err_create: 'The ticket could not be created',
+    reauth_create: 'This email is already registered. Sign in with your code to open a ticket (it protects you: no one can open tickets in your name).',
+    reauth_btn: 'Sign in with my code',
     created_title: 'Ticket created!',
     created_desc: 'Save this number: with it and your email you can track its status anytime.',
     your_ticket_number: 'Your ticket number',
@@ -470,6 +474,8 @@ export const dict = {
     err_bad_code: 'Código incorreto',
 
     err_create: 'Não foi possível criar o chamado',
+    reauth_create: 'Este email já está registado. Entra com o teu código para abrir um chamado (é a tua proteção: assim ninguém abre chamados em teu nome).',
+    reauth_btn: 'Entrar com o meu código',
     created_title: 'Chamado criado!',
     created_desc: 'Guarde este número: com ele e o seu email pode acompanhar o estado quando quiser.',
     your_ticket_number: 'O seu número de chamado',

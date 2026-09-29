@@ -713,6 +713,7 @@ function Crear({ go, prefill, onOpen, onExpire }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [okCode, setOkCode] = useState(null)
+  const [reauth, setReauth] = useState(false)   // el correo ya existe → hay que meter código
   const [copiado, setCopiado] = useState(false)
   const [abiertas, setAbiertas] = useState([])   // incidencias abiertas del cliente (si ya está identificado)
   const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())
@@ -740,11 +741,14 @@ function Crear({ go, prefill, onOpen, onExpire }) {
   useEffect(() => { if (getPass()) portal.me().then((r) => { if (r.ok && r.email) setEmail(r.email) }) }, [])
 
   const enviar = async () => {
-    setBusy(true); setErr('')
+    setBusy(true); setErr(''); setReauth(false)
     const r = await portal.create({ email: email.trim(), phone: phone.trim(), subject, category_id: catId || null, body, files })
     setBusy(false)
-    if (r.reauth) return onExpire()
-    if (r.ok) setOkCode(r.code); else setErr(r.error || t('err_create'))
+    if (r.ok) { setOkCode(r.code); return }
+    // Correo YA registrado: hay que entrar con el código (protección). Antes esto se
+    // tragaba en silencio (onExpire no hacía nada en la vista «crear»); ahora se avisa.
+    if (r.reauth) { setReauth(true); setErr(t('reauth_create')) }
+    else setErr(r.error || t('err_create'))
   }
 
   const copiar = () => {
@@ -827,7 +831,12 @@ function Crear({ go, prefill, onOpen, onExpire }) {
       <div className="f"><span className="lab">{t('attach_label')} <span className="hint" style={{ fontWeight: 400 }}>{t('attach_optional')}</span></span>
         <Adjuntar files={files} setFiles={setFiles} /></div>
 
-      {err && <p className="hint" style={{ color: 'var(--danger)' }}>{err}</p>}
+      {err && <p className="hint" style={{ color: reauth ? 'var(--ink-2)' : 'var(--danger)' }}>{err}</p>}
+      {reauth && (
+        <button className="btn sec" style={{ marginBottom: 10 }} onClick={() => go('mis')}>
+          {I.lock} {t('reauth_btn')}
+        </button>
+      )}
       <button className="btn" disabled={busy || !emailOk || !subject.trim() || body.trim().length < 5} onClick={enviar}>
         {busy ? t('sending') : <>{I.send} {t('send_ticket')}</>}
       </button>
