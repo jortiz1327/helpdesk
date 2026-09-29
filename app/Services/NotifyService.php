@@ -34,10 +34,14 @@ class NotifyService
             $out[mb_strtolower($t->contact_email)] = $t->contact_name;
         }
         if (!empty($r['agent']) && $t->agent_email) {
-            // El aviso de asignación respeta la preferencia del agente (notify_assigned).
-            $bloquea = $tpl->key === 'ticket_assigned'
-                && property_exists($t, 'agent_notify_assigned') && !$t->agent_notify_assigned;
-            if (!$bloquea) $out[mb_strtolower($t->agent_email)] = $t->agent_name;
+            // Cada agente decide qué avisos quiere (preferencias por usuario). Si no viene
+            // la preferencia en $t (otros flujos), se asume que sí la quiere.
+            $pref = match ($tpl->key) {
+                'ticket_assigned' => !property_exists($t, 'agent_notify_assigned') || $t->agent_notify_assigned,
+                'ticket_reply'    => !property_exists($t, 'agent_notify_reply') || $t->agent_notify_reply,
+                default           => true,
+            };
+            if ($pref) $out[mb_strtolower($t->agent_email)] = $t->agent_name;
         }
         // Agentes del ÁREA del ticket (los «miembros del departamento» de osTicket).
         if (!empty($r['category'])) {
@@ -297,7 +301,8 @@ class NotifyService
                 ->leftJoin('users as u', 'u.id', '=', 't.assigned_to')
                 ->where('t.id', $ticketId)
                 ->first(['t.code', 't.subject', 't.status', 'c.name as contact_name', 'c.email as contact_email',
-                         'u.name as agent_name', 'u.email as agent_email', 'u.notify_assigned as agent_notify_assigned']);
+                         'u.name as agent_name', 'u.email as agent_email',
+                         'u.notify_assigned as agent_notify_assigned', 'u.notify_reply as agent_notify_reply']);
             if (!$t) return false;
 
             // ¿A quién se avisa? Lo dice la plantilla (cliente, agente, área, admins).

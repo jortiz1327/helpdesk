@@ -631,6 +631,10 @@ export const api = {
     return res
   },
   logout: async () => { setToken(''); return req('auth.php?action=logout') },
+  // El propio usuario ajusta sus avisos por correo (asignación / respuesta / SLA).
+  saveNotifyPrefs: (prefs) => req('auth.php?action=notify', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(prefs),
+  }),
   changeAccount: async (payload) => {
     const res = await req('auth.php?action=change', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),

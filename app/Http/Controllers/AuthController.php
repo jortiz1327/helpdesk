@@ -30,7 +30,28 @@ class AuthController extends Controller
         if ($action === 'change' && $post) {
             return $this->change($request);
         }
+        if ($action === 'notify' && $post) {
+            return $this->notifyPrefs($request);
+        }
         return response()->json(['error' => 'Acción no válida'], 400);
+    }
+
+    /**
+     * El propio usuario ajusta SUS avisos por correo (asignación / respuesta del cliente
+     * / SLA). Solo requiere estar autenticado (no la contraseña: no es un dato sensible).
+     */
+    protected function notifyPrefs(Request $request)
+    {
+        $token = $request->header('X-App-Token') ?: $request->bearerToken() ?: $request->query('token');
+        $me    = TokenService::verify($token);
+        if (!$me) return response()->json(['error' => 'No autenticado', 'authenticated' => false], 401);
+
+        $me->notify_assigned = $request->boolean('notify_assigned', (bool) $me->notify_assigned);
+        $me->notify_reply    = $request->boolean('notify_reply', (bool) $me->notify_reply);
+        $me->notify_sla      = $request->boolean('notify_sla', (bool) $me->notify_sla);
+        $me->save();
+
+        return response()->json(['ok' => true, 'user' => $this->pub($me)]);
     }
 
     protected function me(Request $request)
@@ -148,6 +169,10 @@ class AuthController extends Controller
             'is_super'    => $u->isSuperAdmin(),
             'permissions' => $u->permissionNames(),
             'modules'     => $u->moduleNames(),
+            // Preferencias de avisos por correo (cada agente decide los suyos).
+            'notify_assigned' => (bool) $u->notify_assigned,
+            'notify_reply'    => (bool) $u->notify_reply,
+            'notify_sla'      => (bool) $u->notify_sla,
         ];
     }
 }

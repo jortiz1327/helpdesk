@@ -1189,7 +1189,7 @@ export default function App() {
                         {view === "organizations" && (
                             <Organizations onVerTickets={(org) => { setOrgFiltro(org); setTicketsTab("tickets"); setView("tickets"); }} />
                         )}
-                        {view === "webpush" && <WebNotifications />}
+                        {view === "webpush" && <WebNotifications user={auth.user} onUser={(u) => setAuth((a) => ({ ...a, user: u }))} />}
                         {view === "analytics" && can("analytics.view") && (
                             <Analytics />
                         )}
