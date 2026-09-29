@@ -121,28 +121,46 @@ function ConfirmDialog({ opts, onClose }) {
 }
 
 const APP_VERSION = "1.1.0";
-// Novedades de la versión actual (se muestran al pulsar «vX.Y.Z» en la barra lateral).
+// Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
-const APP_CHANGELOG = {
-    version: "1.1.0",
-    date: "29 sep 2026",
-    mejoras: [
-        ["Estados nuevos: Planificado y adiós a «Esperando respuesta»", "Estados: Nuevo · Abierto · Planificado · Resuelto · Cerrado. «Esperando respuesta» pasa a un indicador redondo (sin responder «!» / respondido «✓»), y el SLA se pausa solo mientras esperas al cliente."],
-        ["Triaje: ponle prioridad antes de trabajar", "Los tickets entran «sin asignar» de prioridad; hay que dársela antes de responder, anotar o asignar."],
-        ["Un agente solo responde sus tickets", "No puedes contestar un ticket de otro agente (sale «Asignármelo»); si está sin asignar, se autoasigna al responder. Encargados y superadmin se saltan la regla."],
-        ["Al añadir una nota, se ofrece cambiar el estado", "Tras una nota (p. ej. «gestionado por teléfono») puedes marcar el ticket como Resuelto, Planificado o Cerrado."],
-        ["Enlace directo a un ticket", "Cada ticket tiene su URL y un botón «Enlace» para compartirlo; al abrirlo entras directo a ese ticket."],
-        ["Avisos a tu gusto", "Nuevo aviso por correo cuando el cliente responde tu ticket, y cada uno elige desde Notificaciones qué avisos quiere. El nº de avisos se ve en la pestaña y suena una campana."],
-        ["Bandeja: filtros y columnas", "Filtro de categoría múltiple (y siempre muestra los «sin categoría»); columnas de tiempos ocultables; los contadores cuadran con la lista; y puedes salir de una vista pulsándola otra vez."],
-        ["Ficha más clara", "Se ve el asunto arriba de la conversación y el teléfono del cliente (clicable). El cliente puede apuntar su teléfono también desde el portal."],
-        ["Coherencia categoría ↔ agente", "Al asignar o cambiar categoría se propone mover/reasignar para que cuadren; al responder un ticket sin categoría toma la del área del agente."],
-    ],
-    arreglos: [
-        ["El «tomado» no se soltaba al cerrar", "Al resolver/cerrar, el ticket quedaba bloqueado para el resto hasta caducar. Ahora se libera al instante."],
-        ["Las fotos grandes del correo se perdían", "Una foto de móvil (hasta 30 MB) llegaba sin adjuntarse a la incidencia; ahora se guarda."],
-        ["Turnos: se distingue mejor pasado y futuro", "Los días por venir resaltan más, en claro y oscuro."],
-    ],
-};
+const VERSIONS = [
+    {
+        version: "1.1.0",
+        date: "29 sep 2026",
+        resumen: "Nuevos estados, reglas de trabajo, avisos a tu gusto y una bandeja más cómoda.",
+        mejoras: [
+            "Estados más claros, con «Planificado» para lo que va a días o semanas.",
+            "Cada agente responde solo sus tickets; los libres se cogen al contestar.",
+            "Al dejar una nota, puedes cerrar o resolver el ticket de paso.",
+            "Enlace para compartir un ticket y abrirlo directo.",
+            "Elige qué avisos por correo quieres; el nº de avisos sale en la pestaña y suena una campana.",
+            "Filtros de la bandeja más potentes (varias categorías a la vez) y más limpios.",
+            "En la ficha se ve el asunto y el teléfono del cliente; también puede dejarlo desde el portal.",
+        ],
+        arreglos: [
+            "El ticket se libera para el resto en cuanto lo cierras.",
+            "Las fotos grandes del correo ya llegan a la incidencia.",
+            "Los turnos distinguen mejor los días pasados de los futuros.",
+        ],
+    },
+    {
+        version: "1.0.1",
+        date: "11 sep 2026",
+        resumen: "Mejoras en la bandeja y en las notificaciones.",
+        mejoras: [
+            "La ⭐ de respuestas efectivas funciona como interruptor.",
+            "Aviso «te han mencionado» en la bandeja.",
+            "Los avisos del navegador abren el ticket directamente.",
+            "Los agentes ya pueden editar contactos.",
+        ],
+        arreglos: [
+            "Notificaciones que no abrían el ticket.",
+            "Orden por última actividad en el histórico.",
+            "Nombres de contacto que salían en código raro.",
+        ],
+    },
+];
+const APP_CHANGELOG = VERSIONS[0];
 
 /*
  * La plataforma tiene dos ÁREAS: Helpdesk y Campañas. El superadmin puede cambiar
@@ -467,37 +485,52 @@ function VersionModal({ onClose }) {
         document.addEventListener("keydown", h);
         return () => document.removeEventListener("keydown", h);
     }, [onClose]);
-    const c = APP_CHANGELOG;
+    const [hist, setHist] = useState(false);
+    const cur = VERSIONS[0];
+    const previas = VERSIONS.slice(1);
+    const secciones = (v) => (
+        <>
+            {v.mejoras?.length > 0 && (
+                <section>
+                    <h4 className="ver-sec mejoras">Novedades</h4>
+                    <ul>{v.mejoras.map((it, i) => <li key={i}>{it}</li>)}</ul>
+                </section>
+            )}
+            {v.arreglos?.length > 0 && (
+                <section>
+                    <h4 className="ver-sec arreglos">Arreglos</h4>
+                    <ul>{v.arreglos.map((it, i) => <li key={i}>{it}</li>)}</ul>
+                </section>
+            )}
+        </>
+    );
     return (
         <div className="modal-bg" onClick={(e) => e.target.classList.contains("modal-bg") && onClose()}>
             <div className="modal ver-modal">
                 <div className="ver-modal-h">
                     <div>
                         <h3>Novedades</h3>
-                        <span className="ver-modal-sub">v{c.version} · {c.date}</span>
+                        <span className="ver-modal-sub">v{cur.version} · {cur.date}</span>
                     </div>
                     <button className="ver-modal-x" onClick={onClose} aria-label="Cerrar">✕</button>
                 </div>
                 <div className="ver-modal-body">
-                    {c.mejoras?.length > 0 && (
-                        <section>
-                            <h4 className="ver-sec mejoras">Mejoras</h4>
-                            <ul>
-                                {c.mejoras.map(([t, d], i) => (
-                                    <li key={i}><b>{t}</b><span>{d}</span></li>
-                                ))}
-                            </ul>
-                        </section>
-                    )}
-                    {c.arreglos?.length > 0 && (
-                        <section>
-                            <h4 className="ver-sec arreglos">Arreglos</h4>
-                            <ul>
-                                {c.arreglos.map(([t, d], i) => (
-                                    <li key={i}><b>{t}</b><span>{d}</span></li>
-                                ))}
-                            </ul>
-                        </section>
+                    {cur.resumen && <p className="ver-resumen">{cur.resumen}</p>}
+                    {secciones(cur)}
+
+                    {previas.length > 0 && (
+                        <div className="ver-hist">
+                            <button className="ver-hist-btn" onClick={() => setHist((h) => !h)}>
+                                <Icon.chevron style={{ transform: hist ? "rotate(90deg)" : "none" }} />
+                                {hist ? "Ocultar versiones anteriores" : "Ver versiones anteriores"}
+                            </button>
+                            {hist && previas.map((v) => (
+                                <div className="ver-old" key={v.version}>
+                                    <div className="ver-old-h"><b>v{v.version}</b><span>{v.date}</span></div>
+                                    {secciones(v)}
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
                 <div className="ver-modal-foot">

@@ -216,11 +216,23 @@ input, textarea, select { font-family: inherit; }
 .ver-sec.mejoras { color: var(--primary); }
 .ver-sec.arreglos { color: var(--ok, #16a34a); }
 .ver-sec::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.ver-modal-body ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.ver-modal-body li { display: flex; flex-direction: column; gap: 2px; }
-.ver-modal-body li b { font-size: 13.5px; color: var(--ink-1); }
-.ver-modal-body li span { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.ver-modal-body ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ver-modal-body li { position: relative; padding-left: 17px; font-size: 13px; color: var(--ink-1); line-height: 1.45; }
+.ver-modal-body li::before { content: ""; position: absolute; left: 3px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--ink-3); }
+.ver-resumen { font-size: 13px; color: var(--ink-2); margin: 0 0 14px; line-height: 1.5; }
 .ver-modal-foot { padding: 8px 22px 20px; display: flex; justify-content: flex-end; }
+
+/* Historial de versiones anteriores (botón desplegable + tarjetas por versión). */
+.ver-hist { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.ver-hist-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; color: var(--primary); font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; padding: 4px 0; }
+.ver-hist-btn svg { width: 14px; height: 14px; fill: currentColor; transition: transform 0.15s; }
+.ver-old { margin-top: 12px; padding: 12px 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; }
+.ver-old-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.ver-old-h b { font-size: 14px; }
+.ver-old-h span { font-size: 11.5px; color: var(--ink-3); }
+.ver-old section { margin-bottom: 10px; }
+.ver-old section:last-child { margin-bottom: 0; }
+.ver-old .ver-sec { font-size: 10.5px; }
 
 /* ===== Main + Topbar ===== */
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
