@@ -869,8 +869,12 @@ class TicketsController extends Controller
         // En un refresco de FONDO (bg=1: sondeo o mensaje entrante) NO se toma/renueva el
         // candado, solo se informa; así un agente ausente lo deja caducar. Al ABRIR de
         // verdad (sin bg) sí se toma. Renovarlo por actividad lo hace el «heartbeat».
+        // Un ticket RESUELTO/CERRADO no se «toma»: nadie lo está atendiendo, así que solo
+        // se informa (nunca se adquiere). Si no, al cerrarlo el propio load() volvería a
+        // bloquearlo y quedaría «tomado» para el resto hasta caducar.
         $lockSvc = app(TicketLockService::class);
-        $lock = $request->boolean('bg')
+        $cerrado = in_array($t->status, ['resuelto', 'cerrado'], true);
+        $lock = ($request->boolean('bg') || $cerrado)
             ? $lockSvc->status($id, (int) $me->id)
             : $lockSvc->acquire($id, (int) $me->id);
 

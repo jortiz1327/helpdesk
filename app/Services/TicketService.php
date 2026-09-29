@@ -259,6 +259,14 @@ class TicketService
         if ($status === 'resuelto') $upd['resolved_at'] = now();
         if ($status === 'cerrado')  $upd['closed_at'] = now();
 
+        // Al resolver/cerrar se SUELTA el candado de colisión («tomado»): un ticket
+        // cerrado no lo está atendiendo nadie, así que no debe quedar bloqueado para el
+        // resto hasta que caduque solo. (Al reabrir, se coge de nuevo al abrir la ficha.)
+        if (in_array($status, ['resuelto', 'cerrado'], true)) {
+            $upd['locked_by'] = null;
+            $upd['locked_at'] = null;
+        }
+
         /*
          * Si un ticket resuelto o cerrado se REABRE, hay que borrar la marca de
          * cumplimiento: si no, el reloj de resolución se quedaría dado por bueno
