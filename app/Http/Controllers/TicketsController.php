@@ -1044,11 +1044,29 @@ class TicketsController extends Controller
         $data = $request->validate(['id' => ['required', 'integer']], ['id.required' => 'Falta el ticket']);
         $id = (int) $data['id'];
         $t  = (clone $this->baseQuery($me))->where('t.id', $id)
-            ->first(['t.id', 't.code', 't.subject', 't.channel', 't.status', 't.contact_id',
+            ->first(['t.id', 't.code', 't.subject', 't.channel', 't.status', 't.contact_id', 't.assigned_to',
                      'c.email as contact_email', 'c.name as contact_name', 'c.wa_id as contact_wa',
                      'cat.signature as cat_signature', 'cat.name as category_name']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
         if ($bloqueo = $this->exigePrioridad($id)) return $bloqueo;   // triaje: prioridad primero
+
+        /*
+         * REGLA DE ASIGNACIÓN al responder (los que reparten —tickets.assign: encargados y
+         * superadmin— se la saltan): un agente no contesta un ticket que no es suyo.
+         *  · Asignado a OTRO agente → bloqueado; debe cogérselo primero («Asignármelo»).
+         *  · Sin asignar            → se lo AUTOASIGNA al responder (lo coge al contestar).
+         */
+        if (!$me->can('tickets.assign')) {
+            $asignado = (int) ($t->assigned_to ?? 0);
+            if ($asignado === 0) {
+                $this->tickets->assign($id, (int) $me->id, (int) $me->id, notify: false);
+                $t->assigned_to = (int) $me->id;
+            } elseif ($asignado !== (int) $me->id) {
+                $otro = DB::table('users')->where('id', $asignado)->value('name') ?: 'otro agente';
+                return response()->json(['ok' => false, 'needs_assign' => true,
+                    'error' => "Este ticket lo tiene {$otro}. Asígnatelo para poder responder."], 403);
+            }
+        }
 
         // Bloqueo: evita que dos agentes respondan a la vez al mismo cliente.
         if ($quien = app(TicketLockService::class)->blockedBy((int) $t->id, (int) $me->id)) {

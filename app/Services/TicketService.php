@@ -401,8 +401,12 @@ class TicketService
         }
     }
 
-    /** Asigna el ticket a un usuario de soporte (o lo deja sin asignar con null). */
-    public function assign(int $ticketId, ?int $assignee, ?int $userId = null): void
+    /**
+     * Asigna el ticket a un usuario de soporte (o lo deja sin asignar con null).
+     * $notify=false silencia el aviso: lo usa la AUTOASIGNACIÓN al responder (no tiene
+     * sentido avisarte de que te has asignado tú al contestar).
+     */
+    public function assign(int $ticketId, ?int $assignee, ?int $userId = null, bool $notify = true): void
     {
         $cur = DB::table('tickets')->where('id', $ticketId)->value('assigned_to');
         if ((int) $cur === (int) $assignee) return;
@@ -412,7 +416,7 @@ class TicketService
         $this->broadcast('assigned', $ticketId, $assignee);
 
         // Solo cuando se asigna a alguien (al desasignar no hay a quién avisar).
-        if ($assignee) {
+        if ($assignee && $notify) {
             app(NotifyService::class)->ticket('ticket_assigned', $ticketId);   // correo
             // Aviso in-app al nuevo responsable (push se salta si se autoasignó).
             $inf    = DB::table('tickets')->where('id', $ticketId)->first(['code', 'subject']);

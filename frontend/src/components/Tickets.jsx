@@ -1767,6 +1767,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   const dormido = t?.snoozed_at && (Number(t.snooze_wake_on_reply)
     || (t.snoozed_until && parseDate(t.snoozed_until) > new Date()))
   const masMio = Number(t?.assigned_to) !== Number(user?.id)
+  // Regla: un agente no responde un ticket asignado a OTRO (los que reparten —tickets.assign—
+  // se la saltan). Sin asignar se puede responder (el backend lo autoasigna al enviar).
+  const asignadoAOtro = !can('tickets.assign') && !!t?.assigned_to && Number(t.assigned_to) !== Number(user?.id)
 
   // Hilo a pintar: los anteriores cargados + la página del detalle, sin duplicar y por id.
   const mensajes = (() => {
@@ -2228,8 +2231,20 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                 </div>
               )}
 
+              {/* Asignado a OTRO agente: no puedes responder hasta cogértelo. */}
+              {view === 'chat' && !t.merged_into_id && t.priority !== 'sin_asignar' && asignadoAOtro && (
+                <div className="tk-triaje">
+                  <Icon.lock />
+                  <div>
+                    <b>Este ticket lo tiene {t.agent_name || 'otro agente'}</b>
+                    <small>Para responder o añadir notas, asígnatelo primero.</small>
+                  </div>
+                  <button className="btn sm" onClick={() => assign(String(user.id))}>Asignármelo</button>
+                </div>
+              )}
+
               {/* El editor solo en la conversación (no en el historial). */}
-              {view === 'chat' && !t.merged_into_id && t.priority !== 'sin_asignar' && (
+              {view === 'chat' && !t.merged_into_id && t.priority !== 'sin_asignar' && !asignadoAOtro && (
                 <Composer
                   // Remonta al cambiar de ticket (si no, el borrador del anterior se
                   // quedaba en pantalla al saltar sin cerrar el modal) y al «Editar» una
