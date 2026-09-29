@@ -245,7 +245,15 @@ class TicketsController extends Controller
      * Aplica al query `$q` (ya con baseQuery) TODOS los filtros de la bandeja según
      * la petición. Vive aparte para que la LISTA y el EXPORT filtren idéntico.
      */
-    protected function aplicarFiltros($q, Request $request, $me): void
+    /**
+     * @param bool $soloEstructural Si true, aplica SOLO los filtros «estructurales»
+     *   (búsqueda, categoría, prioridad, canal, contacto, organización, etiqueta) y NO
+     *   las dimensiones de las vistas rápidas (estado/asignado/sin-responder/SLA/pospuesto).
+     *   Lo usan los CONTADORES: así el número de arriba se ciñe al mismo alcance que la
+     *   lista (una vista de «categoría soporte» cuenta solo tickets de soporte), pero
+     *   sigue desglosando por Activos/Sin responder/Míos/… por su cuenta.
+     */
+    protected function aplicarFiltros($q, Request $request, $me, bool $soloEstructural = false): void
     {
         $s = trim((string) $request->query('q', ''));
         $donde = $request->query('search_in') === 'messages' ? 'messages' : 'ficha';
@@ -292,11 +300,14 @@ class TicketsController extends Controller
             });
         }
         // «Abiertos» agrupa todos los estados vivos: es el filtro por defecto de la cola.
+        // (Dimensión de vista rápida: los contadores no la aplican, desglosan ellos.)
         $status = $request->query('status', 'open');
-        if ($status === 'open') {
-            $q->whereIn('t.status', TicketService::OPEN_STATUSES);
-        } elseif ($status !== '' && $status !== 'all') {
-            $q->where('t.status', $status);
+        if (!$soloEstructural) {
+            if ($status === 'open') {
+                $q->whereIn('t.status', TicketService::OPEN_STATUSES);
+            } elseif ($status !== '' && $status !== 'all') {
+                $q->where('t.status', $status);
+            }
         }
 
         foreach ([
@@ -308,7 +319,7 @@ class TicketsController extends Controller
         ] as $param => $col) {
             if (($v = $request->query($param, '')) !== '' && $v !== 'all') $q->where($col, $v);
         }
-        if (($a = $request->query('assigned', '')) !== '' && $a !== 'all') {
+        if (!$soloEstructural && ($a = $request->query('assigned', '')) !== '' && $a !== 'all') {
             match (true) {
                 $a === 'me'   => $q->where('t.assigned_to', $me->id),
                 $a === 'none' => $q->whereNull('t.assigned_to'),
@@ -324,7 +335,7 @@ class TicketsController extends Controller
             });
         }
 
-        if ($request->query('sla') === 'late' && SlaService::activo()) {
+        if (!$soloEstructural && $request->query('sla') === 'late' && SlaService::activo()) {
             $q->whereIn('t.status', TicketService::OPEN_STATUSES)
               ->whereNull('t.sla_paused_since')   // en pausa ≠ vencido (reloj parado)
               ->where(function ($w) {
@@ -334,10 +345,12 @@ class TicketsController extends Controller
               });
         }
 
-        if (($r = $request->query('reply', '')) === 'pending') {
-            $q->where('t.last_direction', 'in');
-        } elseif ($r === 'answered') {
-            $q->where('t.last_direction', 'out');
+        if (!$soloEstructural) {
+            if (($r = $request->query('reply', '')) === 'pending') {
+                $q->where('t.last_direction', 'in');
+            } elseif ($r === 'answered') {
+                $q->where('t.last_direction', 'out');
+            }
         }
 
         /*
@@ -346,11 +359,15 @@ class TicketsController extends Controller
          * ocultado por defecto se aplica solo a la cola diaria («Abiertos») y cuando no
          * hay búsqueda: así buscar por código/texto sí encuentra un ticket dormido.
          */
-        $snz = $request->query('snoozed', '');
-        if ($snz === 'only') {
-            $q->whereNotNull('t.snoozed_at')->whereRaw('NOT ' . self::SQL_DESPIERTO);
-        } elseif ($snz !== 'all' && $status === 'open' && $s === '') {
-            $q->whereRaw(self::SQL_DESPIERTO);
+        // Los contadores NO filtran por pospuestos: su propia consulta separa
+        // despiertos/dormidos (SUM condicional), así que se salta en modo estructural.
+        if (!$soloEstructural) {
+            $snz = $request->query('snoozed', '');
+            if ($snz === 'only') {
+                $q->whereNotNull('t.snoozed_at')->whereRaw('NOT ' . self::SQL_DESPIERTO);
+            } elseif ($snz !== 'all' && $status === 'open' && $s === '') {
+                $q->whereRaw(self::SQL_DESPIERTO);
+            }
         }
     }
 
@@ -476,7 +493,7 @@ class TicketsController extends Controller
             'ok'        => true,
             'tickets'   => $rows,
             'can_times' => $canTimes,
-            'counts'    => $this->counts($me),
+            'counts'    => $this->countsScoped($me, $request),
             'page'      => $pagina,
             'per_page'  => $porPagina,
             'total'     => $total,
@@ -551,7 +568,30 @@ class TicketsController extends Controller
         return Cache::remember(TicketCounters::key((int) $me->id), 15, fn () => $this->calcularCounts($me));
     }
 
-    protected function calcularCounts(User $me): array
+    /**
+     * Contadores CIÑÉNDOSE a los filtros estructurales de la petición (categoría, vista
+     * guardada…). Así el número de arriba coincide con lo que muestra la lista. Sin caché
+     * global cuando hay filtro: es un subconjunto (más barato) y depende de cada filtro;
+     * la caché de 15 s se reserva para el caso sin filtros (el barrido caro de ~50k).
+     */
+    protected function countsScoped(User $me, Request $request): array
+    {
+        if (!$this->hayFiltroEstructural($request)) return $this->counts($me);
+        return $this->calcularCounts($me, $request);
+    }
+
+    /** ¿La petición trae algún filtro estructural (no de vista rápida)? */
+    protected function hayFiltroEstructural(Request $request): bool
+    {
+        if (trim((string) $request->query('q', '')) !== '') return true;
+        foreach (['category', 'priority', 'channel', 'contact', 'contact_email', 'org'] as $p) {
+            $v = $request->query($p, '');
+            if ($v !== '' && $v !== 'all') return true;
+        }
+        return (int) $request->query('label', 0) > 0;
+    }
+
+    protected function calcularCounts(User $me, ?Request $request = null): array
     {
         // «Despierto» = NO dormido. Un ticket pospuesto está fuera de tu plato: no cuenta
         // en Activos/Pendientes/Míos/Sin asignar (igual que sale de la cola por defecto).
@@ -576,7 +616,16 @@ class TicketsController extends Controller
          * «Pendientes» ya no calcula quién habló el último: lo lee de la columna
          * `last_direction` del ticket. Era, de largo, el contador más caro.
          */
-        $r = $this->countQuery($me)->selectRaw(
+        $q = $this->countQuery($me);
+        // Si viene con filtros estructurales (categoría, vista guardada…), se aplican para
+        // que los contadores cuadren con la lista; las dimensiones de vista rápida NO.
+        if ($request) {
+            // El filtro por organización y por correo del contacto usan la tabla contacts;
+            // countQuery no la une (los contadores globales no la necesitan). Es 1:1, no infla.
+            $q->leftJoin('contacts as c', 'c.id', '=', 't.contact_id');
+            $this->aplicarFiltros($q, $request, $me, true);
+        }
+        $r = $q->selectRaw(
             "SUM($abiertos) AS activos,
              SUM($abiertos AND t.last_direction = 'in') AS pendientes,
              SUM($abiertos AND t.assigned_to = ?) AS mios,

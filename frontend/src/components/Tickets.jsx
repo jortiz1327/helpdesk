@@ -692,7 +692,12 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   // se ignoran valores corruptos (null/'null'/undefined, que el backend traduce a un
   // filtro que no casa con nada → 0 resultados) y el BUSCADOR (q/search_in), que es
   // transitorio y no debe formar parte de una vista guardada.
+  // Activa si el filtro actual coincide con TODAS las claves guardadas de la vista.
+  const vistaGuardadaOn = (v) => Object.entries(v.filters || {}).every(([k, val]) => String(f[k] ?? '') === String(val ?? ''))
   const aplicarVista = (v) => {
+    // Toggle: si la vista YA está aplicada, se SALE de ella (vuelve a «todos los activos»,
+    // sin recargar la página). Volver a pulsarla la reactiva.
+    if (vistaGuardadaOn(v)) { setF({ ...BASE_F }); return }
     const clean = { ...BASE_F }
     for (const [k, val] of Object.entries(v.filters || {})) {
       if (val === null || val === undefined || val === 'null') continue
@@ -701,8 +706,6 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
     }
     setF(clean)
   }
-  // Activa si el filtro actual coincide con TODAS las claves guardadas de la vista.
-  const vistaGuardadaOn = (v) => Object.entries(v.filters || {}).every(([k, val]) => String(f[k] ?? '') === String(val ?? ''))
   const guardarVista = async () => {
     const nombre = newName.trim()
     if (!nombre) return
@@ -863,7 +866,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             {/* Vistas guardadas: personales + COMPARTIDAS del equipo (marcadas con 👥). */}
             {savedViews.map((v) => (
               <button key={`sv${v.id}`} className={`tkv sv ${v.shared ? 'team' : ''} ${vistaGuardadaOn(v) ? 'on' : ''}`} style={{ '--sv': v.color }}
-                onClick={() => aplicarVista(v)} title={v.shared ? 'Vista del equipo' : 'Vista guardada'}>
+                onClick={() => aplicarVista(v)} title={vistaGuardadaOn(v) ? 'Vista activa · pulsa para salir' : (v.shared ? 'Vista del equipo' : 'Vista guardada')}>
                 {v.shared ? <span className="tkv-team" aria-label="Vista del equipo">👥</span> : <span className="tkv-dot" />}
                 {v.name}
                 {(!v.shared || canShare) && (
