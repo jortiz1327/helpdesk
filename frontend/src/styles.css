@@ -1872,8 +1872,12 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 /* Vista COMPACTA: menos aire para barrer más cola de un vistazo (toggle Cómoda/Compacta). */
 .tk-table.compact th { padding: 7px 9px; }
 .tk-table.compact td { padding: 5px 9px; font-size: 12.5px; }
-.tk-table.compact .tk-cli small,
-.tk-table.compact .tk-row-tags { display: none; }   /* en compacta, lo secundario se calla */
+.tk-table.compact .tk-cli small { display: none; }   /* en compacta, el correo del contacto se calla */
+/* Las etiquetas SÍ se ven en compacta (útil saber si es Hoteles, Tiendas…), pero más
+   bajitas: fuente y relleno menores y menos margen para no engordar la fila. */
+.tk-table.compact .tk-row-tags { margin-top: 2px; gap: 4px; }
+.tk-table.compact .tk-tag { font-size: 10px; padding: 0 6px; gap: 4px; line-height: 15px; }
+.tk-table.compact .tk-tag-dot { width: 6px; height: 6px; }
 
 /* Presencia: «alguien está viendo este ticket ahora». */
 .tk-view-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px;
