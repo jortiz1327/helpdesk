@@ -120,22 +120,27 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.1.0";
 // Novedades de la versión actual (se muestran al pulsar «vX.Y.Z» en la barra lateral).
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const APP_CHANGELOG = {
-    version: "1.0.1",
-    date: "11 sep 2026",
+    version: "1.1.0",
+    date: "29 sep 2026",
     mejoras: [
-        ["Respuestas efectivas: la ⭐ es un interruptor", "Guarda y quita una respuesta buena de la memoria; se ve rellena cuando está guardada y mantiene el estado al recargar."],
-        ["«Te han mencionado» en la bandeja", "Si te @mencionan en una nota interna y aún no has abierto el ticket, su fila lo avisa. Al abrirlo, el aviso desaparece."],
-        ["Los avisos del navegador abren el ticket", "Al pulsar un aviso de escritorio (respuesta, ticket nuevo, asignación) se abre ese ticket, no solo la lista."],
-        ["Los agentes pueden editar contactos", "El rol Agente ya puede editar la ficha de un contacto (nombre, correo, teléfono…), antes solo los encargados."],
+        ["Estados nuevos: Planificado y adiós a «Esperando respuesta»", "Estados: Nuevo · Abierto · Planificado · Resuelto · Cerrado. «Esperando respuesta» pasa a un indicador redondo (sin responder «!» / respondido «✓»), y el SLA se pausa solo mientras esperas al cliente."],
+        ["Triaje: ponle prioridad antes de trabajar", "Los tickets entran «sin asignar» de prioridad; hay que dársela antes de responder, anotar o asignar."],
+        ["Un agente solo responde sus tickets", "No puedes contestar un ticket de otro agente (sale «Asignármelo»); si está sin asignar, se autoasigna al responder. Encargados y superadmin se saltan la regla."],
+        ["Al añadir una nota, se ofrece cambiar el estado", "Tras una nota (p. ej. «gestionado por teléfono») puedes marcar el ticket como Resuelto, Planificado o Cerrado."],
+        ["Enlace directo a un ticket", "Cada ticket tiene su URL y un botón «Enlace» para compartirlo; al abrirlo entras directo a ese ticket."],
+        ["Avisos a tu gusto", "Nuevo aviso por correo cuando el cliente responde tu ticket, y cada uno elige desde Notificaciones qué avisos quiere. El nº de avisos se ve en la pestaña y suena una campana."],
+        ["Bandeja: filtros y columnas", "Filtro de categoría múltiple (y siempre muestra los «sin categoría»); columnas de tiempos ocultables; los contadores cuadran con la lista; y puedes salir de una vista pulsándola otra vez."],
+        ["Ficha más clara", "Se ve el asunto arriba de la conversación y el teléfono del cliente (clicable). El cliente puede apuntar su teléfono también desde el portal."],
+        ["Coherencia categoría ↔ agente", "Al asignar o cambiar categoría se propone mover/reasignar para que cuadren; al responder un ticket sin categoría toma la del área del agente."],
     ],
     arreglos: [
-        ["Notificaciones que no abrían el ticket", "Estando ya en la bandeja, pulsar una notificación no abría el ticket. Corregido."],
-        ["Orden por última actividad (histórico de Faveo)", "Un ticket antiguo con respuesta reciente no subía en la bandeja. Ahora se ordena por el último mensaje real."],
-        ["Nombres de contacto en código raro", "Nombres que llegaban como «=?utf-8?…» ahora se ven bien."],
+        ["El «tomado» no se soltaba al cerrar", "Al resolver/cerrar, el ticket quedaba bloqueado para el resto hasta caducar. Ahora se libera al instante."],
+        ["Las fotos grandes del correo se perdían", "Una foto de móvil (hasta 30 MB) llegaba sin adjuntarse a la incidencia; ahora se guarda."],
+        ["Turnos: se distingue mejor pasado y futuro", "Los días por venir resaltan más, en claro y oscuro."],
     ],
 };
 

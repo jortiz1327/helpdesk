@@ -3,60 +3,68 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
-## [Sin publicar]
+## [1.1.0] — 2026-09-29
 
 ### Mejoras
 
 - **Estados nuevos: Nuevo · Abierto · Planificado · Resuelto · Cerrado.** «Planificado»
   para peticiones que se gestionan a días/semanas (activo, pero sin que corra el SLA).
-  «Esperando respuesta» deja de ser estado y pasa a un indicador redondo en la columna
-  de estado (amarillo «!» sin responder · verde «✓» respondido). El reloj del SLA se
-  pausa solo mientras esperas al cliente.
+  Se retira «En progreso» (se fusiona en «Abierto»). «Esperando respuesta» deja de ser
+  estado y pasa a un indicador redondo en la columna de estado (amarillo «!» sin
+  responder · verde «✓» respondido; punto de color en vista compacta). El reloj del SLA
+  se **pausa solo** mientras esperas al cliente, y cuando el cliente responde el ticket
+  vuelve a «Abierto».
 
-- **Filtro de categoría múltiple.** Se pueden elegir varias categorías a la vez (útil
-  para quien lleva varias áreas). Al filtrar por categoría se muestran siempre también
-  los tickets **sin categoría** (los nuevos sin gestionar), para que no se escapen.
+- **Triaje antes de trabajar.** Los tickets entran con prioridad «sin asignar» y no se
+  pueden responder, anotar ni asignar hasta ponerles una prioridad.
 
-- **Columnas de tiempos ocultas por defecto.** Los tiempos de atención y resolución no
-  se muestran salvo que pulses «Tiempos» en la barra (se recuerda por usuario). La
-  bandeja queda más limpia para el día a día.
+- **Un agente solo responde sus tickets.** No se puede contestar un ticket asignado a
+  otro agente (sale un botón «Asignármelo»); si está sin asignar, se autoasigna al
+  responder. Superadmin y encargados se saltan la regla.
 
-- **La bandeja: los contadores cuadran con la lista, y se puede salir de una vista.**
-  Los números de arriba (Activos, Sin responder, Míos…) se calculaban sobre TODO lo
-  visible e ignoraban el filtro aplicado (categoría, vista guardada), así que no
-  coincidían con lo que mostraba la lista. Ahora se ciñen a los mismos filtros. Y
-  pulsar una vista guardada que ya está activa **sale** de ella (vuelve a todos los
-  activos) sin recargar; volver a pulsarla la reactiva.
+- **Al añadir una nota, se ofrece cambiar el estado** (Resuelto, Planificado o Cerrado)
+  — p. ej. una nota «gestionado por teléfono».
 
-- **Aviso al agente cuando el cliente responde.** Nueva plantilla *«Respuesta del
-  cliente»* (Configuración → Avisos automáticos): cuando el cliente contesta —por
-  correo o por el portal— un ticket con agente asignado, ese agente recibe el aviso
-  con botón «Abrir el ticket».
+- **Coherencia entre categoría y agente.** Las «áreas» de un agente son las categorías
+  que atiende. Al asignar a un agente de varias áreas cuya categoría no coincide, se
+  pregunta a cuál mover; al cambiar la categoría a una que el asignado no lleva, se
+  ofrece reasignar o quitar la asignación. Y al responder un ticket sin categoría, toma
+  la del área del agente.
 
-- **Coherencia entre categoría y agente.** Las «áreas» de un agente son las
-  categorías que atiende. Al asignar un ticket a un agente de **varias** áreas cuya
-  categoría no coincide con ninguna, un modal pregunta a cuál moverlo. Y al cambiar
-  la categoría a una que el agente asignado no lleva, se ofrece reasignar a alguien
-  de esa área, quitar la asignación o dejarlo. Nunca obliga.
+- **Enlace directo a un ticket.** Cada ticket tiene una URL que lo abre y un botón
+  «Enlace» para copiarla; con un ticket abierto la barra del navegador ya lo refleja.
 
-- **Enlace directo a un ticket.** Cada ticket tiene una URL que lo abre:
-  `https://soporte.aemegroup.com/agentes/tickets/TK-2609-0063`. Si se la pasas a un
-  agente y la abre, se le abre ese ticket (respetando su visibilidad; si no existe
-  o no puede verlo, se le avisa). Con un ticket abierto la barra del navegador ya
-  muestra su código, y en la ficha hay un botón **«Enlace»** que lo copia.
-- **Triaje antes de trabajar.** Los tickets entran con prioridad «sin asignar» y
-  no se pueden responder, anotar ni asignar hasta ponerles una prioridad.
-- **Flujo de estados más simple.** Se retira «En progreso» (se fusiona en
-  «Abierto»). Al responder, se ofrece marcar «Esperando respuesta»; cuando el
-  cliente contesta, el ticket vuelve a «Abierto». Los tickets sin contestar llevan
-  una marca «Sin responder» bien visible.
-- **Fecha en cada mensaje del chat.** Junto a la hora se muestra el día
-  («19:58 - lunes 14/09/26»), y la hora y la estrella de «respuesta efectiva» se
-  ven mejor en modo claro y oscuro.
-- **«Parecidas» con vista previa.** Al pasar el ratón por una respuesta sugerida
-  se ve su texto completo en un tooltip.
+- **Avisos personalizables por usuario.** Nuevo aviso «Respuesta del cliente» (correo al
+  agente cuando el cliente contesta, con botón «Abrir el ticket»), y cada agente elige
+  desde Notificaciones qué avisos por correo quiere recibir.
+
+- **Notificaciones más visibles.** El número de avisos aparece sobre el favicon de la
+  pestaña, y el sonido de aviso es una campana más fuerte (aún más y repetida con la
+  ventana oculta).
+
+- **Bandeja: filtros y columnas.** Filtro de categoría **múltiple** (y siempre muestra
+  los «sin categoría»); las columnas de tiempos nacen ocultas (botón «Tiempos»); los
+  contadores de arriba cuadran con la lista al usar una vista/categoría; y se puede
+  **salir de una vista** pulsándola otra vez.
+
+- **Ficha del ticket más clara.** Se ve el **asunto** arriba de la conversación y el
+  **teléfono** del cliente (clicable). El cliente puede apuntar su teléfono también
+  desde el portal.
+
+- **Turnos: se distinguen mejor pasado y futuro** (los días por venir resaltan), en
+  claro y oscuro. Etiquetas de cliente visibles también en la vista compacta.
+
+- **Fecha en cada mensaje del chat** («19:58 - lunes 14/09/26»), hora y estrella más
+  legibles, y vista previa del texto completo en «Parecidas».
+
+- **Contactos.** La lista de Campañas muestra solo contactos de WhatsApp y enseña la
+  empresa/tienda. La plantilla de muestra «hello_world» de WhatsApp ya no aparece.
 
 ### Arreglos
+
+- **El estado «tomado» no se soltaba al cerrar un ticket.** Al resolver/cerrar, el ticket
+  quedaba bloqueado («lo está atendiendo X») para el resto hasta que caducaba solo. Ahora
+  se libera al instante, y abrir un ticket cerrado ya no lo vuelve a bloquear.
 
 - **Las fotos grandes de los clientes no llegaban a la incidencia.**
   Un correo con una foto de móvil (15-20 MB) creaba el ticket pero **sin la
