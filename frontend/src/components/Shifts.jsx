@@ -175,7 +175,7 @@ export default function Shifts() {
           {Array.from({ length: hueco }, (_, i) => <div key={'h' + i} className="cal-hueco" />)}
 
           {d.days.map((x) => (
-            <button key={x.date} className={`cal-dia ${x.today ? 'hoy' : ''} ${x.past ? 'pasado' : ''} ${x.holiday_id ? 'festivo' : ''} ${x.note ? 'con-nota' : ''}`}
+            <button key={x.date} className={`cal-dia ${x.today ? 'hoy' : ''} ${x.past ? 'pasado' : ''} ${!x.past && !x.today ? 'futuro' : ''} ${x.holiday_id ? 'festivo' : ''} ${x.note ? 'con-nota' : ''}`}
               onClick={() => setDia(x)} title={x.note || undefined}>
               <div className="cal-dia-h">
                 <b>{x.day}</b>
@@ -302,7 +302,7 @@ function Listado({ d, onDia }) {
               <div className="tn-l-dias" title="Pincha un día para verlo o cambiarlo">
                 {s.dias.map((x) => (
                   <button key={x.date} onClick={() => onDia(x)}
-                    className={`tn-l-d ${x.today ? 'hoy' : ''} ${x.past ? 'pasado' : ''} ${x.holiday_id ? 'fest' : ''}`}
+                    className={`tn-l-d ${x.today ? 'hoy' : ''} ${x.past ? 'pasado' : ''} ${!x.past && !x.today ? 'futuro' : ''} ${x.holiday_id ? 'fest' : ''}`}
                     title={[x.holiday_id && `Festivo${x.holiday ? ': ' + x.holiday : ''}`, x.note].filter(Boolean).join(' · ') || undefined}>
                     <i>{INIC[x.dow - 1]}</i><b>{x.day}</b>
                     <span className="tn-l-marcas">
