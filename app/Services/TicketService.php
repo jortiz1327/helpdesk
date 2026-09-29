@@ -17,7 +17,7 @@ class TicketService
     public const STATUSES = [
         'nuevo'               => 'Nuevo',
         'abierto'             => 'Abierto',
-        'esperando_respuesta' => 'Esperando respuesta',
+        'planificado'         => 'Planificado',
         'resuelto'            => 'Resuelto',
         'cerrado'             => 'Cerrado',
     ];
@@ -31,7 +31,7 @@ class TicketService
     public const STATUS_COLORS = [
         'nuevo'               => '#2563eb',
         'abierto'             => '#10b981',
-        'esperando_respuesta' => '#f97316',
+        'planificado'         => '#6366f1',
         'resuelto'            => '#8b5cf6',
         'cerrado'             => '#94a3b8',
     ];
@@ -47,7 +47,7 @@ class TicketService
     }
 
     /** Estados en los que un ticket sigue VIVO (y por tanto admite mensajes nuevos). */
-    public const OPEN_STATUSES = ['nuevo', 'abierto', 'esperando_respuesta'];
+    public const OPEN_STATUSES = ['nuevo', 'abierto', 'planificado'];
 
     /**
      * Prioridad «sin asignar»: los tickets NACEN así (valor fuera del catálogo, para
@@ -57,11 +57,24 @@ class TicketService
     public const SIN_PRIORIDAD = 'sin_asignar';
 
     /**
-     * Estados en los que el RELOJ DEL SLA se para: la pelota no está en nuestro
-     * tejado. Un ticket esperando al cliente tres días no es un incumplimiento
-     * nuestro, y contarlo como tal vuelve inservible la vista de vencidos.
+     * Estados en los que el RELOJ DEL SLA se para SIEMPRE: «planificado» (se gestiona
+     * a semanas: no cuenta como incumplimiento), resuelto y cerrado. Además, el reloj
+     * también se pausa AUTOMÁTICAMENTE mientras esperamos al cliente (último mensaje
+     * saliente), aunque el estado sea abierto/nuevo — ver debePausarSla().
      */
-    public const SLA_PAUSED_STATUSES = ['esperando_respuesta', 'resuelto', 'cerrado'];
+    public const SLA_PAUSED_STATUSES = ['planificado', 'resuelto', 'cerrado'];
+
+    /**
+     * ¿Debe estar PAUSADO el reloj del SLA? Sí cuando el estado lo pausa (planificado/
+     * resuelto/cerrado) O cuando la pelota está en el tejado del cliente: el ticket
+     * sigue vivo (abierto/nuevo/planificado) y el último mensaje fue NUESTRO (out).
+     * Esto sustituye al antiguo estado «esperando respuesta», ahora un simple indicador.
+     */
+    public static function debePausarSla(?string $status, ?string $lastDirection): bool
+    {
+        if (in_array($status, self::SLA_PAUSED_STATUSES, true)) return true;
+        return in_array($status, self::OPEN_STATUSES, true) && $lastDirection === 'out';
+    }
 
     /**
      * Prioridades: ya NO son una lista fija, se configuran en «Configuración de
@@ -251,7 +264,7 @@ class TicketService
     public function setStatus(int $ticketId, string $status, ?int $userId = null, bool $notify = true): bool
     {
         $t = DB::table('tickets')->where('id', $ticketId)
-            ->first(['status', 'sla_paused_minutes', 'sla_paused_since']);
+            ->first(['status', 'last_direction', 'sla_paused_minutes', 'sla_paused_since']);
         $cur = $t->status ?? null;
         if (!$cur || $cur === $status) return false;
 
@@ -280,7 +293,9 @@ class TicketService
             $upd['sla_breached_at'] = null;
         }
 
-        $upd += $this->pausaSla($t, $status);
+        // El reloj se pausa según el ESTADO nuevo y quién habló el último (esperar al
+        // cliente pausa aunque siga «abierto»).
+        $upd += $this->pausaSla($t, self::debePausarSla($status, $t->last_direction ?? null));
 
         DB::table('tickets')->where('id', $ticketId)->update($upd);
 
@@ -351,10 +366,9 @@ class TicketService
      * esperando toda la noche, esa noche no contaba de todas formas—.
      * Devuelve los campos a actualizar (vacío si no hay nada que tocar).
      */
-    protected function pausaSla(object $t, string $nuevo): array
+    protected function pausaSla(object $t, bool $estara): array
     {
         $estaba = $t->sla_paused_since !== null;
-        $estara = in_array($nuevo, self::SLA_PAUSED_STATUSES, true);
 
         if ($estara === $estaba) return [];   // sigue igual: nada que hacer
 
@@ -367,6 +381,24 @@ class TicketService
             'sla_paused_minutes' => (int) $t->sla_paused_minutes + max(0, $mins),
             'sla_paused_since'   => null,
         ];
+    }
+
+    /**
+     * Recalcula la PAUSA del SLA según el estado y quién habló el último. Se llama al
+     * llegar/enviar un mensaje (cambia last_direction): responder al cliente pausa el
+     * reloj, y que el cliente conteste lo reanuda. Sustituye al estado «esperando
+     * respuesta». No hace nada si la pausa ya estaba como debe.
+     */
+    public function actualizarPausaSla(int $ticketId): void
+    {
+        $t = DB::table('tickets')->where('id', $ticketId)
+            ->first(['status', 'last_direction', 'sla_paused_minutes', 'sla_paused_since']);
+        if (!$t) return;
+        $upd = $this->pausaSla($t, self::debePausarSla($t->status, $t->last_direction));
+        if ($upd) {
+            DB::table('tickets')->where('id', $ticketId)->update($upd);
+            $this->recalcularSla($ticketId);
+        }
     }
 
     /** Asigna el ticket a un usuario de soporte (o lo deja sin asignar con null). */

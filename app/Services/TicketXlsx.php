@@ -30,8 +30,9 @@ class TicketXlsx
     private const ESTADO = [
         'nuevo'               => ['FFEEF0FF', 'FF3730A3'],
         'abierto'             => ['FFE6F1FB', 'FF0C447C'],
-        'en_progreso'         => ['FFFEF3E2', 'FF854F0B'],
-        'esperando_respuesta' => ['FFFBEAF0', 'FF8A2B4E'],
+        'en_progreso'         => ['FFFEF3E2', 'FF854F0B'],   // legado (histórico)
+        'esperando_respuesta' => ['FFFBEAF0', 'FF8A2B4E'],   // legado (histórico)
+        'planificado'         => ['FFEEEEFC', 'FF3F3D91'],
         'resuelto'            => ['FFE2F5EC', 'FF0F6E56'],
         'cerrado'             => ['FFEFEDE7', 'FF44413C'],
     ];

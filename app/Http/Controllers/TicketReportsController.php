@@ -44,7 +44,7 @@ class TicketReportsController extends Controller
         $vencido   = SlaService::activo()
             ? '(t.sla_paused_since IS NULL AND (t.sla_resolve_due_at < NOW() OR (t.sla_response_due_at < NOW() AND t.first_response_at IS NULL)))'
             : '0';
-        $abiertos  = "t.status IN ('nuevo','abierto','en_progreso','esperando_respuesta')";
+        $abiertos  = "t.status IN ('nuevo','abierto','planificado')";
         $resueltos = "t.status IN ('resuelto','cerrado')";
         $resolMin  = 'AVG(CASE WHEN t.resolved_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.resolved_at) END)';
         $respMin   = 'AVG(CASE WHEN t.first_response_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.first_response_at) END)';

@@ -137,7 +137,7 @@ function prChip(v, meta, small = false) {
 /* Estados retirados que aún pueden aparecer en el HISTORIAL de tickets antiguos:
    ya no se pueden elegir, pero hay que saber pintarlos con su nombre de siempre.
    «En progreso» se fusionó en «Abierto» (sep-2026). */
-const LEGACY_STATUS = { en_progreso: 'En progreso' }
+const LEGACY_STATUS = { en_progreso: 'En progreso', esperando_respuesta: 'Esperando respuesta' }
 
 /* Chip de ESTADO con color desde meta.status_meta (misma idea que prChip): así no
    depende del nombre de clase CSS. Si falta meta, cae a la clase `.chip.{estado}`. */
@@ -1166,11 +1166,14 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         <td>{prChip(t.priority, meta)}</td>
                         <td>
                           {stChip(t.status, meta)}
-                          {/* «Sin responder»: el cliente escribió lo último y el ticket sigue
-                              abierto. Se marca aparte del estado para que salte a la vista. */}
-                          {waiting && !['resuelto', 'cerrado'].includes(t.status)
-                            ? <span className="chip sinresp" title="El cliente escribió lo último: sin responder">Sin responder</span>
-                            : (t.last_direction === 'out' && <span className="chip answered" title="Ya hemos respondido">✓</span>)}
+                          {/* Indicador redondo de RESPUESTA (aparte del estado): amarillo «!»
+                              si el cliente escribió lo último (sin responder), verde «✓» si ya
+                              hemos contestado. Solo en tickets vivos (no resueltos/cerrados). */}
+                          {!['resuelto', 'cerrado'].includes(t.status) && (
+                            waiting
+                              ? <span className="st-ind pend" title="Sin responder: el cliente escribió lo último y aún no le hemos contestado">!</span>
+                              : (t.last_direction === 'out' && <span className="st-ind resp" title="Respondido: ya hemos contestado y esperamos al cliente">✓</span>)
+                          )}
                         </td>
                         {canTimes && <>
                           <td className="tk-time">{fmtMins(t.response_mins)}</td>
@@ -1661,18 +1664,6 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
      * fuese obligatorio, la gente escribiría «-» y no serviría de nada.
      */
     if (tarde) setJustificar(true)
-  }
-  // Tras responder por correo, se ofrece pasar el ticket a «Esperando respuesta»:
-  // la pelota queda en el cliente y el reloj del SLA se pausa. No molesta si ya
-  // estaba en ese estado, ni cuando la respuesta iba programada para más tarde.
-  const ofrecerEsperandoRespuesta = async () => {
-    if (d?.ticket?.status === 'esperando_respuesta') return
-    const ok = await confirm({
-      title: '¿Marcar como «Esperando respuesta»?',
-      message: 'Respondiste al cliente. ¿Dejas el ticket a la espera de su respuesta? Mientras tanto el reloj del SLA se pausa.',
-      confirmText: 'Sí, esperando respuesta', cancelText: 'No hace falta',
-    })
-    if (ok) setStatus('esperando_respuesta')
   }
   // Coherencia área↔asignado también desde la ficha.
   const coh = useCoherenciaArea(meta, () => { load(); onChange?.() })
@@ -2258,14 +2249,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()
                         // Al responder, si el ticket no tiene categoría, se le pone la del
-                        // área del agente (1 área → auto; 2+ → pregunta). Devuelve si abrió
-                        // el modal, para no encadenarlo con el aviso de «Esperando respuesta».
-                        const abrioCat = !r.scheduled && can('tickets.categorize')
-                          ? coh.trasResponder(id, user?.id, d?.ticket?.category_id)
-                          : false
-                        // Envío real (no programado): preguntar si pasa a «Esperando respuesta».
-                        // Sin await para no dejar el compositor bloqueado mientras se decide.
-                        if (!r.scheduled && !abrioCat) ofrecerEsperandoRespuesta()
+                        // área del agente (1 área → auto; 2+ → pregunta).
+                        if (!r.scheduled && can('tickets.categorize')) {
+                          coh.trasResponder(id, user?.id, d?.ticket?.category_id)
+                        }
                       } else toast(r.error || 'No se pudo enviar la respuesta', 'err')
                       return r.ok
                     }

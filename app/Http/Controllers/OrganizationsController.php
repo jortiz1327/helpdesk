@@ -78,7 +78,7 @@ class OrganizationsController extends Controller
         $vencido   = SlaService::activo()
             ? '(t.sla_resolve_due_at < NOW() OR (t.sla_response_due_at < NOW() AND t.first_response_at IS NULL))'
             : '0';
-        $abiertos  = "t.status IN ('nuevo','abierto','en_progreso','esperando_respuesta')";
+        $abiertos  = "t.status IN ('nuevo','abierto','planificado')";
         $resueltos = "t.status IN ('resuelto','cerrado')";
 
         [$idCol, $label, $group] = match ($level) {
