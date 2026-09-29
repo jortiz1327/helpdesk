@@ -493,6 +493,7 @@ function TicketCustomFields({ ticketId, initial, bare = false }) {
  * Se usa igual desde la lista y desde la ficha (por eso es un hook con su JSX).
  */
 function useCoherenciaArea(meta, onChanged) {
+  const toast = useToast()
   const [elegir, setElegir] = useState(null)   // { ticketId, agentName, cats:[{id,name}] }
   const [reasig, setReasig] = useState(null)    // { ticketId, agentName, catName, cands:[{id,name}] }
   const catName = (id) => (meta?.categories || []).find((c) => String(c.id) === String(id))?.name
@@ -505,6 +506,23 @@ function useCoherenciaArea(meta, onChanged) {
     if (areas.length >= 2 && !areas.includes(String(ticketCatId ?? ''))) {
       setElegir({ ticketId, agentName: u.name, cats: (u.category_ids || []).map((id) => ({ id, name: catName(id) })).filter((c) => c.name) })
     }
+  }
+  // Llamar TRAS RESPONDER el agente. Si el ticket NO tiene categoría, se le pone la del
+  // área del agente que responde: 1 área → automático; 2+ → se le pregunta a cuál.
+  // Devuelve true si abrió el modal (para no encadenarlo con otros avisos).
+  const trasResponder = (ticketId, agentUserId, ticketCatId) => {
+    if (ticketCatId) return false   // ya tiene categoría: no se toca
+    const u = userById(agentUserId); if (!u) return false
+    const areas = (u.category_ids || [])
+    if (areas.length === 1) {
+      api.setTicketCategory(ticketId, areas[0]).then((r) => { if (r?.ok) { toast(`Categoría: ${catName(areas[0]) || ''}`); onChanged?.() } })
+      return false
+    }
+    if (areas.length >= 2) {
+      setElegir({ ticketId, agentName: u.name, cats: areas.map((id) => ({ id, name: catName(id) })).filter((c) => c.name) })
+      return true
+    }
+    return false
   }
   // Llamar TRAS cambiar de categoría con éxito. assignedTo = agente asignado (o null).
   const trasCategoria = (ticketId, newCatId, assignedTo) => {
@@ -524,7 +542,7 @@ function useCoherenciaArea(meta, onChanged) {
       {reasig && <ModalReasignarArea data={reasig} onClose={() => setReasig(null)} onDone={() => { setReasig(null); onChanged?.() }} />}
     </>
   )
-  return { trasAsignar, trasCategoria, modales }
+  return { trasAsignar, trasCategoria, trasResponder, modales }
 }
 
 // Elegir a cuál de las áreas del agente (varias) mover el ticket.
@@ -2239,9 +2257,15 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                         if (r.reopened) toast('El ticket estaba cerrado y se ha reabierto')
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()
+                        // Al responder, si el ticket no tiene categoría, se le pone la del
+                        // área del agente (1 área → auto; 2+ → pregunta). Devuelve si abrió
+                        // el modal, para no encadenarlo con el aviso de «Esperando respuesta».
+                        const abrioCat = !r.scheduled && can('tickets.categorize')
+                          ? coh.trasResponder(id, user?.id, d?.ticket?.category_id)
+                          : false
                         // Envío real (no programado): preguntar si pasa a «Esperando respuesta».
                         // Sin await para no dejar el compositor bloqueado mientras se decide.
-                        if (!r.scheduled) ofrecerEsperandoRespuesta()
+                        if (!r.scheduled && !abrioCat) ofrecerEsperandoRespuesta()
                       } else toast(r.error || 'No se pudo enviar la respuesta', 'err')
                       return r.ok
                     }
