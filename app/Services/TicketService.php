@@ -29,11 +29,11 @@ class TicketService
      * tabla configurable, esto pasa a la BD sin tocar el frontend.
      */
     public const STATUS_COLORS = [
-        'nuevo'               => '#2563eb',
-        'abierto'             => '#10b981',
-        'planificado'         => '#6366f1',
-        'resuelto'            => '#8b5cf6',
-        'cerrado'             => '#94a3b8',
+        'nuevo'               => '#ec4899', // rosa
+        'abierto'             => '#a855f7', // púrpura
+        'planificado'         => '#06b6d4', // cian
+        'resuelto'            => '#10b981', // verde
+        'cerrado'             => '#2563eb', // azul
     ];
 
     /** Estados con etiqueta + color, para el frontend (como priority_meta). */
