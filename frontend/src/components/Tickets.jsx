@@ -1182,15 +1182,20 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         </td>
                         <td>{prChip(t.priority, meta)}</td>
                         <td>
-                          {stChip(t.status, meta)}
-                          {/* Indicador redondo de RESPUESTA (aparte del estado): amarillo «!»
-                              si el cliente escribió lo último (sin responder), verde «✓» si ya
-                              hemos contestado. Solo en tickets vivos (no resueltos/cerrados). */}
-                          {!['resuelto', 'cerrado'].includes(t.status) && (
-                            waiting
-                              ? <span className="st-ind pend" title="Sin responder: el cliente escribió lo último y aún no le hemos contestado">!</span>
-                              : (t.last_direction === 'out' && <span className="st-ind resp" title="Respondido: ya hemos contestado y esperamos al cliente">✓</span>)
-                          )}
+                          {/* Estado + indicador de RESPUESTA en LÍNEA (nunca apilados). El
+                              indicador solo en tickets vivos: círculo ✓/! en vista cómoda, y
+                              un punto de color en vista compacta (ocupa menos). */}
+                          <span className="st-cell">
+                            {stChip(t.status, meta)}
+                            {!['resuelto', 'cerrado'].includes(t.status) && (waiting || t.last_direction === 'out') && (
+                              density === 'compacta'
+                                ? <span className={`st-dot ${waiting ? 'no' : 'ok'}`}
+                                    title={waiting ? 'Sin responder: el cliente escribió lo último' : 'Respondido: esperamos al cliente'} />
+                                : (waiting
+                                    ? <span className="st-ind pend" title="Sin responder: el cliente escribió lo último y aún no le hemos contestado">!</span>
+                                    : <span className="st-ind resp" title="Respondido: ya hemos contestado y esperamos al cliente">✓</span>)
+                            )}
+                          </span>
                         </td>
                         {verTiempos && <>
                           <td className="tk-time">{fmtMins(t.response_mins)}</td>

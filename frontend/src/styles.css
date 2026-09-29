@@ -2244,13 +2244,21 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .chip.sinresp { background: rgba(245, 158, 11, 0.18); color: #fbbf24; margin-left: 5px; padding: 3px 7px; font-weight: 600; }
 :root[data-theme="light"] .chip.sinresp { background: #fff7ec; color: #b45309; }
 
-/* Indicador REDONDO de respuesta en la columna de estado (info, no estado):
-   «!» amarillo = sin responder · «✓» verde = respondido. */
-.st-ind { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; margin-left: 6px; font-size: 11px; font-weight: 800; line-height: 1; vertical-align: middle; }
+/* Estado + indicador de respuesta EN LÍNEA (no apilados). */
+.st-cell { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+/* Indicador REDONDO de respuesta (vista cómoda): «!» amarillo = sin responder ·
+   «✓» verde = respondido. Info, no estado. */
+.st-ind { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 800; line-height: 1; flex: none; }
 .st-ind.pend { background: rgba(245, 158, 11, 0.22); color: #f5a524; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.14); }
 .st-ind.resp { background: rgba(16, 185, 129, 0.20); color: #34d399; }
 :root[data-theme="light"] .st-ind.pend { background: #fef3c7; color: #b45309; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18); }
 :root[data-theme="light"] .st-ind.resp { background: #d1fae5; color: #047857; }
+
+/* Indicador de respuesta en vista COMPACTA: un punto de color (ocupa menos). */
+.st-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.st-dot.no { background: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18); }
+.st-dot.ok { background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.16); }
 
 /* --- MODAL del ticket: no se cambia de página --- */
 .tk-modal { position: relative; display: flex; width: min(1800px, 97vw); height: 94vh; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35); }
