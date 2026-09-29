@@ -50,31 +50,34 @@ function audioCtx() {
 }
 
 /*
- * Aviso sonoro (sin ficheros de audio, se sintetiza). Dos variantes:
- *  · normal (ventana visible): «din-don» corto de dos notas.
- *  · fuerte (ventana oculta):  patrón doble, más largo y a más volumen, para que se
- *    oiga aunque estés en otra pestaña o app.
+ * Aviso sonoro tipo CAMPANA (sin ficheros de audio, se sintetiza): fundamental + un
+ * armónico agudo con cola larga (~1,1 s). Dos variantes:
+ *  · normal (ventana visible): una campanada, fuerte.
+ *  · fuerte (ventana oculta):  campana REPETIDA x2 y aún más alta (con compresor para
+ *    ganar volumen sin distorsionar), para que se oiga estando en otra pestaña o app.
  */
 function beep(strong = false) {
   const ctx = audioCtx(); if (!ctx) return
   const now = ctx.currentTime
   const master = ctx.createGain()
-  master.connect(ctx.destination)
-  master.gain.value = strong ? 0.55 : 0.34   // antes 0.15: ahora bastante más alto
+  // El compresor sube el volumen percibido sin que reviente cuando suenan a la vez.
+  const comp = ctx.createDynamicsCompressor()
+  master.connect(comp); comp.connect(ctx.destination)
+  master.gain.value = strong ? 0.85 : 0.6   // antes 0.15/0.34: ahora mucho más fuerte
 
-  // [frecuencia Hz, inicio s, duración s]
-  const notas = strong
-    ? [[988, 0, 0.14], [1319, 0.14, 0.16], [988, 0.36, 0.14], [1319, 0.5, 0.22]]
-    : [[880, 0, 0.12], [1174, 0.12, 0.18]]
-
-  for (const [freq, t0, dur] of notas) {
-    const o = ctx.createOscillator(), g = ctx.createGain()
-    o.type = 'triangle'; o.frequency.value = freq
-    o.connect(g); g.connect(master)
-    const s = now + t0
-    g.gain.setValueAtTime(0.0001, s)
-    g.gain.exponentialRampToValueAtTime(1, s + 0.015)
-    g.gain.exponentialRampToValueAtTime(0.0001, s + dur)
-    o.start(s); o.stop(s + dur + 0.03)
+  // Una campanada en el instante t0: fundamental (largo) + armónico agudo (más corto).
+  const campanada = (t0) => {
+    for (const [freq, dur, vol] of [[1318.5, 1.15, 1], [2637, 0.85, 0.34]]) {
+      const o = ctx.createOscillator(), g = ctx.createGain()
+      o.type = 'sine'; o.frequency.value = freq
+      o.connect(g); g.connect(master)
+      const s = now + t0
+      g.gain.setValueAtTime(0.0001, s)
+      g.gain.exponentialRampToValueAtTime(vol, s + 0.008)
+      g.gain.exponentialRampToValueAtTime(0.0001, s + dur)
+      o.start(s); o.stop(s + dur + 0.05)
+    }
   }
+  campanada(0)
+  if (strong) campanada(0.55)   // ventana oculta: suena dos veces
 }
