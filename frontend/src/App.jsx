@@ -120,10 +120,21 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.1.1";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.1.1",
+        date: "1 oct 2026",
+        resumen: "Estados con colores nuevos y un detalle menos en los tickets cerrados.",
+        mejoras: [
+            "Nuevos colores de estado: Nuevo rosa, Abierto púrpura, Planificado cian, Resuelto verde, Cerrado azul.",
+        ],
+        arreglos: [
+            "Un ticket cerrado ya no se marca como «sin responder».",
+        ],
+    },
     {
         version: "1.1.0",
         date: "29 sep 2026",

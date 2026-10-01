@@ -1104,7 +1104,9 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                   {rows === null
                     ? Array.from({ length: 8 }).map((_, i) => <SkelRow key={i} canTimes={verTiempos} />)
                     : rows.map((t) => {
-                    const waiting = t.last_direction === 'in'   // habló el cliente: nos toca
+                    // «Nos toca a nosotros»: el cliente escribió lo último Y el ticket sigue vivo.
+                    // Un resuelto/cerrado nunca está «sin responder» aunque el cliente hablara al final.
+                    const waiting = t.last_direction === 'in' && !['resuelto', 'cerrado'].includes(t.status)
                     const sleeping = t.snoozed_at && (Number(t.snooze_wake_on_reply)
                       || (t.snoozed_until && parseDate(t.snoozed_until) > new Date()))
                     // Presencia: otro agente lo tiene abierto AHORA (bloqueo vigente).

@@ -3,6 +3,20 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.1.1] — 2026-10-01
+
+### Mejoras
+
+- **Nuevos colores de estado:** Nuevo (rosa), Abierto (púrpura), Planificado (cian),
+  Resuelto (verde) y Cerrado (azul). El color sigue viniendo del backend (fuente única),
+  así que se aplica a la vez en la bandeja, la ficha y los informes.
+
+### Arreglos
+
+- **Un ticket cerrado ya no se marca como «sin responder».** Si el cliente escribió lo
+  último antes de cerrarlo, ya no sale el punto naranja junto al asunto ni el indicador
+  amarillo: un ticket resuelto/cerrado nunca está pendiente de nuestra respuesta.
+
 ## [1.1.0] — 2026-09-29
 
 ### Mejoras
