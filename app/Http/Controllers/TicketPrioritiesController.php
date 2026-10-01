@@ -56,9 +56,12 @@ class TicketPrioritiesController extends Controller
         // (ese reloj caerá al plazo de la categoría, si la tiene).
         $min = fn ($v) => ($n = (int) $v) > 0 ? $n : null;
 
+        $desc = trim((string) $request->input('description', ''));
+
         $data = [
             'key'      => $key,
             'name'     => mb_substr($name, 0, 60),
+            'description' => $desc !== '' ? mb_substr($desc, 0, 160) : null,
             'color'    => $color,
             'position' => (int) $request->input('position', 0),
             'active'   => filter_var($request->input('active', true), FILTER_VALIDATE_BOOLEAN),

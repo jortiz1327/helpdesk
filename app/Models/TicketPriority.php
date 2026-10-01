@@ -17,7 +17,7 @@ class TicketPriority extends Model
     public static function activas(): array
     {
         return self::$cache ??= self::where('active', true)->orderBy('position')->orderBy('id')
-            ->get(['key', 'name', 'color'])->keyBy('key')->toArray();
+            ->get(['key', 'name', 'description', 'color'])->keyBy('key')->toArray();
     }
 
     public static function olvidarCache(): void

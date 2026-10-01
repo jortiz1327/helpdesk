@@ -120,10 +120,20 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.1.1";
+const APP_VERSION = "1.1.2";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.1.2",
+        date: "1 oct 2026",
+        resumen: "Las prioridades ahora explican cuándo usar cada una.",
+        mejoras: [
+            "Cada prioridad lleva una descripción corta que se ve en el selector (p. ej. «Urgente — servicio caído o impacto grave»).",
+            "Las descripciones se editan en Configuración → Prioridades.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.1.1",
         date: "1 oct 2026",

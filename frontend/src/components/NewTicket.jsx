@@ -154,7 +154,9 @@ export default function NewTicket({ user, onCreated, onCancel, onOpenTicket }) {
               <div className="field">
                 <span className="lbl">Prioridad</span>
                 <Select block value={f.priority} onChange={set('priority')}
-                  options={Object.entries(meta?.priorities || {}).map(([value, label]) => ({ value, label }))} />
+                  options={meta?.priority_meta
+                    ? Object.entries(meta.priority_meta).map(([value, p]) => ({ value, label: p.name, sub: p.description || undefined, color: p.color }))
+                    : Object.entries(meta?.priorities || {}).map(([value, label]) => ({ value, label }))} />
               </div>
               {/* Solo quien puede repartir trabajo ve este campo */}
               {can('tickets.assign') && (

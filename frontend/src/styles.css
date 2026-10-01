@@ -1821,7 +1821,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .sel-opt.on { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
 .sel-opt-t { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .sel-opt-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sel-opt-sub { font-size: 11.5px; color: var(--ink-3); font-weight: 400; }
+.sel-opt-sub { font-size: 11.5px; color: var(--ink-3); font-weight: 400; font-style: italic; white-space: normal; }
 .sel-check { width: 16px; height: 16px; fill: var(--primary); flex: none; }
 
 /* Casilla de aviso de baja + tooltip de ayuda */

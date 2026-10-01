@@ -3,6 +3,16 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.1.2] — 2026-10-01
+
+### Mejoras
+
+- **Descripción por prioridad.** Cada prioridad puede llevar una frase corta que explica
+  cuándo usarla; se muestra bajo el nombre (en cursiva) en el selector de prioridad —en la
+  ficha y al crear un ticket— y es editable en **Configuración → Prioridades**. Las cuatro
+  de serie vienen con texto por defecto (Urgente: «Servicio completamente caído o impacto
+  grave», etc.).
+
 ## [1.1.1] — 2026-10-01
 
 ### Mejoras

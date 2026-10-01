@@ -1249,7 +1249,7 @@ function Priorities() {
   const load = useCallback(() => { api.listPriorities().then((d) => setRows(d.priorities || [])) }, [])
   useEffect(() => { load() }, [load])
 
-  const blank = { id: 0, name: '', color: '#64748b', position: (rows?.length || 0) + 1, active: true, is_default: false, sla_response_mins: 0, sla_resolve_mins: 0 }
+  const blank = { id: 0, name: '', description: '', color: '#64748b', position: (rows?.length || 0) + 1, active: true, is_default: false, sla_response_mins: 0, sla_resolve_mins: 0 }
 
   const save = async () => {
     if (!form.name.trim()) { toast('El nombre es obligatorio', 'err'); return }
@@ -1283,6 +1283,7 @@ function Priorities() {
                 {Number(p.is_default) === 1 && <span className="pill sm">Por defecto</span>}
                 <span className={`chip ${Number(p.active) ? 'abierto' : 'cerrado'} sm`}>{Number(p.active) ? 'Activa' : 'Inactiva'}</span>
               </div>
+              {p.description && <p className="cfg-desc" style={{ fontStyle: 'italic' }}>{p.description}</p>}
               <p className="cfg-desc">
                 {p.tickets} ticket{p.tickets === 1 ? '' : 's'} la usan
                 <span className="muted" style={{ marginLeft: 8, fontFamily: 'var(--mono, monospace)', fontSize: 11.5 }}>{p.key}</span>
@@ -1297,7 +1298,7 @@ function Priorities() {
               <div className="cfg-actions">
                 <span className="muted" style={{ fontSize: 12, marginRight: 'auto' }}>#{p.position}</span>
                 <button className="icon-btn" title="Editar" onClick={() => setForm({
-                  id: p.id, name: p.name, color: p.color, position: p.position,
+                  id: p.id, name: p.name, description: p.description || '', color: p.color, position: p.position,
                   active: !!Number(p.active), is_default: !!Number(p.is_default),
                   sla_response_mins: Number(p.sla_response_mins) || 0,
                   sla_resolve_mins: Number(p.sla_resolve_mins) || 0,
@@ -1318,6 +1319,10 @@ function Priorities() {
             <label className="field" style={{ maxWidth: 120 }}><span className="lbl">Orden</span>
               <input type="number" min="0" value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} /></label>
           </div>
+          <label className="field"><span className="lbl">Descripción <span className="hint">· cuándo usarla</span></span>
+            <input value={form.description} maxLength={160}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="p. ej. Servicio completamente caído o impacto grave" /></label>
           <div className="field"><span className="lbl">Color</span>
             <Select block value={form.color} onChange={(color) => setForm((f) => ({ ...f, color }))}
               options={COLORS.map((c) => ({ ...c, color: c.value }))} /></div>

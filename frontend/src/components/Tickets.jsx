@@ -148,6 +148,14 @@ export function stChip(v, meta, small = false) {
   return <span className={cls} style={style}>{s?.name || meta?.statuses?.[v] || LEGACY_STATUS[v] || v}</span>
 }
 
+/* Opciones del <Select> de prioridad: nombre + descripción (sub, letra pequeña en
+   cursiva) + color del punto. Sale del priority_meta; si faltara, cae a solo nombre. */
+function prioOptions(meta) {
+  const pm = meta?.priority_meta
+  if (pm) return Object.entries(pm).map(([value, p]) => ({ value, label: p.name, sub: p.description || undefined, color: p.color }))
+  return Object.entries(meta?.priorities || {}).map(([value, label]) => ({ value, label }))
+}
+
 // Historial de movimientos: icono + frase legible por tipo de evento.
 const EV_ICON = { created: '🎫', status: '🔄', assign: '👤', category: '🏷️', priority: '⚑', merge_in: '🔗', merge_out: '🔗', requester: '✉️' }
 function describeEvent(e, meta) {
@@ -1060,7 +1068,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                   <div style={{ minWidth: 140 }}>
                     <Select sm block value="" placeholder="Prioridad…"
                       onChange={(pr) => pr && bulk({ op: 'priority', priority: pr }, 'Prioridad cambiada')}
-                      options={Object.entries(meta?.priorities || {}).map(([value, label]) => ({ value, label }))} />
+                      options={prioOptions(meta)} />
                   </div>
                   <div style={{ minWidth: 160 }}>
                     <Select sm block value="" placeholder="Categoría…"
@@ -1897,7 +1905,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   {can('tickets.categorize') ? (
                     <Select value={t.priority && t.priority !== 'sin_asignar' ? t.priority : ''}
                       placeholder="Ponle prioridad…" onChange={(v) => cambiarPrioridad(v)}
-                      options={Object.entries(meta?.priorities || {}).map(([value, label]) => ({ value, label }))} />
+                      options={prioOptions(meta)} />
                   ) : prChip(t.priority, meta)}
                 </div>
                 <div className="tkm-row"><span>Categoría</span>
