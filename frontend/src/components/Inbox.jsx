@@ -64,6 +64,21 @@ function InteractivePreview({ payload }) {
   )
 }
 
+/* Reconstruye el TEXTO REAL que le llega al cliente al enviar una plantilla: cabecera
+   (si es de texto) + cuerpo + pie, con las variables {{n}} sustituidas por lo que puso
+   el agente. Así el chat muestra el mensaje tal cual, no «Plantilla: nombre». */
+function renderTemplate(tpl, components = []) {
+  const comps = tpl?.components || []
+  const header = comps.find((c) => c.type === 'HEADER' && c.format === 'TEXT')?.text || ''
+  const body = comps.find((c) => c.type === 'BODY')?.text || ''
+  const footer = comps.find((c) => c.type === 'FOOTER')?.text || ''
+  const sub = (text, kind) => {
+    const params = (components.find((c) => c.type === kind)?.parameters || []).map((p) => p.text ?? '')
+    return (text || '').replace(/\{\{(\d+)\}\}/g, (_, n) => params[+n - 1] ?? `{{${n}}}`)
+  }
+  return [sub(header, 'header'), sub(body, 'body'), footer].filter(Boolean).join('\n\n')
+}
+
 function Bubble({ m, onCtx }) {
   const isImg = ['image', 'sticker'].includes(m.type) && m.media_url
   const isVideo = m.type === 'video' && m.media_url
@@ -73,6 +88,7 @@ function Bubble({ m, onCtx }) {
   return (
     <div className={`bubble ${m.direction === 'in' ? 'in' : 'out'}`} onContextMenu={onCtx ? (e) => onCtx(e, m) : undefined}>
       {m.direction === 'out' && m.sent_by_name && <span className="bubble-by">{m.sent_by_name}</span>}
+      {m.type === 'template' && <span className="bubble-tag"><Icon.templates style={{ width: 11, height: 11, fill: 'currentColor', verticalAlign: '-1px' }} /> Plantilla</span>}
       {isImg && <img className="media" src={mediaUrl(m.media_url)} loading="lazy" alt="" />}
       {isVideo && <video className="media" controls src={mediaUrl(m.media_url)} />}
       {isAudio && <audio className="media-audio" controls src={mediaUrl(m.media_url)} />}
@@ -256,7 +272,10 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
 
   const sendTemplate = async (tpl, components = []) => {
     setPickerOpen(false)
-    const res = await api.send({ contact_id: active.id, to: active.wa_id, type: 'template', template_name: tpl.name, language: tpl.language, components })
+    // body_preview = texto real que recibirá el cliente, para guardarlo como cuerpo del
+    // mensaje (en vez de «Plantilla: nombre») y que el chat lo muestre tal cual.
+    const rendered = renderTemplate(tpl, components)
+    const res = await api.send({ contact_id: active.id, to: active.wa_id, type: 'template', template_name: tpl.name, language: tpl.language, components, body_preview: rendered })
     if (res.ok) { toast('Plantilla enviada'); loadConvs(query) } else toast(res.error || 'No se pudo enviar', 'err')
   }
 

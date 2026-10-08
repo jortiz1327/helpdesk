@@ -37,7 +37,11 @@ class SendController extends Controller
             $components = $request->input('components', []);
             if (!$name) return response()->json(['error' => 'Falta el nombre de la plantilla'], 400);
             [$code, $res] = $wa->sendTemplate($to, $name, $lang, is_array($components) ? $components : []);
-            $bodyPreview = '📋 Plantilla: ' . $name;
+            // El front manda el texto real ya montado (cabecera+cuerpo+pie con variables
+            // sustituidas): se guarda como cuerpo para que el chat lo muestre tal cual.
+            // Si no viniera, se cae al nombre de la plantilla como antes.
+            $rendered = trim((string) $request->input('body_preview', ''));
+            $bodyPreview = $rendered !== '' ? $rendered : '📋 Plantilla: ' . $name;
         } elseif ($type === 'interactive') {
             $interactive = $request->input('interactive');
             if (!is_array($interactive) || empty($interactive['type'])) {
