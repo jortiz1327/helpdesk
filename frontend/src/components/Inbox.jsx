@@ -130,8 +130,10 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   const [ibMode, setIbMode] = useState(null)          // 'button' | 'list'
   const [formPicker, setFormPicker] = useState(false) // selector «Enviar formulario»
   const [mediaPreview, setMediaPreview] = useState(null) // { file, type, url, caption }
-  const [newConv, setNewConv] = useState(null)        // { country_code, phone, name } | null (modal «Nueva conversación»)
+  const [newConv, setNewConv] = useState(null)        // { mode:null|'new'|'saved', country_code, phone, name } | null
   const [startBusy, setStartBusy] = useState(false)
+  const [savedQ, setSavedQ] = useState('')            // buscador de la cara «contacto guardado»
+  const [savedList, setSavedList] = useState(null)
 
   const fileRef = useRef(null)
   const pendingTypeRef = useRef('document')
@@ -199,17 +201,12 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
     })
   }
 
-  // «Nueva conversación»: resuelve/crea el contacto por número y abre el hilo. Si el
-  // número es nuevo (sin ventana de 24 h abierta), guía al agente a enviar una plantilla.
-  const startNewConv = async () => {
-    if (startBusy || !newConv) return
-    const phone = (newConv.phone || '').trim()
-    if (!phone) { toast('Indica el número', 'err'); return }
-    setStartBusy(true)
-    const r = await api.startConversation({ country_code: newConv.country_code, phone, name: newConv.name })
-    setStartBusy(false)
-    if (!r.ok) { toast(r.error || 'No se pudo iniciar la conversación', 'err'); return }
-    setNewConv(null)
+  const closeNewConv = () => { setNewConv(null); setSavedQ(''); setSavedList(null) }
+
+  // Parte común tras resolver el contacto: abre el hilo y, si no hay ventana de 24 h
+  // abierta (sin histórico), guía al agente a arrancar con una plantilla.
+  const finishStart = (r) => {
+    closeNewConv()
     const c = r.contact
     // Si aún no tiene histórico no saldrá en la lista del servidor (filtra por mensajes),
     // pero lo añadimos arriba para que se vea seleccionado mientras arranca.
@@ -219,10 +216,45 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
     })
     openChat(c)
     if (!r.existing) {
-      toast('Número nuevo: la ventana de 24 h está cerrada, arranca con una plantilla')
+      toast('Ventana de 24 h cerrada: arranca con una plantilla')
       setTimeout(() => setPickerOpen(true), 350)
     }
   }
+
+  // Cara «contacto nuevo»: resuelve/crea por número.
+  const startNewConv = async () => {
+    if (startBusy || !newConv) return
+    const phone = (newConv.phone || '').trim()
+    if (!phone) { toast('Indica el número', 'err'); return }
+    setStartBusy(true)
+    const r = await api.startConversation({ country_code: newConv.country_code, phone, name: newConv.name })
+    setStartBusy(false)
+    if (!r.ok) { toast(r.error || 'No se pudo iniciar la conversación', 'err'); return }
+    finishStart(r)
+  }
+
+  // Cara «contacto guardado»: abre el hilo de un contacto de la agenda (por su número).
+  const openSavedContact = async (c) => {
+    if (startBusy) return
+    setStartBusy(true)
+    const r = await api.startConversation({ country_code: '', phone: c.wa_id, name: '' })
+    setStartBusy(false)
+    if (!r.ok) { toast(r.error || 'No se pudo abrir la conversación', 'err'); return }
+    finishStart(r)
+  }
+
+  // Carga (con debounce) los contactos con WhatsApp al entrar en la cara «guardado».
+  useEffect(() => {
+    if (newConv?.mode !== 'saved') return
+    let cancel = false
+    setSavedList(null)
+    const t = setTimeout(() => {
+      api.listContacts(savedQ, 0, '', 'campaigns').then((d) => {
+        if (!cancel) setSavedList((d.contacts || []).filter((c) => c.wa_id))
+      })
+    }, 250)
+    return () => { cancel = true; clearTimeout(t) }
+  }, [newConv?.mode, savedQ])
 
   useEffect(() => {
     if (!active) return
@@ -448,7 +480,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
             <h1>Chat en vivo</h1>
             <span className="count">{convs ? `${convs.length}` : ''}</span>
             <button className="round nc-btn" title="Nueva conversación" disabled={waLocked} style={{ marginLeft: 'auto' }}
-              onClick={() => setNewConv({ country_code: '34', phone: '', name: '' })}><Icon.plus /></button>
+              onClick={() => setNewConv({ mode: null, country_code: '34', phone: '', name: '' })}><Icon.plus /></button>
           </div>
           <div className="search">
             <Icon.search />
@@ -600,32 +632,83 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
       )}
 
       {newConv && (
-        <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && setNewConv(null)}>
-          <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && closeNewConv()}>
+          <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-h">
-              <h3>Nueva conversación</h3>
-              <button className="icon-btn" onClick={() => setNewConv(null)} title="Cerrar (Esc)">✕</button>
+              <h3>{newConv.mode === 'new' ? 'Contacto nuevo' : newConv.mode === 'saved' ? 'Contacto guardado' : 'Nueva conversación'}</h3>
+              <button className="icon-btn" onClick={closeNewConv} title="Cerrar (Esc)">✕</button>
             </div>
-            <div className="modal-body">
-              <p className="ct-hint" style={{ marginTop: 0 }}>
-                Escribe el número de WhatsApp aunque no sea un contacto. Si no te ha escrito en las
-                últimas 24 h, la conversación se arranca con una <b>plantilla</b> (la eliges al abrir el chat).
-              </p>
-              <div className="ct-phone">
-                <label className="field"><span className="lbl">Código de país</span>
-                  <input value={newConv.country_code} onChange={(e) => setNewConv((s) => ({ ...s, country_code: e.target.value }))} placeholder="34" inputMode="numeric" /></label>
-                <label className="field"><span className="lbl">Teléfono</span>
-                  <input value={newConv.phone} autoFocus inputMode="numeric" placeholder="600123456"
-                    onChange={(e) => setNewConv((s) => ({ ...s, phone: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') startNewConv() }} /></label>
+
+            {/* Cara 0: ¿nuevo o de la agenda? */}
+            {!newConv.mode && (
+              <div className="modal-body">
+                <p className="ct-hint" style={{ marginTop: 0 }}>¿Con quién quieres hablar?</p>
+                <div className="nc-choices">
+                  <button className="nc-choice" onClick={() => setNewConv((s) => ({ ...s, mode: 'new' }))}>
+                    <span className="nc-ic"><Icon.plus /></span>
+                    <b>Contacto nuevo</b>
+                    <small>Escribe un número que aún no tienes guardado</small>
+                  </button>
+                  <button className="nc-choice" onClick={() => setNewConv((s) => ({ ...s, mode: 'saved' }))}>
+                    <span className="nc-ic"><Icon.user /></span>
+                    <b>Contacto guardado</b>
+                    <small>Elige a alguien de tu agenda</small>
+                  </button>
+                </div>
               </div>
-              <label className="field"><span className="lbl">Nombre <span className="hint">· opcional</span></span>
-                <input value={newConv.name} onChange={(e) => setNewConv((s) => ({ ...s, name: e.target.value }))} placeholder="Nombre del contacto" /></label>
-            </div>
-            <div className="modal-foot">
-              <button className="btn ghost" onClick={() => setNewConv(null)}>Cancelar</button>
-              <button className="btn" disabled={startBusy || !newConv.phone.trim()} onClick={startNewConv}>{startBusy ? 'Abriendo…' : 'Abrir chat'}</button>
-            </div>
+            )}
+
+            {/* Cara 1: número nuevo */}
+            {newConv.mode === 'new' && (
+              <div className="modal-body">
+                <p className="ct-hint" style={{ marginTop: 0 }}>
+                  Escribe el número de WhatsApp aunque no sea un contacto. Si no te ha escrito en las
+                  últimas 24 h, la conversación se arranca con una <b>plantilla</b> (la eliges al abrir el chat).
+                </p>
+                <div className="ct-phone">
+                  <label className="field"><span className="lbl">Código de país</span>
+                    <input value={newConv.country_code} onChange={(e) => setNewConv((s) => ({ ...s, country_code: e.target.value }))} placeholder="34" inputMode="numeric" /></label>
+                  <label className="field"><span className="lbl">Teléfono</span>
+                    <input value={newConv.phone} autoFocus inputMode="numeric" placeholder="600123456"
+                      onChange={(e) => setNewConv((s) => ({ ...s, phone: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === 'Enter') startNewConv() }} /></label>
+                </div>
+                <label className="field"><span className="lbl">Nombre <span className="hint">· opcional</span></span>
+                  <input value={newConv.name} onChange={(e) => setNewConv((s) => ({ ...s, name: e.target.value }))} placeholder="Nombre del contacto" /></label>
+              </div>
+            )}
+
+            {/* Cara 2: contacto de la agenda */}
+            {newConv.mode === 'saved' && (
+              <div className="modal-body">
+                <div className="search" style={{ marginBottom: 10 }}>
+                  <Icon.search />
+                  <input autoFocus placeholder="Buscar por nombre o número" value={savedQ} onChange={(e) => setSavedQ(e.target.value)} />
+                </div>
+                <div className="nc-saved-list">
+                  {savedList === null && <div className="center-load"><div className="spinner" /></div>}
+                  {savedList && savedList.length === 0 && (
+                    <div className="empty"><p>No hay contactos con WhatsApp{savedQ ? ' para esa búsqueda' : ''}.</p></div>
+                  )}
+                  {savedList?.map((c) => (
+                    <button key={c.id} className="nc-saved" disabled={startBusy} onClick={() => openSavedContact(c)}>
+                      <Avatar c={c} size="md" />
+                      <div className="nc-saved-info">
+                        <b>{c.name || '+' + c.wa_id}</b>
+                        <small>+{c.wa_id}{c.empresa ? ' · ' + c.empresa : ''}</small>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {newConv.mode && (
+              <div className="modal-foot">
+                <button className="btn ghost" onClick={() => setNewConv((s) => ({ ...s, mode: null }))}>Atrás</button>
+                {newConv.mode === 'new' && <button className="btn" disabled={startBusy || !newConv.phone.trim()} onClick={startNewConv}>{startBusy ? 'Abriendo…' : 'Abrir chat'}</button>}
+              </div>
+            )}
           </div>
         </div>
       )}
