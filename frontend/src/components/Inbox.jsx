@@ -114,6 +114,8 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   const [ibMode, setIbMode] = useState(null)          // 'button' | 'list'
   const [formPicker, setFormPicker] = useState(false) // selector «Enviar formulario»
   const [mediaPreview, setMediaPreview] = useState(null) // { file, type, url, caption }
+  const [newConv, setNewConv] = useState(null)        // { country_code, phone, name } | null (modal «Nueva conversación»)
+  const [startBusy, setStartBusy] = useState(false)
 
   const fileRef = useRef(null)
   const pendingTypeRef = useRef('document')
@@ -179,6 +181,31 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
       setConvs((cs) => cs?.map((x) => (x.id === c.id ? { ...x, unread: 0 } : x)))
       loadConvs(query)
     })
+  }
+
+  // «Nueva conversación»: resuelve/crea el contacto por número y abre el hilo. Si el
+  // número es nuevo (sin ventana de 24 h abierta), guía al agente a enviar una plantilla.
+  const startNewConv = async () => {
+    if (startBusy || !newConv) return
+    const phone = (newConv.phone || '').trim()
+    if (!phone) { toast('Indica el número', 'err'); return }
+    setStartBusy(true)
+    const r = await api.startConversation({ country_code: newConv.country_code, phone, name: newConv.name })
+    setStartBusy(false)
+    if (!r.ok) { toast(r.error || 'No se pudo iniciar la conversación', 'err'); return }
+    setNewConv(null)
+    const c = r.contact
+    // Si aún no tiene histórico no saldrá en la lista del servidor (filtra por mensajes),
+    // pero lo añadimos arriba para que se vea seleccionado mientras arranca.
+    setConvs((cs) => {
+      const list = cs || []
+      return list.some((x) => x.id === c.id) ? list : [{ ...c, unread: 0, last_time: null, last_message: '' }, ...list]
+    })
+    openChat(c)
+    if (!r.existing) {
+      toast('Número nuevo: la ventana de 24 h está cerrada, arranca con una plantilla')
+      setTimeout(() => setPickerOpen(true), 350)
+    }
   }
 
   useEffect(() => {
@@ -401,6 +428,8 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
             <span className="ic"><Icon.message /></span>
             <h1>Chat en vivo</h1>
             <span className="count">{convs ? `${convs.length}` : ''}</span>
+            <button className="round nc-btn" title="Nueva conversación" disabled={waLocked} style={{ marginLeft: 'auto' }}
+              onClick={() => setNewConv({ country_code: '34', phone: '', name: '' })}><Icon.plus /></button>
           </div>
           <div className="search">
             <Icon.search />
@@ -549,6 +578,37 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
           onSendForm={() => setFormPicker(true)}
           formsEnabled={!waLocked}
         />
+      )}
+
+      {newConv && (
+        <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && setNewConv(null)}>
+          <div className="modal" style={{ maxWidth: 440 }}>
+            <div className="modal-h">
+              <h3>Nueva conversación</h3>
+              <button className="icon-btn" onClick={() => setNewConv(null)} title="Cerrar (Esc)">✕</button>
+            </div>
+            <div className="modal-body">
+              <p className="ct-hint" style={{ marginTop: 0 }}>
+                Escribe el número de WhatsApp aunque no sea un contacto. Si no te ha escrito en las
+                últimas 24 h, la conversación se arranca con una <b>plantilla</b> (la eliges al abrir el chat).
+              </p>
+              <div className="ct-phone">
+                <label className="field"><span className="lbl">Código de país</span>
+                  <input value={newConv.country_code} onChange={(e) => setNewConv((s) => ({ ...s, country_code: e.target.value }))} placeholder="34" inputMode="numeric" /></label>
+                <label className="field"><span className="lbl">Teléfono</span>
+                  <input value={newConv.phone} autoFocus inputMode="numeric" placeholder="600123456"
+                    onChange={(e) => setNewConv((s) => ({ ...s, phone: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') startNewConv() }} /></label>
+              </div>
+              <label className="field"><span className="lbl">Nombre <span className="hint">· opcional</span></span>
+                <input value={newConv.name} onChange={(e) => setNewConv((s) => ({ ...s, name: e.target.value }))} placeholder="Nombre del contacto" /></label>
+            </div>
+            <div className="modal-foot">
+              <button className="btn ghost" onClick={() => setNewConv(null)}>Cancelar</button>
+              <button className="btn" disabled={startBusy || !newConv.phone.trim()} onClick={startNewConv}>{startBusy ? 'Abriendo…' : 'Abrir chat'}</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pickerOpen && <TemplatePicker onClose={() => setPickerOpen(false)} onPick={sendTemplate} />}

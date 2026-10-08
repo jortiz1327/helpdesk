@@ -20,6 +20,7 @@ class ConversationController extends Controller
             $action === 'ticket_cats'     => $this->ticketCats(),
             $action === 'to_ticket' && $post => $this->toTicket($request),
             $action === 'assign' && $post => $this->assign($request),
+            $action === 'start'  && $post => $this->start($request),
             $action === 'delete' && $post => $this->delete($request),
             $action === 'list'            => $this->list($request),
             $action === 'messages'        => $this->messages($request),
@@ -153,6 +154,47 @@ class ConversationController extends Controller
             DB::update('UPDATE contacts SET assigned_to = NULL, bot_off = 0 WHERE id = ?', [$id]);
         }
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Inicia (o reutiliza) una conversación de WhatsApp con un número suelto, SIN que
+     * tenga que existir ya como contacto ni con histórico. Normaliza país+número, crea
+     * el contacto si hace falta y lo devuelve para abrir el hilo en el Chat en vivo.
+     *
+     * NO envía nada: a un número «frío» (fuera de la ventana de 24 h) WhatsApp solo deja
+     * arrancar la conversación con una PLANTILLA aprobada, que el agente elige luego en el
+     * propio chat. Si el contacto ya existía, se respeta su nombre y su código de país.
+     */
+    protected function start(Request $r)
+    {
+        // Escribir en el Chat en vivo = mismo permiso que responder.
+        if (!$r->user()?->can('inbox.reply')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
+
+        $cc   = preg_replace('/\D+/', '', (string) $r->input('country_code', ''));
+        $num  = preg_replace('/\D+/', '', (string) $r->input('phone', ''));
+        $name = trim((string) $r->input('name', ''));
+
+        // Si el número ya trae el prefijo del país, no lo dupliques.
+        $wa = ($cc && !str_starts_with($num, $cc)) ? $cc . $num : $num;
+        if (strlen($wa) < 7 || strlen($wa) > 20) {
+            return response()->json(['ok' => false, 'error' => 'Número no válido'], 400);
+        }
+
+        $existente = DB::table('contacts')->where('wa_id', $wa)->first(['id']);
+        if ($existente) {
+            $id = (int) $existente->id;
+        } else {
+            $id = \App\Services\ChatService::upsertContact($wa, $name ?: null);
+            if ($cc) DB::table('contacts')->where('id', $id)->update(['country_code' => $cc]);
+        }
+
+        $c = DB::table('contacts')->where('id', $id)->first(['id', 'wa_id', 'name', 'assigned_to']);
+
+        // ¿Ya tenía conversación de campañas? El front lo usa para avisar de si es nueva.
+        $tieneHist = DB::table('messages')->where('contact_id', $id)
+            ->where('channel', 'whatsapp')->where('funcion', 'campanas')->exists();
+
+        return response()->json(['ok' => true, 'contact' => $c, 'existing' => (bool) $tieneHist]);
     }
 
     protected function delete(Request $r)

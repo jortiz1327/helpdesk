@@ -109,6 +109,10 @@ export const api = {
   deleteConversation: (contact_id) => req('conversations.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contact_id }),
   }),
+  // Iniciar/reutilizar una conversación con un número suelto (no hace falta contacto previo).
+  startConversation: (payload) => req('conversations.php?action=start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
 
   // Enviar
   send: (payload) => req('send.php', {

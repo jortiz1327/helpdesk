@@ -120,10 +120,20 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.1.2";
+const APP_VERSION = "1.1.3";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.1.3",
+        date: "8 oct 2026",
+        resumen: "Puedes iniciar un chat de WhatsApp con un número que aún no es contacto.",
+        mejoras: [
+            "Nuevo botón «＋ Nueva conversación» en el Chat en vivo: escribes el número y abres el hilo.",
+            "Si el número no te ha escrito en 24 h, la conversación arranca con una plantilla (como manda WhatsApp).",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.1.2",
         date: "1 oct 2026",

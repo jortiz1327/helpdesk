@@ -3,6 +3,19 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.1.3] — 2026-10-08
+
+### Mejoras
+
+- **Iniciar conversación con un número que no es contacto.** Nuevo botón «＋ Nueva
+  conversación» en el Chat en vivo de Campañas: se teclea país + número (+ nombre
+  opcional), se crea/reutiliza el contacto y se abre el hilo. Como a un número «frío»
+  (fuera de la ventana de 24 h) WhatsApp solo deja arrancar con una **plantilla**
+  aprobada, al abrir el chat se ofrece directamente el selector de plantillas. Cuando la
+  persona responde, se abre la ventana y ya se chatea con normalidad. Respeta el candado
+  de WhatsApp (si no está configurado, el botón queda deshabilitado) y el permiso
+  `inbox.reply`. Nuevo endpoint `conversations.php?action=start`.
+
 ## [1.1.2] — 2026-10-01
 
 ### Mejoras

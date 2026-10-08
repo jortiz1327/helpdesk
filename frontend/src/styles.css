@@ -265,6 +265,10 @@ input, textarea, select { font-family: inherit; }
 .conv-col { width: 340px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .conv-header { padding: 16px 16px 10px; }
 .conv-header .title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+.conv-header .nc-btn { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink-2); transition: 0.14s; flex-shrink: 0; }
+.conv-header .nc-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.conv-header .nc-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.conv-header .nc-btn svg { width: 18px; height: 18px; fill: currentColor; }
 .conv-header .ic { width: 30px; height: 30px; border-radius: 9px; background: var(--primary-soft); display: grid; place-items: center; }
 .conv-header .ic svg { width: 18px; height: 18px; fill: var(--primary); }
 .conv-header h1 { font-size: 17px; font-weight: 700; }
