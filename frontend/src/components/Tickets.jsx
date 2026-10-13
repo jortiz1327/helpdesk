@@ -1198,12 +1198,9 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                           <span className="st-cell">
                             {stChip(t.status, meta)}
                             {!['resuelto', 'cerrado'].includes(t.status) && (waiting || t.last_direction === 'out') && (
-                              density === 'compacta'
-                                ? <span className={`st-dot ${waiting ? 'no' : 'ok'}`}
-                                    title={waiting ? 'Sin responder: el cliente escribió lo último' : 'Respondido: esperamos al cliente'} />
-                                : (waiting
-                                    ? <span className="st-ind pend" title="Sin responder: el cliente escribió lo último y aún no le hemos contestado">!</span>
-                                    : <span className="st-ind resp" title="Respondido: ya hemos contestado y esperamos al cliente">✓</span>)
+                              waiting
+                                ? <span className={`st-ind pend ${density === 'compacta' ? 'sm' : ''}`} title="Sin responder: el cliente escribió lo último y aún no le hemos contestado">!</span>
+                                : <span className={`st-ind resp ${density === 'compacta' ? 'sm' : ''}`} title="Respondido: ya hemos contestado y esperamos al cliente">✓</span>
                             )}
                           </span>
                         </td>
