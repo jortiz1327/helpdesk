@@ -414,15 +414,35 @@ class MailService
             $sentAt = now();
         }
 
-        /*
-         * Cuerpo HTML ya limpio de la CITA (la respuesta anterior arrastrada). Se
-         * calcula AQUÍ, antes del ticket, porque las reglas automáticas necesitan el
-         * texto para decidir; dejarlo más abajo lo dejaba sin definir.
-         */
-        $rawHtml = self::stripQuoted(trim((string) $message->getHTMLBody()), $subject);
-
         // --- Contacto ---
         $contactId = ChatService::upsertContactByEmail($email, $name);
+
+        /*
+         * ¿Es respuesta a un ticket EXISTENTE? (threading por código en el asunto + que el
+         * remitente sea el DUEÑO del ticket). Se resuelve AQUÍ —antes del cuerpo— porque de
+         * ello depende si hay que recortar la cita. Un tercero que acierte un «TK-…» no debe
+         * inyectar en la incidencia de otro: si no coincide, se trata como ticket nuevo.
+         */
+        $ticketId = $this->ticketByCode($subject);
+        if ($ticketId) {
+            $dueno = (int) DB::table('tickets')->where('id', $ticketId)->value('contact_id');
+            if ($dueno !== (int) $contactId) {
+                logger()->warning("Correo con código de OTRO contacto: ticket {$ticketId} (contacto {$dueno}) "
+                    . "desde {$email} (contacto {$contactId}). Se crea ticket nuevo en vez de inyectar.");
+                $ticketId = null;
+            }
+        }
+
+        /*
+         * Cuerpo HTML. La CITA (el correo anterior arrastrado) SOLO se recorta cuando es una
+         * RESPUESTA a un ticket existente —ahí el mensaje anterior ya está en el ticket—. En un
+         * ticket NUEVO la «cita» puede SER la incidencia (p. ej. una compañera reenvía/traspasa
+         * el correo del cliente), así que se conserva y solo se colapsan bloques repetidos
+         * (firmas, avisos legales). Esto arregla el reenvío que llega con asunto «RE:» y perdía
+         * el original. Se calcula antes del ticket porque las reglas automáticas necesitan el texto.
+         */
+        $rawBody = trim((string) $message->getHTMLBody());
+        $rawHtml = $ticketId ? self::stripQuoted($rawBody, $subject) : self::colapsarRepetidos($rawBody);
 
         /*
          * AVISO DE CRON: no es un ticket de cliente, nadie contesta a un cron. Se
@@ -447,21 +467,7 @@ class MailService
             }
         }
 
-        // --- Ticket: threading por código en el asunto, si no, nuevo ---
-        $ticketId  = $this->ticketByCode($subject);
-
-        // SEGURIDAD: solo se engancha al hilo si el REMITENTE es el contacto del ticket.
-        // Un tercero que acierte un código «TK-…» no debe poder inyectar mensajes en la
-        // incidencia de otro cliente. Si no coincide, se trata como ticket nuevo y se anota.
-        if ($ticketId) {
-            $dueno = (int) DB::table('tickets')->where('id', $ticketId)->value('contact_id');
-            if ($dueno !== (int) $contactId) {
-                logger()->warning("Correo con código de OTRO contacto: ticket {$ticketId} (contacto {$dueno}) "
-                    . "desde {$email} (contacto {$contactId}). Se crea ticket nuevo en vez de inyectar.");
-                $ticketId = null;
-            }
-        }
-
+        // --- Ticket: threading por código / dueño ya resuelto arriba ($ticketId) ---
         $ticketNew = false;
         if ($ticketId) {
             $this->tickets->touch($ticketId);
@@ -552,8 +558,10 @@ class MailService
             $isHtml = $body !== '' && trim(strip_tags($body)) !== '';
         }
         if (!$isHtml) {
-            // Sin HTML útil: texto plano (o el HTML reducido a texto).
-            $body = self::stripQuotedText(trim((string) $message->getTextBody()), $subject);
+            // Sin HTML útil: texto plano (o el HTML reducido a texto). Mismo criterio que el
+            // HTML: en un ticket NUEVO no se recorta la cita (puede ser el reenvío/traspaso).
+            $textoPlano = trim((string) $message->getTextBody());
+            $body = $ticketNew ? $textoPlano : self::stripQuotedText($textoPlano, $subject);
             if ($body === '' && $rawHtml !== '') {
                 $body = trim(html_entity_decode(strip_tags($rawHtml), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
             }
