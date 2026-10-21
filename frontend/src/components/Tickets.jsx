@@ -157,16 +157,25 @@ function prioOptions(meta) {
 }
 
 // Historial de movimientos: icono + frase legible por tipo de evento.
-const EV_ICON = { created: '🎫', status: '🔄', assign: '👤', category: '🏷️', priority: '⚑', merge_in: '🔗', merge_out: '🔗', requester: '✉️' }
+const EV_ICON = { created: '🎫', status: '🔄', assign: '👤', category: '🏷️', priority: '⚑', merge_in: '🔗', merge_out: '🔗', requester: '✉️', snooze: '💤', snooze_wake: '⏰' }
 function describeEvent(e, meta) {
   const st = (v) => meta?.statuses?.[v] || LEGACY_STATUS[v] || v
-  const pr = (v) => meta?.priorities?.[v] || v
+  const pr = (v) => (v === 'sin_asignar' ? 'Sin asignar' : meta?.priorities?.[v] || v)
+  const cat = (id) => (id ? (meta?.categories || []).find((c) => String(c.id) === String(id))?.name || `#${id}` : 'Sin categoría')
 
   switch (e.type) {
     case 'created':  return 'Ticket creado'
     case 'status':   return `Estado: ${st(e.from_value)} → ${st(e.to_value)}`
     case 'priority': return `Prioridad: ${pr(e.from_value)} → ${pr(e.to_value)}`
-    case 'category': return 'Categoría cambiada'
+    case 'category': return `Categoría: ${cat(e.from_value)} → ${cat(e.to_value)}`
+    // Posponer: hasta que responda el cliente ('reply') o hasta una fecha ('Y-m-d H:i').
+    case 'snooze': {
+      if (e.to_value === 'reply') return 'Pospuesto hasta que responda el cliente'
+      const d = e.to_value ? parseDate(e.to_value + ':00') : null
+      return d ? `Pospuesto hasta el ${d.toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'Pospuesto'
+    }
+    case 'snooze_wake':
+      return { reply: 'Reactivado: el cliente respondió', due: 'Reactivado: llegó la fecha', manual: 'Reactivado a mano' }[e.to_value] || 'Reactivado'
     case 'assign':
       if (!e.to_name) return `Desasignado${e.from_name ? ` (era de ${e.from_name})` : ''}`
       return `Asignado a ${e.to_name}`
