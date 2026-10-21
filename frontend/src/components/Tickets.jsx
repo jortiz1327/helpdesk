@@ -331,7 +331,16 @@ function SnoozeControl({ t, onSnooze, onWake, compact = false }) {
           <button className="snz-opt" onClick={() => pick('tomorrow')}><span className="snz-ic">☀️</span>Mañana por la mañana</button>
           <button className="snz-opt" onClick={() => pick('monday')}><span className="snz-ic">📅</span>El lunes</button>
           <button className="snz-opt" onClick={() => pick('week')}><span className="snz-ic">🗓️</span>En una semana</button>
-          <button className="snz-opt special" onClick={() => pick('reply')}><span className="snz-ic">💬</span>Hasta que el cliente responda</button>
+          {/* Si lo último es del cliente, esperar su respuesta no tiene salida: él espera
+              la nuestra. El backend también lo rechaza. */}
+          {t.last_direction === 'in' ? (
+            <button className="snz-opt special" disabled title="El cliente espera tu respuesta: contéstale primero o pospónlo hasta una fecha">
+              <span className="snz-ic">💬</span>
+              <span>Hasta que el cliente responda<small className="snz-why">Antes contéstale: él espera tu respuesta</small></span>
+            </button>
+          ) : (
+            <button className="snz-opt special" onClick={() => pick('reply')}><span className="snz-ic">💬</span>Hasta que el cliente responda</button>
+          )}
           {custom ? (
             <div className="snz-custom">
               <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />

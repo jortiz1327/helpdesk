@@ -1412,7 +1412,7 @@ class TicketsController extends Controller
     {
         if (DB::table('tickets')->where('id', $ticketId)->value('priority') === TicketService::SIN_PRIORIDAD) {
             return response()->json(['ok' => false, 'needs_priority' => true,
-                'error' => 'Ponle una prioridad al ticket antes de responder, asignarlo o añadir notas.'], 422);
+                'error' => 'Ponle una prioridad al ticket antes de responder, asignarlo, posponerlo o añadir notas.'], 422);
         }
         return null;
     }
@@ -1430,12 +1430,22 @@ class TicketsController extends Controller
             return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
         }
 
+        // Triaje: como responder o asignar, posponer exige prioridad (si no, el ticket
+        // se aparta sin que nadie haya valorado su urgencia).
+        if ($bloqueo = $this->exigePrioridad($id)) return $bloqueo;
+
         $preset = (string) $request->input('preset', '');
         $reason = trim((string) $request->input('reason', ''));
         $wakeOnReply = false;
         $until = null;
 
         if ($preset === 'reply') {
+            // «Hasta que responda» con lo último del CLIENTE = callejón sin salida: él
+            // espera nuestra respuesta y nosotros la suya, así que nunca despertaría.
+            if (DB::table('tickets')->where('id', $id)->value('last_direction') === 'in') {
+                return response()->json(['ok' => false,
+                    'error' => 'El cliente espera tu respuesta: contéstale primero o pospónlo hasta una fecha.'], 422);
+            }
             $wakeOnReply = true;
         } elseif ($preset === 'custom') {
             try { $until = \Illuminate\Support\Carbon::parse((string) $request->input('until', '')); }
