@@ -10,7 +10,11 @@ import InfoTip from './InfoTip.jsx'
  * (chat en vivo / flujos). Cada campo lleva su pista (?) para configurarlo a mano.
  * ---------------------------------------------------------------------- */
 
-const FUNC = { campanas: { label: 'Campañas', color: '#12925a', icon: Icon.send, hint: 'chat en vivo / flujos' } }
+const FUNC = {
+  campanas: { label: 'Campañas', color: '#12925a', icon: Icon.send, hint: 'chat en vivo / flujos' },
+  // Soporte (el 01, Coexistence): de momento sus eventos solo se guardan; la bandeja llega después.
+  soporte:  { label: 'Soporte',  color: '#2563eb', icon: Icon.message, hint: 'captura (sin bot)' },
+}
 const funcOf = (k) => FUNC[k] || FUNC.campanas
 
 const blank = { id: 0, label: '', phone_number_id: '', funcion: 'campanas', entorno: 'prueba', token: '', app_secret: '', waba_id: '', app_id: '', active: true }
@@ -110,7 +114,7 @@ export default function WhatsAppNumbers() {
         <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setForm(null)}>
           <div className="modal" style={{ maxWidth: 560 }}>
             <div className="modal-head">
-              <h3>{form.id ? 'Editar número' : 'Añadir número de WhatsApp'} <span className="wa-num-func" style={{ marginLeft: 6 }}>Campañas</span></h3>
+              <h3>{form.id ? 'Editar número' : 'Añadir número de WhatsApp'} <span className="wa-num-func" style={{ marginLeft: 6 }}>{funcOf(form.funcion).label}</span></h3>
               <button className="x" onClick={() => setForm(null)}>×</button>
             </div>
             <div className="modal-body">
@@ -123,6 +127,12 @@ export default function WhatsAppNumbers() {
                     <option value="real">Número real (producción)</option>
                   </select></label>
               </div>
+
+              <label className="field"><span className="lbl">Función <InfoTip text="Campañas = chat en vivo, flujos y difusiones. Soporte = el número de atención (Coexistence con el móvil): sus mensajes se guardan sin bot ni chat de Campañas." wide /></span>
+                <select value={form.funcion} onChange={(e) => setForm((f) => ({ ...f, funcion: e.target.value }))}>
+                  <option value="campanas">Campañas</option>
+                  <option value="soporte">Soporte</option>
+                </select></label>
 
               <div className="grid2">
                 <label className="field"><span className="lbl">ID del número <InfoTip text="El phone_number_id. En Meta → tu App → WhatsApp → Configuración de la API. OJO: es el ID, no el número de teléfono en sí." /></span>

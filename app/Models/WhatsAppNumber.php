@@ -20,7 +20,16 @@ class WhatsAppNumber extends Model
 
     protected $casts = ['active' => 'boolean'];
 
-    public const FUNCIONES = ['campanas'];   // WhatsApp solo alimenta Campañas (esta edición no usa WhatsApp de soporte)
+    // 'soporte' = el 01 (Coexistence). De momento sus eventos solo se CAPTURAN en
+    // wa_raw_events (sin bot, sin chat de Campañas); la bandeja de soporte es la fase 2.
+    public const FUNCIONES = ['campanas', 'soporte'];
+
+    /** El número activo de un WABA (para eventos sin phone_number_id, p. ej. account_update). */
+    public static function porWaba(?string $wabaId): ?self
+    {
+        if (!$wabaId) return null;
+        return static::where('waba_id', $wabaId)->where('active', true)->orderBy('id')->first();
+    }
 
     /** ¿Hay al menos un número configurado y activo? Decide si se enruta o se usa el legacy. */
     public static function hayConfigurados(): bool

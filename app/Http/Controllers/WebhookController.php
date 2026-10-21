@@ -46,8 +46,8 @@ class WebhookController extends Controller
          * hay (p. ej. pruebas locales con curl), se permite pero la protección está INACTIVA
          * (se indica en Ajustes). Configura wa_app_secret antes de producción.
          */
-        $appSecret = $this->appSecretDelEvento($raw);
-        if ($appSecret === '') {
+        $secrets = $this->appSecretsDelEvento($raw);
+        if (!$secrets) {
             /*
              * Sin App Secret no se puede verificar la firma. En LOCAL se permite (pruebas
              * con curl). En PRODUCCIÓN se RECHAZA: procesar un webhook sin firmar es una
@@ -60,8 +60,11 @@ class WebhookController extends Controller
             }
         } else {
             $sig = (string) $request->header('X-Hub-Signature-256', '');
-            $expected = 'sha256=' . hash_hmac('sha256', $raw, $appSecret);
-            if ($sig === '' || !hash_equals($expected, $sig)) {
+            $valida = false;
+            foreach ($secrets as $s) {
+                if ($sig !== '' && hash_equals('sha256=' . hash_hmac('sha256', $raw, $s), $sig)) { $valida = true; break; }
+            }
+            if (!$valida) {
                 return response('Invalid signature', 403); // no es Meta: se descarta sin procesar
             }
         }
@@ -84,18 +87,26 @@ class WebhookController extends Controller
     }
 
     /**
-     * App Secret con el que verificar la firma de ESTE evento. Cada app de Meta firma
-     * con el suyo, así que se resuelve por el `phone_number_id` del evento (todos los de
-     * un mismo POST son de la misma app). Si el número no está configurado o no tiene
-     * App Secret propio, se cae al global (`wa_app_secret`).
+     * App Secrets con los que puede venir firmado ESTE evento. Cada app de Meta firma con
+     * el suyo (Campañas = CRM CAMPAÑAS, el 01 = HELPDESK AEME). Primero el del número del
+     * evento (por `phone_number_id`, o por WABA si el evento no lo trae —account_update—);
+     * después el resto de secretos configurados y el global. Basta con que case uno: todos
+     * son NUESTROS, así que la protección es la misma.
      */
-    protected function appSecretDelEvento(string $raw): string
+    protected function appSecretsDelEvento(string $raw): array
     {
         $data = json_decode($raw, true);
-        $phoneId = $data['entry'][0]['changes'][0]['value']['metadata']['phone_number_id'] ?? '';
-        $num = WhatsAppNumber::porPhoneId((string) $phoneId);
+        $phoneId = (string) ($data['entry'][0]['changes'][0]['value']['metadata']['phone_number_id'] ?? '');
+        $num = WhatsAppNumber::porPhoneId($phoneId) ?? WhatsAppNumber::porWaba((string) ($data['entry'][0]['id'] ?? ''));
 
-        return ($num && $num->app_secret) ? (string) $num->app_secret : (string) Setting::get('wa_app_secret', '');
+        $secrets = [];
+        if ($num && $num->app_secret) $secrets[] = (string) $num->app_secret;
+        foreach (WhatsAppNumber::where('active', true)->whereNotNull('app_secret')->pluck('app_secret') as $s) {
+            if ((string) $s !== '') $secrets[] = (string) $s;
+        }
+        if (($g = (string) Setting::get('wa_app_secret', '')) !== '') $secrets[] = $g;
+
+        return array_values(array_unique($secrets));
     }
 
     protected function process(array $data): void
@@ -112,12 +123,32 @@ class WebhookController extends Controller
                 // Todo el WhatsApp entrante es de Campañas (chat + bot). Nunca crea tickets.
                 $funcion = 'campanas';
                 if ($enrutar) {
-                    $num = WhatsAppNumber::porPhoneId($phoneId);
+                    $num = WhatsAppNumber::porPhoneId($phoneId) ?? WhatsAppNumber::porWaba((string) ($entry['id'] ?? ''));
                     if (!$num) {
                         Log::info("WhatsApp: evento de un número no configurado ($phoneId), se ignora.");
                         continue;   // número desconocido → no se crea nada
                     }
                     $funcion = $num->funcion;
+                }
+
+                /*
+                 * Números que NO son de Campañas (el 01 de soporte, Coexistence): se GUARDA
+                 * el evento crudo y nada más. Ni bot, ni consentimiento, ni BAJA/ALTA, ni chat
+                 * de Campañas. Incluye el historial y los contactos del móvil (llegan una sola
+                 * vez) y lo que se envía desde el móvil (smb_message_echoes).
+                 */
+                if ($funcion !== 'campanas') {
+                    try {
+                        DB::table('wa_raw_events')->insert([
+                            'field'           => mb_substr((string) ($change['field'] ?? '?'), 0, 40),
+                            'waba_id'         => $entry['id'] ?? null,
+                            'phone_number_id' => $phoneId ?: ($num->phone_number_id ?? null),
+                            'payload'         => json_encode($value, JSON_UNESCAPED_UNICODE),
+                        ]);
+                    } catch (\Throwable $e) {
+                        Log::error('WhatsApp soporte: no se pudo guardar el evento crudo: ' . $e->getMessage());
+                    }
+                    continue;
                 }
 
                 $contactNames = [];

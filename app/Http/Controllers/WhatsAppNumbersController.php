@@ -31,6 +31,7 @@ class WhatsAppNumbersController extends Controller
             'numbers' => WhatsAppNumber::orderBy('id')->get(),
             'funciones' => [
                 ['value' => 'campanas', 'label' => 'Campañas'],
+                ['value' => 'soporte',  'label' => 'Soporte'],
             ],
         ]);
     }
