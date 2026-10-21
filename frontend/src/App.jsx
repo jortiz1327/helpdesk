@@ -740,10 +740,14 @@ export default function App() {
         };
     }, [auth.state]);
 
-    // Avisos web (Nivel 1): detecta mensajes nuevos comparando last_time con unread
+    // Avisos web (Nivel 1): detecta mensajes nuevos comparando last_time con unread.
+    // La lista es el Chat en vivo de CAMPAÑAS (WhatsApp funcion='campanas'): solo se
+    // sondea para quien tiene campaigns.access. El endpoint también lo abre helpdesk.access
+    // (inbox.access), y por eso los agentes de soporte recibían avisos de campañas.
     const notifSeen = useRef(null); // Map contactId -> last_time, o null = sin sembrar
+    const canCampaigns = (auth.user?.permissions || []).includes("campaigns.access");
     useEffect(() => {
-        if (auth.state !== "in") return;
+        if (auth.state !== "in" || !canCampaigns) return;
         let alive = true;
         const tick = async () => {
             if (!notifyActive() || !getNotify().messages) {
@@ -779,7 +783,7 @@ export default function App() {
             alive = false;
             clearInterval(t);
         };
-    }, [auth.state]);
+    }, [auth.state, canCampaigns]);
 
     // Si el usuario no tiene permiso para la vista actual, se le lleva a la HOME de su
     // primera área accesible (no a un ítem cualquiera del menú). Antes se cogía «la primera
