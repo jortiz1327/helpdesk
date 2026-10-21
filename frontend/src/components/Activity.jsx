@@ -172,6 +172,11 @@ export default function Activity() {
                 {d.items.map((r) => {
                   const sec = sectOf(r.section)
                   const Ic = sec.icon
+                  // Tickets: la referencia es «TK-… · asunto». Si la frase ya nombra el código,
+                  // debajo va solo el asunto; si no (registros antiguos, «#6950»), va el chip.
+                  const [refCode, ...refRest] = (r.subject || '').split(' · ')
+                  const enFrase = refCode && (r.summary || '').includes(refCode)
+                  const asunto = enFrase ? refRest.join(' · ') : ''
                   return (
                     <div className="act-item" key={r.id}>
                       <span className="act-node" style={{ '--sc': sec.color }}>
@@ -185,8 +190,14 @@ export default function Activity() {
                           <p className="act-headline">
                             <span className="act-user">{r.user_name || 'Sistema'}</span>{' '}
                             <span className="act-what">{frase(r.summary)}</span>
-                            {r.subject ? <span className="act-ref">{r.subject}</span> : null}
+                            {r.subject && !enFrase ? <span className="act-ref">{r.subject}</span> : null}
                           </p>
+                          {asunto ? <p className="act-subj" title={asunto}>«{asunto}»</p> : null}
+                          {r.details?.length ? (
+                            <ul className="act-details">
+                              {r.details.map((d, i) => <li key={i}>{d}</li>)}
+                            </ul>
+                          ) : null}
                           <p className="act-meta">
                             <span className="act-sec" style={{ '--sc': sec.color }}>{r.section}</span>
                             <span className="act-time">{hora(r.created_at)}</span>

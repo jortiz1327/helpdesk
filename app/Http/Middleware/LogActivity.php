@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\ActivityLog;
+use App\Services\ConfigActivity;
+use App\Services\TicketActivity;
 use App\Services\TokenService;
 use Closure;
 use Illuminate\Http\Request;
@@ -22,6 +24,24 @@ class LogActivity
 {
     public function handle(Request $request, Closure $next)
     {
+        // Tickets: foto de cómo estaban ANTES, para poder contar después QUÉ cambió.
+        // Va en los atributos de la petición: terminate() corre en otra instancia.
+        try {
+            $endpoint = basename($request->path());
+            $action   = (string) ($request->query('action') ?? $request->input('action') ?? '');
+            if ($endpoint === 'tickets.php'
+                && in_array($request->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
+                && ! in_array($action, [...TicketActivity::RUIDO, ...self::IGNORAR], true)) {
+                $request->attributes->set('activity_antes', TicketActivity::snapshot(TicketActivity::idsDe($request)));
+            }
+            // Contactos y configuración: lo mismo con las tablas que toca cada endpoint.
+            if (ConfigActivity::cubre($endpoint) && ConfigActivity::escribe($endpoint, $request, $action)
+                && ! in_array($action, self::IGNORAR, true)) {
+                $request->attributes->set('activity_antes', ConfigActivity::snapshot($endpoint, $request));
+            }
+        } catch (\Throwable $e) {
+            report($e);   // auditar nunca debe tumbar una petición
+        }
         return $next($request);
     }
 
@@ -30,7 +50,8 @@ class LogActivity
         try {
             $this->registrar($request, $response);
         } catch (\Throwable $e) {
-            // Auditar nunca debe tumbar una petición.
+            // Auditar nunca debe tumbar una petición, pero sí dejar rastro en el log.
+            report($e);
         }
     }
 
@@ -48,6 +69,13 @@ class LogActivity
         // el flujo normal (login no autentica por token), así que se resuelve aparte.
         if ($endpoint === 'auth.php') {
             $this->registrarSesion($request);
+            return;
+        }
+
+        // Contactos y configuración: qué se creó, borró o cambió, campo a campo. Si la
+        // acción no cambió nada (guardar sin tocar), no se apunta.
+        if (ConfigActivity::cubre($endpoint)) {
+            $this->registrarConfig($endpoint, $request, $response);
             return;
         }
 
@@ -70,9 +98,52 @@ class LogActivity
             return;
         }
 
+        // Respuestas 200 que en realidad fallaron ({ok:false}): no pasó nada que auditar.
+        $json = method_exists($response, 'getData') ? (array) $response->getData(true) : [];
+        if (($json['ok'] ?? true) === false) {
+            return;
+        }
+
+        // Tickets: frase con el código, referencia con el asunto y el detalle del cambio.
+        if ($endpoint === 'tickets.php') {
+            if (in_array($action, TicketActivity::RUIDO, true)) {
+                return;   // abrir/cerrar la ficha, latidos… no son acciones del agente
+            }
+            $d = TicketActivity::describir($action, $request, (array) $request->attributes->get('activity_antes', []), $json);
+            if ($d === null && in_array($action, ['assign', 'status', 'priority', 'category', 'labels'], true)) {
+                return;   // «cambio» que no cambió nada (mismo valor)
+            }
+            if ($d !== null) {
+                [$summary, $subject, $details] = $d;
+                $this->guardar($user->id, $user->name ?: $user->email, $mapa['section'], $action, $summary, $subject ?? $this->sujeto($request), $request, $details);
+                return;
+            }
+        }
+
         [$section, $summary] = $this->describir($endpoint, $mapa, $action, $request);
 
         $this->guardar($user->id, $user->name ?: $user->email, $section, $action ?: strtolower($request->getMethod()), $summary, $this->sujeto($request), $request);
+    }
+
+    private function registrarConfig(string $endpoint, Request $request, $response): void
+    {
+        $user   = $request->user();
+        $action = (string) ($request->query('action') ?? $request->input('action') ?? '');
+        $antes  = $request->attributes->get('activity_antes');
+        if (! $user || $antes === null || in_array($action, self::IGNORAR, true)) {
+            return;   // sin foto previa = no era una escritura
+        }
+        $json = method_exists($response, 'getData') ? (array) $response->getData(true) : [];
+        if (($json['ok'] ?? true) === false) {
+            return;
+        }
+        $d = ConfigActivity::describir($endpoint, $action, $request, (array) $antes, $json);
+        if ($d === null) {
+            return;
+        }
+        [$summary, $subject, $details] = $d;
+        $this->guardar($user->id, $user->name ?: $user->email, ConfigActivity::ENDPOINTS[$endpoint]['section'],
+            $action ?: strtolower($request->getMethod()), $summary, $subject, $request, $details);
     }
 
     /* Login (por email) · logout y cambio de contraseña (por el token de la cabecera). */
@@ -104,7 +175,7 @@ class LogActivity
         }
     }
 
-    private function guardar(?int $uid, ?string $uname, string $section, string $action, string $summary, ?string $subject, Request $request): void
+    private function guardar(?int $uid, ?string $uname, string $section, string $action, string $summary, ?string $subject, Request $request, array $details = []): void
     {
         ActivityLog::create([
             'user_id'    => $uid,
@@ -112,7 +183,8 @@ class LogActivity
             'section'    => $section,
             'action'     => mb_substr($action, 0, 60),
             'summary'    => mb_substr($summary, 0, 300),
-            'subject'    => $subject ? mb_substr($subject, 0, 120) : null,
+            'subject'    => $subject ? mb_substr($subject, 0, 200) : null,
+            'details'    => $details ? json_encode(array_values($details), JSON_UNESCAPED_UNICODE) : null,
             'method'     => $request->getMethod(),
             'ip'         => $request->ip(),
             'created_at' => now(),
@@ -181,8 +253,7 @@ class LogActivity
     private const ESTADO = [
         'cerrado'              => 'Cerró un ticket',
         'resuelto'             => 'Resolvió un ticket',
-        'en_progreso'          => 'Puso un ticket en progreso',
-        'esperando_respuesta'  => 'Dejó un ticket esperando respuesta',
+        'planificado'          => 'Planificó un ticket',
         'abierto'              => 'Reabrió un ticket',
         'nuevo'                => 'Marcó un ticket como nuevo',
     ];
@@ -206,21 +277,13 @@ class LogActivity
             'delete' => 'Eliminó un ticket',
             'merge'  => 'Fusionó tickets',
             'bulk'   => 'Acción masiva sobre tickets',
-            'unlock' => 'Desbloqueó un ticket',
-            // 'status' se resuelve aparte (según el estado destino).
+            // 'status' se resuelve aparte (según el estado destino). Lo normal es que
+            // TicketActivity dé la frase con el detalle; estas quedan de reserva.
         ]],
         'send.php'       => ['section' => 'Helpdesk', 'noun' => 'un mensaje'],
         'send_media.php' => ['section' => 'Helpdesk', 'noun' => 'un adjunto'],
 
-        // --- Contactos ---
-        'contacts.php' => ['section' => 'Contactos', 'noun' => 'contactos', 'actions' => [
-            'merge'          => 'Fusionó contactos',
-            'bulk_label'     => 'Etiquetó contactos en bloque',
-            'bulk_phonebook' => 'Movió contactos de agenda',
-            'set_optout'     => 'Cambió el consentimiento de un contacto',
-        ]],
-        'contact.php' => ['section' => 'Contactos', 'noun' => 'un contacto'],
-        'labels.php'  => ['section' => 'Contactos', 'noun' => 'una etiqueta'],
+        // Contactos y Configuración: los describe ConfigActivity (con el detalle del cambio).
 
         // --- Organización ---
         'organizations.php' => ['section' => 'Organización'],
@@ -238,18 +301,6 @@ class LogActivity
         'forms.php'        => ['section' => 'Campañas', 'noun' => 'un formulario'],
         'flows.php'        => ['section' => 'Campañas', 'noun' => 'un flujo'],
         'upload_media.php' => ['section' => 'Campañas', 'noun' => 'un archivo'],
-
-        // --- Configuración ---
-        'support_settings.php'  => ['section' => 'Configuración', 'noun' => 'los ajustes de soporte',  'kind' => 'config'],
-        'ticket_settings.php'   => ['section' => 'Configuración', 'noun' => 'los ajustes del ticket',   'kind' => 'config'],
-        'business_hours.php'    => ['section' => 'Configuración', 'noun' => 'el horario laboral',        'kind' => 'config'],
-        'settings.php'          => ['section' => 'Configuración', 'noun' => 'los ajustes generales',     'kind' => 'config'],
-        'ticket_priorities.php' => ['section' => 'Configuración', 'noun' => 'una prioridad'],
-        'ticket_rules.php'      => ['section' => 'Configuración', 'noun' => 'una regla automática'],
-        'faqs.php'              => ['section' => 'Configuración', 'noun' => 'una entrada de la base de conocimiento'],
-        'email.php'             => ['section' => 'Configuración', 'noun' => 'una cuenta de correo'],
-        'email_bans.php'        => ['section' => 'Configuración', 'noun' => 'un bloqueo de correo'],
-        'email_templates.php'   => ['section' => 'Configuración', 'noun' => 'una plantilla de correo'],
 
         // --- Administración ---
         'users.php' => ['section' => 'Administración', 'noun' => 'un usuario'],

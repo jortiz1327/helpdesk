@@ -9,7 +9,10 @@ import WhatsAppNumbers from './WhatsAppNumbers.jsx'
 // (global) y el mensaje de consentimiento.
 const FIELDS = ['business_name', 'wa_verify_token', 'consent_message']
 
-export default function Settings({ embedded = false }) {
+// area="soporte" (Helpdesk → Configuración → WhatsApp): solo los números de soporte y el
+// webhook. Consentimiento, tarifas y verificación son de Campañas y ahí no salen.
+export default function Settings({ embedded = false, area = 'campanas' }) {
+  const soporte = area === 'soporte'
   const toast = useToast()
   const [f, setF] = useState(null)
   const [webhook, setWebhook] = useState('')
@@ -66,11 +69,11 @@ export default function Settings({ embedded = false }) {
           {/* Opción B: los números y su función (enrutado por phone_number_id).
               Aquí se configura TODO (token, App Secret, WABA…) por número; el viejo
               bloque global «Conexión con Meta» se retiró por redundante. */}
-          <WhatsAppNumbers />
+          <WhatsAppNumbers funcion={soporte ? 'soporte' : null} />
 
           <div className="card">
             <h2>Webhook</h2>
-            <p className="desc">Configura estos valores en Meta → tu App → WhatsApp → Configuración → Webhook, y suscríbete al campo <b>messages</b>.</p>
+            <p className="desc">Configura estos valores en Meta → tu App → WhatsApp → Configuración → Webhook, y suscríbete al campo <b>messages</b>{soporte && <> (y, en Coexistence, a <b>smb_message_echoes</b>, <b>history</b> y <b>smb_app_state_sync</b>)</>}.</p>
             {/* Estado de la verificación de firma: protege el webhook de mensajes falsos */}
             <div className={`wn-banner ${sigActive ? 'ok' : 'warn'}`} style={{ marginBottom: 14 }}>
               <Icon.lock />
@@ -99,6 +102,7 @@ export default function Settings({ embedded = false }) {
             </label>
           </div>
 
+          {!soporte && (<>
           <div className="card">
             <h2>Consentimiento (primera vez)</h2>
             <p className="desc">Cuando alguien te escribe <b>por primera vez</b>, el bot le envía este mensaje con los botones <b>Acepto</b> y <b>BAJA</b> antes de continuar. Usa <code>{'{{{senderName}}}'}</code> para el nombre del cliente. Edita <b>[Tu Empresa]</b> y <b>[Enlace a tu web]</b>.</p>
@@ -142,6 +146,7 @@ export default function Settings({ embedded = false }) {
             </label>
             <span className="hint" style={{ display: 'block', marginTop: 8 }}>Esto solo quita los candados de la app. Si la cuenta no cumple de verdad, Meta seguirá devolviendo su propio error al intentar la acción.</span>
           </div>
+          </>)}
         </div>
       </div>
     </>

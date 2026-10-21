@@ -14,6 +14,9 @@ class ActivityController extends Controller
 {
     private const POR_PAGINA = 60;
 
+    /* Registros viejos de acciones automáticas (abrir/cerrar la ficha, latidos): se ocultan. */
+    private const RUIDO = ['unlock', 'heartbeat'];
+
     public function handle(Request $request)
     {
         return match ($request->query('action', 'list')) {
@@ -25,7 +28,7 @@ class ActivityController extends Controller
     /* Opciones para los filtros: quién ha hecho algo y en qué apartados. */
     private function meta()
     {
-        $usuarios = DB::table('activity_log')
+        $usuarios = DB::table('activity_log')->whereNotIn('action', self::RUIDO)
             ->select('user_id', DB::raw('MAX(user_name) as user_name'), DB::raw('COUNT(*) as n'))
             ->groupBy('user_id')
             ->orderByDesc('n')
@@ -42,13 +45,13 @@ class ActivityController extends Controller
             'ok'        => true,
             'usuarios'  => $usuarios,
             'apartados' => $apartados,
-            'total'     => DB::table('activity_log')->count(),
+            'total'     => DB::table('activity_log')->whereNotIn('action', self::RUIDO)->count(),
         ]);
     }
 
     private function list(Request $request)
     {
-        $q = DB::table('activity_log');
+        $q = DB::table('activity_log')->whereNotIn('action', self::RUIDO);
 
         if (($uid = $request->query('user_id')) !== null && $uid !== '') {
             $q->where('user_id', (int) $uid);
@@ -67,6 +70,7 @@ class ActivityController extends Controller
             $q->where(function ($w) use ($like) {
                 $w->where('summary', 'like', $like)
                   ->orWhere('subject', 'like', $like)
+                  ->orWhere('details', 'like', $like)
                   ->orWhere('user_name', 'like', $like);
             });
         }
@@ -77,14 +81,20 @@ class ActivityController extends Controller
             ->limit(self::POR_PAGINA + 1)   // +1 para saber si hay más
             ->get([
                 'id', 'user_id', 'user_name', 'section', 'action',
-                'summary', 'subject', 'ip', 'created_at',
+                'summary', 'subject', 'details', 'ip', 'created_at',
             ]);
 
         $hayMas = $rows->count() > self::POR_PAGINA;
 
+        // Detalle (qué cambió): JSON → lista de frases.
+        $rows = $rows->take(self::POR_PAGINA)->map(function ($r) {
+            $r->details = $r->details ? (json_decode($r->details, true) ?: []) : [];
+            return $r;
+        });
+
         return response()->json([
             'ok'      => true,
-            'rows'    => $rows->take(self::POR_PAGINA)->values(),
+            'rows'    => $rows->values(),
             'has_more'=> $hayMas,
             'page'    => $page,
         ]);

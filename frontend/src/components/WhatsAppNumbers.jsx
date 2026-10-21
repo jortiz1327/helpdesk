@@ -19,7 +19,12 @@ const funcOf = (k) => FUNC[k] || FUNC.campanas
 
 const blank = { id: 0, label: '', phone_number_id: '', funcion: 'campanas', entorno: 'prueba', token: '', app_secret: '', waba_id: '', app_id: '', active: true }
 
-export default function WhatsAppNumbers() {
+/*
+ * `funcion` fija la lista a UNA función: desde Helpdesk se pasa «soporte» y solo se ven
+ * (y se crean) números de soporte; los de Campañas no aparecen ni se pueden tocar desde ahí.
+ * Sin `funcion` (Campañas → Ajustes) se ven todos, como siempre.
+ */
+export default function WhatsAppNumbers({ funcion = null }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [rows, setRows] = useState(null)
@@ -27,12 +32,14 @@ export default function WhatsAppNumbers() {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(0)
 
-  const load = useCallback(() => { api.waNumbers().then((d) => setRows(d.numbers || [])) }, [])
+  const load = useCallback(() => {
+    api.waNumbers().then((d) => setRows((d.numbers || []).filter((n) => !funcion || n.funcion === funcion)))
+  }, [funcion])
   useEffect(() => { load() }, [load])
 
   const abrir = (n) => setForm(n
     ? { ...blank, ...n, token: '', app_secret: '', active: !!Number(n.active) }   // no se re-muestran secretos
-    : { ...blank, position: (rows?.length || 0) + 1 })
+    : { ...blank, ...(funcion ? { funcion } : {}), position: (rows?.length || 0) + 1 })
 
   const save = async () => {
     if (!form.label.trim()) { toast('Ponle una etiqueta', 'err'); return }
@@ -75,7 +82,9 @@ export default function WhatsAppNumbers() {
       {rows === null ? <div className="center-load"><div className="spinner" /></div> : rows.length === 0 ? (
         <div className="wa-num-empty">
           <Icon.message style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
-          <p>Aún no hay números. Añade el de <b>Campañas</b> (al menos el de prueba de Meta) para el chat en vivo y las difusiones.</p>
+          <p>{funcion === 'soporte'
+            ? <>Aún no hay número de <b>Soporte</b>. Añade el de atención (Coexistence): de momento sus mensajes solo se guardan.</>
+            : <>Aún no hay números. Añade el de <b>Campañas</b> (al menos el de prueba de Meta) para el chat en vivo y las difusiones.</>}</p>
         </div>
       ) : (
         <div className="wa-num-list">
@@ -120,7 +129,7 @@ export default function WhatsAppNumbers() {
             <div className="modal-body">
               <div className="grid2">
                 <label className="field"><span className="lbl">Etiqueta <em>*</em> <InfoTip text="Un nombre para reconocerlo, p. ej. «Campañas»." /></span>
-                  <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="Campañas" autoFocus /></label>
+                  <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder={funcion === 'soporte' ? 'Soporte' : 'Campañas'} autoFocus /></label>
                 <label className="field"><span className="lbl">Entorno <InfoTip text="«Pruebas» = el número gratis que da Meta (solo escribe a destinatarios que registres en la app). «Real» = un número verificado de producción, para escribir a cualquier cliente." /></span>
                   <select value={form.entorno} onChange={(e) => setForm((f) => ({ ...f, entorno: e.target.value }))}>
                     <option value="prueba">Número de pruebas de Meta</option>
@@ -128,11 +137,13 @@ export default function WhatsAppNumbers() {
                   </select></label>
               </div>
 
-              <label className="field"><span className="lbl">Función <InfoTip text="Campañas = chat en vivo, flujos y difusiones. Soporte = el número de atención (Coexistence con el móvil): sus mensajes se guardan sin bot ni chat de Campañas." wide /></span>
-                <select value={form.funcion} onChange={(e) => setForm((f) => ({ ...f, funcion: e.target.value }))}>
-                  <option value="campanas">Campañas</option>
-                  <option value="soporte">Soporte</option>
-                </select></label>
+              {!funcion && (
+                <label className="field"><span className="lbl">Función <InfoTip text="Campañas = chat en vivo, flujos y difusiones. Soporte = el número de atención (Coexistence con el móvil): sus mensajes se guardan sin bot ni chat de Campañas." wide /></span>
+                  <select value={form.funcion} onChange={(e) => setForm((f) => ({ ...f, funcion: e.target.value }))}>
+                    <option value="campanas">Campañas</option>
+                    <option value="soporte">Soporte</option>
+                  </select></label>
+              )}
 
               <div className="grid2">
                 <label className="field"><span className="lbl">ID del número <InfoTip text="El phone_number_id. En Meta → tu App → WhatsApp → Configuración de la API. OJO: es el ID, no el número de teléfono en sí." /></span>

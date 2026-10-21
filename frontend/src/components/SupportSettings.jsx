@@ -4,12 +4,13 @@ import { fmtDate } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
+import Settings from './Settings.jsx'
 
 /* ---------------------------------------------------------------------------
  * CONFIGURACIÓN — solo superadmin / encargado (permiso support.config). Hub con
  * nav lateral por grupos: Plataforma (Funciones/Seguridad/Tareas), Clasificación,
- * Flujo de trabajo, Contenido y respuestas, y Correo. La config de WhatsApp NO
- * está aquí: es de Campañas (Campañas → Ajustes).
+ * Flujo de trabajo, Contenido y respuestas, y Correo. WhatsApp (solo superadmin)
+ * muestra SOLO los números de soporte; los de Campañas siguen en Campañas → Ajustes.
  * ------------------------------------------------------------------------- */
 
 const COLORS = [
@@ -54,19 +55,20 @@ const SECCIONES = [
 ]
 
 /*
- * PLATAFORMA: lo transversal del sistema (no es propio del soporte). «Funciones»
- * solo la ve el superadmin; «Seguridad» y «Tareas programadas» las ve quien tenga
- * support.config. WhatsApp NO vive aquí: es de Campañas (Campañas → Ajustes).
+ * PLATAFORMA: lo transversal del sistema (no es propio del soporte). «Funciones» y
+ * «WhatsApp» solo los ve el superadmin; «Seguridad» y «Tareas programadas» quien tenga
+ * support.config. «WhatsApp» = el número de soporte (Coexistence) y el webhook.
  */
 const PLATAFORMA = [
   { key: 'security', label: 'Seguridad',          icon: Icon.lock,    desc: 'Protección del acceso frente a intentos.' },
   { key: 'cron',     label: 'Tareas programadas', icon: Icon.refresh, desc: 'El planificador que mueve el correo y los cierres.' },
 ]
 const FEATURES_ITEM = { key: 'features', label: 'Funciones', icon: Icon.bolt, desc: 'Un vistazo del estado: qué está activo y la salud del correo.' }
+const WHATSAPP_ITEM = { key: 'whatsapp', label: 'WhatsApp', icon: Icon.whatsappCfg, desc: 'Número de soporte (Coexistence) y webhook de Meta.' }
 
 export default function SupportSettings({ user }) {
-  // «Plataforma» va la primera: Funciones (solo superadmin) + Seguridad + Tareas.
-  const plataforma = { grupo: 'Plataforma', items: user?.is_super ? [FEATURES_ITEM, ...PLATAFORMA] : PLATAFORMA }
+  // «Plataforma» va la primera: Funciones y WhatsApp (solo superadmin) + Seguridad + Tareas.
+  const plataforma = { grupo: 'Plataforma', items: user?.is_super ? [FEATURES_ITEM, WHATSAPP_ITEM, ...PLATAFORMA] : PLATAFORMA }
   const secciones = [plataforma, ...SECCIONES]
   const [tab, setTab] = useState(user?.is_super ? 'features' : 'categories')
   const actual = secciones.flatMap((s) => s.items).find((i) => i.key === tab)
@@ -96,6 +98,7 @@ export default function SupportSettings({ user }) {
 
         <div className="cfg-body">
           {tab === 'features' && <Features onGoto={setTab} />}
+          {tab === 'whatsapp' && user?.is_super && <Settings embedded area="soporte" />}
           {tab === 'categories' && <Categories />}
           {tab === 'canned' && <Canned />}
           {tab === 'faqs' && <Faqs />}

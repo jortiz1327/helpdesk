@@ -3566,6 +3566,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .act-user { color: var(--ink); font-weight: 700; }
 .act-what { color: var(--ink-2); }
 .act-ref { display: inline-block; margin-left: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 700; color: var(--sc); background: color-mix(in srgb, var(--sc) 12%, transparent); border: 1px solid color-mix(in srgb, var(--sc) 22%, transparent); border-radius: 7px; padding: 1px 8px; vertical-align: 1px; }
+/* Asunto del ticket (debajo de la frase) y DETALLE de lo que cambió. */
+.act-subj { margin: 2px 0 0; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-details { list-style: none; margin: 8px 0 0; padding: 7px 10px; display: grid; gap: 3px; font-size: 13px; color: var(--ink-2); background: color-mix(in srgb, var(--sc) 5%, var(--panel)); border-left: 2px solid color-mix(in srgb, var(--sc) 45%, transparent); border-radius: 0 7px 7px 0; }
+.act-details li { overflow-wrap: anywhere; }
 .act-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin: 7px 0 0; font-size: 12.5px; color: var(--ink-3); }
 .act-sec { position: relative; padding-left: 15px; font-weight: 700; color: var(--sc); }
 .act-sec::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border-radius: 50%; background: var(--sc); }
