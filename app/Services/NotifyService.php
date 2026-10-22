@@ -30,7 +30,9 @@ class NotifyService
         $r = $tpl->recipients ?: ['client' => true];
         $out = [];
 
-        if (!empty($r['client']) && $t->contact_email) {
+        // Al cliente de un ticket de WHATSAPP no se le manda NADA (ni acuse, ni cierre): es un
+        // chat, y aunque tenga correo en su ficha recibiría correos que no espera.
+        if (!empty($r['client']) && $t->contact_email && ($t->channel ?? null) !== 'whatsapp') {
             $out[mb_strtolower($t->contact_email)] = $t->contact_name;
         }
         if (!empty($r['agent']) && $t->agent_email) {
@@ -239,8 +241,9 @@ class NotifyService
             $t = DB::table('tickets as t')
                 ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
                 ->where('t.id', $ticketId)
-                ->first(['t.code', 't.subject', 't.status', 'c.name as contact_name', 'c.email as contact_email']);
+                ->first(['t.code', 't.subject', 't.status', 't.channel', 'c.name as contact_name', 'c.email as contact_email']);
             if (!$t || !$t->contact_email) return false;
+            if ($t->channel === 'whatsapp') return false;   // chat de WhatsApp: sin encuesta por correo
             if (!in_array($t->status, ['resuelto', 'cerrado'], true)) return false;
 
             // No repetir si ya valoró.
@@ -314,7 +317,7 @@ class NotifyService
                 ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
                 ->leftJoin('users as u', 'u.id', '=', 't.assigned_to')
                 ->where('t.id', $ticketId)
-                ->first(['t.code', 't.subject', 't.status', 'c.name as contact_name', 'c.email as contact_email',
+                ->first(['t.code', 't.subject', 't.status', 't.channel', 'c.name as contact_name', 'c.email as contact_email',
                          'u.name as agent_name', 'u.email as agent_email',
                          'u.notify_assigned as agent_notify_assigned', 'u.notify_reply as agent_notify_reply']);
             if (!$t) return false;
