@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { api, mediaUrl } from '../api.js'
-import { parseDate, fmtDate, fmtTime, fmtDiaLegible } from '../util.js'
+import { parseDate, fmtDate, fmtTime, fmtDiaLegible, fmtDateShort, dayLabel, fmtTel, nombreContacto } from '../util.js'
 import WaAudio from './WaAudio.jsx'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
@@ -157,6 +157,36 @@ function prioOptions(meta) {
 }
 
 // Historial de movimientos: icono + frase legible por tipo de evento.
+// Separador de día del chat: «Hoy», «Ayer», «lunes, 20 de octubre» (el año solo si no es el actual).
+function diaChat(s) {
+  const dl = dayLabel(s), d = parseDate(s)
+  if (dl === 'Hoy' || dl === 'Ayer' || !d) return dl
+  const otroAño = fmtDate(s, { year: 'numeric' }) !== String(new Date().getFullYear())
+  return fmtDate(s, { weekday: 'long', day: 'numeric', month: 'long', ...(otroAño ? { year: 'numeric' } : {}) })
+}
+
+// Texto de WhatsApp con su formato (*negrita*, _cursiva_, ~tachado~) y enlaces clicables.
+// Se monta con nodos de React, nunca como HTML: lo que escribe el cliente no se interpreta.
+// Las marcas solo cuentan pegadas a texto y fuera de palabras (como en WhatsApp: un
+// «nombre_de_archivo» no se pone en cursiva).
+const WA_TOKEN = /((?<![\p{L}\p{N}])\*(?=\S)[^*\n]*?\S\*(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])_(?=\S)[^_\n]*?\S_(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])~(?=\S)[^~\n]*?\S~(?![\p{L}\p{N}])|https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/gu
+function waTexto(s) {
+  return String(s).split(WA_TOKEN).map((p, i) => {
+    if (i % 2 === 0) return p
+    if (/^https?:/.test(p)) return <a key={i} href={p} target="_blank" rel="noreferrer">{p}</a>
+    const dentro = p.slice(1, -1)
+    if (p[0] === '*') return <b key={i}>{dentro}</b>
+    if (p[0] === '_') return <i key={i}>{dentro}</i>
+    return <s key={i}>{dentro}</s>
+  })
+}
+
+// Multimedia de WhatsApp que llegó SIN archivo (historial del móvil): qué era y su icono.
+const SIN_ARCHIVO = {
+  image: { label: 'Foto', icon: 'image' }, video: { label: 'Vídeo', icon: 'video' },
+  audio: { label: 'Audio', icon: 'mic' }, document: { label: 'Documento', icon: 'file' },
+  sticker: { label: 'Sticker', icon: 'image' }, unavailable: { label: 'Archivo', icon: 'file' },
+}
 const EV_ICON = { created: '🎫', status: '🔄', assign: '👤', category: '🏷️', priority: '⚑', merge_in: '🔗', merge_out: '🔗', requester: '✉️', snooze: '💤', snooze_wake: '⏰' }
 function describeEvent(e, meta) {
   const st = (v) => meta?.statuses?.[v] || LEGACY_STATUS[v] || v
@@ -1144,13 +1174,13 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                     return (
                       <tr key={t.id} className={`tk-row ${waiting ? 'wait' : ''} ${sleeping ? 'sleeping' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
                         tabIndex={0} onKeyDown={teclaAbrir(() => setOpen(t.id))}
-                        aria-label={`Ticket ${t.code}, ${t.contact_name || 'sin nombre'}: ${t.subject || 'sin asunto'}. Pulsa Intro para abrir.`}>
+                        aria-label={`Ticket ${t.code}, ${nombreContacto(t.contact_name, t.contact_wa, 'sin nombre')}: ${t.subject || 'sin asunto'}. Pulsa Intro para abrir.`}>
                         <td className="tk-chk" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={sel.has(t.id)} onChange={() => toggleSel(t.id)} />
                         </td>
                         <td className="tk-code">{t.code}</td>
                         <td><ChannelBadge channel={t.channel} source={t.source} /></td>
-                        <td className="tk-cli"><b>{t.contact_name || 'Sin nombre'}</b><small>{t.contact_email || (t.contact_wa ? '+' + t.contact_wa : '—')}</small></td>
+                        <td className="tk-cli"><b>{nombreContacto(t.contact_name, t.contact_wa)}</b><small>{t.contact_email || (t.contact_wa && t.contact_name ? fmtTel(t.contact_wa) : t.contact_wa ? 'WhatsApp' : '—')}</small></td>
                         <td className="tk-subj">
                           {waiting && <span className="dot-wait" title="El cliente escribió lo último: sin responder" />}
                           {t.subject}
@@ -1541,6 +1571,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   const [older, setOlder] = useState([])              // mensajes anteriores cargados a demanda (paginación)
   const [moreOld, setMoreOld] = useState(false)       // ¿hay mensajes antes de los cargados?
   const [loadingOld, setLoadingOld] = useState(false)
+  // WhatsApp: ya se está leyendo el historial del cliente (sus tickets anteriores) y la
+  // ficha de cada uno ({ id: {code,status,subject} }) para los separadores.
+  const [hist, setHist] = useState(false)
+  const [fichas, setFichas] = useState({})
   const [loadErr, setLoadErr] = useState(false)       // no se pudo cargar el ticket (red/servidor)
   const [masOpen, setMasOpen] = useState(false)       // menú «Más ⋯» de acciones secundarias
   const masRef = useRef(null)
@@ -1583,17 +1617,21 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
 
   /* Paginación del hilo: al cambiar de ticket se olvidan los anteriores cargados; y
      mientras no se haya cargado ninguno, «hay más» lo dice el propio detalle. */
-  useEffect(() => { setOlder([]); setMoreOld(false) }, [id])
+  useEffect(() => { setOlder([]); setMoreOld(false); setHist(false); setFichas({}) }, [id])
   useEffect(() => { if (d && older.length === 0) setMoreOld(!!d.messages_more) }, [d, older.length])
 
-  const cargarAnteriores = async () => {
+  // conHist: pasar a las conversaciones anteriores del cliente (WhatsApp).
+  const cargarAnteriores = async (conHist = hist) => {
     const shown = [...older, ...(d?.messages || [])]
     const oldestId = shown.reduce((m, x) => Math.min(m, x.id), Infinity)
     if (!isFinite(oldestId) || loadingOld) return
     setLoadingOld(true)
-    const r = await api.olderMessages(id, oldestId).catch(() => null)
+    const r = await api.olderMessages(id, oldestId, conHist).catch(() => null)
     setLoadingOld(false)
-    if (r?.ok) { setOlder((o) => [...(r.messages || []), ...o]); setMoreOld(!!r.more) }
+    if (r?.ok) {
+      setOlder((o) => [...(r.messages || []), ...o]); setMoreOld(!!r.more)
+      if (conHist) { setHist(true); setFichas((f) => ({ ...f, ...(r.tickets || {}) })) }
+    }
     else toast('No se pudieron cargar los mensajes anteriores', 'err')
   }
 
@@ -1823,9 +1861,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
               {/* Cliente: lo primero, con cara. Es con quien estás hablando. El lápiz
                   permite CAMBIAR el solicitante (corregir el correo mal escrito). */}
               <div className="tkm-cli">
-                <span className="tkm-av">{(t.contact_name || '?').slice(0, 1).toUpperCase()}</span>
+                <span className="tkm-av">{t.contact_name ? t.contact_name.slice(0, 1).toUpperCase() : t.contact_wa ? <Icon.phone /> : '?'}</span>
                 <div className="tkm-cli-tx">
-                  <b>{t.contact_name || 'Sin nombre'}</b>
+                  <b>{nombreContacto(t.contact_name, t.contact_wa)}</b>
                   <small>{t.contact_email || 'Sin correo'}</small>
                 </div>
                 {can('tickets.reply') && (
@@ -2069,12 +2107,19 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                     ))}
                 </div>
               ) : (
-              <div className="tkm-thread">
+              <div className={`tkm-thread${t.channel === 'whatsapp' ? ' is-wa' : ''}`}>
                 {mensajes.length === 0 && <div className="tk-empty"><p>Este ticket aún no tiene mensajes.</p></div>}
                 {/* Cargar mensajes anteriores (hilos largos de WhatsApp): no se traen todos de golpe. */}
                 {moreOld && (
-                  <button className="tk-loadmore" disabled={loadingOld} onClick={cargarAnteriores}>
+                  <button className="tk-loadmore" disabled={loadingOld} onClick={() => cargarAnteriores()}>
                     {loadingOld ? 'Cargando…' : '↑ Ver mensajes anteriores'}
+                  </button>
+                )}
+                {/* WhatsApp: al llegar al principio de ESTE ticket, se puede seguir leyendo
+                    el historial del cliente (sus conversaciones anteriores), como en el móvil. */}
+                {!moreOld && !hist && t.channel === 'whatsapp' && d.wa?.previous > 0 && (
+                  <button className="tk-loadmore" disabled={loadingOld} onClick={() => cargarAnteriores(true)}>
+                    {loadingOld ? 'Cargando…' : `↑ Ver conversaciones anteriores (${d.wa.previous})`}
                   </button>
                 )}
                 {(() => {
@@ -2082,25 +2127,69 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   // (en los cerrados es todo historial) y si hay mensajes anteriores.
                   const abierto = !['resuelto', 'cerrado'].includes(t.status)
                   const convSince = abierto ? t.conversation_since : null
+                  // WhatsApp se lee como en el móvil: separador por día, sin avatares y
+                  // burbujas seguidas del mismo lado agrupadas (nombre solo en la primera).
+                  const esWa = t.channel === 'whatsapp'
+                  const nota = (x) => !!Number(x?.is_internal_note)
+                  const mismoGrupo = (a, b) => !!a && !!b && a.direction === b.direction && nota(a) === nota(b)
+                    && Number(a.ticket_id) === Number(b.ticket_id)
+                    && a.author_user_id === b.author_user_id && a.via === b.via
+                    && fmtDateShort(a.created_at) === fmtDateShort(b.created_at)
+                    && parseDate(b.created_at) - parseDate(a.created_at) <= 5 * 60 * 1000
+                  const autorDe = (x) => `${x.author_user_id || ''}|${x.via || ''}`
                   let sepPuesto = false
+                  let autorOut = null   // quién contestó la última vez (para no repetir su nombre)
                   return mensajes.map((m, i) => {
                   const out = m.direction === 'out'
+                  const esNota = nota(m)
+                  const prev = mensajes[i - 1], next = mensajes[i + 1]
+                  // Historial del cliente cargado: separador al empezar cada conversación (ticket).
+                  const cambiaTicket = esWa && hist && (prev ? Number(prev.ticket_id) !== Number(m.ticket_id) : Number(m.ticket_id) !== Number(t.id))
+                  const esteTicket = Number(m.ticket_id) === Number(t.id)
+                  if (cambiaTicket && esteTicket) sepPuesto = true   // ya lo marca el separador de conversación
                   const sep = convSince && !sepPuesto && i > 0 && m.created_at >= convSince
                   if (sep) sepPuesto = true
+                  const ficha = cambiaTicket && !esteTicket ? fichas[m.ticket_id] : null
+                  const nuevoDia = esWa && (!prev || fmtDateShort(prev.created_at) !== fmtDateShort(m.created_at))
+                  const ini = !esWa || sep || !mismoGrupo(prev, m)
+                  const fin = !esWa || !mismoGrupo(m, next)
+                  // En WhatsApp el nombre solo hace falta en lo NUESTRO y cuando cambia quién
+                  // contesta: el cliente es siempre el mismo y ya sale en la cabecera.
+                  const cambiaAutor = out && !esNota && autorDe(m) !== autorOut
+                  if (out && !esNota) autorOut = autorDe(m)
+                  const conNombre = !esWa || esNota || (ini && cambiaAutor)
+                  const conEstrella = out && !esNota && (m.body || m.type === 'text')
+                  // Foto/audio/… sin archivo: el historial del móvil no lo trae (Meta no lo manda).
+                  const sinArchivo = !m.media_url && !(m.attachments || []).length && SIN_ARCHIVO[m.type]
                   return (
                     <Fragment key={m.id}>
+                    {cambiaTicket && (
+                      <div className={`wa-conv${esteTicket ? ' actual' : ''}`}>
+                        {esteTicket
+                          ? <span><b>Esta conversación</b> · {t.code}</span>
+                          : <span>
+                              <b>Conversación anterior</b> · {ficha?.code || 'otro ticket'}
+                              {ficha?.status && <> · {['resuelto', 'cerrado'].includes(ficha.status) ? 'cerrada' : 'abierta'}</>}
+                              <button type="button" onClick={() => onOpenTicket?.(Number(m.ticket_id))}>Abrir</button>
+                            </span>}
+                      </div>
+                    )}
+                    {nuevoDia && <div className="wa-day"><span>{diaChat(m.created_at)}</span></div>}
                     {sep && <div className="tk-conv-sep"><span><Icon.chat style={{ width: 13, height: 13, fill: 'currentColor' }} /> Conversación más reciente</span></div>}
-                    <div className={`tk-msg ${out ? 'out' : 'in'} ${Number(m.is_internal_note) ? 'note' : ''} ${m.channel === 'email' && !out ? 'is-email' : ''}`}>
-                      <span className={`tk-av ${Number(m.is_internal_note) ? 'note' : out ? 'sop' : 'cli'}`}>
-                        {Number(m.is_internal_note)
-                          ? <Icon.note style={{ width: 15, height: 15, fill: 'currentColor' }} />
-                          : out ? <Icon.headset style={{ width: 15, height: 15, fill: 'currentColor' }} /> : <Icon.user style={{ width: 15, height: 15, fill: 'currentColor' }} />}
-                      </span>
+                    <div className={`tk-msg ${out ? 'out' : 'in'} ${esNota ? 'note' : ''} ${m.channel === 'email' && !out ? 'is-email' : ''}${ini ? ' grp-ini' : ''}${fin ? ' grp-fin' : ''}`}>
+                      {(!esWa || esNota) && (
+                        <span className={`tk-av ${esNota ? 'note' : out ? 'sop' : 'cli'}`}>
+                          {esNota
+                            ? <Icon.note style={{ width: 15, height: 15, fill: 'currentColor' }} />
+                            : out ? <Icon.headset style={{ width: 15, height: 15, fill: 'currentColor' }} /> : <Icon.user style={{ width: 15, height: 15, fill: 'currentColor' }} />}
+                        </span>
+                      )}
                       <div className="tk-bub">
-                        <div className="b-who">
+                        {(conNombre || conEstrella) && (
+                        <div className={`b-who${conNombre ? '' : ' solo-star'}`}>
                           {/* Nota interna: badge bien visible + quién la escribió. Si no,
-                              el agente concreto, «Automático» (bot) o el cliente. */}
-                          {Number(m.is_internal_note)
+                              el agente concreto, el móvil (Coexistence), «Automático» (bot) o el cliente. */}
+                          {conNombre && (esNota
                             ? <>
                                 <span className={`note-badge ${m.status === 'sla_justificacion' ? 'sla' : ''}`}>
                                   {m.status === 'sla_justificacion'
@@ -2110,15 +2199,25 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                                 {m.author_name && <span className="note-author"> · {m.author_name}</span>}
                               </>
                             : out
-                              ? (m.author_name || 'Automático')
-                              : (t.contact_name || 'Cliente')}
+                              ? (m.author_name || (m.via === 'movil'
+                                  ? <span className="b-via"><Icon.phone /> Desde el móvil</span>
+                                  : 'Automático'))
+                              : (t.contact_name || 'Cliente'))}
                           {/* ⭐ interruptor: guardar/quitar en la memoria de respuestas efectivas. */}
-                          {out && !Number(m.is_internal_note) && (m.body || m.type === 'text') && (
+                          {conEstrella && (
                             <button type="button" className={'tk-star' + (esEfectiva(m) ? ' on' : '')}
                               title={esEfectiva(m) ? 'Quitar de respuestas efectivas' : 'Guardar como respuesta efectiva'}
                               onClick={() => guardarEfectiva(m)}><Icon.star /></button>
                           )}
                         </div>
+                        )}
+
+                        {sinArchivo && (
+                          <div className="wa-nofile">
+                            <span className="wa-nofile-ic">{(Icon[sinArchivo.icon] || Icon.file)({})}</span>
+                            <span className="wa-nofile-tx"><b>{sinArchivo.label} no disponible</b><small>Solo está en el móvil</small></span>
+                          </div>
+                        )}
 
                         {/* Multimedia de WhatsApp (media_url = id de Meta; se baja por el proxy). */}
                         {m.media_url && (m.type === 'image' || m.type === 'sticker') && (
@@ -2154,7 +2253,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                              muestra si NO hay ni texto ni multimedia. */
                           : Number(m.is_html)
                             ? <div className={`b-html${m.channel === 'email' ? ' b-email' : ''}`} dangerouslySetInnerHTML={{ __html: m.body }} />
-                            : (m.body || (!m.media_url && <i>[{m.type}]</i>))}
+                            : m.body
+                              ? (esWa ? waTexto(m.body) : m.body)
+                              : (!m.media_url && !sinArchivo && !(m.attachments || []).length && <i>[{m.type}]</i>)}
 
                         {/* Adjuntos: se excluyen las imágenes EN LÍNEA (inline), que ya
                             se muestran dentro del cuerpo del correo (firma, etc.). */}
@@ -2184,9 +2285,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                           </div>
                         )}
 
-                        <div className="b-t">
+                        {/* En WhatsApp la hora va dentro de la línea final, como en el móvil
+                            (el día ya lo dice el separador); el título da la fecha completa. */}
+                        <div className="b-t" title={esWa ? fmtDiaLegible(m.created_at) : undefined}>
                           <span className="b-hora">{fmtTime(m.created_at)}</span>
-                          <span className="b-fecha"> - {fmtDiaLegible(m.created_at)}</span>
+                          {!esWa && <span className="b-fecha"> - {fmtDiaLegible(m.created_at)}</span>}
                           {/* Estado de entrega del WhatsApp saliente: enviado/entregado/leído/fallido */}
                           {out && m.channel === 'whatsapp' && !Number(m.is_internal_note) && m.status && (
                             m.status === 'failed'
@@ -2292,6 +2395,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   to={d.ticket.channel === 'email' ? d.ticket.contact_email : null}
                   // Programar el envío: solo por correo (WhatsApp tiene ventana de 24h).
                   canSchedule={d.ticket.channel === 'email'}
+                  // WhatsApp: editor limitado a su formato y ventana de 24 h.
+                  wa={d.ticket.channel === 'whatsapp' ? (d.wa || { window_open: false }) : null}
                   ccSugerido={d.cc_sugerido || []}
                   disabled={!can('tickets.reply') || (d.lock && !d.lock.mine)}
                   disabledHint={!can('tickets.reply')
@@ -2317,7 +2422,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                       const r = await api.ticketReply(id, html, files, cc, bcc, schedule, send_at)
                       if (r.ok) {
                         if (r.scheduled) toast(`⏱ Respuesta programada para ${fmtDate(r.send_at)}`)
-                        else toast('✉️ Respuesta enviada por correo')
+                        else toast(d.ticket.channel === 'whatsapp' ? '💬 Enviado por WhatsApp' : '✉️ Respuesta enviada por correo')
                         if (r.reopened) toast('El ticket estaba cerrado y se ha reabierto')
                         if (r.warnings?.length) toast(r.warnings.join(' · '), 'err')
                         load(); onChange?.()

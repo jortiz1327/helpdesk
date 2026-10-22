@@ -47,6 +47,8 @@ class SettingsController extends Controller
                 || \App\Models\WhatsAppNumber::whereNotNull('app_secret')->where('app_secret', '!=', '')->exists(),
             'account_verified'   => (string) Setting::get('account_verified', '0') === '1',
             'consent_enabled'    => (string) Setting::get('consent_enabled', '0') === '1',
+            // WhatsApp de soporte (el 01): ¿sus mensajes crean/alimentan tickets? (fase 2)
+            'wa_soporte_tickets' => \App\Services\SoporteWhatsApp::activo(),
             'consent_message'    => (string) Setting::get('consent_message', '') ?: self::consentDefault(),
             'webhook_url'        => $base . '/api/webhook.php',
             // Red de seguridad de envíos
@@ -80,6 +82,11 @@ class SettingsController extends Controller
         }
         if (array_key_exists('consent_enabled', $in)) {
             Setting::put('consent_enabled', !empty($in['consent_enabled']) ? '1' : '0');
+        }
+        if (array_key_exists('wa_soporte_tickets', $in)) {
+            // Solo superadmin: decide si los clientes de WhatsApp empiezan a crear tickets.
+            if (!$request->user()?->is_super) return response()->json(['ok' => false, 'error' => 'Solo superadmin'], 403);
+            Setting::put('wa_soporte_tickets', !empty($in['wa_soporte_tickets']) ? '1' : '0');
         }
         // Red de seguridad de envíos
         if (array_key_exists('outbound_paused', $in)) {

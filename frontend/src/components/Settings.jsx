@@ -21,11 +21,13 @@ export default function Settings({ embedded = false, area = 'campanas' }) {
   const [consentOn, setConsentOn] = useState(true)
   const [sigActive, setSigActive] = useState(false)
   const [prices, setPrices] = useState(null)
+  const [ticketsOn, setTicketsOn] = useState(false)
 
   useEffect(() => {
     api.getSettings().then((d) => {
       const init = {}; FIELDS.forEach((k) => (init[k] = d[k] || ''))
       setF(init); setWebhook(d.webhook_url || ''); setVerified(!!d.account_verified); setConsentOn(!!d.consent_enabled)
+      setTicketsOn(!!d.wa_soporte_tickets)
       setSigActive(!!d.webhook_signature_active)
       setPrices(d.wa_prices || { marketing: 0.06, utility: 0.0166, authentication: 0.0166, service: 0 })
     })
@@ -35,6 +37,13 @@ export default function Settings({ embedded = false, area = 'campanas' }) {
     setVerified(v)
     await api.saveSettings({ account_verified: v })
     toast(v ? 'Cuenta marcada como verificada — candados levantados' : 'Candados reactivados')
+  }
+
+  const toggleTickets = async (v) => {
+    setTicketsOn(v)
+    const res = await api.saveSettings({ wa_soporte_tickets: v ? 1 : 0 })
+    if (!res.ok) { setTicketsOn(!v); return toast(res.error || 'No se pudo guardar', 'err') }
+    toast(v ? 'Los WhatsApp de soporte ya crean tickets' : 'WhatsApp de soporte: solo se guardan, sin tickets')
   }
 
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
@@ -70,6 +79,18 @@ export default function Settings({ embedded = false, area = 'campanas' }) {
               Aquí se configura TODO (token, App Secret, WABA…) por número; el viejo
               bloque global «Conexión con Meta» se retiró por redundante. */}
           <WhatsAppNumbers funcion={soporte ? 'soporte' : null} />
+
+          {soporte && (
+            <div className="card">
+              <h2>Tickets de WhatsApp</h2>
+              <p className="desc">Con esto activado, lo que escriben los clientes al número de soporte entra como <b>ticket</b>, y lo que contestáis desde el móvil se añade al ticket como <b>«Desde el móvil»</b>. Si el cliente vuelve a escribir antes de 7 días de silencio, sigue en el mismo ticket (si estaba resuelto, se reabre: cerrarlo es cosa del agente); pasado ese tiempo, ticket nuevo. Aquí no hay bot ni mensaje de consentimiento: eso es solo de Campañas.</p>
+              <label className="fb-req-row" style={{ marginTop: 4 }}>
+                <span className="fb-switch"><input type="checkbox" checked={ticketsOn} onChange={(e) => toggleTickets(e.target.checked)} /><span className={`fb-toggle ${ticketsOn ? 'on' : ''}`} /></span>
+                <span className="fb-req-label">Crear tickets con los WhatsApp de soporte</span>
+              </label>
+              <span className="hint" style={{ display: 'block', marginTop: 8 }}>Apagado, los mensajes se siguen guardando (sin perder ninguno) pero no crean tickets. Al encenderlo, lo guardado mientras tanto se puede pasar a tickets.</span>
+            </div>
+          )}
 
           <div className="card">
             <h2>Webhook</h2>

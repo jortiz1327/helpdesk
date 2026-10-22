@@ -11,12 +11,18 @@ const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
  * En los tickets de correo lleva además los DESTINATARIOS: quien venía en copia en
  * el hilo sigue en la conversación, así que se propone solo y el agente decide.
  */
-export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], ticketId = null, cannedVars = null, mentionUsers = null, canSchedule = false }) {
+export default function Composer({ onSend, disabled = false, disabledHint, to, ccSugerido = [], ticketId = null, cannedVars = null, mentionUsers = null, canSchedule = false, wa = null }) {
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
   const [sending, setSending] = useState(false)   // envío en curso: bloquea el botón y evita doble envío
   const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
   const note = mode === 'note'
+  /* WhatsApp (`wa` = { window_open, window_closes }): fuera de la ventana de 24 h Meta no
+     deja escribir al cliente, así que la respuesta se bloquea (la nota interna no). */
+  const waCerrada = !!wa && !note && !wa.window_open
+  const waCierra = wa?.window_open && wa.window_closes ? new Date(wa.window_closes) : null
+  const waPocoMargen = waCierra && waCierra - Date.now() < 3 * 3600 * 1000
+  const bloqueado = disabled || waCerrada
   // Programar envío (solo respuesta por correo): menú del botón partido.
   const [schedOpen, setSchedOpen] = useState(false)
   const [schedCustom, setSchedCustom] = useState(false)
@@ -115,7 +121,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
 
   return (
     <div className={`cmp-wrap ${note ? 'note-mode' : ''}`} onKeyDown={(e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !disabled && !empty && !sending) send()
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !bloqueado && !empty && !sending) send()
     }}>
       {/* Conmutador: responder al cliente vs nota interna (solo la ven los agentes) */}
       <div className="cmp-mode">
@@ -149,22 +155,37 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
         </div>
       )}
 
+      {waCerrada && (
+        <div className="cmp-wa-win">
+          <Icon.clock />
+          <span><b>Solo puedes escribirle desde el móvil.</b> Han pasado más de 24 h desde su último mensaje y WhatsApp ya no deja contestar desde el Helpdesk. Lo que le envíes desde el móvil aparecerá aquí como «Desde el móvil». Aquí sí puedes dejar una nota interna.</span>
+        </div>
+      )}
+
       {/* canned = activa el menú «/» de respuestas predefinidas */}
       <RichInput
         ref={ed}
-        disabled={disabled}
+        disabled={bloqueado}
+        whatsapp={!!wa && !note}
         canned
         cannedVars={cannedVars}
         mentionUsers={note ? mentionUsers : null}
         minHeight={84}
         placeholder={disabled ? (disabledHint || 'No disponible')
+          : waCerrada ? 'Contesta desde el móvil (más de 24 h sin mensajes del cliente)'
           : note ? 'Escribe una nota interna… (solo la verán los agentes)'
+          : wa ? 'Escribe tu respuesta por WhatsApp… (o / para respuestas rápidas)'
           : 'Escribe tu respuesta… (o / para respuestas rápidas)'}
         onChange={guardarBorrador}
       />
       <div className="cmp-foot">
         {disabled && <span className="cmp-warn"><Icon.warn /> {disabledHint}</span>}
         {!disabled && note && <span className="cmp-note-tag"><Icon.lock /> No se envía al cliente</span>}
+        {!disabled && !note && waPocoMargen && (
+          <span className="cmp-wa-tag" title="Pasadas 24 h desde su último mensaje, WhatsApp no deja escribirle">
+            <Icon.clock /> Puedes escribirle hasta las {waCierra.toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
         {/* Respuestas efectivas parecidas: memoria de lo que funcionó en casos similares. */}
         {!disabled && !note && efectivas.length > 0 && (
           <div className="cmp-ef">
@@ -189,10 +210,10 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
         <span className="spacer" />
         <span className="cmp-hint">Ctrl + Enter</span>
         {note || !canSchedule ? (
-          <button className={`btn ${note ? 'note-btn' : ''}`} disabled={disabled || empty || sending} onClick={() => send()}>
+          <button className={`btn ${note ? 'note-btn' : ''} ${wa && !note ? 'wa-btn' : ''}`} disabled={bloqueado || empty || sending} onClick={() => send()}>
             {sending
               ? <>{note ? <Icon.note /> : <Icon.send />} {note ? 'Guardando…' : 'Enviando…'}</>
-              : (note ? <><Icon.note /> Guardar nota</> : <><Icon.send /> Enviar respuesta</>)}
+              : (note ? <><Icon.note /> Guardar nota</> : <><Icon.send /> {wa ? 'Enviar por WhatsApp' : 'Enviar respuesta'}</>)}
           </button>
         ) : (
           <span className="cmp-split" ref={schedRef}>

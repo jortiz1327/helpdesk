@@ -78,6 +78,18 @@ export function fmtDateShort(s) {
   const d = parseDate(s)
   return d ? d.toLocaleDateString(ES, { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
 }
+// Teléfono de WhatsApp (wa_id, solo dígitos) legible: «+34 683 248 357».
+export function fmtTel(wa) {
+  const d = String(wa || '').replace(/\D+/g, '')
+  if (!d) return ''
+  const m = d.match(/^34(\d{3})(\d{3})(\d{3})$/)
+  return m ? `+34 ${m[1]} ${m[2]} ${m[3]}` : '+' + d
+}
+// Nombre del cliente; si no lo tiene (WhatsApp sin nombre de perfil), su teléfono.
+export function nombreContacto(name, wa, fallback = 'Sin nombre') {
+  return name || fmtTel(wa) || fallback
+}
+
 // Día legible con nombre de semana: «lunes 14/09/26» (para la hora de cada mensaje).
 // es-ES mete una coma tras el día de la semana; se quita para que quede como el ejemplo.
 export function fmtDiaLegible(s) {

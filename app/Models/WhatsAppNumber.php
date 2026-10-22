@@ -20,8 +20,8 @@ class WhatsAppNumber extends Model
 
     protected $casts = ['active' => 'boolean'];
 
-    // 'soporte' = el 01 (Coexistence). De momento sus eventos solo se CAPTURAN en
-    // wa_raw_events (sin bot, sin chat de Campañas); la bandeja de soporte es la fase 2.
+    // 'soporte' = el 01 (Coexistence). Sus eventos se guardan en wa_raw_events (sin bot,
+    // sin chat de Campañas) y, con `wa_soporte_tickets` activo, van a tickets (SoporteWhatsApp).
     public const FUNCIONES = ['campanas', 'soporte'];
 
     /** El número activo de un WABA (para eventos sin phone_number_id, p. ej. account_update). */

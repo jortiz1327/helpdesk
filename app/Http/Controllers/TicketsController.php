@@ -893,6 +893,8 @@ class TicketsController extends Controller
             'messages_more' => $totalMsg > $messages->count(),
             // Copias que ya estaban en la conversación, para proponerlas al responder.
             'cc_sugerido' => $this->ccDelHilo($messages, (string) $t->contact_email),
+            // WhatsApp: ventana de 24 h y conversaciones anteriores del cliente.
+            'wa' => $t->channel === 'whatsapp' ? $this->waContexto($t) : null,
         ]);
     }
 
@@ -900,33 +902,41 @@ class TicketsController extends Controller
      * Carga una PÁGINA de mensajes de un ticket (los `$limit` más recientes con id menor
      * que `$before`, o los últimos si `$before` es null), en orden ascendente para pintar.
      * Cuelga adjuntos y el motivo de fallo de entrega. Compartido por detail() y messages().
+     * `$ids` puede ser VARIOS tickets: el historial de WhatsApp del cliente (sus
+     * conversaciones anteriores) se lee seguido, como en el móvil.
      */
-    protected function cargarMensajes(int $id, ?int $before, int $limit)
+    protected function cargarMensajes(int|array $ids, ?int $before, int $limit)
     {
+        $ids = array_map('intval', (array) $ids);
         $q = DB::table('messages as m')
             ->leftJoin('users as au', 'au.id', '=', 'm.author_user_id')
-            ->where('m.ticket_id', $id);
+            ->whereIn('m.ticket_id', $ids);
         if ($before) $q->where('m.id', '<', $before);
 
         $messages = $q->orderByDesc('m.id')->limit($limit)
             ->get([
-                'm.id', 'm.direction', 'm.channel', 'm.type', 'm.body', 'm.is_html', 'm.is_internal_note',
+                'm.id', 'm.ticket_id', 'm.direction', 'm.channel', 'm.type', 'm.body', 'm.is_html', 'm.is_internal_note',
                 'm.media_url', 'm.media_mime', 'm.status', 'm.author_user_id', 'm.created_at',
                 'm.cc', 'm.bcc', 'm.payload',
                 'au.name as author_name', 'au.email as author_email',
             ])
             ->reverse()->values();   // se leyó desc (para el LIMIT); se pinta asc
 
-        $byMessage = $this->attachments->forTicket($id);
+        $byMessage = [];
+        foreach (array_unique($messages->pluck('ticket_id')->map(fn ($x) => (int) $x)->all()) as $tid) {
+            $byMessage += $this->attachments->forTicket($tid);
+        }
         // Qué mensajes están marcados como «respuesta efectiva» (⭐), para pintar la estrella rellena.
         $starred = $messages->isEmpty() ? [] : DB::table('effective_responses')
-            ->where('ticket_id', $id)->whereIn('message_id', $messages->pluck('id')->all())
+            ->whereIn('ticket_id', $ids)->whereIn('message_id', $messages->pluck('id')->all())
             ->pluck('message_id')->flip()->all();
         foreach ($messages as $m) {
             $m->attachments = $byMessage[$m->id] ?? [];
             $m->starred = isset($starred[$m->id]);
-            if ($m->payload && ($p = json_decode($m->payload, true)) && !empty($p['delivery_error'])) {
-                $m->delivery_error = $p['delivery_error'];
+            if ($m->payload && ($p = json_decode($m->payload, true))) {
+                if (!empty($p['delivery_error'])) $m->delivery_error = $p['delivery_error'];
+                // Enviado desde el móvil (WhatsApp Business con Coexistence), no desde el Helpdesk.
+                if (($p['_via'] ?? null) === 'movil') $m->via = 'movil';
             }
             unset($m->payload);
         }
@@ -941,14 +951,50 @@ class TicketsController extends Controller
         if (!(clone $this->baseQuery($me))->where('t.id', $id)->exists()) {
             return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
         }
-        $before   = (int) $request->query('before');
-        $messages = $this->cargarMensajes($id, $before ?: null, self::MSG_PAGE);
+        $before = (int) $request->query('before');
+        // hist=1 (WhatsApp): se sigue hacia atrás por las conversaciones ANTERIORES del
+        // cliente (sus otros tickets de WhatsApp), con la ficha de cada una para el separador.
+        $ids = [$id];
+        $fichas = [];
+        if ($request->boolean('hist')) {
+            $prev = $this->waAnteriores($id);
+            $ids = array_merge($ids, $prev->pluck('id')->all());
+            foreach ($prev as $p) $fichas[$p->id] = $p;
+        }
+        $messages = $this->cargarMensajes($ids, $before ?: null, self::MSG_PAGE);
         $firstId  = $messages->first()->id ?? null;
         $more     = $firstId
-            ? DB::table('messages')->where('ticket_id', $id)->where('id', '<', $firstId)->exists()
+            ? DB::table('messages')->whereIn('ticket_id', $ids)->where('id', '<', $firstId)->exists()
             : false;
 
-        return response()->json(['ok' => true, 'messages' => $messages, 'more' => $more]);
+        return response()->json(['ok' => true, 'messages' => $messages, 'more' => $more, 'tickets' => (object) $fichas]);
+    }
+
+    /** Conversaciones (tickets de WhatsApp) ANTERIORES del mismo cliente, sin las fusionadas. */
+    protected function waAnteriores(int $id)
+    {
+        $t = DB::table('tickets')->where('id', $id)->first(['contact_id', 'channel']);
+        if (!$t || $t->channel !== 'whatsapp') return collect();
+        return DB::table('tickets')->where('contact_id', $t->contact_id)->where('channel', 'whatsapp')
+            ->where('id', '<', $id)->whereNull('merged_into_id')
+            ->orderByDesc('id')->get(['id', 'code', 'status', 'subject']);
+    }
+
+    /**
+     * WhatsApp: ventana de 24 h para escribir texto libre (Meta solo deja contestar
+     * dentro de las 24 h desde el último mensaje del cliente; después, solo plantillas)
+     * y cuántas conversaciones anteriores tiene el cliente.
+     */
+    protected function waContexto(object $t): array
+    {
+        $ultimo = DB::table('messages')->where('contact_id', $t->contact_id)->where('channel', 'whatsapp')
+            ->where('funcion', 'soporte')->where('direction', 'in')->max('created_at');
+        $cierra = $ultimo ? \Illuminate\Support\Carbon::parse($ultimo)->addDay() : null;
+        return [
+            'window_open'   => $cierra && $cierra->isFuture(),
+            'window_closes' => $cierra?->toIso8601String(),
+            'previous'      => $this->waAnteriores((int) $t->id)->count(),
+        ];
     }
 
     /** Suelta el bloqueo al cerrar el ticket (si no, caduca solo). */
@@ -1098,7 +1144,18 @@ class TicketsController extends Controller
 
         $svc = app(\App\Services\TicketReplyService::class);
 
-        // Los tickets solo se responden por CORREO (web/otros canales aún no envían).
+        // WhatsApp (el número de soporte): texto con el formato que admite WhatsApp y los
+        // adjuntos como mensajes aparte. Sin programar (la ventana de 24 h no espera).
+        if ($t->channel === 'whatsapp') {
+            $r = $svc->porWhatsApp($t, $html, (array) $files, $me);
+            if (($r['ok'] ?? false) && in_array($t->status, ['resuelto', 'cerrado'], true)) {
+                app(\App\Services\TicketService::class)->setStatus($id, 'abierto', (int) $me->id);
+                $r['reopened'] = true;
+            }
+            return $this->respuesta($r);
+        }
+
+        // El resto de canales (web…) aún no envían: solo correo y WhatsApp.
         if ($t->channel !== 'email') {
             return response()->json(['ok' => false, 'error' => 'El envío para el canal «' . $t->channel . '» aún no está disponible'], 422);
         }

@@ -96,7 +96,8 @@ class ChatService
         // El resumen del contacto (last_message/last_time/unread) es el de la vista
         // «Chat en vivo» de Campañas, que es SOLO WhatsApp. Los mensajes de correo/web
         // (soporte) NO lo tocan: su actividad vive en el ticket, no en esa bandeja.
-        if (($opts['channel'] ?? 'whatsapp') === 'whatsapp') {
+        // Tampoco el WhatsApp de SOPORTE (el 01): es otra bandeja, la de tickets.
+        if (($opts['channel'] ?? 'whatsapp') === 'whatsapp' && $attrs['funcion'] !== 'soporte') {
             $preview = $opts['preview'] ?? ($body !== '' ? $body : '[' . $type . ']');
             DB::table('contacts')->where('id', $contactId)->update([
                 'last_message' => mb_substr($preview, 0, 120),

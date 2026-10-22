@@ -8,6 +8,7 @@ use App\Services\CampaignService;
 use App\Services\ChatService;
 use App\Services\FlowEngine;
 use App\Services\FlowsMetaService;
+use App\Services\SoporteWhatsApp;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -138,15 +139,31 @@ class WebhookController extends Controller
                  * vez) y lo que se envía desde el móvil (smb_message_echoes).
                  */
                 if ($funcion !== 'campanas') {
+                    $field = mb_substr((string) ($change['field'] ?? '?'), 0, 40);
+                    $rawId = null;
                     try {
-                        DB::table('wa_raw_events')->insert([
-                            'field'           => mb_substr((string) ($change['field'] ?? '?'), 0, 40),
+                        $rawId = DB::table('wa_raw_events')->insertGetId([
+                            'field'           => $field,
                             'waba_id'         => $entry['id'] ?? null,
                             'phone_number_id' => $phoneId ?: ($num->phone_number_id ?? null),
                             'payload'         => json_encode($value, JSON_UNESCAPED_UNICODE),
                         ]);
                     } catch (\Throwable $e) {
                         Log::error('WhatsApp soporte: no se pudo guardar el evento crudo: ' . $e->getMessage());
+                    }
+                    /*
+                     * Fase 2: mensajes del cliente y lo contestado desde el móvil → su ticket
+                     * (solo con el ajuste activado). Si falla, el evento queda SIN
+                     * processed_at y `wa:process-raw` lo reintenta: no se pierde nada.
+                     */
+                    if ($funcion === 'soporte' && SoporteWhatsApp::activo()) {
+                        try {
+                            $this->handleStatuses($value['statuses'] ?? []);   // ✓✓ de lo enviado desde el Helpdesk
+                            app(SoporteWhatsApp::class)->procesar($field, $value);
+                            if ($rawId) DB::table('wa_raw_events')->where('id', $rawId)->update(['processed_at' => now()]);
+                        } catch (\Throwable $e) {
+                            report($e);
+                        }
                     }
                     continue;
                 }

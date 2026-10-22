@@ -154,7 +154,8 @@ export const api = {
     return req(`tickets.php?action=detail&${p}${bg ? '&bg=1' : ''}`)
   },
   // Mensajes anteriores del hilo (paginación hacia atrás): los previos a `before`.
-  olderMessages: (id, before) => req(`tickets.php?action=messages&id=${id}&before=${before}`),
+  // hist=true (WhatsApp): sigue por las conversaciones anteriores del cliente.
+  olderMessages: (id, before, hist = false) => req(`tickets.php?action=messages&id=${id}&before=${before}${hist ? '&hist=1' : ''}`),
   // Se envía como multipart porque puede llevar adjuntos (JSON no transporta ficheros).
   createTicket: ({ files = [], ...payload }) => {
     const fd = new FormData()

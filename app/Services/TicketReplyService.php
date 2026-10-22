@@ -129,6 +129,127 @@ class TicketReplyService
         return ['ok' => true, 'id' => $messageId, 'warnings' => $warnings];
     }
 
+    /**
+     * Responde por WHATSAPP desde el número de SOPORTE (nunca desde el de Campañas). El
+     * texto sale con el formato que admite WhatsApp (*negrita*, _cursiva_, ~tachado~) y
+     * cada adjunto como un mensaje aparte. Los adjuntos se guardan también aquí (Meta
+     * borra sus archivos a las pocas semanas). Sin bot ni consentimiento: es soporte.
+     */
+    public function porWhatsApp(object $t, string $html, array $files, $me): array
+    {
+        $to = preg_replace('/\D+/', '', (string) ($t->contact_wa ?? ''));
+        if ($to === '') return ['ok' => false, 'error' => 'El contacto no tiene número de WhatsApp', '_status' => 422];
+
+        $num = \App\Models\WhatsAppNumber::porFuncion('soporte');
+        $wa  = $num ? app(WhatsAppService::class)->paraNumero($num) : null;
+        if (!$wa || !$num->token || !$wa->configured()) {
+            return ['ok' => false, 'error' => 'El número de WhatsApp de soporte no tiene token para enviar (Configuración → WhatsApp)', '_status' => 422];
+        }
+
+        // Ventana de 24 h: fuera de ella Meta solo admite plantillas aprobadas.
+        $ultimo = DB::table('messages')->where('contact_id', $t->contact_id)->where('channel', 'whatsapp')
+            ->where('funcion', 'soporte')->where('direction', 'in')->max('created_at');
+        if (!$ultimo || \Illuminate\Support\Carbon::parse($ultimo)->addDay()->isPast()) {
+            return ['ok' => false, 'error' => self::SOLO_MOVIL, '_status' => 422];
+        }
+
+        $texto = self::aTextoWhatsApp($html);
+        if ($texto === '' && !$files) return ['ok' => false, 'error' => 'La respuesta está vacía', '_status' => 400];
+        if (mb_strlen($texto) > 4096) return ['ok' => false, 'error' => 'WhatsApp admite hasta 4096 caracteres por mensaje', '_status' => 422];
+
+        $opts = ['ticket_id' => (int) $t->id, 'author_user_id' => (int) $me->id, 'sent_by' => (int) $me->id,
+                 'channel' => 'whatsapp', 'funcion' => 'soporte', 'status' => 'sent'];
+        $ids = [];
+
+        if ($texto !== '') {
+            [$code, $res] = $wa->sendText($to, $texto);
+            if (!($code >= 200 && $code < 300 && !empty($res['messages'][0]['id']))) {
+                return ['ok' => false, 'error' => self::errorMeta($res), '_status' => 502];
+            }
+            $ids[] = ChatService::storeMessage((int) $t->contact_id, $to, 'out', 'text', $texto, $opts + ['wamid' => $res['messages'][0]['id']]);
+        }
+
+        // Adjuntos: subir a Meta, enviar y guardar copia propia colgada del mensaje.
+        $warnings = [];
+        foreach ($files as $f) {
+            if (!$f || !$f->isValid()) continue;
+            $mime = $f->getClientMimeType() ?: 'application/octet-stream';
+            $name = $f->getClientOriginalName() ?: 'archivo';
+            $tipo = match (true) {
+                in_array($mime, ['image/jpeg', 'image/png'], true)            => 'image',
+                in_array($mime, ['video/mp4', 'video/3gpp'], true)           => 'video',
+                str_starts_with($mime, 'audio/')                             => 'audio',
+                default                                                      => 'document',
+            };
+            [$uc, $ur] = $wa->uploadMedia($f->getRealPath(), $mime, $name);
+            if (empty($ur['id'])) { $warnings[] = "«{$name}» no se pudo subir a WhatsApp: " . self::errorMeta($ur); continue; }
+            [$code, $res] = $wa->sendMedia($to, $tipo, (string) $ur['id'], '', $tipo === 'document' ? $name : null);
+            if (!($code >= 200 && $code < 300 && !empty($res['messages'][0]['id']))) { $warnings[] = "«{$name}» no se envió: " . self::errorMeta($res); continue; }
+
+            // Sin texto: el archivo (con su nombre) se ve como adjunto del mensaje.
+            $mid = ChatService::storeMessage((int) $t->contact_id, $to, 'out', $tipo, '',
+                $opts + ['wamid' => $res['messages'][0]['id']]);
+            [$saved, $w] = $this->attachments->store([$f], (int) $t->id, $mid, (int) $me->id);
+            $warnings = array_merge($warnings, $w);
+            $ids[] = $mid;
+        }
+
+        if (!$ids) return ['ok' => false, 'error' => $warnings[0] ?? 'No se envió nada', '_status' => 502];
+        $this->tickets->broadcast('message', (int) $t->id);
+        return ['ok' => true, 'id' => end($ids), 'warnings' => $warnings];
+    }
+
+    /*
+     * Fuera de la ventana de 24 h la API no deja escribir, pero la app del MÓVIL sí
+     * (Coexistence): lo que se envíe desde allí entra en el ticket como «Desde el móvil».
+     */
+    public const SOLO_MOVIL = 'Solo puedes escribirle desde el móvil: han pasado más de 24 h desde su último mensaje y WhatsApp ya no deja contestar desde el Helpdesk.';
+
+    /** Mensaje legible de un error de la Graph API (con los casos típicos de WhatsApp). */
+    protected static function errorMeta(array $res): string
+    {
+        $code = (int) ($res['error']['code'] ?? 0);
+        return match ($code) {
+            131047  => self::SOLO_MOVIL,
+            131026  => 'Ese número no puede recibir el mensaje (¿no tiene WhatsApp?).',
+            190     => 'El token del número de soporte ha caducado o no es válido.',
+            default => 'WhatsApp: ' . mb_substr((string) ($res['error']['error_data']['details'] ?? $res['error']['message'] ?? 'error desconocido'), 0, 200),
+        };
+    }
+
+    /**
+     * HTML del editor → texto de WhatsApp: negrita *x*, cursiva _x_, tachado ~x~, saltos
+     * de línea; los enlaces quedan como «texto (url)». Lo demás se queda en texto plano.
+     */
+    public static function aTextoWhatsApp(string $html): string
+    {
+        $h = preg_replace('#<br\s*/?>#i', "\n", $html);
+        $h = preg_replace('#</(p|div|li|blockquote|h\d)>#i', "\n", $h);
+        $h = preg_replace('#<li[^>]*>#i', '• ', $h);
+        $h = preg_replace_callback('#<a\s[^>]*href="([^"]+)"[^>]*>(.*?)</a>#is', function ($m) {
+            $txt = trim(strip_tags($m[2]));
+            $url = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            return ($txt === '' || $txt === $url) ? $url : "{$txt} ({$url})";
+        }, $h);
+        // Marcas de formato. El espacio pegado a la marca rompe el formato en WhatsApp
+        // («*hola *» no sale en negrita), así que se saca fuera.
+        $marca = function (string $tags, string $m) use (&$h) {
+            $h = preg_replace_callback('#<(' . $tags . ')(\s[^>]*)?>(.*?)</\1>#is', function ($x) use ($m) {
+                if (!preg_match('/^(\s*)(.*?)(\s*)$/su', $x[3], $p) || trim(strip_tags($p[2])) === '') return $x[3];
+                return $p[1] . $m . $p[2] . $m . $p[3];
+            }, $h);
+        };
+        $marca('b|strong', '*');
+        $marca('i|em', '_');
+        $marca('s|strike|del', '~');
+
+        $t = html_entity_decode(strip_tags($h), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $t = str_replace("\u{00A0}", ' ', $t);
+        $t = preg_replace("/[ \t]+\n/", "\n", $t);
+        $t = preg_replace("/\n{3,}/", "\n\n", $t);
+        return trim($t);
+    }
+
     protected function replySubject(string $subject, string $code): string
     {
         $s = trim($subject) ?: 'Sin asunto';

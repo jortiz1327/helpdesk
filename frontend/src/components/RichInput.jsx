@@ -64,6 +64,8 @@ const TOOLS = [
   { sep: true },
   { cmd: 'removeFormat', ico: 'eraser', title: 'Quitar formato' },
 ]
+// WhatsApp solo admite *negrita*, _cursiva_ y ~tachado~: el resto ni se ofrece.
+const WA_CMDS = ['bold', 'italic', 'strikeThrough']
 
 const RichInput = forwardRef(function RichInput({
   placeholder = 'Escribe aquí…',
@@ -72,8 +74,10 @@ const RichInput = forwardRef(function RichInput({
   canned = false,          // habilita el menú «/» de respuestas predefinidas
   cannedVars = null,       // { cliente, codigo, agente, sede } para sustituir {{...}} al insertar
   mentionUsers = null,     // [{id,name}] → habilita el menú «@» de menciones (notas internas)
+  whatsapp = false,        // respuesta por WhatsApp: solo negrita/cursiva/tachado; imágenes como adjunto
   onChange,
 }, ref) {
+  const tools = whatsapp ? TOOLS.filter((t) => WA_CMDS.includes(t.cmd)) : TOOLS
   const area = useRef(null)
   const fileRef = useRef(null)
   const imgRef = useRef(null)
@@ -196,10 +200,10 @@ const RichInput = forwardRef(function RichInput({
   const setImgSize = (cls) => { if (imgTool?.el) { imgTool.el.className = cls; onChange?.() } }
   const delImg = () => { if (imgTool?.el) { imgTool.el.remove(); setImgTool(null); setEmpty(isBlank()); onChange?.() } }
 
-  /** Ctrl+V: las imágenes se insertan EN LÍNEA; el texto se pega en plano. */
+  /** Ctrl+V: las imágenes se insertan EN LÍNEA (en WhatsApp, como adjunto); el texto se pega en plano. */
   const onPaste = (e) => {
     const imgs = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'))
-    if (imgs.length) { e.preventDefault(); imgs.forEach(insertImage); return }
+    if (imgs.length) { e.preventDefault(); whatsapp ? addFiles(imgs) : imgs.forEach(insertImage); return }
     e.preventDefault()
     document.execCommand('insertText', false, e.clipboardData.getData('text/plain'))
   }
@@ -290,6 +294,8 @@ const RichInput = forwardRef(function RichInput({
   }
 
   const kb = (e) => {
+    // Ctrl+U (subrayado) no existe en WhatsApp: el navegador lo aplicaría igual.
+    if (whatsapp && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { e.preventDefault(); return }
     // Menú de menciones «@» (tiene prioridad si está abierto).
     if (at && mentionMatches.length) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setAt((s) => ({ ...s, index: (s.index + 1) % mentionMatches.length })); return }
@@ -309,6 +315,7 @@ const RichInput = forwardRef(function RichInput({
       onDrop={(e) => {
         e.preventDefault(); if (disabled) return
         const fs = [...(e.dataTransfer?.files || [])]
+        if (whatsapp) { if (fs.length) addFiles(fs); return }                 // WhatsApp: todo como adjunto
         fs.filter((f) => f.type.startsWith('image/')).forEach(insertImage)   // imágenes en línea
         const docs = fs.filter((f) => !f.type.startsWith('image/'))
         if (docs.length) addFiles(docs)                                       // el resto, adjuntos
@@ -316,7 +323,7 @@ const RichInput = forwardRef(function RichInput({
       onDragOver={(e) => e.preventDefault()}>
 
       <div className="cmp-tools">
-        {TOOLS.map((t, i) => {
+        {tools.map((t, i) => {
           if (t.sep) return <span key={i} className="cmp-sep" />
           const Ico = t.ico ? Icon[t.ico] : null
           return (
@@ -326,19 +333,26 @@ const RichInput = forwardRef(function RichInput({
             </button>
           )
         })}
-        <button type="button" className="cmp-t" title="Insertar enlace" disabled={disabled}
-          onMouseDown={(e) => { e.preventDefault(); abrirEnlace() }}><Icon.link /></button>
-        <span className="cmp-sep" />
-        <button type="button" className="cmp-t" title="Insertar imagen (en el texto)" disabled={disabled}
-          onClick={() => imgRef.current?.click()}><Icon.image /></button>
-        <input ref={imgRef} type="file" accept="image/*" multiple hidden
-          onChange={(e) => { [...e.target.files].forEach(insertImage); e.target.value = '' }} />
-        <button type="button" className="cmp-t" title="Adjuntar archivo" disabled={disabled}
+        {/* En WhatsApp los enlaces van tal cual en el texto (WhatsApp los detecta solo)
+            y las imágenes viajan como adjunto, no dentro del texto. */}
+        {!whatsapp && <>
+          <button type="button" className="cmp-t" title="Insertar enlace" disabled={disabled}
+            onMouseDown={(e) => { e.preventDefault(); abrirEnlace() }}><Icon.link /></button>
+          <span className="cmp-sep" />
+          <button type="button" className="cmp-t" title="Insertar imagen (en el texto)" disabled={disabled}
+            onClick={() => imgRef.current?.click()}><Icon.image /></button>
+          <input ref={imgRef} type="file" accept="image/*" multiple hidden
+            onChange={(e) => { [...e.target.files].forEach(insertImage); e.target.value = '' }} />
+        </>}
+        {whatsapp && <span className="cmp-sep" />}
+        <button type="button" className="cmp-t" title={whatsapp ? 'Adjuntar foto o archivo' : 'Adjuntar archivo'} disabled={disabled}
           onClick={() => fileRef.current?.click()}><Icon.file /></button>
         <input ref={fileRef} type="file" multiple hidden
           onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} />
         <span className="spacer" />
-        <span className="cmp-hint">{canned ? 'Escribe / para respuestas rápidas · pega con Ctrl+V' : 'Pega capturas con Ctrl+V o arrastra archivos'}</span>
+        <span className="cmp-hint">{whatsapp
+          ? 'WhatsApp: negrita, cursiva y tachado · / para respuestas rápidas'
+          : canned ? 'Escribe / para respuestas rápidas · pega con Ctrl+V' : 'Pega capturas con Ctrl+V o arrastra archivos'}</span>
       </div>
 
       <div style={{ position: 'relative' }}>

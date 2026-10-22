@@ -51,7 +51,8 @@ class ConfigActivity
         'business_hours.php'   => ['section' => 'Configuración', 'tablas' => ['business_hours', 'holidays'], 'settings' => ['sla_active', 'sla_alerts_active', 'sla_escalate_active', 'sla_escalate_priority'],
                                    'resumen' => 'Actualizó el horario y el SLA', 'escribe' => ['save', 'add_holiday', 'del_holiday', 'toggle_sla', 'toggle_alerts', 'save_escalate']],
         'settings.php'         => ['section' => 'Configuración', 'tablas' => [], 'settings' => ['wa_verify_token', 'business_name', 'consent_message', 'account_verified',
-                                   'consent_enabled', 'outbound_paused', 'daily_send_cap', 'wa_price_marketing', 'wa_price_utility', 'wa_price_authentication', 'wa_price_service', 'send_business_days_only'],
+                                   'consent_enabled', 'outbound_paused', 'daily_send_cap', 'wa_price_marketing', 'wa_price_utility', 'wa_price_authentication', 'wa_price_service',
+                                   'wa_soporte_tickets', 'send_business_days_only'],
                                    'resumen' => 'Actualizó los ajustes de WhatsApp'],
         'whatsapp_numbers.php' => ['section' => 'Configuración', 'tablas' => ['whatsapp_numbers'], 'resumen' => 'Actualizó los números de WhatsApp', 'escribe' => ['save', 'delete']],
     ];
@@ -109,7 +110,7 @@ class ConfigActivity
     /** Campos sí/no. */
     private const BOOL = ['active', 'required', 'stop', 'use_shift', 'is_default', 'opted_out', 'consent', 'bot_off',
         'sla_active', 'sla_alerts_active', 'sla_escalate_active', 'csat_active', 'ticket_autoclose_notify', 'account_verified',
-        'consent_enabled', 'outbound_paused', 'email_footer_active', 'send_business_days_only'];
+        'consent_enabled', 'outbound_paused', 'email_footer_active', 'wa_soporte_tickets', 'send_business_days_only'];
 
     /** Textos largos: se dice que cambiaron, sin volcarlos. */
     private const LARGOS = ['body', 'answer', 'signature', 'description', 'conditions', 'actions', 'comentarios', 'note', 'notes',
@@ -123,7 +124,8 @@ class ConfigActivity
         'login_lock_minutes' => 'Bloqueo de acceso (min)', 'login_lock_message' => 'Mensaje de acceso bloqueado',
         'sla_active' => 'SLA', 'sla_alerts_active' => 'Avisos de SLA', 'sla_escalate_active' => 'Escalado de SLA',
         'sla_escalate_priority' => 'Prioridad de escalado', 'business_name' => 'Nombre del negocio', 'consent_message' => 'Mensaje de consentimiento',
-        'account_verified' => 'Cuenta de Meta verificada', 'consent_enabled' => 'Pedir consentimiento', 'outbound_paused' => 'Envíos pausados',
+        'account_verified' => 'Cuenta de Meta verificada', 'consent_enabled' => 'Pedir consentimiento',
+        'wa_soporte_tickets' => 'Tickets desde el WhatsApp de soporte', 'outbound_paused' => 'Envíos pausados',
         'daily_send_cap' => 'Tope diario de envíos', 'send_business_days_only' => 'Campañas solo en días laborables', 'wa_price_marketing' => 'Tarifa marketing', 'wa_price_utility' => 'Tarifa utilidad',
         'wa_price_authentication' => 'Tarifa autenticación', 'wa_price_service' => 'Tarifa servicio', 'email_footer' => 'Pie de correo',
         'email_footer_active' => 'Pie de correo activo', 'wa_verify_token' => 'Verify Token',

@@ -23,6 +23,10 @@ class MediaController extends Controller
             : $me->can('campaigns.access'));
         if (!$puede) return response('medio no encontrado', 404);
 
+        // Cada número baja sus archivos con SU token: los del WhatsApp de soporte (otra
+        // app de Meta) no se pueden descargar con el de Campañas.
+        if ($msg->funcion === 'soporte') $wa = $wa->paraFuncion('soporte');
+
         $m = $wa->mediaBinary($mediaId);
         if (!$m) return response('medio no encontrado', 404);
 
