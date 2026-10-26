@@ -72,6 +72,9 @@ export default function Kanban({ onOpen, embedded = false, area = '' }) {
     if (!conv) return
     let ids = (conv.labels || []).map((l) => l.id)
     if (sourceColId != null) ids = ids.filter((id) => id !== sourceColId)
+    // Excluyentes: al soltar en «Interés alto» se quitan las otras de su grupo.
+    const g = labels.find((l) => l.id === targetColId)?.grupo
+    if (g) ids = ids.filter((id) => labels.find((l) => l.id === id)?.grupo !== g)
     if (targetColId != null && !ids.includes(targetColId)) ids.push(targetColId)
     const newLabels = labels.filter((l) => ids.includes(l.id))
     setConvs((prev) => prev.map((c) => (c.id === contactId ? { ...c, labels: newLabels } : c)))

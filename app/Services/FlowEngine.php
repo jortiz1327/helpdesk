@@ -247,7 +247,8 @@ class FlowEngine
         if (($d['action'] ?? 'add') === 'remove') {
             $set = array_diff($set, $ids);
         } else {
-            $set = array_unique(array_merge($set, $ids));
+            // Excluyentes: las que pone el bot van al final y mandan sobre las de su grupo.
+            $set = \App\Models\Label::excluyentes(array_merge(array_diff($set, $ids), $ids));
         }
         DB::table('contact_labels')->where('contact_id', $contactId)->delete();
         $rows = array_map(fn ($lid) => ['contact_id' => $contactId, 'label_id' => $lid], $set);

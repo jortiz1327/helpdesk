@@ -36,6 +36,7 @@ class ContactsController extends Controller
         if (!$ids || !$label) return response()->json(['ok' => false, 'error' => 'Faltan contactos o etiqueta'], 400);
 
         if ($mode === 'add') {
+            \App\Models\Label::quitarHermanas($ids, $label);   // excluyentes: fuera las del mismo grupo
             $rows = array_map(fn ($cid) => ['contact_id' => $cid, 'label_id' => $label], $ids);
             $n = DB::table('contact_labels')->insertOrIgnore($rows);
             return response()->json(['ok' => true, 'changed' => $n]);
@@ -98,11 +99,15 @@ class ContactsController extends Controller
             }
             // Etiquetas: clave compuesta (contact_id,label_id) → insertOrIgnore evita chocar
             // si ambos ya comparten una etiqueta.
-            $labels = DB::table('contact_labels')->where('contact_id', $mergeId)->pluck('label_id');
+            // Excluyentes: si chocan (los dos tienen «Interés…»), manda la del principal.
+            $labels = \App\Models\Label::excluyentes(array_merge(
+                DB::table('contact_labels')->where('contact_id', $mergeId)->pluck('label_id')->all(),
+                DB::table('contact_labels')->where('contact_id', $keepId)->pluck('label_id')->all(),
+            ));
+            DB::table('contact_labels')->whereIn('contact_id', [$keepId, $mergeId])->delete();
             foreach ($labels as $lid) {
                 DB::table('contact_labels')->insertOrIgnore(['contact_id' => $keepId, 'label_id' => $lid]);
             }
-            DB::table('contact_labels')->where('contact_id', $mergeId)->delete();
 
             // 2) Rellenar SOLO los huecos del principal (lo suyo manda).
             $upd = [];

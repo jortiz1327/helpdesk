@@ -60,7 +60,13 @@ export default function ChatInfo({ contact, messages, onClose, onUpdated, onSend
 
   const toggleLabel = async (id) => {
     const next = new Set(assigned)
-    next.has(id) ? next.delete(id) : next.add(id)
+    if (next.has(id)) next.delete(id)
+    else {
+      // Excluyentes: al marcar «Interés alto» se desmarcan las otras de su grupo.
+      const g = allLabels.find((l) => l.id === id)?.grupo
+      if (g) allLabels.forEach((l) => { if (l.grupo === g) next.delete(l.id) })
+      next.add(id)
+    }
     const ids = [...next]
     await api.setContactLabels(contact.id, ids)
     onUpdated({ labels: allLabels.filter((l) => next.has(l.id)) })

@@ -88,7 +88,8 @@ class ContactController extends Controller
         }
 
         if ($action === 'labels' && $request->isMethod('post')) {
-            $labelIds = array_map('intval', (array) $request->input('label_ids', []));
+            // Excluyentes: de cada grupo (interés, tipo) se queda la última elegida.
+            $labelIds = \App\Models\Label::excluyentes((array) $request->input('label_ids', []));
             DB::table('contact_labels')->where('contact_id', $id)->delete();
             if ($labelIds) {
                 $rows = array_map(fn ($lid) => ['contact_id' => $id, 'label_id' => $lid], $labelIds);
@@ -321,7 +322,10 @@ class ContactController extends Controller
                         $tagsNew++;
                     }
                 }
-                if ($key !== '') DB::table('contact_labels')->insertOrIgnore(['contact_id' => $cid, 'label_id' => $labelCache[$key]]);
+                if ($key !== '') {
+                    \App\Models\Label::quitarHermanas([$cid], $labelCache[$key]);   // p. ej. «Cliente» quita «Excliente»
+                    DB::table('contact_labels')->insertOrIgnore(['contact_id' => $cid, 'label_id' => $labelCache[$key]]);
+                }
             }
         }
 

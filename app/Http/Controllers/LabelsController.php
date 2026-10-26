@@ -13,7 +13,8 @@ class LabelsController extends Controller
         $action = $request->query('action', '');
 
         if ($request->isMethod('get')) {
-            $rows = DB::select('SELECT id, name, color, position FROM labels ORDER BY position ASC, name ASC');
+            // grupo: etiquetas excluyentes (interés, tipo); la pantalla quita las hermanas al marcar.
+            $rows = DB::select('SELECT id, name, color, grupo, position FROM labels ORDER BY position ASC, name ASC');
             return response()->json(['ok' => true, 'labels' => $rows]);
         }
 
