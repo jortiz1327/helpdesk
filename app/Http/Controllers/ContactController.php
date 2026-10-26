@@ -45,6 +45,24 @@ class ContactController extends Controller
                     return response()->json(['ok' => false, 'error' => 'El correo no es válido'], 400);
                 }
                 $upd['email'] = $email ?: null;
+
+                /*
+                 * El correo es la IDENTIDAD del cliente en el portal (y adónde van las
+                 * respuestas). Cambiarlo en un contacto con tickets solo puede hacerlo quien
+                 * tiene Helpdesk y ve TODOS sus tickets: si no, alguien de Campañas u otra
+                 * área podría poner su propio correo y entrar al portal como ese cliente.
+                 */
+                $actual = mb_strtolower((string) DB::table('contacts')->where('id', $id)->value('email'));
+                if ($upd['email'] !== ($actual ?: null)) {
+                    $me = $request->user();
+                    $total = DB::table('tickets')->where('contact_id', $id)->count();
+                    if ($total > 0) {
+                        $visibles = \App\Support\TicketVisibility::scope(DB::table('tickets as t')->where('t.contact_id', $id), $me)->count();
+                        if (!$me->can('helpdesk.access') || $visibles < $total) {
+                            return response()->json(['ok' => false, 'error' => 'Este contacto tiene tickets que no puedes ver: no puedes cambiar su correo'], 403);
+                        }
+                    }
+                }
             }
 
             /*

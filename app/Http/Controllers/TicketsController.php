@@ -965,9 +965,21 @@ class TicketsController extends Controller
      * de tiempo si el candado ya es suyo (o estaba libre/caducado), o devuelve quién lo
      * tiene si lo perdió mientras tanto —así el editor se bloquea y avisa—.
      */
+    /**
+     * 403 si el usuario NO puede ver ese ticket (misma regla que la bandeja). Toda acción
+     * que toque un ticket por id debe pasar por aquí: si no, un agente podría asignarse,
+     * descategorizar o cerrar un ticket de otra área y así hacerlo visible para él.
+     */
+    protected function sinAcceso($me, int $id)
+    {
+        if ((clone $this->baseQuery($me))->where('t.id', $id)->exists()) return null;
+        return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
+    }
+
     protected function heartbeat(Request $request)
     {
         $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
+        if ($bloqueo = $this->sinAcceso($request->user(), $id)) return $bloqueo;
         $lock = app(TicketLockService::class)->acquire($id, (int) $request->user()->id);
         return response()->json(['ok' => true, 'lock' => $lock]);
     }
@@ -1138,6 +1150,9 @@ class TicketsController extends Controller
 
         $sid = (int) $request->input('sched_id');
         if (!$sid) return response()->json(['ok' => false, 'error' => 'Falta la programación'], 400);
+        $tid = (int) DB::table('scheduled_replies')->where('id', $sid)->value('ticket_id');
+        if (!$tid) return response()->json(['ok' => false, 'error' => 'Esa programación no existe'], 404);
+        if ($bloqueo = $this->sinAcceso($me, $tid)) return $bloqueo;
 
         return response()->json(['ok' => app(\App\Services\ScheduledReplyService::class)->cancel($sid)]);
     }
@@ -1337,6 +1352,7 @@ class TicketsController extends Controller
             'status.in'       => 'Estado no válido',
         ]);
 
+        if ($bloqueo = $this->sinAcceso($me, (int) $data['id'])) return $bloqueo;
         $this->tickets->setStatus((int) $data['id'], $data['status'], (int) $me->id);
         return response()->json(['ok' => true]);
     }
@@ -1350,6 +1366,7 @@ class TicketsController extends Controller
         ], ['id.required' => 'Falta el ticket']);
         $id     = (int) $data['id'];
         $target = !empty($data['user_id']) ? (int) $data['user_id'] : null;
+        if ($bloqueo = $this->sinAcceso($me, $id)) return $bloqueo;
 
         /*
          * Dos permisos distintos:
@@ -1385,6 +1402,7 @@ class TicketsController extends Controller
         }
         $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
 
+        if ($bloqueo = $this->sinAcceso($me, $id)) return $bloqueo;
         $catId = $request->input('category_id');
         $catId = $catId ? (int) $catId : null;
         if ($catId && !DB::table('ticket_categories')->where('id', $catId)->exists()) {
@@ -1404,6 +1422,7 @@ class TicketsController extends Controller
         }
         $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
 
+        if ($bloqueo = $this->sinAcceso($me, $id)) return $bloqueo;
         $pr = (string) $request->input('priority');
         if (!array_key_exists($pr, TicketService::priorities())) {
             return response()->json(['ok' => false, 'error' => 'Prioridad no válida'], 400);
