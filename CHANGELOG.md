@@ -3,6 +3,22 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.4.1] — 2026-10-26
+
+### Mejoras
+
+- **Campañas en tramos de días:** «Repartir en varios días» al crear la campaña (X
+  contactos al día, o durante X días), con la fecha estimada del último envío. Cada día
+  sigue a la misma hora a la que se programó.
+- **Campañas solo en días laborables** (nuevo interruptor en «Seguridad de envíos»,
+  encendido por defecto): nada sale en sábado, domingo ni en los festivos de Horarios /
+  Turnos. Lo pendiente sigue el siguiente día laborable.
+
+### Arreglos
+
+- Al llegar al tope diario, la campaña seguía a medianoche; ahora continúa al día
+  siguiente a la hora a la que se programó.
+
 ## [1.4.0] — 2026-10-26
 
 ### Mejoras

@@ -120,10 +120,22 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.1";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.4.1",
+        date: "26 oct 2026",
+        resumen: "Campañas en tramos de días y sin envíos en fin de semana ni festivos.",
+        mejoras: [
+            "Campañas en tramos: enviar a X contactos al día durante varios días, de lunes a viernes.",
+            "Las campañas no salen en fin de semana ni en festivo (se puede desactivar en «Seguridad de envíos»).",
+        ],
+        arreglos: [
+            "Al llegar al tope diario, la campaña ya no sigue a medianoche: continúa al día siguiente a su hora.",
+        ],
+    },
     {
         version: "1.4.0",
         date: "26 oct 2026",

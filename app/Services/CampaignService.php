@@ -28,6 +28,29 @@ class CampaignService
         );
     }
 
+    /**
+     * Por qué NO sale nada ahora (null = puede salir):
+     * - 'no_laborable': regla «solo días laborables» (por defecto encendida) y hoy es sábado,
+     *   domingo o festivo (los festivos de Horarios / Turnos, misma tabla).
+     * - 'hora': lo que sigue OTRO día (tramos, tope diario, fin de semana) arranca a la
+     *   misma hora a la que se programó la campaña, no a medianoche.
+     */
+    public function esperaHoy(?object $camp = null): ?string
+    {
+        $ahora = now();
+        if ((string) Setting::get('send_business_days_only', '1') === '1'
+            && ($ahora->isWeekend() || DB::table('holidays')->where('date', $ahora->toDateString())->exists())) {
+            return 'no_laborable';
+        }
+        if ($camp && !empty($camp->scheduled_at)) {
+            $prog = \Illuminate\Support\Carbon::parse($camp->scheduled_at);
+            if ($prog->lt($ahora->copy()->startOfDay()) && $ahora->format('H:i:s') < $prog->format('H:i:s')) {
+                return 'hora';
+            }
+        }
+        return null;
+    }
+
     protected function resolveValue(array $p, object $recipient): string
     {
         if (!isset($p['source']) && isset($p['text'])) return (string) $p['text'];
@@ -93,6 +116,23 @@ class CampaignService
         if ((string) Setting::get('outbound_paused', '0') === '1') {
             $pending = DB::table('campaign_recipients')->where('campaign_id', $campaignId)->where('status', 'pending')->count();
             return [0, 0, $pending]; // interruptor de pánico activo
+        }
+        // Fin de semana / festivo (si está la regla) o aún no es la hora del tramo de hoy.
+        if ($this->esperaHoy($camp) !== null) {
+            $pending = DB::table('campaign_recipients')->where('campaign_id', $campaignId)->where('status', 'pending')->count();
+            return [0, 0, $pending];
+        }
+        // TRAMOS: la campaña reparte sus destinatarios en varios días (como mucho N al día).
+        if ((int) ($camp->daily_limit ?? 0) > 0) {
+            $hechosHoy = DB::table('campaign_recipients')->where('campaign_id', $campaignId)
+                ->whereIn('status', ['sent', 'delivered', 'read', 'failed'])
+                ->where('sent_at', '>=', now()->startOfDay())->count();
+            $quedan = (int) $camp->daily_limit - $hechosHoy;
+            if ($quedan <= 0) {
+                $pending = DB::table('campaign_recipients')->where('campaign_id', $campaignId)->where('status', 'pending')->count();
+                return [0, 0, $pending]; // tramo de hoy completo: sigue el próximo día de envío
+            }
+            $limit = min($limit, $quedan);
         }
         // El tope diario protege el gasto de WhatsApp (mensajes de pago). El correo no es de
         // pago por mensaje, así que no lo limita este tope.

@@ -604,8 +604,8 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Estimación de coste antes de enviar: destinatarios × tarifa de la categoría
-  estimateCampaign: ({ category = '', phonebook_id = 0, label_id = 0 }) =>
-    req(`campaigns.php?action=estimate&category=${encodeURIComponent(category)}&phonebook_id=${phonebook_id || 0}&label_id=${label_id || 0}`),
+  estimateCampaign: ({ category = '', phonebook_id = 0, label_id = 0, channel = '' }) =>
+    req(`campaigns.php?action=estimate&category=${encodeURIComponent(category)}&phonebook_id=${phonebook_id || 0}&label_id=${label_id || 0}${channel ? `&channel=${channel}` : ''}`),
   // Historial/trazabilidad de campañas (con coste real)
   campaignHistory: () => req('campaigns.php?action=history'),
   runCampaign: (id) => req(`campaigns.php?action=run&id=${id}`, { method: 'POST' }),

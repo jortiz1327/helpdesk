@@ -3785,3 +3785,9 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .man-desc { font-size: 12.5px; color: var(--ink-3, #6b7280); line-height: 1.4; }
 .man-sub { font-size: 11.5px; color: var(--ink-4, #9aa3af); margin-top: 1px; }
 .man-card .btn { flex: 0 0 auto; }
+
+/* --- Campañas: repartir en varios días --- */
+.tramos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; font-size: 13.5px; }
+.tramos label { display: inline-flex; align-items: center; gap: 8px; }
+.tramos input.cmp-var { width: 86px; }
+.tramos .hint { flex-basis: 100%; }

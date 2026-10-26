@@ -28,6 +28,43 @@ function varCount(text) {
   return m.length ? Math.max(...m) : 0
 }
 
+// Día en que acaba un envío en `dias` tramos de lunes a viernes, empezando en `desde`
+// (si cae en fin de semana, empieza el lunes). Los festivos no se conocen aquí.
+function finTramos(desde, dias) {
+  const d = new Date(desde)
+  const laborable = () => d.getDay() !== 0 && d.getDay() !== 6
+  while (!laborable()) d.setDate(d.getDate() + 1)
+  for (let k = 1; k < dias; k++) { do d.setDate(d.getDate() + 1); while (!laborable()) }
+  return d
+}
+
+// Repartir la campaña en varios días: N contactos al día (o «durante X días», que calcula N).
+function Tramos({ on, setOn, perDay, setPerDay, total, desde }) {
+  const n = Math.max(0, parseInt(perDay, 10) || 0)
+  const dias = total && n ? Math.ceil(total / n) : 0
+  const ponDias = (v) => { const k = parseInt(v, 10) || 0; if (total && k > 0) setPerDay(String(Math.ceil(total / k))) }
+  const fin = dias > 1 ? finTramos(desde ? new Date(desde) : new Date(), dias) : null
+  return (
+    <div style={{ marginTop: 12 }}>
+      <label className="fb-req-row">
+        <span className="fb-switch"><input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} /><span className={`fb-toggle ${on ? 'on' : ''}`} /></span>
+        <span className="fb-req-label">Repartir en varios días</span>
+      </label>
+      {on && (
+        <div className="tramos">
+          <label>Enviar a <input className="cmp-var" type="number" min="1" value={perDay} onChange={(e) => setPerDay(e.target.value)} /> contactos al día</label>
+          {total > 0 && <label>durante <input className="cmp-var" type="number" min="1" value={dias || ''} onChange={(e) => ponDias(e.target.value)} /> días</label>}
+          <span className="hint">
+            {fin
+              ? <>De lunes a viernes, a la misma hora. Último envío ≈ <b>{fin.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</b> (si no hay festivos por medio).</>
+              : total > 0 && n >= total ? 'Con ese número sale todo el mismo día.' : 'De lunes a viernes, a la misma hora; los festivos se saltan.'}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SendCampaign({ onDone }) {
   const toast = useToast()
   const [channel, setChannel] = useState('whatsapp')   // 'whatsapp' | 'email'
@@ -44,6 +81,15 @@ export default function SendCampaign({ onDone }) {
   const [emailImmediate, setEmailImmediate] = useState(true)
   const [emailWhen, setEmailWhen] = useState('')
   const [emailSending, setEmailSending] = useState(false)
+  const [emailTramos, setEmailTramos] = useState(false)
+  const [emailPerDay, setEmailPerDay] = useState('')
+  const [emailTotal, setEmailTotal] = useState(0)   // destinatarios con correo de la etiqueta
+  useEffect(() => {
+    if (!emailLabelId) { setEmailTotal(0); return }
+    let alive = true
+    api.estimateCampaign({ channel: 'email', label_id: Number(emailLabelId) }).then((d) => { if (alive) setEmailTotal(d?.ok ? d.recipients : 0) })
+    return () => { alive = false }
+  }, [emailLabelId])
   const [emailCfg, setEmailCfg] = useState(null)   // { ready } del remitente de campañas
   useEffect(() => { api.getEmailAccount('campanas').then((d) => setEmailCfg({ ready: !!(d.account && d.account.active && d.account.smtp_host) })) }, [])
 
@@ -54,16 +100,19 @@ export default function SendCampaign({ onDone }) {
     if (!body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()) { toast('Escribe el cuerpo del correo', 'err'); return }
     if (!emailLabelId) { toast('Elige una etiqueta de destino', 'err'); return }
     if (!emailImmediate && !emailWhen) { toast('Indica la fecha y hora de envío', 'err'); return }
+    if (emailTramos && !(parseInt(emailPerDay, 10) > 0)) { toast('Indica cuántos contactos al día', 'err'); return }
     setEmailSending(true)
     const r = await api.createCampaign({
       channel: 'email', title: emailTitle, subject: emailSubject, body_html: body,
       label_id: Number(emailLabelId),
       schedule: emailImmediate ? { mode: 'now' } : { mode: 'later', at: emailWhen },
+      daily_limit: emailTramos ? parseInt(emailPerDay, 10) : 0,
     })
     setEmailSending(false)
     if (!r.ok) { toast(r.error || 'No se pudo crear la campaña', 'err'); return }
     const exc = r.excluded ? ` · ${r.excluded} excluido${r.excluded > 1 ? 's' : ''} por baja` : ''
-    if (r.immediate) toast(`Campaña lanzada · ${r.stats?.sent ?? 0} enviados${r.stats?.failed ? `, ${r.stats.failed} fallidos` : ''}${r.stats?.pending ? `, ${r.stats.pending} en cola` : ''}${exc}`)
+    if (r.waiting === 'no_laborable') toast(`Campaña en cola: hoy no es día laborable, saldrá el próximo a esta hora${exc}`)
+    else if (r.immediate) toast(`Campaña lanzada · ${r.stats?.sent ?? 0} enviados${r.stats?.failed ? `, ${r.stats.failed} fallidos` : ''}${r.stats?.pending ? `, ${r.stats.pending} en cola` : ''}${exc}`)
     else toast(`Campaña programada${exc}`)
     onDone?.()
   }
@@ -83,6 +132,8 @@ export default function SendCampaign({ onDone }) {
   const [immediate, setImmediate] = useState(true)
   const [when, setWhen] = useState('')
   const [sending, setSending] = useState(false)
+  const [tramos, setTramos] = useState(false)
+  const [perDay, setPerDay] = useState('')
   const [estimate, setEstimate] = useState(null)   // { recipients, excluded, rate, cost } | { loading }
 
   // Estimación de coste al elegir plantilla + destino (destinatarios × tarifa categoría)
@@ -156,6 +207,7 @@ export default function SendCampaign({ onDone }) {
     if (headerVars > 0 && missingFixed(vars.header)) { toast('Rellena las variables de valor fijo de la cabecera', 'err'); return }
     if (bodyVars > 0 && missingFixed(vars.body)) { toast('Rellena las variables de valor fijo del mensaje', 'err'); return }
     if (!immediate && !when) { toast('Indica la fecha y hora de envío', 'err'); return }
+    if (tramos && !(parseInt(perDay, 10) > 0)) { toast('Indica cuántos contactos al día', 'err'); return }
     setSending(true)
     const r = await api.createCampaign({
       title, template_name: picked.name, language: picked.language || 'es',
@@ -164,11 +216,13 @@ export default function SendCampaign({ onDone }) {
       phonebook_id: destType === 'phonebook' ? Number(pbId) : 0,
       label_id: destType === 'label' ? Number(labelId) : 0,
       schedule: immediate ? { mode: 'now' } : { mode: 'later', at: when },
+      daily_limit: tramos ? parseInt(perDay, 10) : 0,
     })
     setSending(false)
     if (!r.ok) { toast(r.error || 'No se pudo crear la campaña', 'err'); return }
     const exc = r.excluded ? ` · ${r.excluded} excluido${r.excluded > 1 ? 's' : ''} por baja` : ''
-    if (r.immediate) toast(`Campaña lanzada · ${r.stats?.sent ?? 0} enviados${r.stats?.failed ? `, ${r.stats.failed} fallidos` : ''}${r.stats?.pending ? `, ${r.stats.pending} en cola` : ''}${exc}`)
+    if (r.waiting === 'no_laborable') toast(`Campaña en cola: hoy no es día laborable, saldrá el próximo a esta hora${exc}`)
+    else if (r.immediate) toast(`Campaña lanzada · ${r.stats?.sent ?? 0} enviados${r.stats?.failed ? `, ${r.stats.failed} fallidos` : ''}${r.stats?.pending ? `, ${r.stats.pending} en cola` : ''}${exc}`)
     else toast(`Campaña programada${exc}`)
     onDone?.()
   }
@@ -234,6 +288,7 @@ export default function SendCampaign({ onDone }) {
                     <span className="fb-req-label">Enviar inmediatamente</span>
                   </label>
                   {!emailImmediate && <input className="cmp-var" type="datetime-local" value={emailWhen} onChange={(e) => setEmailWhen(e.target.value)} style={{ marginTop: 10, maxWidth: 280 }} />}
+                  <Tramos on={emailTramos} setOn={setEmailTramos} perDay={emailPerDay} setPerDay={setEmailPerDay} total={emailTotal}desde={emailImmediate ? '' : emailWhen} />
                 </div>
 
                 <div className="fb-actions">
@@ -369,6 +424,7 @@ export default function SendCampaign({ onDone }) {
                     <span className="fb-req-label">Enviar inmediatamente</span>
                   </label>
                   {!immediate && <input className="cmp-var" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} style={{ marginTop: 10, maxWidth: 280 }} />}
+                  <Tramos on={tramos} setOn={setTramos} perDay={perDay} setPerDay={setPerDay} total={estimate?.recipients || 0} desde={immediate ? '' : when} />
                 </div>
 
                 {estimate && !estimate.loading && (

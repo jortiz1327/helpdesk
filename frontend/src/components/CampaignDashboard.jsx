@@ -118,6 +118,12 @@ function SendSafety() {
     if (r.ok) { setS((v) => ({ ...v, outbound_paused: next })); toast(next ? '⏸ Envíos PAUSADOS' : '▶ Envíos reactivados') }
     else toast(r.error || 'Error', 'err')
   }
+  const toggleLaborables = async () => {
+    const next = !s.send_business_days_only
+    const r = await api.saveSettings({ send_business_days_only: next })
+    if (r.ok) { setS((v) => ({ ...v, send_business_days_only: next })); toast(next ? 'Las campañas solo salen de lunes a viernes, sin festivos' : 'Las campañas pueden salir cualquier día') }
+    else toast(r.error || 'Error', 'err')
+  }
   const saveCap = async () => {
     const n = Math.max(0, parseInt(cap, 10) || 0)
     const r = await api.saveSettings({ daily_send_cap: n })
@@ -136,6 +142,14 @@ function SendSafety() {
         <label className="fb-switch"><input type="checkbox" checked={s.outbound_paused} onChange={togglePause} /><span className={`fb-toggle ${s.outbound_paused ? 'on' : ''}`} /></label>
       </div>
       {s.outbound_paused && <div className="safety-warn"><Icon.warn /> Los envíos están <b>PAUSADOS</b>. No saldrá ninguna campaña hasta que lo reactives.</div>}
+      <div className="safety-sep" />
+      <div className="safety-row">
+        <div className="safety-meta">
+          <b>Solo días laborables</b>
+          <span className="muted">Ninguna campaña sale en sábado, domingo ni festivo (los festivos de Horarios / Turnos). Lo pendiente sigue el siguiente día laborable, a la misma hora.</span>
+        </div>
+        <label className="fb-switch"><input type="checkbox" checked={!!s.send_business_days_only} onChange={toggleLaborables} /><span className={`fb-toggle ${s.send_business_days_only ? 'on' : ''}`} /></label>
+      </div>
       <div className="safety-sep" />
       <div className="safety-row">
         <div className="safety-meta">
@@ -229,7 +243,7 @@ export default function CampaignDashboard({ onNew, user }) {
                           </span>
                           <span className={`pill sm ${st.c}`}><span className="dot" />{st.t}</span>
                         </div>
-                        <span className="muted" style={{ fontSize: 12.5 }}>{(c.channel === 'email' ? c.subject : c.template_name) || '—'} · {c.source_name || '—'} · {fmt(c.scheduled_at || c.created_at)}</span>
+                        <span className="muted" style={{ fontSize: 12.5 }}>{(c.channel === 'email' ? c.subject : c.template_name) || '—'} · {c.source_name || '—'} · {fmt(c.scheduled_at || c.created_at)}{c.daily_limit ? ` · ${c.daily_limit} al día` : ''}</span>
                         <div className="camp-bar"><span style={{ width: pct + '%' }} /></div>
                       </div>
                       <div className="camp-nums">

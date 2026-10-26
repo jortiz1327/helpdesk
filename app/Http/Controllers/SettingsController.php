@@ -52,6 +52,7 @@ class SettingsController extends Controller
             // Red de seguridad de envíos
             'outbound_paused'    => (string) Setting::get('outbound_paused', '0') === '1',
             'daily_send_cap'     => (int) Setting::get('daily_send_cap', '0'),
+            'send_business_days_only' => (string) Setting::get('send_business_days_only', '1') === '1',
             // Tarifas de WhatsApp (EUR/mensaje) para la estimación de coste de campañas.
             'wa_prices'          => [
                 'marketing'      => (float) Setting::get('wa_price_marketing', '0.06'),
@@ -86,6 +87,9 @@ class SettingsController extends Controller
         }
         if (array_key_exists('daily_send_cap', $in)) {
             Setting::put('daily_send_cap', (string) max(0, (int) $in['daily_send_cap']));
+        }
+        if (array_key_exists('send_business_days_only', $in)) {
+            Setting::put('send_business_days_only', !empty($in['send_business_days_only']) ? '1' : '0');
         }
         // Tarifas de WhatsApp por categoría (EUR/mensaje). No negativas.
         if (array_key_exists('wa_prices', $in) && is_array($in['wa_prices'])) {

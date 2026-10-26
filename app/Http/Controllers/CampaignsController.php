@@ -84,7 +84,7 @@ class CampaignsController extends Controller
         if ($request->isMethod('get')) {
             $rows = DB::select("
                 SELECT c.id, c.title, c.channel, c.subject, c.template_name, c.status, c.total, c.sent, c.failed, c.scheduled_at, c.created_at,
-                       COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name,
+                       c.daily_limit, COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name,
                        " . self::SQL_ENTREGA . "
                 FROM campaigns c
                 LEFT JOIN phonebooks p ON p.id = c.phonebook_id
@@ -129,6 +129,14 @@ class CampaignsController extends Controller
         $labelId  = (int) $request->query('label_id');
 
         $recipients = 0; $excluded = 0;
+        // Correo: contactos de la etiqueta con correo (sin repetir), mismo criterio que create().
+        if ($request->query('channel') === 'email') {
+            $raw = $labelId ? DB::table('contacts as c')->join('contact_labels as cl', 'cl.contact_id', '=', 'c.id')
+                ->where('cl.label_id', $labelId)->whereNotNull('c.email')->where('c.email', '<>', '')
+                ->get(['c.email', 'c.opted_out']) : collect();
+            $ok = $raw->where('opted_out', '!=', 1)->map(fn ($r) => mb_strtolower(trim((string) $r->email)))->unique();
+            return response()->json(['ok' => true, 'recipients' => $ok->count(), 'excluded' => $raw->count() - $ok->count()]);
+        }
         if ($pbId || $labelId) {
             $raw = $labelId
                 ? DB::select('SELECT c.wa_id FROM contacts c JOIN contact_labels cl ON cl.contact_id = c.id WHERE cl.label_id = ?', [$labelId])
@@ -311,9 +319,14 @@ class CampaignsController extends Controller
             $scheduledAt = date('Y-m-d H:i:s', $ts);
         }
 
+        // Tramos: como mucho N destinatarios al día (vacío/0 = todos de una vez). Si cabe en
+        // un solo tramo no hace falta repartir.
+        $porDia = max(0, (int) $request->input('daily_limit', 0));
+        $porDia = ($porDia > 0 && $porDia < count($recipients)) ? $porDia : null;
+
         $campaignId = DB::table('campaigns')->insertGetId(array_merge([
             'title' => $title, 'status' => 'scheduled', 'scheduled_at' => $scheduledAt,
-            'total' => count($recipients), 'created_by' => $request->user()?->id,
+            'total' => count($recipients), 'daily_limit' => $porDia, 'created_by' => $request->user()?->id,
             'created_at' => now(), 'updated_at' => now(),
         ], $campos));
 
@@ -332,7 +345,9 @@ class CampaignsController extends Controller
             [$s, $f, $p] = $campaigns->process($campaignId, 25);
             $stats = ['sent' => $s, 'failed' => $f, 'pending' => $p];
         }
-        return response()->json(['ok' => true, 'id' => $campaignId, 'immediate' => $immediate, 'stats' => $stats, 'excluded' => $excluded]);
+        return response()->json(['ok' => true, 'id' => $campaignId, 'immediate' => $immediate, 'stats' => $stats, 'excluded' => $excluded,
+            // Lanzada «ya» pero hoy no sale (fin de semana o festivo): para avisar en pantalla.
+            'waiting' => $immediate ? $campaigns->esperaHoy() : null]);
     }
 
     /**
