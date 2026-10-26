@@ -35,6 +35,11 @@ class EffectiveResponsesController extends Controller
     protected function save(Request $request)
     {
         $ticketId = (int) $request->input('ticket_id');
+        // Solo de tickets que el agente PUEDE ver (si no, guardar y luego «sugerir» servía
+        // para leer cualquier hilo).
+        if (!\App\Support\TicketVisibility::puedeVer($request->user(), $ticketId)) {
+            return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
+        }
         $t = DB::table('tickets')->where('id', $ticketId)->first(['category_id', 'subject']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
@@ -53,10 +58,14 @@ class EffectiveResponsesController extends Controller
         // El cuerpo: de un mensaje concreto (por id) o del payload.
         $body = (string) $request->input('body', '');
         if ($msgId) {
-            $m = DB::table('messages')->where('id', $msgId)->where('ticket_id', $ticketId)->first(['body']);
-            if ($m) $body = (string) $m->body;
+            // Respuestas al cliente, nunca notas internas (las sugerencias las ve todo el equipo).
+            $m = DB::table('messages')->where('id', $msgId)->where('ticket_id', $ticketId)
+                ->where('is_internal_note', 0)->first(['body']);
+            if (!$m) return response()->json(['ok' => false, 'error' => 'Mensaje no encontrado'], 404);
+            $body = (string) $m->body;
         }
-        $body = trim($body);
+        // Se guarda SANEADO: acaba insertado en el editor (innerHTML) de otros agentes.
+        $body = trim(\App\Services\HtmlSanitizer::clean($body));
         if ($body === '' || $this->plain($body) === '') {
             return response()->json(['ok' => false, 'error' => 'La respuesta está vacía'], 400);
         }
@@ -93,6 +102,9 @@ class EffectiveResponsesController extends Controller
     protected function suggest(Request $request)
     {
         $ticketId = (int) $request->query('ticket_id');
+        if (!\App\Support\TicketVisibility::puedeVer($request->user(), $ticketId)) {
+            return response()->json(['ok' => true, 'items' => []]);
+        }
         $t = DB::table('tickets')->where('id', $ticketId)->first(['category_id', 'subject']);
         if (!$t) return response()->json(['ok' => true, 'items' => []]);
 
