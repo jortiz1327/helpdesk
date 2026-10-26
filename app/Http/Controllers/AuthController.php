@@ -176,6 +176,8 @@ class AuthController extends Controller
             'notify_assigned' => (bool) $u->notify_assigned,
             'notify_reply'    => (bool) $u->notify_reply,
             'notify_sla'      => (bool) $u->notify_sla,
+            // Token corto (24 h) y solo de descarga para las URL de adjuntos y medios.
+            'media_token'     => TokenService::mediaToken($u),
         ];
     }
 }

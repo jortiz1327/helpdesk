@@ -12,11 +12,16 @@ class TokenAuth
 {
     public function handle(Request $request, Closure $next)
     {
-        $token = $request->header('X-App-Token')
-            ?: $request->bearerToken()
-            ?: $request->query('token');
-
-        $user = TokenService::verify($token);
+        $cabecera = $request->header('X-App-Token') ?: $request->bearerToken();
+        if ($cabecera) {
+            $user = TokenService::verify($cabecera);
+        } else {
+            // Por URL (?token=) solo entra el token de MEDIOS, y solo para descargar: las
+            // URL quedan en logs e historial, y ahí no debe ir el token de sesión de 30 días.
+            $descarga = $request->isMethod('get')
+                && in_array($request->path(), ['api/attachment.php', 'api/media.php', 'api/responses.php'], true);
+            $user = $descarga ? TokenService::verify((string) $request->query('token'), 'media') : null;
+        }
         if (!$user) {
             return response()->json(['error' => 'No autenticado', 'authenticated' => false], 401);
         }

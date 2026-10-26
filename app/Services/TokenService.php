@@ -33,22 +33,36 @@ class TokenService
         return base64_decode(strtr($d, '-_', '+/'));
     }
 
-    /** Genera un token firmado para un usuario (válido 30 días). */
-    public static function make(User $u): string
+    /**
+     * Genera un token firmado para un usuario. Por defecto, el de SESIÓN (30 días, va en
+     * la cabecera). Con $scope='media', uno corto y limitado para las URL de descargas.
+     */
+    public static function make(User $u, ?int $ttl = null, string $scope = 'full'): string
     {
-        $payload = self::b64url(json_encode([
+        $datos = [
             'uid'   => (int) $u->id,
             'email' => $u->email,
             'name'  => $u->name ?? '',
             'tv'    => (int) ($u->token_version ?? 1),   // versión: si sube, este token caduca
-            'exp'   => time() + 60 * 60 * 24 * 30,
-        ]));
+            'exp'   => time() + ($ttl ?? 60 * 60 * 24 * 30),
+        ];
+        if ($scope !== 'full') $datos['sc'] = $scope;
+        $payload = self::b64url(json_encode($datos));
         $sig = self::b64url(hash_hmac('sha256', $payload, self::secret(), true));
         return $payload . '.' . $sig;
     }
 
+    /**
+     * Token de MEDIOS: 24 h y solo para descargar (adjuntos, medios, CSV). Es el que va en
+     * las URL (?token=): las URL acaban en logs e historial, así que ahí no va el de sesión.
+     */
+    public static function mediaToken(User $u): string
+    {
+        return self::make($u, 60 * 60 * 24, 'media');
+    }
+
     /** Devuelve el User del token válido (fresco de BD para el rol), o null. */
-    public static function verify(?string $token): ?User
+    public static function verify(?string $token, string $scope = 'full'): ?User
     {
         $token = trim((string) $token);
         if ($token === '' || substr_count($token, '.') !== 1) {
@@ -61,6 +75,10 @@ class TokenService
         }
         $data = json_decode(self::b64urlDec($payload), true);
         if (!is_array($data) || (int) ($data['exp'] ?? 0) <= time()) {
+            return null;
+        }
+        // Ámbito: un token de medios no sirve como sesión, ni al revés.
+        if (($data['sc'] ?? 'full') !== $scope) {
             return null;
         }
         $u = User::find((int) ($data['uid'] ?? 0));

@@ -12,7 +12,13 @@ const BASE = '/api'
 // --- Token de autenticación (en localStorage, enviado por cabecera) ---
 const TOKEN_KEY = 'app_token'
 export const getToken = () => localStorage.getItem(TOKEN_KEY) || ''
-export const setToken = (t) => { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY) }
+export const setToken = (t) => { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); if (!t) localStorage.removeItem(MEDIA_KEY) }
+
+// Token de MEDIOS (24 h, solo descargas): es el que va en las URL de adjuntos, medios y
+// CSV (<img src>, enlaces). El de sesión NO va nunca en una URL (acabaría en logs e
+// historial). Llega con los datos del usuario (login / me) y se renueva cada 6 h.
+const MEDIA_KEY = 'media_token'
+const getMediaToken = () => localStorage.getItem(MEDIA_KEY) || ''
 
 let unauthorizedHandler = null
 export function onUnauthorized(fn) { unauthorizedHandler = fn }
@@ -74,6 +80,7 @@ async function req(path, opts = {}) {
   let json
   try {
     json = JSON.parse(text)
+    if (json?.user?.media_token) localStorage.setItem(MEDIA_KEY, json.user.media_token)
   } catch {
     /*
      * La respuesta NO es JSON (una página de error del servidor, un HTML del
@@ -154,7 +161,7 @@ export const api = {
     files.forEach((f) => fd.append('files[]', f))
     return req('tickets.php?action=create', { method: 'POST', body: fd })
   },
-  attachmentUrl: (id) => `${BASE}/attachment.php?id=${id}&token=${encodeURIComponent(getToken())}`,
+  attachmentUrl: (id) => `${BASE}/attachment.php?id=${id}&token=${encodeURIComponent(getMediaToken())}`,
   listTicketAgents: () => req('tickets.php?action=agents'),
   agentHistory: (userId) => req(`tickets.php?action=history&user_id=${userId}`),
   cannedForComposer: () => req('tickets.php?action=canned'),
@@ -503,7 +510,7 @@ export const api = {
 
   // Respuestas capturadas por el bot
   listBotResponses: (q = '') => req(`responses.php?q=${encodeURIComponent(q)}`),
-  botResponsesCsvUrl: (q = '') => `${BASE}/responses.php?action=csv&q=${encodeURIComponent(q)}&token=${encodeURIComponent(getToken())}`,
+  botResponsesCsvUrl: (q = '') => `${BASE}/responses.php?action=csv&q=${encodeURIComponent(q)}&token=${encodeURIComponent(getMediaToken())}`,
 
   // Flujos de automatización
   listFlows: () => req('flows.php'),
@@ -648,4 +655,9 @@ export const api = {
   },
 }
 
-export const mediaUrl = (id) => `${BASE}/media.php?id=${encodeURIComponent(id)}&token=${encodeURIComponent(getToken())}`
+export const mediaUrl = (id) => `${BASE}/media.php?id=${encodeURIComponent(id)}&token=${encodeURIComponent(getMediaToken())}`
+
+// Renovar el token de medios antes de que caduque (24 h) en pestañas abiertas mucho tiempo.
+if (typeof window !== 'undefined') {
+  setInterval(() => { if (getToken()) api.me() }, 6 * 60 * 60 * 1000)
+}
