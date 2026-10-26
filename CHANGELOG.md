@@ -14,6 +14,9 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
   incluye clientes que solo son del Helpdesk.
 - **Audiencias guardadas**: la regla se guarda con nombre y se recalcula en cada envío.
   El historial de campañas muestra a quién se envió.
+- **Filtros en el Chat en vivo de Campañas**: Interés, Tipo y otras etiquetas (mismo criterio
+  que las audiencias), provincia, «ventana de 24 h abierta» (se les puede responder sin
+  plantilla), «sin clasificar» y «ocultar dados de baja». Se recuerdan en el navegador.
 - **Registro de consentimientos y bajas (RGPD)**: cada aceptación, baja o vuelta a
   suscribirse queda anotada con fecha y origen (WhatsApp, enlace del correo o un agente).
   Se descarga en CSV desde «Seguridad de envíos», solo con acceso a Campañas y permiso de

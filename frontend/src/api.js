@@ -101,7 +101,8 @@ async function req(path, opts = {}) {
 
 export const api = {
   // Conversaciones
-  listConversations: (q = '', assigned = '', page = null) => req(`conversations.php?action=list&q=${encodeURIComponent(q)}&assigned=${assigned}${page != null ? `&page=${page}` : ''}`),
+  // filtros: { interes:[ids], tipo:[ids], labels:[ids], provincia, ventana, sin_clasificar, sin_bajas }
+  listConversations: (q = '', assigned = '', page = null, filtros = null) => req(`conversations.php?action=list&q=${encodeURIComponent(q)}&assigned=${assigned}${page != null ? `&page=${page}` : ''}${filtros ? `&f=${encodeURIComponent(JSON.stringify(filtros))}` : ''}`),
   listAgents: () => req('conversations.php?action=agents'),
   getMessages: (id) => req(`conversations.php?action=messages&contact_id=${id}`),
   pollMessages: (id, after) => req(`conversations.php?action=poll&contact_id=${id}&after=${after}`),

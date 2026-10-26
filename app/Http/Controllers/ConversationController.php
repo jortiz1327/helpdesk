@@ -257,6 +257,31 @@ class ConversationController extends Controller
         }
         if ($assigned === 'me')   { $where[] = 'c.assigned_to = ?'; $params[] = $r->user()->id; }
         elseif ($assigned === 'none') { $where[] = 'c.assigned_to IS NULL'; }
+
+        /*
+         * FILTROS del Chat en vivo (`f`, JSON). Etiquetas: dentro de un grupo vale cualquiera
+         * (Interés alto O medio); entre grupos, todas (Interés alto Y No cliente) — igual que
+         * las audiencias de campaña. Más: provincia, ventana de 24 h abierta (se le puede
+         * escribir libremente), sin clasificar por interés y ocultar los dados de baja.
+         */
+        $f = json_decode((string) $r->query('f', ''), true);
+        if (is_array($f)) {
+            $ints = fn ($v) => array_values(array_filter(array_map('intval', (array) $v), fn ($x) => $x > 0));
+            foreach (['interes', 'tipo', 'labels'] as $g) {
+                if ($ids = $ints($f[$g] ?? [])) {
+                    $where[] = 'EXISTS (SELECT 1 FROM contact_labels clf WHERE clf.contact_id = c.id AND clf.label_id IN (' . implode(',', $ids) . '))';
+                }
+            }
+            if (($prov = trim((string) ($f['provincia'] ?? ''))) !== '') { $where[] = 'c.provincia = ?'; $params[] = $prov; }
+            if (!empty($f['ventana'])) {
+                $where[] = "EXISTS (SELECT 1 FROM messages mv WHERE mv.contact_id = c.id AND mv.channel = 'whatsapp' AND mv.funcion = 'campanas'
+                            AND mv.direction = 'in' AND mv.created_at >= NOW() - INTERVAL 24 HOUR)";
+            }
+            if (!empty($f['sin_clasificar'])) {
+                $where[] = "NOT EXISTS (SELECT 1 FROM contact_labels cls JOIN labels ls ON ls.id = cls.label_id WHERE cls.contact_id = c.id AND ls.grupo = 'interes')";
+            }
+            if (!empty($f['sin_bajas'])) $where[] = 'c.opted_out = 0';
+        }
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
         $sql .= ' ORDER BY (c.last_time IS NULL), c.last_time DESC, c.id DESC';
 

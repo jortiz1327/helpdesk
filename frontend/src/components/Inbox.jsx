@@ -8,6 +8,7 @@ import InteractiveBuilder from './InteractiveBuilder.jsx'
 import FormPicker from './FormPicker.jsx'
 import ChatInfo from './ChatInfo.jsx'
 import Select from './Select.jsx'
+import ChatFilters, { filtrosGuardados, filtrosParaApi, cuantosFiltros } from './ChatFilters.jsx'
 
 // Tipos de adjunto del menú 📎 (clip) del composer
 const ATTACH = [
@@ -143,6 +144,9 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   activeRef.current = active
   const assignRef = useRef('all')
   assignRef.current = assignFilter
+  const [filtros, setFiltros] = useState(filtrosGuardados)   // etiquetas, provincia, 24 h…
+  const filtrosRef = useRef(filtros)
+  filtrosRef.current = filtros
 
   useEffect(() => { api.listAgents().then((d) => setAgents(d.agents || [])) }, [])
   // Candados: si WhatsApp no está configurado, la caja de responder queda solo lectura.
@@ -150,7 +154,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   useEffect(() => { api.gating().then((d) => setGate(d?.ok ? d : null)) }, [])
 
   const loadConvs = useCallback((q) => {
-    api.listConversations(q ?? '', assignRef.current).then((d) => {
+    api.listConversations(q ?? '', assignRef.current, null, filtrosParaApi(filtrosRef.current)).then((d) => {
       const list = d.conversations || []
       setConvs(list)
       onUnread(list.reduce((s, c) => s + (parseInt(c.unread) || 0), 0))
@@ -169,7 +173,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialContactId, convs])
   useEffect(() => { const t = setTimeout(() => loadConvs(query), 280); return () => clearTimeout(t) }, [query, loadConvs])
-  useEffect(() => { loadConvs(query) }, [assignFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadConvs(query) }, [assignFilter, filtros]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const assign = async (userId) => {
     if (!active) return
@@ -487,6 +491,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
             <input placeholder="Buscar por nombre o número" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <div className="assign-filter">
+            <ChatFilters value={filtros} onChange={setFiltros} />
             <Select sm block value={assignFilter} onChange={setAssignFilter} options={[
               { value: 'all', label: 'Todas las conversaciones' },
               { value: 'me', label: 'Asignadas a mí' },
@@ -508,7 +513,7 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
             </div>
           )}
           {convs && filtered.length === 0 && (
-            <div className="empty"><div className="ico"><Icon.chat /></div><p>{tab === 'all' ? 'Aún no hay conversaciones. Aparecerán aquí cuando alguien escriba a tu WhatsApp.' : 'No hay conversaciones en este filtro.'}</p></div>
+            <div className="empty"><div className="ico"><Icon.chat /></div><p>{tab === 'all' && !cuantosFiltros(filtros) ? 'Aún no hay conversaciones. Aparecerán aquí cuando alguien escriba a tu WhatsApp.' : 'No hay conversaciones en este filtro.'}</p></div>
           )}
           {filtered.map((c) => (
             <div key={c.id} className={`conv ${active?.id === c.id ? 'active' : ''}`} onClick={() => openChat(c)} onContextMenu={(e) => openCtx(e, c)}>

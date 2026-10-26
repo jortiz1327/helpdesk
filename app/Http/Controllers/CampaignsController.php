@@ -145,6 +145,15 @@ class CampaignsController extends Controller
         $labels = DB::select('SELECT l.id, l.name, l.color, l.grupo,
                 (SELECT COUNT(*) FROM contact_labels cl WHERE cl.label_id = l.id) AS contacts
             FROM labels l ORDER BY l.position, l.name');
+        // Los grupos en su orden natural (alto → medio → bajo; cliente → no cliente → excliente).
+        $orden = ['excliente' => 2, 'no cliente' => 1, 'cliente' => 0, 'alto' => 0, 'medio' => 1, 'bajo' => 2];   // más largo primero
+        $clave = function ($l) use ($orden) {
+            $n = mb_strtolower($l->name);
+            $r = 9;
+            foreach ($orden as $k => $v) { if (str_contains($n, $k)) { $r = $v; break; } }
+            return [$l->grupo ?? '~', $l->grupo ? $r : 0, $n];
+        };
+        usort($labels, fn ($a, $b) => $clave($a) <=> $clave($b));
         $provincias = DB::table('contacts as c')->whereRaw(\App\Http\Controllers\ContactsController::SQL_CAMPANAS)
             ->whereNotNull('c.provincia')->where('c.provincia', '<>', '')
             ->groupBy('c.provincia')->orderBy('c.provincia')

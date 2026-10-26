@@ -132,6 +132,7 @@ const VERSIONS = [
             "Nuevo «¿A quién se lo envías?» con tarjetas: por segmento (interés + tipo), etiquetas, agenda, provincia o todos.",
             "Audiencias guardadas que se actualizan solas, p. ej. «Interés alto + No cliente».",
             "Se ve al momento cuántos contactos recibirán la campaña.",
+            "Chat en vivo de Campañas con filtros: interés, tipo, etiquetas, provincia, ventana de 24 h, sin clasificar y sin bajas.",
             "Registro de consentimientos y bajas descargable (RGPD), solo en Campañas.",
         ],
         arreglos: [
