@@ -182,17 +182,18 @@ Route::middleware('token')->group(function () {
     Route::match(['get', 'post'], 'cron_alerts.php', [CronAlertsController::class, 'handle'])
         ->middleware('can:helpdesk.access');
 
-    // --- Bandeja / conversaciones (Helpdesk tickets Y Chat en vivo de Campañas) ---
-    // inbox.access = helpdesk.access O campaigns.access (ver AppServiceProvider): el
-    // Chat en vivo es de Campañas y comparte este controlador con el Helpdesk.
+    // --- Chat en vivo de CAMPAÑAS (WhatsApp del 51) ---
+    // SOLO Campañas. Antes era inbox.access (= helpdesk O campañas) y un agente de soporte
+    // podía, por API, leer y borrar chats de Campañas y enviar WhatsApp desde el 51. El
+    // Helpdesk no usa estos endpoints: responde por tickets.php (correo y WhatsApp del 01).
     Route::match(['get', 'post'], 'conversations.php', [ConversationController::class, 'handle'])
-        ->middleware('can:inbox.access');
+        ->middleware('can:campaigns.access');
 
-    // Responder (texto/plantilla/interactivo y multimedia). inbox.reply = campaigns.access
-    // O tickets.reply: campañas responde su Chat en vivo; el Helpdesk sigue con tickets.reply.
-    Route::post('send.php', [SendController::class, 'handle'])->middleware('can:inbox.reply');
-    Route::post('send_media.php', [SendMediaController::class, 'handle'])->middleware('can:inbox.reply');
-    // Subir imagen en línea del editor (devuelve su URL firmada)
+    // Responder en el Chat en vivo (texto/plantilla/interactivo y multimedia): solo Campañas.
+    Route::post('send.php', [SendController::class, 'handle'])->middleware('can:campaigns.access');
+    Route::post('send_media.php', [SendMediaController::class, 'handle'])->middleware('can:campaigns.access');
+    // Subir imagen en línea del editor (devuelve su URL firmada). Lo usa también el editor
+    // de tickets, así que sigue con inbox.reply (campañas O tickets.reply).
     Route::post('inline_media.php', [InlineImageController::class, 'upload'])->middleware('can:inbox.reply');
     // Memoria de respuestas efectivas: guardar ⭐ / sugerir parecidas / contar uso. Gestión
     // (listar/borrar) la filtra el controlador con support.config.
