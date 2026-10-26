@@ -149,12 +149,18 @@ class EmailAccountsController extends Controller
         $a->active     = filter_var($request->input('active', true), FILTER_VALIDATE_BOOLEAN);
 
         foreach (['imap', 'smtp'] as $p) {
-            $a->{"{$p}_host"}       = trim((string) $request->input("{$p}_host")) ?: null;
-            $a->{"{$p}_port"}       = (int) $request->input("{$p}_port", $p === 'imap' ? 993 : 465);
-            $a->{"{$p}_encryption"} = in_array($request->input("{$p}_encryption"), ['ssl', 'tls', 'none'], true) ? $request->input("{$p}_encryption") : 'ssl';
-            $a->{"{$p}_user"}       = trim((string) $request->input("{$p}_user")) ?: null;
-            // La contraseña solo se cambia si viene una nueva (vacío = se conserva la que hay).
+            $host = trim((string) $request->input("{$p}_host")) ?: null;
+            $port = (int) $request->input("{$p}_port", $p === 'imap' ? 993 : 465);
+            $enc  = in_array($request->input("{$p}_encryption"), ['ssl', 'tls', 'none'], true) ? $request->input("{$p}_encryption") : 'ssl';
+            $user = trim((string) $request->input("{$p}_user")) ?: null;
+            // La contraseña solo se cambia si viene una nueva (vacío = se conserva la que hay)...
             $pw = (string) $request->input("{$p}_password");
+            // ...pero SOLO si el destino es el mismo: si no, cualquiera con esta pantalla
+            // podría apuntar el buzón a su servidor y recibir la contraseña guardada.
+            if ($pw === '' && $a->exists && $a->{"{$p}_password"} && !$this->mismoDestino($a, $p, (string) $host, $port, $enc, (string) $user)) {
+                return response()->json(['ok' => false, 'error' => 'Has cambiado el servidor, el puerto, el cifrado o el usuario de ' . strtoupper($p) . ': vuelve a escribir su contraseña'], 422);
+            }
+            $a->{"{$p}_host"} = $host; $a->{"{$p}_port"} = $port; $a->{"{$p}_encryption"} = $enc; $a->{"{$p}_user"} = $user;
             if ($pw !== '') $a->{"{$p}_password"} = $pw;
         }
         $a->save();
@@ -174,15 +180,35 @@ class EmailAccountsController extends Controller
     protected function test(Request $request)
     {
         $a = $this->cuenta($this->funcion($request)) ?: new EmailAccount();
-        // Permite probar con datos aún sin guardar; la contraseña, si no viene, usa la guardada.
+        // Permite probar con datos aún sin guardar. La contraseña guardada SOLO se usa si se
+        // prueba contra el MISMO servidor/usuario guardado: si no, se exige escribirla (si no,
+        // bastaría con poner un servidor propio para recibir la contraseña real).
         $get = fn ($k, $def = null) => $request->filled($k) ? $request->input($k) : ($a->{$k} ?? $def);
-        $imapPass = (string) ($request->input('imap_password') ?: $a->imap_password);
-        $smtpPass = (string) ($request->input('smtp_password') ?: $a->smtp_password);
+        $res = [];
+        foreach (['imap' => 993, 'smtp' => 465] as $p => $defPort) {
+            $host = (string) $get("{$p}_host"); $port = (int) $get("{$p}_port", $defPort);
+            $enc  = (string) $get("{$p}_encryption", 'ssl'); $user = (string) $get("{$p}_user");
+            $pass = (string) $request->input("{$p}_password");
+            if ($pass === '') {
+                if ($a->exists && !$this->mismoDestino($a, $p, $host, $port, $enc, $user)) {
+                    $res[$p] = ['ok' => false, 'error' => 'Para probar otro servidor o usuario, escribe la contraseña'];
+                    continue;
+                }
+                $pass = (string) $a->{"{$p}_password"};
+            }
+            $res[$p] = $p === 'imap' ? $this->testImap($host, $port, $enc, $user, $pass) : $this->testSmtp($host, $port, $enc, $user, $pass);
+        }
 
-        $imap = $this->testImap((string) $get('imap_host'), (int) $get('imap_port', 993), (string) $get('imap_encryption', 'ssl'), (string) $get('imap_user'), $imapPass);
-        $smtp = $this->testSmtp((string) $get('smtp_host'), (int) $get('smtp_port', 465), (string) $get('smtp_encryption', 'ssl'), (string) $get('smtp_user'), $smtpPass);
+        return response()->json(['ok' => true, 'imap' => $res['imap'], 'smtp' => $res['smtp']]);
+    }
 
-        return response()->json(['ok' => true, 'imap' => $imap, 'smtp' => $smtp]);
+    /** ¿Servidor, puerto, cifrado y usuario son los GUARDADOS? (para reutilizar su contraseña) */
+    protected function mismoDestino(EmailAccount $a, string $p, string $host, int $port, string $enc, string $user): bool
+    {
+        return mb_strtolower(trim($host)) === mb_strtolower(trim((string) $a->{"{$p}_host"}))
+            && $port === (int) $a->{"{$p}_port"}
+            && $enc === (string) ($a->{"{$p}_encryption"} ?: 'ssl')
+            && mb_strtolower(trim($user)) === mb_strtolower(trim((string) $a->{"{$p}_user"}));
     }
 
     protected function testImap(string $host, int $port, string $enc, string $user, string $pass): array
