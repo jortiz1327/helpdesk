@@ -1031,7 +1031,11 @@ class TicketsController extends Controller
         // usuarios reales. push() se salta la autonotificación (mencionarte a ti mismo).
         $mentions = array_values(array_unique(array_filter(array_map('intval', (array) $request->input('mentions', [])))));
         if ($mentions) {
-            $validos  = DB::table('users')->whereIn('id', $mentions)->pluck('id');
+            // Solo compañeros activos que PUEDEN ver el ticket: la mención lleva un extracto,
+            // y no debe llegarle a alguien de Campañas ni a quien no tiene acceso a ese ticket.
+            $validos  = User::whereIn('id', $mentions)->where('active', true)->get()
+                ->filter(fn ($u) => $u->can('helpdesk.access') && \App\Support\TicketVisibility::puedeVer($u, (int) $t->id))
+                ->pluck('id');
             $extracto = mb_substr(trim(HtmlSanitizer::toText($html)), 0, 140);
             $cuerpo   = "{$me->name} te mencionó en {$t->code}" . ($extracto !== '' ? ": «{$extracto}»" : '');
             foreach ($validos as $uid) {

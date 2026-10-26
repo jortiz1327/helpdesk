@@ -33,7 +33,10 @@ class User extends Authenticatable
     public static function asignable(?int $id): bool
     {
         if (!$id) return true;
-        return (bool) (\Illuminate\Support\Facades\DB::table('users')->where('id', $id)->value('assignable') ?? true);
+        // Además de no estar marcada como «no recibe tickets», la cuenta tiene que estar
+        // activa y tener acceso al Helpdesk (si no, recibiría el aviso con un ticket que no ve).
+        $u = static::find($id);
+        return $u && $u->assignable !== false && !$u->deshabilitado() && $u->can('helpdesk.access');
     }
 
     /** El superadministrador: tiene bypass a todos los permisos (ver AppServiceProvider). */
