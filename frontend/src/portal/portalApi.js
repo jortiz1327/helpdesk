@@ -56,7 +56,17 @@ async function call(action, { method = 'GET', body, form, query, ttoken } = {}) 
   return data
 }
 
+/** ¿Hay algo del cliente en este navegador? (pase del correo o enlaces de algún ticket) */
+export const haySesion = () => !!getPass() || Object.keys(ttMap()).length > 0
+
 export const portal = {
+  // Salir: el servidor anula el pase y aquí se olvida todo lo del cliente (pase, enlaces
+  // de tickets y «último visto»), por si el equipo es compartido.
+  logout: async () => {
+    if (getPass()) await call('logout', { method: 'POST' })
+    setPass('')
+    try { localStorage.removeItem(TT_KEY); localStorage.removeItem(SEEN_KEY) } catch { /* sin almacenamiento */ }
+  },
   requestCode: (email) => call('request-code', { method: 'POST', body: { email } }),
   verifyCode: (email, code) => call('verify-code', { method: 'POST', body: { email, code } }),
   categories: () => call('categories'),

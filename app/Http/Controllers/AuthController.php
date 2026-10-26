@@ -30,6 +30,9 @@ class AuthController extends Controller
         if ($action === 'change' && $post) {
             return $this->change($request);
         }
+        if ($action === 'logout_all' && $post) {
+            return $this->logoutAll($request);
+        }
         if ($action === 'notify' && $post) {
             return $this->notifyPrefs($request);
         }
@@ -113,6 +116,26 @@ class AuthController extends Controller
             'token' => TokenService::make($u),
             'user'  => $this->pub($u),
         ]);
+    }
+
+    /**
+     * Cerrar sesión en TODOS los dispositivos (también en este): sube token_version y
+     * cualquier token emitido antes —otro navegador, un móvil perdido, un token robado—
+     * deja de valer al instante. Se anota aquí porque, después, el token ya no identifica.
+     */
+    protected function logoutAll(Request $request)
+    {
+        $token = $request->header('X-App-Token') ?: $request->bearerToken();
+        $me    = TokenService::verify($token);
+        if (!$me) return response()->json(['error' => 'No autenticado', 'authenticated' => false], 401);
+
+        $me->token_version = (int) ($me->token_version ?? 1) + 1;
+        $me->save();
+        \App\Models\ActivityLog::create([
+            'user_id' => $me->id, 'user_name' => $me->name ?: $me->email, 'section' => 'Sesión', 'action' => 'logout_all',
+            'summary' => 'Cerró sesión en todos los dispositivos', 'method' => 'POST', 'ip' => $request->ip(), 'created_at' => now(),
+        ]);
+        return response()->json(['ok' => true]);
     }
 
     protected function change(Request $request)

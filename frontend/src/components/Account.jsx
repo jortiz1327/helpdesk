@@ -1,10 +1,25 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
-import { useToast } from '../App.jsx'
+import { useToast, useConfirm } from '../App.jsx'
 
-export default function Account({ user, onAccountChange }) {
+export default function Account({ user, onAccountChange, onSignedOut }) {
   const toast = useToast()
+  const confirm = useConfirm()
+  const [cerrando, setCerrando] = useState(false)
+
+  const cerrarTodas = async () => {
+    if (!(await confirm({
+      title: 'Cerrar sesión en todos los dispositivos',
+      message: 'Saldrás de la app en todos los navegadores y móviles donde hayas entrado, también en este. Tendrás que volver a iniciar sesión.',
+      confirmText: 'Cerrar en todos', danger: true,
+    }))) return
+    setCerrando(true)
+    const r = await api.logoutAll()
+    setCerrando(false)
+    if (r.ok) onSignedOut?.()
+    else toast(r.error || 'No se pudo cerrar las sesiones', 'err')
+  }
   const [a, setA] = useState({ email: user?.email || '', current: '', new_password: '', confirm: '' })
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setA((s) => ({ ...s, [k]: e.target.value }))
@@ -44,7 +59,7 @@ export default function Account({ user, onAccountChange }) {
               </label>
               <label className="field">
                 <span className="lbl">Nueva contraseña <span className="hint">(opcional)</span></span>
-                <input type="password" value={a.new_password} onChange={set('new_password')} placeholder="mín. 6 caracteres" autoComplete="new-password" />
+                <input type="password" value={a.new_password} onChange={set('new_password')} placeholder="mín. 8 caracteres" autoComplete="new-password" />
               </label>
               <label className="field">
                 <span className="lbl">Repetir nueva contraseña</span>
@@ -52,6 +67,12 @@ export default function Account({ user, onAccountChange }) {
               </label>
             </div>
             <button className="btn" disabled={busy} onClick={submit}><Icon.lock /> {busy ? 'Guardando…' : 'Actualizar acceso'}</button>
+          </div>
+
+          <div className="card" style={{ marginTop: 16, marginBottom: 0 }}>
+            <h2>Sesiones abiertas</h2>
+            <p className="desc">¿Has entrado en un ordenador que no es tuyo o has perdido el móvil? Cierra la sesión en todos los dispositivos a la vez, incluido este.</p>
+            <button className="btn danger" disabled={cerrando} onClick={cerrarTodas}><Icon.logout /> {cerrando ? 'Cerrando…' : 'Cerrar sesión en todos los dispositivos'}</button>
           </div>
         </div>
       </div>

@@ -3,6 +3,22 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.4.3] — 2026-10-26
+
+### Seguridad (pendientes de la auditoría del 26/10)
+
+- **Portal: botón «Salir».** Anula el pase en el servidor (aunque alguien lo hubiera
+  copiado, deja de valer) y borra de ese navegador el pase, los enlaces de tickets y el
+  «último visto». Solo aparece cuando hay algo del cliente guardado. Los demás
+  dispositivos del cliente no se ven afectados.
+- **Cuenta del agente: «Cerrar sesión en todos los dispositivos».** Sube la versión del
+  token: todas las sesiones abiertas (también esta) caen al instante. Queda anotado en
+  Actividad.
+
+### Arreglos
+
+- La pista de «Nueva contraseña» decía «mín. 6 caracteres»; el mínimo real es 8.
+
 ## [1.4.2] — 2026-10-26
 
 ### Mejoras

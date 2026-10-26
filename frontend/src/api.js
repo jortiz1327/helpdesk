@@ -656,6 +656,13 @@ export const api = {
     return res
   },
   logout: async () => { setToken(''); return req('auth.php?action=logout') },
+  // Cerrar sesión en todos los dispositivos (también este). Primero se pide al servidor
+  // —con el token aún puesto— y después se olvida aquí.
+  logoutAll: async () => {
+    const r = await req('auth.php?action=logout_all', { method: 'POST' })
+    if (r.ok) setToken('')
+    return r
+  },
   // El propio usuario ajusta sus avisos por correo (asignación / respuesta / SLA).
   saveNotifyPrefs: (prefs) => req('auth.php?action=notify', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(prefs),

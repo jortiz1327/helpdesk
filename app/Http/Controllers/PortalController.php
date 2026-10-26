@@ -49,6 +49,10 @@ class PortalController extends Controller
             // Descargar el hilo en PDF (siempre anónimo) y recuperar el enlace de 24h.
             'pdf'          => $this->pdf($request),
             'resend-link'  => $this->resendLink($request),
+            // Salir: anula el pase de este navegador. Siempre «ok» (salir dos veces no falla).
+            'logout'       => $request->isMethod('post')
+                                ? tap(response()->json(['ok' => true]), fn () => $this->portal->cerrarSesion($request->header('X-Portal-Token') ?: $request->bearerToken()))
+                                : response()->json(['ok' => false, 'error' => 'Método no permitido'], 405),
             default        => response()->json(['ok' => false, 'error' => 'Acción no válida'], 400),
         };
     }

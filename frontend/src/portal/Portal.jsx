@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { portal, getPass, setPass, setTicketToken, getSeen, markSeen } from './portalApi.js'
+import { portal, getPass, setPass, setTicketToken, getSeen, markSeen, haySesion } from './portalApi.js'
 import { LangProvider, useLang, LANGS, LOCALES } from './i18n.js'
 import { parseDate } from '../util.js'
 import logo from '../assets/logo.png'
@@ -65,6 +65,7 @@ const I = {
   clock: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
   phone: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 14l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 2 6a2 2 0 0 1 2-2z" /></svg>,
   info: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5v.5" /></svg>,
+  out: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>,
   // Estrella para la valoración (CSAT). Sin fill/stroke fijos: los pone el CSS
   // según esté marcada o no, para poder rellenarla en dorado.
   star: <svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.3 6.9.6-5.2 4.5 1.6 6.7L12 17.6 5.8 21.1l1.6-6.7L2.2 9.4l6.9-.6L12 2.5z" /></svg>,
@@ -235,6 +236,7 @@ export default function Portal() {
 }
 
 function PortalApp() {
+  const { t } = useLang()
   // Pantalla: home | crear | mis | ticket. El «pase» decide si hay que pedir código.
   const [view, setView] = useState('home')
   const [pass, setPassState] = useState(getPass())
@@ -280,10 +282,21 @@ function PortalApp() {
     setPass(''); setPassState(''); setCaducado(true)
     setView((v) => (v === 'ticket' ? 'mis' : v))
   }
+  // Salir: se anula el pase y se olvida todo en este navegador; vuelta al inicio.
+  const [saliendo, setSaliendo] = useState(false)
+  const [salido, setSalido] = useState(false)
+  const salir = async () => {
+    setSaliendo(true)
+    await portal.logout()
+    setSaliendo(false); setPassState(''); setOpenCode(null); setCaducado(false); setSalido(true)
+    go('home')
+    setTimeout(() => setSalido(false), 5000)
+  }
 
   return (
     <>
-      <Top onLogo={() => go('home')} />
+      <Top onLogo={() => go('home')} onSalir={(pass || view === 'ticket' || haySesion()) ? salir : null} saliendo={saliendo} />
+      {salido && <div className="salido" role="status">{I.check} {t('logout_done')}</div>}
       {view === 'home' && <Home go={go} irCrear={irCrear} />}
       {/* Crear ya NO pide código: es público. Al crearse, el ticket se abre con el
           token que devuelve (verlo/responderlo sin código). */}
@@ -299,7 +312,7 @@ function PortalApp() {
 }
 
 /* -------------------------------- Barra ---------------------------------- */
-function Top({ onLogo }) {
+function Top({ onLogo, onSalir, saliendo }) {
   const { lang, setLang, t } = useLang()
   const [scr, setScr] = useState(false)
   useEffect(() => {
@@ -323,6 +336,11 @@ function Top({ onLogo }) {
               onClick={() => setLang(code)}>{FLAGS[code]}</button>
           ))}
         </div>
+        {onSalir && (
+          <button type="button" className="ghostlink salir" onClick={onSalir} disabled={saliendo} title={t('logout_title')}>
+            {I.out} {t('logout')}
+          </button>
+        )}
         <a className="ghostlink" href="/agentes">{I.lock} {t('agent_access')}</a>
       </div>
     </div>

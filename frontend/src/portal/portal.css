@@ -700,3 +700,14 @@
   .otp input { width: 40px; height: 50px; font-size: 20px; }
   .centro-inner { padding: 18px 15px 22px; }
 }
+
+/* Salir (portal) */
+.ghostlink.salir{border:0;background:none;cursor:pointer;font:inherit;font-size:13.5px}
+.ghostlink.salir:disabled{opacity:.6;cursor:default}
+.salido{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:8px;
+  max-width:calc(100vw - 32px);padding:11px 16px;border-radius:12px;background:var(--ink);color:var(--bg,#fff);font-size:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.2);animation:salido-in .2s ease-out}
+.salido svg{width:16px;height:16px;flex:none}
+@keyframes salido-in{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+@media (prefers-reduced-motion:reduce){.salido{animation:none}}
+@media (max-width:560px){.ghostlink.salir{padding:7px 8px}}

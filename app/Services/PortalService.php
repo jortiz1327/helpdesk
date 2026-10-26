@@ -226,6 +226,12 @@ class PortalService
         return $email !== '' && DB::table('contacts')->where('email', $email)->exists();
     }
 
+    /** «Salir»: anula ese pase en el servidor (aunque alguien lo hubiera copiado, ya no vale). */
+    public function cerrarSesion(?string $token): void
+    {
+        if ($token) DB::table('portal_sessions')->where('token_hash', hash('sha256', $token))->delete();
+    }
+
     public function emailFromToken(?string $token): ?string
     {
         if (!$token) return null;

@@ -17,6 +17,9 @@ export const dict = {
     top_home_title: 'Volver al inicio',
     top_home_aria: 'Ir al inicio',
     agent_access: 'Acceso agentes',
+    logout: 'Salir',
+    logout_title: 'Cerrar tu sesión en este dispositivo',
+    logout_done: 'Has salido. Para volver a ver tus incidencias te pediremos un código.',
     lang_label: 'Idioma',
 
     /* ---- Home ---- */
@@ -224,6 +227,9 @@ export const dict = {
     top_home_title: 'Back to home',
     top_home_aria: 'Go to home',
     agent_access: 'Agent login',
+    logout: 'Sign out',
+    logout_title: 'Sign out on this device',
+    logout_done: 'You have signed out. To see your requests again we will ask you for a code.',
     lang_label: 'Language',
 
     status_open: 'We are online now',
@@ -418,6 +424,9 @@ export const dict = {
     top_home_title: 'Voltar ao início',
     top_home_aria: 'Ir para o início',
     agent_access: 'Acesso de agentes',
+    logout: 'Sair',
+    logout_title: 'Terminar a sessão neste dispositivo',
+    logout_done: 'Saiu da sessão. Para voltar a ver os seus pedidos vamos pedir-lhe um código.',
     lang_label: 'Idioma',
 
     status_open: 'Estamos a atender agora',

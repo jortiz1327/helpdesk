@@ -120,10 +120,22 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.4.2";
+const APP_VERSION = "1.4.3";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.4.3",
+        date: "26 oct 2026",
+        resumen: "Botón «Salir» en el portal y cerrar sesión en todos los dispositivos.",
+        mejoras: [
+            "Portal de clientes: botón «Salir» que cierra la sesión y borra los datos del cliente de ese navegador.",
+            "Cuenta: «Cerrar sesión en todos los dispositivos», por si se pierde un móvil o se entra en un ordenador ajeno.",
+        ],
+        arreglos: [
+            "La pista de la contraseña nueva decía 6 caracteres; son 8.",
+        ],
+    },
     {
         version: "1.4.2",
         date: "26 oct 2026",
@@ -1321,6 +1333,12 @@ export default function App() {
                         {view === "account" && (
                             <Account
                                 user={auth.user}
+                                onSignedOut={() => {
+                                    setAuth({ state: "out", user: null });
+                                    setView("support");
+                                    setChooserDone(false);
+                                    try { localStorage.removeItem("chooser_done"); } catch { /* sin almacenamiento */ }
+                                }}
                                 onAccountChange={(u) =>
                                     setAuth((a) => ({
                                         ...a,
