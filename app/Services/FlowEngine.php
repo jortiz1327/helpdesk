@@ -230,7 +230,16 @@ class FlowEngine
             return;
         }
         if (($d['auto'] ?? 'auto') === 'auto') {
+            // Reparto automático SOLO entre gente de Campañas activa y sin el superadmin
+            // (mismo criterio que la lista de agentes del Chat en vivo). Antes entraban
+            // todos los usuarios: agentes de soporte, el superadmin y ex-empleados.
+            $super = config('rbac.super_role');
+            $candidatos = \App\Models\User::where('active', true)->get()
+                ->filter(fn ($u) => !$u->hasRole($super) && $u->can('campaigns.access'))
+                ->pluck('id')->all();
+            if (!$candidatos) return;
             $uid = DB::table('users')->leftJoin('contacts', 'contacts.assigned_to', '=', 'users.id')
+                ->whereIn('users.id', $candidatos)
                 ->groupBy('users.id')->orderByRaw('COUNT(contacts.id) ASC, users.id ASC')
                 ->value('users.id');
             if ($uid) DB::update('UPDATE contacts SET assigned_to = ? WHERE id = ?', [(int) $uid, $contactId]);

@@ -24,18 +24,16 @@ class WhatsAppService
     protected ?\App\Models\WhatsAppNumber $defectoCache = null;
 
     /**
-     * Número por defecto (opción B) sin contexto explícito: primero el de CAMPAÑAS
-     * (el envío «suelto» es de campañas), y si no hay, cualquier número activo con
-     * credenciales. Así el proxy de multimedia puede bajar imágenes con el token de
-     * un número válido aunque el único que haya sea de soporte. Memoizado.
+     * Número por defecto (opción B) sin contexto explícito: el de CAMPAÑAS (el envío
+     * «suelto» —campañas, bot, Chat en vivo, avisos de baja— es de campañas). NUNCA otro:
+     * si faltara el 51, caer al 01 de soporte haría que las campañas salieran desde
+     * soporte. Sin número de campañas se usan las credenciales globales (legacy). Lo de
+     * soporte va siempre explícito con paraFuncion('soporte'). Memoizado.
      */
     protected function numeroDefecto(): ?\App\Models\WhatsAppNumber
     {
         if (!$this->defectoFetched) {
-            $this->defectoCache = \App\Models\WhatsAppNumber::porFuncion('campanas')
-                ?? \App\Models\WhatsAppNumber::where('active', 1)
-                    ->whereNotNull('token')->where('token', '!=', '')
-                    ->whereNotNull('phone_number_id')->orderBy('id')->first();
+            $this->defectoCache = \App\Models\WhatsAppNumber::porFuncion('campanas');
             $this->defectoFetched = true;
         }
         return $this->defectoCache;
