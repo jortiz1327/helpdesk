@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Services;
+
+use App\Support\Telefono;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Un cliente = una ficha. Fusión de contactos (manual desde Contactos, desde el aviso de
+ * «posibles duplicados» y automática cuando la evidencia es inequívoca) y alta de teléfono
+ * sin crear duplicados.
+ */
+class ContactMergeService
+{
+    /**
+     * Fusiona $mergeId DENTRO de $keepId: todo lo que cuelga del absorbido pasa al principal,
+     * se rellenan SOLO los huecos del principal y el absorbido se borra. En transacción.
+     */
+    public function fusionar(int $keepId, int $mergeId): void
+    {
+        if ($keepId === $mergeId) return;
+        $keep  = DB::table('contacts')->where('id', $keepId)->first();
+        $merge = DB::table('contacts')->where('id', $mergeId)->first();
+        if (!$keep || !$merge) return;
+
+        DB::transaction(function () use ($keep, $merge, $keepId, $mergeId) {
+            // 1) Todo lo que cuelga del contacto pasa al principal.
+            foreach (['messages', 'tickets', 'flow_sessions', 'flow_responses', 'form_submissions'] as $t) {
+                DB::table($t)->where('contact_id', $mergeId)->update(['contact_id' => $keepId]);
+            }
+            // Etiquetas excluyentes: si chocan (los dos tienen «Interés…»), manda la del principal.
+            $labels = \App\Models\Label::excluyentes(array_merge(
+                DB::table('contact_labels')->where('contact_id', $mergeId)->pluck('label_id')->all(),
+                DB::table('contact_labels')->where('contact_id', $keepId)->pluck('label_id')->all(),
+            ));
+            DB::table('contact_labels')->whereIn('contact_id', [$keepId, $mergeId])->delete();
+            foreach ($labels as $lid) {
+                DB::table('contact_labels')->insertOrIgnore(['contact_id' => $keepId, 'label_id' => $lid]);
+            }
+
+            // 2) Rellenar SOLO los huecos del principal (lo suyo manda).
+            $upd = [];
+            foreach (['name', 'email', 'wa_id', 'country_code', 'note', 'empresa', 'tienda', 'cargo', 'provincia', 'comentarios', 'sede_id'] as $col) {
+                if (property_exists($keep, $col) && empty($keep->$col) && !empty($merge->$col)) $upd[$col] = $merge->$col;
+            }
+            // Se conserva la actividad más reciente de los dos.
+            if (!empty($merge->last_time) && (empty($keep->last_time) || $merge->last_time > $keep->last_time)) {
+                $upd['last_time']    = $merge->last_time;
+                $upd['last_message'] = $merge->last_message;
+            }
+            $upd['unread'] = (int) $keep->unread + (int) $merge->unread;
+            // Si cualquiera de los dos se dio de baja, la baja manda (más conservador).
+            if ((int) $merge->opted_out === 1) $upd['opted_out'] = 1;
+
+            // wa_id y email son únicos: se liberan del absorbido ANTES de copiarlos.
+            DB::table('contacts')->where('id', $mergeId)->update(['wa_id' => null, 'email' => null]);
+            DB::table('contacts')->where('id', $keepId)->update($upd);
+
+            // 3) Fuera el duplicado (y sus «no son la misma persona», que ya no aplican).
+            DB::table('contact_duplicate_ignores')->where('contact_a', $mergeId)->orWhere('contact_b', $mergeId)->delete();
+            DB::table('contacts')->where('id', $mergeId)->delete();
+        });
+    }
+
+    /**
+     * Pone el teléfono a un contacto SIN crear duplicados. Si ese número ya es de otra ficha
+     * que solo tiene teléfono (p. ej. un cliente que escribió por WhatsApp), es la MISMA
+     * persona: se fusiona en esta. Si la otra ficha tiene su propio correo, son personas
+     * distintas con el mismo número: no se toca nada. Nunca pisa un teléfono ya guardado.
+     */
+    public function asignarTelefono(int $contactId, ?string $telefono): void
+    {
+        $tel = Telefono::normalizar($telefono);
+        if (!$tel) return;
+        $c = DB::table('contacts')->where('id', $contactId)->first(['wa_id']);
+        if (!$c || !empty($c->wa_id)) return;
+
+        $otro = DB::table('contacts')->where('wa_id', $tel)->where('id', '<>', $contactId)->first(['id', 'email']);
+        if (!$otro) {
+            DB::table('contacts')->where('id', $contactId)->update(['wa_id' => $tel]);
+        } elseif (empty($otro->email)) {
+            $this->fusionar($contactId, (int) $otro->id);   // trae su teléfono, chats y tickets
+        }
+    }
+}

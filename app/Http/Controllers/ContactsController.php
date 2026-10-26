@@ -24,6 +24,8 @@ class ContactsController extends Controller
         }
 
         return match (true) {
+            $action === 'duplicates'              => $this->duplicados($request),
+            $post && $action === 'ignore_duplicate' => $this->ignorarDuplicado($request),
             $post && $action === 'bulk_label'     => $this->bulkLabel($request),
             $post && $action === 'set_optout'     => $this->setOptout($request),
             $post && $action === 'bulk_phonebook' => $this->bulkPhonebook($request),
@@ -45,6 +47,64 @@ class ContactsController extends Controller
                 OR (c.wa_id IS NOT NULL
                     AND NOT EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)
                     AND NOT EXISTS (SELECT 1 FROM messages ms WHERE ms.contact_id = c.id AND ms.funcion = 'soporte')))";
+
+    /**
+     * POSIBLES DUPLICADOS: la misma persona en dos fichas. Lo inequívoco (mismo correo o
+     * mismo teléfono) ya no puede pasar —índices únicos y teléfono normalizado—, así que
+     * aquí queda lo que una persona tiene que confirmar: mismo nombre y una ficha solo con
+     * teléfono (WhatsApp) y otra solo con correo. Sin los pares marcados como «no son la
+     * misma persona». Cada uno ve solo pares de las áreas a las que tiene acceso.
+     */
+    protected function duplicados(Request $r)
+    {
+        $me = $r->user();
+        if (!$me->can('contacts.edit')) return response()->json(['ok' => true, 'pairs' => []]);
+
+        $norm = fn ($s) => trim(preg_replace('/[^a-z0-9 ]+/', '', preg_replace('/\s+/', ' ', mb_strtolower(\Illuminate\Support\Str::ascii((string) $s)))));
+        $cs = DB::table('contacts')->whereNotNull('name')->where('name', '<>', '')
+            ->where(fn ($w) => $w->whereNull('email')->orWhere('email', '')->orWhereNull('wa_id')->orWhere('wa_id', ''))
+            ->get(['id', 'name', 'email', 'wa_id', 'created_at']);
+        $soloTel  = $cs->filter(fn ($c) => $c->wa_id && !$c->email && mb_strlen($norm($c->name)) >= 4);
+        $soloMail = $cs->filter(fn ($c) => $c->email && !$c->wa_id)->groupBy(fn ($c) => $norm($c->name));
+
+        $ignorados = DB::table('contact_duplicate_ignores')->get(['contact_a', 'contact_b'])
+            ->map(fn ($i) => $i->contact_a . '-' . $i->contact_b)->flip();
+
+        $pares = [];
+        foreach ($soloTel as $t) {
+            foreach ($soloMail->get($norm($t->name), []) as $e) {
+                [$a, $b] = $t->id < $e->id ? [$t->id, $e->id] : [$e->id, $t->id];
+                if (isset($ignorados["$a-$b"])) continue;
+                $pares[] = [$t, $e, str_contains($norm($t->name), ' ') ? 'nombre' : 'nombre_corto'];
+            }
+        }
+        if (!$pares) return response()->json(['ok' => true, 'pairs' => []]);
+
+        // Datos de cada ficha + a qué área pertenece (para no enseñar clientes de otra área).
+        $ids = collect($pares)->flatMap(fn ($p) => [$p[0]->id, $p[1]->id])->unique()->values();
+        $tickets = DB::table('tickets')->whereIn('contact_id', $ids)->groupBy('contact_id')->selectRaw('contact_id, COUNT(*) n')->pluck('n', 'contact_id');
+        $soporte = DB::table('messages')->whereIn('contact_id', $ids)->where('funcion', 'soporte')->distinct()->pluck('contact_id')->flip();
+        $puedeVer = fn ($c) => (isset($tickets[$c->id]) || isset($soporte[$c->id])) ? $me->can('helpdesk.access') : $me->can('campaigns.access');
+        $ficha = fn ($c) => ['id' => (int) $c->id, 'name' => $c->name, 'email' => $c->email, 'wa_id' => $c->wa_id,
+            'tickets' => (int) ($tickets[$c->id] ?? 0), 'created_at' => $c->created_at];
+
+        $out = [];
+        foreach ($pares as [$t, $e, $motivo]) {
+            if (!$puedeVer($t) || !$puedeVer($e)) continue;
+            $out[] = ['a' => $ficha($e), 'b' => $ficha($t), 'motivo' => $motivo];
+        }
+        return response()->json(['ok' => true, 'pairs' => $out]);
+    }
+
+    /** «No son la misma persona»: ese par deja de sugerirse. */
+    protected function ignorarDuplicado(Request $r)
+    {
+        $a = (int) $r->input('a'); $b = (int) $r->input('b');
+        if (!$a || !$b || $a === $b) return response()->json(['ok' => false, 'error' => 'Faltan los contactos'], 400);
+        [$a, $b] = $a < $b ? [$a, $b] : [$b, $a];
+        DB::table('contact_duplicate_ignores')->insertOrIgnore(['contact_a' => $a, 'contact_b' => $b, 'user_id' => $r->user()->id]);
+        return response()->json(['ok' => true]);
+    }
 
     protected function ids(Request $r): array
     {
@@ -120,45 +180,7 @@ class ContactsController extends Controller
             return response()->json(['ok' => false, 'error' => 'Estos contactos tienen tickets: solo se pueden fusionar desde el Helpdesk'], 403);
         }
 
-        DB::transaction(function () use ($keep, $merge, $keepId, $mergeId) {
-            // 1) Todo lo que cuelga del contacto pasa al principal.
-            foreach (['messages', 'tickets', 'flow_sessions', 'flow_responses', 'form_submissions'] as $t) {
-                DB::table($t)->where('contact_id', $mergeId)->update(['contact_id' => $keepId]);
-            }
-            // Etiquetas: clave compuesta (contact_id,label_id) → insertOrIgnore evita chocar
-            // si ambos ya comparten una etiqueta.
-            // Excluyentes: si chocan (los dos tienen «Interés…»), manda la del principal.
-            $labels = \App\Models\Label::excluyentes(array_merge(
-                DB::table('contact_labels')->where('contact_id', $mergeId)->pluck('label_id')->all(),
-                DB::table('contact_labels')->where('contact_id', $keepId)->pluck('label_id')->all(),
-            ));
-            DB::table('contact_labels')->whereIn('contact_id', [$keepId, $mergeId])->delete();
-            foreach ($labels as $lid) {
-                DB::table('contact_labels')->insertOrIgnore(['contact_id' => $keepId, 'label_id' => $lid]);
-            }
-
-            // 2) Rellenar SOLO los huecos del principal (lo suyo manda).
-            $upd = [];
-            foreach (['name', 'email', 'wa_id', 'country_code', 'note'] as $col) {
-                if (empty($keep->$col) && !empty($merge->$col)) $upd[$col] = $merge->$col;
-            }
-            // Se conserva la actividad más reciente de los dos.
-            if (!empty($merge->last_time) && (empty($keep->last_time) || $merge->last_time > $keep->last_time)) {
-                $upd['last_time']    = $merge->last_time;
-                $upd['last_message'] = $merge->last_message;
-            }
-            $upd['unread'] = (int) $keep->unread + (int) $merge->unread;
-            // Si cualquiera de los dos se dio de baja, la baja manda (más conservador).
-            if ((int) $merge->opted_out === 1) $upd['opted_out'] = 1;
-
-            // El wa_id es único: hay que liberarlo del absorbido ANTES de copiarlo.
-            DB::table('contacts')->where('id', $mergeId)->update(['wa_id' => null]);
-            DB::table('contacts')->where('id', $keepId)->update($upd);
-
-            // 3) Fuera el duplicado.
-            DB::table('contacts')->where('id', $mergeId)->delete();
-        });
-
+        app(\App\Services\ContactMergeService::class)->fusionar($keepId, $mergeId);
         return response()->json(['ok' => true]);
     }
 

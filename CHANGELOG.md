@@ -3,6 +3,48 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.4.0] — 2026-10-26
+
+### Mejoras
+
+- **Etiquetas de Campañas excluyentes por grupo:** Interés (alto, medio, bajo) y Tipo
+  (cliente, no cliente, excliente). Al poner una se quitan las de su grupo, desde la
+  ficha, en bloque, el Kanban, el bot, la importación o la fusión.
+- **Contactos › Campañas** solo muestra contactos de Campañas, no los clientes del
+  Helpdesk que tienen teléfono.
+- **«Puede recibir tickets asignados»** por usuario. Apagado, nadie le asigna tickets.
+- **Un cliente = una ficha.** Teléfono en un formato único con prefijo (34…) en todas las
+  entradas, con una migración que normaliza y fusiona los ya existentes. Fusión automática
+  cuando el teléfono lo confirma, y aviso de «posibles duplicados» en Contactos con
+  fusionar o «no es la misma persona».
+- **Número 51 de Campañas migrado a Coexistence** (nuevo Phone Number ID y WABA).
+
+### Seguridad (auditoría del 26/10)
+
+- Las cuentas deshabilitadas ya no pueden entrar, y deshabilitar o cambiar la contraseña
+  cierra sus sesiones.
+- Un remitente externo ya no puede sacar adjuntos de otros clientes con el PDF del
+  portal.
+- Visibilidad de tickets en asignar, categorizar, estado, prioridad, bloqueo y
+  programadas.
+- Separación entre Campañas y Helpdesk: chat y envío del 51, contactos, etiquetas,
+  agendas, stats, analíticas e informes.
+- «Eliminar conversación» ya no borra los tickets del cliente.
+- Las contraseñas de los buzones ya no se pueden extraer con «Probar conexión».
+- Sin escalada a superadmin con `users.manage`. El nodo SQL de los flujos tiene lista
+  blanca de tablas.
+- Variables escapadas en los correos automáticos. Las respuestas efectivas respetan la
+  visibilidad.
+- Las URL de descarga llevan un token de medios de 24 h, nunca el de sesión. Los
+  adjuntos toman su tipo de la extensión y nunca se abre un SVG en línea.
+- Límites en los códigos del portal y en la consulta pública de estado.
+- Dependencias PHP actualizadas (`composer audit` sin avisos).
+
+### Arreglos
+
+- Crear un ticket a mano con un teléfono que ya tenía otro contacto daba error 500.
+- Los interruptores de la ficha de usuario se veían blancos cuando estaban activados.
+
 ## [1.1.3] — 2026-10-08
 
 ### Mejoras

@@ -1560,7 +1560,7 @@ class TicketsController extends Controller
         if (!$me->can('tickets.create')) return response()->json(['ok' => false], 403);
 
         $email = trim((string) $request->query('email', ''));
-        $phone = preg_replace('/\D+/', '', (string) $request->query('phone', ''));
+        $phone = (string) \App\Support\Telefono::normalizar($request->query('phone', ''));
         if ($email === '' && $phone === '') return response()->json(['ok' => true, 'tickets' => []]);
 
         $cid = DB::table('contacts')
@@ -1727,7 +1727,8 @@ class TicketsController extends Controller
 
         $name    = trim((string) $request->input('name'));
         $email   = trim((string) $request->input('email'));
-        $phone   = preg_replace('/\D+/', '', (string) $request->input('phone'));
+        $email   = mb_strtolower($email);
+        $phone   = (string) \App\Support\Telefono::normalizar($request->input('phone'));   // con prefijo: 34612…
         $subject = trim((string) $request->input('subject'));
 
         // La descripción llega como HTML del editor: se SANEA por lista blanca.
@@ -1747,13 +1748,14 @@ class TicketsController extends Controller
         $contactId = $q->value('id');
 
         if (!$contactId) {
-            // Alta del contacto. Si dos altas coinciden a la vez con el MISMO correo, el
-            // índice único lo evita: la 2ª falla y aquí se recupera el ya creado.
+            // Alta del contacto (SIN teléfono: se pone después sin duplicar). Si dos altas
+            // coinciden a la vez con el MISMO correo, el índice único lo evita: la 2ª falla
+            // y aquí se recupera el ya creado.
             try {
                 $contactId = DB::table('contacts')->insertGetId([
                     'name'  => $name,
                     'email' => $email ?: null,
-                    'wa_id' => $phone ?: null,
+                    'wa_id' => $email === '' ? ($phone ?: null) : null,
                 ]);
             } catch (\Illuminate\Database\QueryException $e) {
                 $q2 = DB::table('contacts');
@@ -1761,13 +1763,11 @@ class TicketsController extends Controller
                 $contactId = $q2->value('id');
                 if (!$contactId) throw $e;
             }
-        } elseif ($phone !== '') {
-            // El contacto ya existía: si NO tenía teléfono, se le pone el que ha apuntado el
-            // cliente al crear (sin pisar uno ya guardado, y solo si ese número está libre —
-            // wa_id es único). Así el teléfono deja de perderse y se ve luego en la ficha.
-            $sinTel = !DB::table('contacts')->where('id', $contactId)->whereNotNull('wa_id')->where('wa_id', '<>', '')->exists();
-            $libre  = !DB::table('contacts')->where('wa_id', $phone)->where('id', '<>', $contactId)->exists();
-            if ($sinTel && $libre) DB::table('contacts')->where('id', $contactId)->update(['wa_id' => $phone]);
+        }
+        // Teléfono sin duplicar: si ya era de una ficha solo-teléfono (WhatsApp), es la
+        // misma persona y se une a esta. Nunca pisa un teléfono ya guardado.
+        if ($phone !== '' && $email !== '') {
+            app(\App\Services\ContactMergeService::class)->asignarTelefono((int) $contactId, $phone);
         }
 
         // Solo quien tiene permiso puede asignar a otro; el resto crea sin asignar.

@@ -56,7 +56,8 @@ class PhonebooksController extends Controller
 
         $insert = [];
         foreach ($rows as $r) {
-            $wa = preg_replace('/\D/', '', is_object($r) ? ($r->wa_id ?? '') : ($r['wa_id'] ?? ''));
+            // Mismo formato que la ficha y WhatsApp (con prefijo): sin repetidos por formato.
+            $wa = \App\Support\Telefono::normalizar(is_object($r) ? ($r->wa_id ?? '') : ($r['wa_id'] ?? ''));
             if (!$wa) continue;
             $insert[] = ['phonebook_id' => $pbId, 'wa_id' => $wa, 'name' => is_object($r) ? ($r->name ?? null) : ($r['name'] ?? null)];
         }

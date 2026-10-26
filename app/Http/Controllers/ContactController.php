@@ -45,6 +45,9 @@ class ContactController extends Controller
                     return response()->json(['ok' => false, 'error' => 'El correo no es válido'], 400);
                 }
                 $upd['email'] = $email ?: null;
+                if ($email !== '' && DB::table('contacts')->where('email', $email)->where('id', '!=', $id)->exists()) {
+                    return response()->json(['ok' => false, 'error' => 'Ese correo ya pertenece a otro contacto: si es la misma persona, fusiónalos desde Contactos'], 409);
+                }
 
                 /*
                  * El correo es la IDENTIDAD del cliente en el portal (y adónde van las
@@ -77,13 +80,15 @@ class ContactController extends Controller
                 // código (p. ej. un contacto de WhatsApp cuyo wa_id ya es país+número),
                 // no se antepone otra vez → nada de «3434641510110».
                 $wa = $ph === '' ? null : (($cc !== '' && str_starts_with($ph, $cc)) ? $ph : $cc . $ph);
+                // Formato único (con prefijo): «612…» y «34612…» son el mismo número.
+                $wa = \App\Support\Telefono::normalizar($wa);
 
                 if ($wa !== null && strlen($wa) > 20) {
                     return response()->json(['ok' => false, 'error' => 'El teléfono es demasiado largo'], 400);
                 }
                 // wa_id es único: no se puede robar el número de otro contacto.
                 if ($wa !== null && DB::table('contacts')->where('wa_id', $wa)->where('id', '!=', $id)->exists()) {
-                    return response()->json(['ok' => false, 'error' => 'Ese teléfono ya pertenece a otro contacto'], 409);
+                    return response()->json(['ok' => false, 'error' => 'Ese teléfono ya pertenece a otro contacto: si es la misma persona, fusiónalos desde Contactos'], 409);
                 }
 
                 $upd['country_code'] = $cc ?: null;
@@ -130,6 +135,7 @@ class ContactController extends Controller
         $cc = preg_replace('/\D+/', '', (string) $r->input('country_code', ''));
         $ph = preg_replace('/\D+/', '', (string) $r->input('phone', ''));
         $wa = $ph === '' ? null : (($cc !== '' && str_starts_with($ph, $cc)) ? $ph : $cc . $ph);
+        $wa = \App\Support\Telefono::normalizar($wa);   // formato único, con prefijo
         if ($wa !== null && strlen($wa) > 20) {
             return response()->json(['ok' => false, 'error' => 'El teléfono es demasiado largo'], 400);
         }
@@ -182,7 +188,7 @@ class ContactController extends Controller
                 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { $inval++; continue; }
                 $cand[$email] = $name;
             } else {
-                $wa = preg_replace('/\D+/', '', $partes[0] ?? '');
+                $wa = (string) \App\Support\Telefono::normalizar($partes[0] ?? '');   // con prefijo
                 if (strlen($wa) < 7 || strlen($wa) > 20) { $inval++; continue; }
                 $cand[$wa] = $name;
             }
@@ -282,7 +288,7 @@ class ContactController extends Controller
             $email = mb_strtolower($val($row, 'email'));
             if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) $email = '';
             $ph = preg_replace('/\D+/', '', $val($row, 'telefono'));
-            $wa = $ph === '' ? null : (str_starts_with($ph, '34') && strlen($ph) >= 11 ? $ph : (strlen($ph) <= 9 ? '34' . $ph : $ph));
+            $wa = \App\Support\Telefono::normalizar($ph);   // mismo formato que WhatsApp
             if ($wa !== null && (strlen($wa) < 7 || strlen($wa) > 20)) $wa = null;
             if ($email === '' && !$wa) { $invalid++; continue; }
 
@@ -300,13 +306,23 @@ class ContactController extends Controller
             $c = null;
             if ($wa) $c = DB::table('contacts')->where('wa_id', $wa)->first();
             if (!$c && $email !== '') $c = DB::table('contacts')->where('email', $email)->first();
+            // La fila dice que ese teléfono y ese correo son la MISMA persona: si hoy son dos
+            // fichas (una con el teléfono y otra solo con el correo), se unen en la del correo.
+            if ($c && $wa && $email !== '' && empty($c->email)) {
+                $porCorreo = DB::table('contacts')->where('email', $email)->where('id', '!=', $c->id)->first(['id', 'wa_id']);
+                if ($porCorreo && empty($porCorreo->wa_id)) {
+                    app(\App\Services\ContactMergeService::class)->fusionar((int) $porCorreo->id, (int) $c->id);
+                    $c = DB::table('contacts')->where('id', $porCorreo->id)->first();
+                }
+            }
 
             if ($c) {
                 $upd = [];
                 foreach ($datos as $k => $v) {
                     if ($v !== null && (($c->$k ?? null) === null || $c->$k === '')) $upd[$k] = $v;
                 }
-                if ($email !== '' && !($c->email ?? '')) $upd['email'] = $email;
+                // El correo solo si nadie más lo tiene (es único): nunca dos fichas con el mismo.
+                if ($email !== '' && !($c->email ?? '') && !DB::table('contacts')->where('email', $email)->exists()) $upd['email'] = $email;
                 if ($wa && !($c->wa_id ?? '')) { $upd['wa_id'] = $wa; $upd['country_code'] = '34'; }
                 if ($upd) DB::table('contacts')->where('id', $c->id)->update($upd);
                 $cid = (int) $c->id;

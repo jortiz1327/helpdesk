@@ -120,10 +120,27 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.1.3";
+const APP_VERSION = "1.4.0";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.4.0",
+        date: "26 oct 2026",
+        resumen: "Revisión de seguridad completa, Campañas más ordenado, nuevas etiquetas y un cliente = una ficha.",
+        mejoras: [
+            "Etiquetas de Campañas para clasificar: interés (alto, medio, bajo) y tipo (cliente, no cliente, excliente), excluyentes.",
+            "Contactos de Campañas muestra solo contactos de Campañas, no los clientes de soporte.",
+            "Cada usuario puede marcarse como «no recibe tickets asignados».",
+            "Teléfonos siempre con prefijo y aviso de «posibles duplicados» en Contactos para unir fichas de la misma persona.",
+            "Revisión de seguridad: permisos más estrictos entre Helpdesk y Campañas, y las cuentas deshabilitadas ya no pueden entrar.",
+        ],
+        arreglos: [
+            "Varios fallos de seguridad corregidos (adjuntos, contraseñas de buzones, enlaces de descarga, portal).",
+            "Los interruptores de la ficha de usuario ya se ven en verde cuando están activados.",
+            "Crear un ticket con un teléfono que ya tenía otro contacto ya no da error: se une a ese cliente.",
+        ],
+    },
     {
         version: "1.1.3",
         date: "8 oct 2026",

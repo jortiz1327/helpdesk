@@ -551,6 +551,11 @@ export const api = {
   mergeContacts: (keep_id, merge_id) => req('contacts.php?action=merge', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keep_id, merge_id }),
   }),
+  // Posibles duplicados (misma persona en dos fichas) y «no son la misma persona».
+  contactDuplicates: () => req('contacts.php?action=duplicates'),
+  ignoreDuplicate: (a, b) => req('contacts.php?action=ignore_duplicate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ a, b }),
+  }),
   bulkAddToPhonebook: (contact_ids, phonebook_id) => req('contacts.php?action=bulk_phonebook', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contact_ids, phonebook_id }),
   }),

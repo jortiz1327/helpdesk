@@ -176,6 +176,7 @@ class ConversationController extends Controller
 
         // Si el número ya trae el prefijo del país, no lo dupliques.
         $wa = ($cc && !str_starts_with($num, $cc)) ? $cc . $num : $num;
+        $wa = (string) \App\Support\Telefono::normalizar($wa);   // formato único, con prefijo
         if (strlen($wa) < 7 || strlen($wa) > 20) {
             return response()->json(['ok' => false, 'error' => 'Número no válido'], 400);
         }

@@ -60,6 +60,12 @@ export default function Contacts({ onOpen, area = '' }) {
   }, [])
   useEffect(() => { loadAux() }, [loadAux])
 
+  // Posibles duplicados (misma persona en dos fichas): aviso arriba + revisión uno a uno.
+  const [dups, setDups] = useState([])
+  const [dupsOpen, setDupsOpen] = useState(false)
+  const loadDups = useCallback(() => { api.contactDuplicates().then((d) => setDups(d?.pairs || [])) }, [])
+  useEffect(() => { loadDups() }, [loadDups])
+
   const visibleIds = useMemo(() => (contacts || []).map((c) => c.id), [contacts])
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => sel.has(id))
 
@@ -114,6 +120,13 @@ export default function Contacts({ onOpen, area = '' }) {
       ) : (
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1120 }}>
+          {dups.length > 0 && (
+            <div className="dup-banner">
+              <Icon.user />
+              <span><b>{dups.length} posible{dups.length > 1 ? 's' : ''} duplicado{dups.length > 1 ? 's' : ''}</b> · la misma persona con una ficha por teléfono y otra por correo</span>
+              <button className="btn sm" onClick={() => setDupsOpen(true)}>Revisar</button>
+            </div>
+          )}
           <div className="cmp-toolbar">
             <div className="search-box" style={{ flex: 1 }}><Icon.search /><input placeholder="Buscar por nombre, número, correo o etiqueta…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
             <Select value={labelFilter} onChange={setLabelFilter}
@@ -244,8 +257,61 @@ export default function Contacts({ onOpen, area = '' }) {
       {bulkOpen && <BulkAddContacts area={area} onClose={() => setBulkOpen(false)} onDone={() => { setBulkOpen(false); load() }} />}
       {importOpen && <ImportContacts onClose={() => setImportOpen(false)} onDone={() => { setImportOpen(false); load(); loadAux() }} />}
       {merging && <ContactMerge pair={merging} onClose={() => setMerging(null)}
-        onMerged={() => { setMerging(null); clearSel(); load() }} />}
+        onMerged={() => { setMerging(null); clearSel(); load(); loadDups() }} />}
+      {dupsOpen && !merging && <ContactDuplicates pairs={dups} onClose={() => setDupsOpen(false)}
+        onMerge={(p) => setMerging([p.a, p.b])}
+        onIgnored={loadDups} />}
     </>
+  )
+}
+
+/* ------------------------- Posibles duplicados -------------------------
+ * La misma persona en dos fichas: una por teléfono (WhatsApp) y otra por correo, con el
+ * mismo nombre. No se fusiona solo (dos personas pueden llamarse igual): se revisa y se
+ * decide. «Fusionar» abre el diálogo de siempre; «No es la misma persona» no vuelve a salir.
+ * ------------------------------------------------------------------------- */
+function ContactDuplicates({ pairs, onClose, onMerge, onIgnored }) {
+  const toast = useToast()
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [onClose])
+  useEffect(() => { if (!pairs.length) onClose() }, [pairs, onClose])
+
+  const ignorar = async (p) => {
+    const r = await api.ignoreDuplicate(p.a.id, p.b.id)
+    if (r.ok) { toast('No se volverá a sugerir'); onIgnored() } else toast(r.error || 'Error', 'err')
+  }
+  const ficha = (c) => (
+    <div className="dup-card">
+      <b>{c.name || '—'}</b>
+      <small>{[c.wa_id ? `+${c.wa_id}` : null, c.email].filter(Boolean).join(' · ')}</small>
+      <small className="dup-meta">{c.tickets ? `${c.tickets} ticket${c.tickets > 1 ? 's' : ''}` : 'sin tickets'}</small>
+    </div>
+  )
+
+  return (
+    <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal" style={{ maxWidth: 680 }}>
+        <div className="modal-h"><h3>Posibles duplicados</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-body">
+          <p className="ct-hint" style={{ marginTop: 0 }}>Mismo nombre, una ficha solo con teléfono y otra solo con correo. Si son la misma persona, fusiónalas: su historial se une en una sola ficha.</p>
+          {pairs.map((p) => (
+            <div key={`${p.a.id}-${p.b.id}`} className="dup-row">
+              {ficha(p.a)}
+              <span className="dup-eq">=</span>
+              {ficha(p.b)}
+              <div className="dup-acts">
+                {p.motivo === 'nombre_corto' && <span className="pill sm" title="Solo coincide un nombre corto: revisa bien">Revisar</span>}
+                <button className="btn sm" onClick={() => onMerge(p)}>Fusionar</button>
+                <button className="btn ghost sm" onClick={() => ignorar(p)}>No es la misma persona</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
