@@ -410,6 +410,9 @@ class TicketService
     {
         $cur = DB::table('tickets')->where('id', $ticketId)->value('assigned_to');
         if ((int) $cur === (int) $assignee) return;
+        // Cuentas que no reciben tickets (p. ej. gerencia): ni reglas, ni turno, ni
+        // escalado, ni autoasignación al responder. A mano lo frena antes el controlador.
+        if (!\App\Models\User::asignable($assignee)) return;
 
         DB::table('tickets')->where('id', $ticketId)->update(['assigned_to' => $assignee]);
         $this->event($ticketId, 'assign', $cur ? (string) $cur : null, $assignee ? (string) $assignee : null, $userId);

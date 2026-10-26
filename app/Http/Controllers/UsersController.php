@@ -57,6 +57,7 @@ class UsersController extends Controller
                         'view_all'     => $u->can('tickets.view_all'),
                         'notify_sla'      => (bool) $u->notify_sla,
                         'notify_assigned' => (bool) $u->notify_assigned,
+                        'assignable'   => $u->assignable !== false,   // false = no recibe tickets asignados
                         'assigned'     => (int) ($asignados[$u->id] ?? 0),
                         'resolved_7d'  => (int) ($resueltos[$u->id] ?? 0),
                         'sla_late'     => (int) ($vencidos[$u->id] ?? 0),
@@ -123,6 +124,8 @@ class UsersController extends Controller
                 $target->email = $email;
                 $target->notify_sla = $request->boolean('notify_sla', true);
                 $target->notify_assigned = $request->boolean('notify_assigned', true);
+                // Solo si viene: los atajos de la lista (avisos, habilitar) no lo mandan.
+                if ($request->has('assignable')) $target->assignable = $request->boolean('assignable');
                 if ($pass !== '') $target->password = $pass; // el cast 'hashed' lo cifra
                 $target->save();
                 $target->syncRoles([$role]);
@@ -141,6 +144,7 @@ class UsersController extends Controller
                 'email'    => $email,
                 'notify_sla'      => $request->boolean('notify_sla', true),
                 'notify_assigned' => $request->boolean('notify_assigned', true),
+                'assignable'      => $request->boolean('assignable', true),
             ]);
             $new->syncRoles([$role]);
             $this->syncCategories($new->id, $request->input('category_ids', []));

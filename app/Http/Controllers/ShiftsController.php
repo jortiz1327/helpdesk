@@ -727,6 +727,7 @@ class ShiftsController extends Controller
         return \App\Models\User::with('roles.permissions', 'permissions')
             ->whereIn('id', $this->idsElegibles())
             ->where(fn ($q) => $q->whereNull('active')->orWhere('active', true))   // solo activos: sin ex-empleados
+            ->where('assignable', true)   // el de guardia recibe tickets: no las cuentas que no los reciben
             ->orderByRaw('name IS NULL, name ASC')->get()
             ->filter(fn ($u) => $u->can('helpdesk.access') && !$this->esMando($u))
             ->map(fn ($u) => ['id' => (int) $u->id, 'name' => $u->name ?: $u->email])

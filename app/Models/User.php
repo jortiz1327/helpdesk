@@ -19,7 +19,15 @@ class User extends Authenticatable
         return [
             'password'   => 'hashed',
             'created_at' => 'datetime',
+            'assignable' => 'boolean',
         ];
+    }
+
+    /** ¿Se le pueden asignar tickets? (null = «sin asignar», siempre vale). */
+    public static function asignable(?int $id): bool
+    {
+        if (!$id) return true;
+        return (bool) (\Illuminate\Support\Facades\DB::table('users')->where('id', $id)->value('assignable') ?? true);
     }
 
     /** El superadministrador: tiene bypass a todos los permisos (ver AppServiceProvider). */

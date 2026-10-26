@@ -718,6 +718,7 @@ class TicketsController extends Controller
             ->filter(fn ($u) => $u->can('helpdesk.access'))
             ->map(fn ($u) => [
                 'id' => (int) $u->id, 'name' => $u->name ?: $u->email, 'active' => (bool) $u->active,
+                'assignable' => $u->assignable !== false,   // false = no sale al elegir a quién asignar
                 // Sus áreas: el frontend las usa para mantener coherentes categoría↔asignado.
                 'category_ids' => $catsByUser->get($u->id, []),
             ])
@@ -1359,11 +1360,20 @@ class TicketsController extends Controller
         if (!$isSelfClaim && !$me->can('tickets.assign')) {
             return response()->json(['ok' => false, 'error' => 'Solo puedes cogerte tickets a ti mismo'], 403);
         }
+        if ($bloqueo = $this->noAsignable($target)) return $bloqueo;
         // Desasignar (target null) sí se permite; asignar exige prioridad primero.
         if ($target !== null && ($bloqueo = $this->exigePrioridad($id))) return $bloqueo;
 
         $this->tickets->assign($id, $target, (int) $me->id);
         return response()->json(['ok' => true]);
+    }
+
+    /** Error claro si se intenta asignar a una cuenta que no recibe tickets. */
+    protected function noAsignable(?int $target)
+    {
+        if (User::asignable($target)) return null;
+        $nombre = DB::table('users')->where('id', $target)->value('name') ?: 'Esa cuenta';
+        return response()->json(['ok' => false, 'error' => "{$nombre} no recibe tickets asignados"], 422);
     }
 
     /** Cambia la categoría del ticket (o la quita si viene vacía). */
@@ -1588,6 +1598,7 @@ class TicketsController extends Controller
             if (!$isSelfClaim && !$me->can('tickets.assign')) {
                 return response()->json(['ok' => false, 'error' => 'Solo puedes cogerte tickets a ti mismo'], 403);
             }
+            if ($bloqueo = $this->noAsignable($target)) return $bloqueo;
             foreach ($visible as $tid) { $this->tickets->assign($tid, $target, (int) $me->id); $n++; }
 
         } elseif ($op === 'label') {
@@ -1740,6 +1751,7 @@ class TicketsController extends Controller
         $assignee = null;
         if ($me->can('tickets.assign') && $request->input('assigned_to')) {
             $assignee = (int) $request->input('assigned_to');
+            if ($bloqueo = $this->noAsignable($assignee)) return $bloqueo;
         }
 
         // Canal según el dato de contacto: si hay CORREO, el ticket es de canal 'email'

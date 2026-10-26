@@ -39,7 +39,7 @@ export default function Users() {
     return () => document.removeEventListener('keydown', h)
   }, [])
 
-  const blank = { id: 0, name: '', email: '', role: defRole, password: '', category_ids: [], notify_sla: true, notify_assigned: true }
+  const blank = { id: 0, name: '', email: '', role: defRole, password: '', category_ids: [], notify_sla: true, notify_assigned: true, assignable: true }
 
   // Roster de fichas: buscador + filtro por grupo de rol.
   const [q, setQ] = useState('')
@@ -184,7 +184,7 @@ export default function Users() {
               </button>
               <span className="um-foot-sp" />
               <button className="icon-btn" title="Deshabilitar (marcar como que ya no está)" onClick={() => toggleActive(u)}><Icon.lock /></button>
-              <button className="icon-btn" title="Editar" onClick={() => setForm({ id: u.id, name: u.name || '', email: u.email || '', role: u.role || defRole, password: '', category_ids: u.category_ids || [], notify_sla: !!u.notify_sla, notify_assigned: !!u.notify_assigned })}><Icon.pencil /></button>
+              <button className="icon-btn" title="Editar" onClick={() => setForm({ id: u.id, name: u.name || '', email: u.email || '', role: u.role || defRole, password: '', category_ids: u.category_ids || [], notify_sla: !!u.notify_sla, notify_assigned: !!u.notify_assigned, assignable: u.assignable !== false })}><Icon.pencil /></button>
               <button className="icon-btn" title="Eliminar" style={{ color: 'var(--danger)' }} onClick={() => del(u)}><Icon.trash /></button>
             </>
           )}
@@ -323,6 +323,15 @@ export default function Users() {
                   </div>
                 </div>
               )}
+
+              <div className="field">
+                <span className="lbl">Tickets</span>
+                <button type="button" className={`um-pref ${form.assignable ? 'on' : ''}`} onClick={() => setForm((f) => ({ ...f, assignable: !f.assignable }))}>
+                  <span className="um-pref-ic blue"><Icon.ticket /></span>
+                  <span className="um-pref-tx"><b>Puede recibir tickets asignados</b><small>Apagado, nadie puede asignarle tickets (ni las reglas ni el turno). Puede verlos y responder igual.</small></span>
+                  <span className={`um-sw lg ${form.assignable ? 'on' : ''}`} />
+                </button>
+              </div>
 
               <div className="field" style={{ marginBottom: 0 }}>
                 <span className="lbl">Avisos por correo</span>

@@ -250,7 +250,8 @@ const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', la
 // el nombre ni reasignarlo sin querer al guardar.
 function opcionesAsignar(users, currentId) {
   const us = users || []
-  const opts = us.filter((u) => u.active !== false).map((u) => ({ value: String(u.id), label: u.name }))
+  // Fuera los ex-empleados y las cuentas que no reciben tickets (p. ej. gerencia).
+  const opts = us.filter((u) => u.active !== false && u.assignable !== false).map((u) => ({ value: String(u.id), label: u.name }))
   const cur = currentId ? us.find((u) => String(u.id) === String(currentId)) : null
   if (cur && cur.active === false) opts.unshift({ value: String(cur.id), label: `${cur.name} (ya no está)` })
   return [{ value: '', label: 'Sin asignar' }, ...opts]
@@ -555,7 +556,7 @@ function useCoherenciaArea(meta, onChanged) {
     if (!assignedTo || !newCatId) return
     const u = userById(assignedTo); if (!u) return
     if (!(u.category_ids || []).map(String).includes(String(newCatId))) {
-      const cands = (meta?.users || []).filter((x) => x.active !== false
+      const cands = (meta?.users || []).filter((x) => x.active !== false && x.assignable !== false
         && (x.category_ids || []).map(String).includes(String(newCatId)) && Number(x.id) !== Number(assignedTo))
         .map((x) => ({ id: x.id, name: x.name }))
       setReasig({ ticketId, agentName: u.name, catName: catName(newCatId), cands })
