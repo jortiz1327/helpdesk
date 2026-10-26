@@ -15,7 +15,9 @@ class ChatService
     {
         $c = Contact::where('wa_id', $waId)->first();
         if ($c) {
-            if ($name && $name !== $c->name) {
+            // El nombre de perfil de WhatsApp solo RELLENA un hueco: no pisa el que puso
+            // alguien a mano (p. ej. soporte en la ficha del cliente).
+            if ($name && !$c->name) {
                 $c->name = $name;
                 $c->save();
             }
