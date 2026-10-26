@@ -36,6 +36,33 @@ class AttachmentService
     ];
 
     /**
+     * Tipo MIME según NUESTRA extensión (de la lista blanca), no el que declara quien
+     * envía: un «foto.png» declarado image/svg+xml se serviría como SVG (con su script).
+     */
+    public const MIME_POR_EXT = [
+        'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif',
+        'webp' => 'image/webp', 'bmp' => 'image/bmp', 'heic' => 'image/heic',
+        'pdf' => 'application/pdf', 'txt' => 'text/plain', 'log' => 'text/plain', 'csv' => 'text/csv',
+        'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'odt' => 'application/vnd.oasis.opendocument.text', 'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+        'zip' => 'application/zip', 'eml' => 'message/rfc822', 'msg' => 'application/vnd.ms-outlook',
+    ];
+
+    /** Tipo a usar para un fichero (por la extensión de su ruta en disco). */
+    public static function mimeDe(string $pathOExt): string
+    {
+        $ext = strtolower(pathinfo($pathOExt, PATHINFO_EXTENSION) ?: $pathOExt);
+        return self::MIME_POR_EXT[$ext] ?? 'application/octet-stream';
+    }
+
+    /** ¿Se puede mostrar en línea sin riesgo? Solo imágenes de mapa de bits (nunca SVG). */
+    public static function imagenSegura(?string $mime): bool
+    {
+        return in_array(strtolower((string) $mime), ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'], true);
+    }
+
+    /**
      * Guarda los ficheros de una petición y los enlaza al ticket/mensaje.
      * Devuelve [guardados, errores[]].
      */
@@ -78,7 +105,7 @@ class AttachmentService
                 'message_id'  => $messageId,
                 'name'        => mb_substr($name, 0, 190),
                 'path'        => $path,
-                'mime'        => $file->getClientMimeType(),
+                'mime'        => self::mimeDe($ext),
                 'size'        => $file->getSize(),
                 'uploaded_by' => $userId,
             ]);
@@ -118,7 +145,7 @@ class AttachmentService
             'message_id'  => $messageId,
             'name'        => mb_substr($name, 0, 190),
             'path'        => $path,
-            'mime'        => $mime ?: 'application/octet-stream',
+            'mime'        => self::mimeDe($ext),   // por la extensión, no por lo declarado
             'content_id'  => $contentId ? mb_substr($contentId, 0, 255) : null,
             'inline'      => $inline,
             'size'        => $size,
@@ -134,7 +161,7 @@ class AttachmentService
 
         $byMessage = [];
         foreach ($rows as $r) {
-            $r->is_image = str_starts_with((string) $r->mime, 'image/');
+            $r->is_image = self::imagenSegura($r->mime);
             $r->inline   = (bool) $r->inline;   // imagen incrustada en el cuerpo (no en la tira)
             $byMessage[$r->message_id ?? 0][] = $r;
         }

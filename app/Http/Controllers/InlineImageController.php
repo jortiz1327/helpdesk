@@ -31,7 +31,8 @@ class InlineImageController extends Controller
 
         $ext  = strtolower($file->getClientOriginalExtension());
         $mime = (string) $file->getMimeType();   // detectado por el servidor, no el del cliente
-        if (!in_array($ext, self::EXT, true) || !str_starts_with($mime, 'image/')) {
+        // Solo imágenes de mapa de bits: un SVG (aunque se llame .png) llevaría script.
+        if (!in_array($ext, self::EXT, true) || !\App\Services\AttachmentService::imagenSegura($mime)) {
             return response()->json(['ok' => false, 'error' => 'Solo se admiten imágenes (jpg, png, gif, webp)'], 400);
         }
         if ($file->getSize() > self::MAX) {
@@ -54,12 +55,13 @@ class InlineImageController extends Controller
     public function serve(int $id)
     {
         $row = DB::table('inline_uploads')->find($id);
-        if (!$row || !Storage::disk('local')->exists($row->path)) {
+        $mime = $row ? \App\Services\AttachmentService::mimeDe((string) $row->path) : null;
+        if (!$row || !\App\Services\AttachmentService::imagenSegura($mime) || !Storage::disk('local')->exists($row->path)) {
             abort(404);
         }
 
         return response(Storage::disk('local')->get($row->path), 200, [
-            'Content-Type'           => $row->mime,
+            'Content-Type'           => $mime,
             'Content-Disposition'    => 'inline',
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control'          => 'private, max-age=31536000',

@@ -224,9 +224,11 @@ class PortalController extends Controller
         if (!$res) abort(404);
         [$path, $row] = $res;
 
-        $inline = str_starts_with((string) $row->mime, 'image/');
+        // Tipo por NUESTRA extensión (no el declarado) y en línea solo imágenes seguras.
+        $mime   = \App\Services\AttachmentService::mimeDe((string) $path);
+        $inline = \App\Services\AttachmentService::imagenSegura($mime);
         return response()->file($path, [
-            'Content-Type'           => $row->mime ?: 'application/octet-stream',
+            'Content-Type'           => $mime,
             'Content-Disposition'    => ($inline ? 'inline' : 'attachment') . '; filename="' . addslashes($row->name) . '"',
             'X-Content-Type-Options' => 'nosniff',
         ]);

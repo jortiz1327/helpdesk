@@ -37,11 +37,13 @@ class AttachmentController extends Controller
             return response()->json(['error' => 'Sin acceso a este adjunto'], 403);
         }
 
-        // inline para las imágenes (se ven en el hilo), descarga para el resto
-        $inline = str_starts_with((string) $row->mime, 'image/');
+        // inline para las imágenes (se ven en el hilo), descarga para el resto. El tipo sale
+        // de NUESTRA extensión en disco, no del que declaró quien lo envió.
+        $mime   = \App\Services\AttachmentService::mimeDe((string) $row->path);
+        $inline = \App\Services\AttachmentService::imagenSegura($mime);
 
         return response()->file($path, [
-            'Content-Type'        => $row->mime ?: 'application/octet-stream',
+            'Content-Type'        => $mime,
             'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . addslashes($row->name) . '"',
         ]);
     }
@@ -54,12 +56,13 @@ class AttachmentController extends Controller
     public function serveInline(int $id)
     {
         $row = DB::table('attachments')->where('id', $id)->first();
-        if (!$row || !str_starts_with((string) $row->mime, 'image/') || !Storage::disk('local')->exists($row->path)) {
+        $mime = $row ? \App\Services\AttachmentService::mimeDe((string) $row->path) : null;
+        if (!$row || !\App\Services\AttachmentService::imagenSegura($mime) || !Storage::disk('local')->exists($row->path)) {
             abort(404);
         }
 
         return response(Storage::disk('local')->get($row->path), 200, [
-            'Content-Type'           => $row->mime,
+            'Content-Type'           => $mime,
             'Content-Disposition'    => 'inline',
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control'          => 'private, max-age=31536000',
