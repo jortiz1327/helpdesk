@@ -153,12 +153,15 @@ class ContactsController extends Controller
          */
         $area = $r->query('area', '');
         if ($area === 'campaigns') {
-            // main = WhatsApp SOLO en Campañas. Un contacto es de Campañas si es
-            // alcanzable por WhatsApp: tiene número (wa_id) o algún mensaje de WhatsApp.
-            // (Antes se colaba aquí CUALQUIER correo sin tickets —agentes, buzón de
-            //  soporte, etc.—, que en realidad son contactos del Helpdesk.)
-            $where[] = "(c.wa_id IS NOT NULL
-                OR EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp'))";
+            // Un contacto es de Campañas si ha hablado con el WhatsApp de Campañas, tiene
+            // alguna etiqueta (las etiquetas son de Campañas), o tiene número y NO es del
+            // Helpdesk (p. ej. alta a mano). Tener teléfono no basta: un ticket del portal
+            // con teléfono o un cliente del WhatsApp de soporte NO es de Campañas.
+            $where[] = "(EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp' AND mw.funcion = 'campanas')
+                OR EXISTS (SELECT 1 FROM contact_labels clc WHERE clc.contact_id = c.id)
+                OR (c.wa_id IS NOT NULL
+                    AND NOT EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)
+                    AND NOT EXISTS (SELECT 1 FROM messages ms WHERE ms.contact_id = c.id AND ms.funcion = 'soporte')))";
         } elseif ($area === 'helpdesk') {
             $where[] = 'EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)';
         }
