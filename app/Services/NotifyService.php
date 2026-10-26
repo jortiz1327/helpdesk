@@ -192,7 +192,7 @@ class NotifyService
             ] + $extraVars;
 
             $subject = strtr($tpl->subject, $vars);
-            $body    = strtr($tpl->body, $vars);
+            $body    = self::cuerpo($tpl->body, $vars);
             if (stripos($subject, (string) $t->code) === false) $subject .= ' [' . $t->code . ']';
 
             $marco = $this->marco($key, $t);
@@ -257,7 +257,7 @@ class NotifyService
                 '{{valoracion}}' => $this->estrellasCsat($ticketId),
             ];
             $subject = strtr($tpl->subject, $vars);
-            $body    = strtr($tpl->body, $vars);
+            $body    = self::cuerpo($tpl->body, $vars);
 
             $this->mail->sendMail($acc, mb_strtolower($t->contact_email), $t->contact_name, $subject, $body,
                 [], null, [], [], [], null, $this->marco('csat_survey', $t));
@@ -284,6 +284,20 @@ class NotifyService
         $stars .= '</tr></table>';
         $stars .= '<div style="font-size:12px;color:#888;margin-top:4px;">1 = muy insatisfecho · 5 = muy satisfecho</div>';
         return $stars;
+    }
+
+    /**
+     * Cuerpo HTML de una plantilla con sus variables ESCAPADAS. El asunto o el nombre
+     * los escribe cualquiera (p. ej. desde el portal público, con el correo de otro): sin
+     * escapar, un «<a href=…>Pague aquí</a>» saldría como enlace real desde nuestro buzón.
+     * {{valoracion}} es HTML nuestro (las estrellas del CSAT) y va tal cual.
+     */
+    protected static function cuerpo(string $plantilla, array $vars): string
+    {
+        foreach ($vars as $k => $v) {
+            if ($k !== '{{valoracion}}') $vars[$k] = e((string) $v);
+        }
+        return strtr($plantilla, $vars);
     }
 
     /**
@@ -321,7 +335,7 @@ class NotifyService
                 '{{soporte}}' => (string) ($acc->from_name ?: $acc->email),
             ];
             $subject = strtr($tpl->subject, $vars);
-            $body    = strtr($tpl->body, $vars);
+            $body    = self::cuerpo($tpl->body, $vars);
 
             // El código en el asunto mantiene el hilo: si el cliente responde al aviso,
             // su respuesta vuelve a ESTE ticket (lo casa MailService::ticketByCode).
