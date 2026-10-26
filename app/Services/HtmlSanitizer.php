@@ -105,13 +105,28 @@ class HtmlSanitizer
         return implode('; ', $out);
     }
 
+    /**
+     * ¿Es `$src` una ruta NUESTRA de ese tipo (`inline` | `attachment_inline`) con la
+     * FIRMA válida? No basta con que «empiece por» la ruta: un remitente podría escribir
+     * `/api/attachment_inline/<id ajeno>?x` y, sin firma, colar adjuntos de otros tickets
+     * (p. ej. en el PDF). Las rutas se firman en relativo (`signed:relative`).
+     */
+    public static function rutaFirmada(string $src, string $tipo): ?int
+    {
+        if (!preg_match('#^(?:https?://[^/?\#]+)?(/api/' . preg_quote($tipo, '#') . '/(\d+)\?[^"\s]*)$#i', html_entity_decode(trim($src)), $m)) {
+            return null;
+        }
+        $req = \Illuminate\Http\Request::create($m[1]);
+        return \Illuminate\Support\Facades\URL::hasValidRelativeSignature($req) ? (int) $m[2] : null;
+    }
+
     /** Perfil EDITOR (por defecto). */
     public static function clean(?string $html): string
     {
         return self::run($html, self::ALLOWED, [self::class, 'safeStyle'], function (DOMElement $img): bool {
-            // SOLO imágenes en línea nuestras (ruta firmada /api/inline/N?...).
+            // SOLO imágenes en línea nuestras (ruta firmada /api/inline/N?..., con firma válida).
             $src = trim((string) $img->getAttribute('src'));
-            if (!preg_match('#^(?:https?://[^/]+)?/api/inline/\d+\?#i', $src)) return false;
+            if (self::rutaFirmada($src, 'inline') === null) return false;
             // class: solo un tamaño de la lista blanca
             if (!in_array(trim((string) $img->getAttribute('class')), ['sz-100', 'sz-50', 'sz-25'], true)) {
                 $img->removeAttribute('class');
@@ -130,7 +145,7 @@ class HtmlSanitizer
     {
         return self::run($html, self::ALLOWED_EMAIL, [self::class, 'safeStyleEmail'], function (DOMElement $img): bool {
             $src = trim((string) $img->getAttribute('src'));
-            if (!preg_match('#^(?:https?://[^/]+)?/api/attachment_inline/\d+\?#i', $src)) return false;
+            if (self::rutaFirmada($src, 'attachment_inline') === null) return false;   // solo las que firmamos nosotros
             // Los anchos/altos y estilos en línea ya se filtran por la lista blanca;
             // aquí basta con dejar pasar la imagen resuelta.
             return true;

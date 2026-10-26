@@ -21,7 +21,7 @@ class TicketPdfService
         $bodies = [];
         foreach ($messages as $m) {
             $bodies[$m->id] = (int) $m->is_html === 1
-                ? $this->incrustarImagenes((string) $m->body, $withImages)
+                ? $this->incrustarImagenes((string) $m->body, $withImages, (int) $t->id)
                 : nl2br(e((string) $m->body));
         }
 
@@ -43,23 +43,34 @@ class TicketPdfService
      * `inline_uploads` y `cid:` del correo `/api/attachment_inline/N` de `attachments`), o
      * las quita si no se piden. dompdf no descarga nada (isRemoteEnabled=false), así que al
      * final se elimina cualquier <img> que NO haya quedado como data: (evita imágenes rotas).
+     *
+     * SEGURIDAD: el `src` lo pudo escribir un remitente externo. Solo se incrusta si la
+     * ruta lleva NUESTRA firma válida y, en los adjuntos, si son DE ESTE ticket y son
+     * imágenes de verdad (nunca SVG: dompdf lo interpretaría). Si no, la imagen se quita.
      */
-    public function incrustarImagenes(string $html, bool $withImages): string
+    public function incrustarImagenes(string $html, bool $withImages, ?int $ticketId = null): string
     {
         if (!$withImages) return preg_replace('#<img[^>]*>#i', '', $html) ?? $html;
 
-        // Editor: /api/inline/{id} (tabla inline_uploads)
-        $html = preg_replace_callback('#<img([^>]*?)src="[^"]*?/api/inline/(\d+)\?[^"]*"([^>]*)>#i', function ($m) {
-            $row = DB::table('inline_uploads')->find((int) $m[2]);
-            if (!$row || !Storage::disk('local')->exists($row->path)) return '';
-            return '<img' . $m[1] . 'src="data:' . $row->mime . ';base64,' . base64_encode(Storage::disk('local')->get($row->path)) . '"' . $m[3] . '>';
-        }, $html) ?? $html;
+        $raster = ['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+        $incrustar = fn ($m, $row) => '<img' . $m[1] . 'src="data:' . $row->mime . ';base64,'
+            . base64_encode(Storage::disk('local')->get($row->path)) . '"' . $m[3] . '>';
 
-        // Correo (cid): /api/attachment_inline/{id} (tabla attachments)
-        $html = preg_replace_callback('#<img([^>]*?)src="[^"]*?/api/attachment_inline/(\d+)\?[^"]*"([^>]*)>#i', function ($m) {
-            $row = DB::table('attachments')->find((int) $m[2]);
-            if (!$row || !$row->mime || !Storage::disk('local')->exists($row->path)) return '';
-            return '<img' . $m[1] . 'src="data:' . $row->mime . ';base64,' . base64_encode(Storage::disk('local')->get($row->path)) . '"' . $m[3] . '>';
+        // Editor: /api/inline/{id} (tabla inline_uploads)
+        $html = preg_replace_callback('#<img([^>]*?)src="([^"]*)"([^>]*)>#i', function ($m) use ($incrustar, $raster, $ticketId) {
+            if (($id = HtmlSanitizer::rutaFirmada($m[2], 'inline')) !== null) {
+                $row = DB::table('inline_uploads')->find($id);
+                if (!$row || !in_array(strtolower((string) $row->mime), $raster, true) || !Storage::disk('local')->exists($row->path)) return '';
+                return $incrustar($m, $row);
+            }
+            // Correo (cid): /api/attachment_inline/{id} (tabla attachments), solo de ESTE ticket
+            if (($id = HtmlSanitizer::rutaFirmada($m[2], 'attachment_inline')) !== null) {
+                $row = DB::table('attachments')->find($id);
+                if (!$row || ($ticketId && (int) $row->ticket_id !== $ticketId)) return '';
+                if (!in_array(strtolower((string) $row->mime), $raster, true) || !Storage::disk('local')->exists($row->path)) return '';
+                return $incrustar($m, $row);
+            }
+            return $m[0];
         }, $html) ?? $html;
 
         // Cualquier <img> que NO haya quedado incrustada (src no es data:) se elimina.
