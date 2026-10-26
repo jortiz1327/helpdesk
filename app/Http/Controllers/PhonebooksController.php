@@ -42,7 +42,9 @@ class PhonebooksController extends Controller
         $rows = [];
         $import = $request->input('import', '');
         if ($import === 'contacts') {
-            $rows = DB::select('SELECT wa_id, name FROM contacts');
+            // «Todos mis contactos» = los de CAMPAÑAS, no toda la tabla: los clientes del
+            // Helpdesk (portal, tickets, WhatsApp de soporte) no pueden acabar recibiendo campañas.
+            $rows = DB::select('SELECT c.wa_id, c.name FROM contacts c WHERE ' . ContactsController::SQL_CAMPANAS);
         } elseif ($import === 'label' && $request->input('label_id')) {
             $rows = DB::select('SELECT c.wa_id, c.name FROM contacts c JOIN contact_labels cl ON cl.contact_id = c.id WHERE cl.label_id = ?', [(int) $request->input('label_id')]);
         } else {

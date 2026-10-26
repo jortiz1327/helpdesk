@@ -23,6 +23,19 @@ class ContactsController extends Controller
         };
     }
 
+    /**
+     * ¿El contacto `c` es de CAMPAÑAS? Si ha hablado con el WhatsApp de Campañas, tiene
+     * alguna etiqueta (las etiquetas son de Campañas), o tiene número y NO es del Helpdesk
+     * (p. ej. alta a mano). Tener teléfono no basta: un ticket del portal con teléfono o un
+     * cliente del WhatsApp de soporte NO es de Campañas. Única definición: la usan esta
+     * lista y la importación a agendas («Todos mis contactos»).
+     */
+    public const SQL_CAMPANAS = "(EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp' AND mw.funcion = 'campanas')
+                OR EXISTS (SELECT 1 FROM contact_labels clc WHERE clc.contact_id = c.id)
+                OR (c.wa_id IS NOT NULL
+                    AND NOT EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)
+                    AND NOT EXISTS (SELECT 1 FROM messages ms WHERE ms.contact_id = c.id AND ms.funcion = 'soporte')))";
+
     protected function ids(Request $r): array
     {
         return array_values(array_filter(array_map('intval', (array) $r->input('contact_ids', []))));
@@ -158,15 +171,7 @@ class ContactsController extends Controller
          */
         $area = $r->query('area', '');
         if ($area === 'campaigns') {
-            // Un contacto es de Campañas si ha hablado con el WhatsApp de Campañas, tiene
-            // alguna etiqueta (las etiquetas son de Campañas), o tiene número y NO es del
-            // Helpdesk (p. ej. alta a mano). Tener teléfono no basta: un ticket del portal
-            // con teléfono o un cliente del WhatsApp de soporte NO es de Campañas.
-            $where[] = "(EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp' AND mw.funcion = 'campanas')
-                OR EXISTS (SELECT 1 FROM contact_labels clc WHERE clc.contact_id = c.id)
-                OR (c.wa_id IS NOT NULL
-                    AND NOT EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)
-                    AND NOT EXISTS (SELECT 1 FROM messages ms WHERE ms.contact_id = c.id AND ms.funcion = 'soporte')))";
+            $where[] = self::SQL_CAMPANAS;
         } elseif ($area === 'helpdesk') {
             $where[] = 'EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)';
         }
