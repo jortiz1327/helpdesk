@@ -95,9 +95,22 @@ class UsersController extends Controller
                 return response()->json(['ok' => false, 'error' => 'Rol no válido'], 400);
             }
 
+            // Escalada: quien gestiona usuarios sin ser superadmin no puede crear ni nombrar
+            // superadmins, ni tocar a uno, ni cambiarse su propio rol.
+            $soySuper = $request->user()->isSuperAdmin();
+            if (!$soySuper && $role === config('rbac.super_role')) {
+                return response()->json(['ok' => false, 'error' => 'Solo un superadministrador puede dar el rol de superadministrador'], 403);
+            }
+
             if ($id) {
                 $target = User::find($id);
                 if (!$target) return response()->json(['ok' => false, 'error' => 'Usuario no encontrado'], 404);
+                if (!$soySuper && $target->isSuperAdmin()) {
+                    return response()->json(['ok' => false, 'error' => 'Solo un superadministrador puede modificar a otro superadministrador'], 403);
+                }
+                if (!$soySuper && $target->id === (int) $request->user()->id && $role !== $target->roleName()) {
+                    return response()->json(['ok' => false, 'error' => 'No puedes cambiar tu propio rol'], 403);
+                }
 
                 // No dejar la plataforma sin ningún superadministrador
                 if ($target->isSuperAdmin() && $role !== config('rbac.super_role') && $this->superCount() <= 1) {
@@ -169,6 +182,9 @@ class UsersController extends Controller
 
             $target = User::find($id);
             if (!$target) return response()->json(['ok' => false, 'error' => 'Usuario no encontrado'], 404);
+            if ($target->isSuperAdmin() && !$me->isSuperAdmin()) {
+                return response()->json(['ok' => false, 'error' => 'Solo un superadministrador puede eliminar a otro superadministrador'], 403);
+            }
             if ($target->isSuperAdmin() && $this->superCount() <= 1) {
                 return response()->json(['ok' => false, 'error' => 'Debe quedar al menos un superadministrador'], 400);
             }

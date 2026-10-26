@@ -19,6 +19,12 @@ class RolesController extends Controller
 {
     public function handle(Request $request)
     {
+        // Ver los roles basta con users.manage (el desplegable de Usuarios los necesita);
+        // CAMBIAR permisos de un rol es roles.manage: si no, quien gestiona usuarios podría
+        // darse a sí mismo cualquier permiso a través de su propio rol.
+        if (($request->isMethod('post') || $request->isMethod('delete')) && !$request->user()->can('roles.manage')) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para gestionar roles'], 403);
+        }
         if ($request->isMethod('post'))   return $this->save($request);
         if ($request->isMethod('delete')) return $this->destroy($request);
         return $this->list();
