@@ -121,6 +121,14 @@ class PortalController extends Controller
     /** Consulta de estado por número (solo lectura, sin auth). */
     protected function ticketStatus(Request $request)
     {
+        // Los códigos son correlativos (TK-AAMM-NNNN): sin límite, se podría recorrer la
+        // numeración para saber cuántas incidencias hay y cuándo. Una persona consulta pocas.
+        $clave = 'portal-status:' . $request->ip();
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($clave, 20)) {
+            return response()->json(['ok' => false, 'error' => 'Demasiadas consultas. Prueba de nuevo dentro de un rato.'], 429);
+        }
+        \Illuminate\Support\Facades\RateLimiter::hit($clave, 3600);
+
         $d = $this->portal->statusByCode((string) $request->query('code'));
         if (!$d) return response()->json(['ok' => false, 'error' => 'No encontramos ninguna incidencia con ese número'], 404);
         return response()->json(['ok' => true, 'status' => $d]);
