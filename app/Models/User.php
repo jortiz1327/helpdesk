@@ -23,6 +23,12 @@ class User extends Authenticatable
         ];
     }
 
+    /** Cuenta DESHABILITADA (ex-empleado): no puede entrar. null = activa (cuentas antiguas). */
+    public function deshabilitado(): bool
+    {
+        return $this->active !== null && !(bool) $this->active;
+    }
+
     /** ¿Se le pueden asignar tickets? (null = «sin asignar», siempre vale). */
     public static function asignable(?int $id): bool
     {

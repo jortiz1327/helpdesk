@@ -95,8 +95,11 @@ class AuthController extends Controller
 
         $u = User::where('email', $email)->first();
 
-        // Mismo mensaje exista o no el email: no revelamos qué correos están dados de alta.
-        if (!$u || !Hash::check($password, $u->password)) {
+        // Mismo mensaje exista o no el email (o esté deshabilitada): no revelamos qué
+        // correos están dados de alta. Sin usuario se compara igual contra un hash ficticio
+        // para que el tiempo de respuesta no delate si la cuenta existe.
+        $passOk = Hash::check($password, $u?->password ?: '$2y$12$' . str_repeat('a', 53));
+        if (!$u || !$passOk || $u->deshabilitado()) {
             RateLimiter::hit($keyUser, $decay);
             RateLimiter::hit($keyIp, $decay);
             return response()->json(['ok' => false, 'error' => 'Email o contraseña incorrectos'], 401);

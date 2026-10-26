@@ -117,6 +117,10 @@ class UsersController extends Controller
                     if (!$wantActive && $target->isSuperAdmin() && $this->superCount() <= 1) {
                         return response()->json(['ok' => false, 'error' => 'Debe quedar al menos un superadministrador'], 400);
                     }
+                    // Al deshabilitar, se cierran YA todas sus sesiones (sus tokens dejan de valer).
+                    if (!$wantActive && !$target->deshabilitado()) {
+                        $target->token_version = (int) ($target->token_version ?? 1) + 1;
+                    }
                     $target->active = $wantActive;
                 }
 
@@ -126,7 +130,11 @@ class UsersController extends Controller
                 $target->notify_assigned = $request->boolean('notify_assigned', true);
                 // Solo si viene: los atajos de la lista (avisos, habilitar) no lo mandan.
                 if ($request->has('assignable')) $target->assignable = $request->boolean('assignable');
-                if ($pass !== '') $target->password = $pass; // el cast 'hashed' lo cifra
+                if ($pass !== '') {
+                    $target->password = $pass; // el cast 'hashed' lo cifra
+                    // Contraseña cambiada por un admin: las sesiones abiertas dejan de valer.
+                    $target->token_version = (int) ($target->token_version ?? 1) + 1;
+                }
                 $target->save();
                 $target->syncRoles([$role]);
                 $this->syncCategories($target->id, $request->input('category_ids', []));

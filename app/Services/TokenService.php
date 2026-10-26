@@ -64,7 +64,8 @@ class TokenService
             return null;
         }
         $u = User::find((int) ($data['uid'] ?? 0));
-        if (!$u) {
+        // Cuenta deshabilitada (ex-empleado): fuera, aunque el token sea válido. null = activa.
+        if (!$u || $u->deshabilitado()) {
             return null;
         }
         // Revocación: el token debe llevar la versión ACTUAL del usuario. Al cambiar la
