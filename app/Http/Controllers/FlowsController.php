@@ -45,15 +45,11 @@ class FlowsController extends Controller
     /** Esquema de la BD para el nodo "Consultar base de datos" (excluye tablas sensibles/internas). */
     protected function schema()
     {
-        $blacklist = [
-            'settings', 'users', 'webhook_log', 'flow_sessions', 'flow_responses',
-            'migrations', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs',
-            'sessions', 'password_reset_tokens',
-        ];
+        // Solo las tablas que el nodo puede leer de verdad (lista blanca de FlowEngine).
         $schema = [];
         foreach (DB::select('SHOW TABLES') as $row) {
             $t = array_values((array) $row)[0];
-            if (in_array($t, $blacklist, true)) continue;
+            if (!in_array(strtolower($t), \App\Services\FlowEngine::TABLAS_PERMITIDAS, true)) continue;
             $schema[$t] = array_map(fn ($c) => $c->Field, DB::select("SHOW COLUMNS FROM `$t`"));
         }
         return response()->json(['ok' => true, 'schema' => $schema]);

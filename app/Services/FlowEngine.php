@@ -255,6 +255,33 @@ class FlowEngine
         if ($rows) DB::table('contact_labels')->insertOrIgnore($rows);
     }
 
+    /**
+     * Tablas que el nodo «Consultar base de datos» puede leer: SOLO datos de Campañas.
+     * Lista BLANCA a propósito: el resultado se le puede enviar por WhatsApp a un cliente,
+     * así que nada de usuarios, ajustes (auth_secret), buzones, tokens, ni datos del Helpdesk.
+     */
+    public const TABLAS_PERMITIDAS = [
+        'contacts', 'contact_labels', 'labels', 'phonebooks', 'phonebook_contacts',
+        'sedes', 'grupos', 'marcas', 'forms', 'form_submissions', 'faqs',
+    ];
+
+    /** ¿Ese SELECT libre solo toca tablas permitidas y no usa nada peligroso? */
+    public static function sqlPermitido(string $sql): bool
+    {
+        if (!preg_match('/^\s*select\s/i', $sql)) return false;
+        // Una sola sentencia, sin comentarios, sin escribir ficheros ni esperar ni metadatos.
+        if (preg_match('/;|--|\/\*|#|\binto\b|\boutfile\b|\bdumpfile\b|\bload_file\b|\bsleep\s*\(|\bbenchmark\s*\(|\bget_lock\s*\(|information_schema|performance_schema|\bmysql\s*\.|\bsys\s*\./i', $sql)) {
+            return false;
+        }
+        try {
+            $todas = array_map(fn ($r) => strtolower(array_values((array) $r)[0]), DB::select('SHOW TABLES'));
+        } catch (\Throwable $e) { return false; }
+        foreach (array_diff($todas, self::TABLAS_PERMITIDAS) as $t) {
+            if (preg_match('/(?<![a-z0-9_])`?' . preg_quote($t, '/') . '`?(?![a-z0-9_])/i', $sql)) return false;
+        }
+        return true;
+    }
+
     /** Nodo "Consultar base de datos" (solo lectura). */
     protected function query(array $d, array &$vars, ?array $contact = null): void
     {
@@ -274,7 +301,7 @@ class FlowEngine
 
         if ($mode === 'sql') {
             $sql = trim($d['query'] ?? '');
-            if (!preg_match('/^select\s/i', $sql)) return;
+            if (!self::sqlPermitido($sql)) return;
             // Los {{{vars}}} vienen del CLIENTE: NUNCA se interpolan en el SQL. Cada uno se
             // sustituye por un marcador «?» y su valor va como PARÁMETRO (evita inyección).
             // Vale tanto '{{{var}}}' (entre comillas del admin) como {{{var}}} suelto: cada
@@ -294,7 +321,7 @@ class FlowEngine
         // Modo constructor seguro
         $table  = $d['table'] ?? '';
         $saveTo = trim($d['saveTo'] ?? '');
-        if ($table === '' || $saveTo === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $table)) return;
+        if ($table === '' || $saveTo === '' || !in_array(strtolower($table), self::TABLAS_PERMITIDAS, true)) return;
 
         try {
             $valid = array_map(fn ($c) => $c->Field, DB::select("SHOW COLUMNS FROM `$table`"));
