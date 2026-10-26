@@ -31,8 +31,11 @@ class ResponsesController extends Controller
         if ($action === 'csv') {
             $fh = fopen('php://temp', 'r+');
             fputcsv($fh, ['Fecha', 'Contacto', 'Telefono', 'Flujo', 'Variable', 'Respuesta']);
+            // Lo escriben clientes por WhatsApp: una celda que empiece por = + - @ (o tab/CR)
+            // Excel la ejecutaría como fórmula. Con una comilla delante queda como texto.
+            $celda = fn ($v) => preg_match('/^[=+\-@\t\r]/', (string) $v) ? "'" . $v : (string) $v;
             foreach ($rows as $r) {
-                fputcsv($fh, [$r->created_at, $r->contact_name ?? '', $r->wa_id ?? '', $r->flow_name ?? '', $r->variable, $r->value]);
+                fputcsv($fh, array_map($celda, [$r->created_at, $r->contact_name ?? '', $r->wa_id ?? '', $r->flow_name ?? '', $r->variable, $r->value]));
             }
             rewind($fh);
             $csv = "\xEF\xBB\xBF" . stream_get_contents($fh); // BOM para Excel
