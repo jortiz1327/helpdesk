@@ -584,11 +584,14 @@ class TicketService
              */
             if ($t->channel === 'cron') return;
 
+            // Sin el ASUNTO: el canal lo escuchan TODOS los agentes, también los que no ven
+            // ese ticket (otra área). Con el código basta para el aviso; el contenido se pide
+            // por la API, que sí aplica la visibilidad.
             TicketActivity::dispatch(
                 $action,
                 $ticketId,
                 (string) $t->code,
-                (string) $t->subject,
+                '',
                 $assignedTo ?? ($t->assigned_to ? (int) $t->assigned_to : null),
             );
         } catch (\Throwable $e) {
