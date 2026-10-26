@@ -24,6 +24,10 @@ class PortalService
     protected const MAX_POR_HORA = 5;
     /** Intentos de acertar un código antes de quemarlo. */
     protected const MAX_INTENTOS = 5;
+    /** Fallos en total por correo y hora, sumando todos sus códigos (fuerza bruta). */
+    protected const MAX_FALLOS_HORA = 10;
+    /** Códigos que se pueden pedir desde una misma IP en una hora. */
+    protected const MAX_POR_IP_HORA = 20;
     /**
      * Días que dura el «pase» tras acertar el código. Es una ventana DESLIZANTE:
      * cada vez que el cliente entra, se renueva (ver emailFromToken). Así, en un
@@ -49,6 +53,13 @@ class PortalService
         if ($ultimaHora >= self::MAX_POR_HORA) {
             return [false, 'Has pedido demasiados códigos. Prueba de nuevo dentro de un rato.'];
         }
+        // Y por IP: que una misma máquina no pueda pedir códigos para cientos de correos.
+        if ($ip && DB::table('portal_codes')->where('ip', $ip)->where('created_at', '>=', now()->subHour())->count() >= self::MAX_POR_IP_HORA) {
+            return [false, 'Se han pedido demasiados códigos desde tu conexión. Prueba de nuevo dentro de un rato.'];
+        }
+        // Solo vale el ÚLTIMO código: los anteriores se anulan (si no, cada código nuevo
+        // daba otros 5 intentos sobre los viejos aún vivos).
+        DB::table('portal_codes')->where('email', $email)->whereNull('used_at')->update(['used_at' => now()]);
 
         $acc = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
         if (!$acc) return [false, 'El envío de correo no está configurado. Avisa a soporte.'];
@@ -171,6 +182,11 @@ class PortalService
             ->orderByDesc('id')->first();
 
         if (!$fila) return [false, 'El código ha caducado. Pide uno nuevo.'];
+        $fallosHora = (int) DB::table('portal_codes')->where('email', $email)
+            ->where('created_at', '>=', now()->subHour())->sum('attempts');
+        if ($fallosHora >= self::MAX_FALLOS_HORA) {
+            return [false, 'Demasiados intentos. Espera un rato y pide un código nuevo.'];
+        }
         if ($fila->attempts >= self::MAX_INTENTOS) {
             return [false, 'Demasiados intentos. Pide un código nuevo.'];
         }
