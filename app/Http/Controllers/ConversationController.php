@@ -204,8 +204,21 @@ class ConversationController extends Controller
 
         $optedOut = (int) DB::table('contacts')->where('id', $id)->value('opted_out');
 
-        DB::delete('DELETE FROM messages WHERE contact_id = ?', [$id]);
+        // SOLO la conversación de Campañas. Los mensajes de soporte (correo, portal,
+        // WhatsApp del 01) y todo lo que cuelga de un ticket NO son de este chat.
+        DB::table('messages')->where('contact_id', $id)
+            ->where('channel', 'whatsapp')->where('funcion', 'campanas')->whereNull('ticket_id')
+            ->delete();
         DB::delete('DELETE FROM contact_labels WHERE contact_id = ?', [$id]);
+
+        // Si el contacto es también cliente del Helpdesk (tickets u otros mensajes), se
+        // CONSERVA: borrarlo arrastraría en cascada todos sus tickets. Solo se limpia el chat.
+        $esDeSoporte = DB::table('tickets')->where('contact_id', $id)->exists()
+            || DB::table('messages')->where('contact_id', $id)->exists();
+        if ($esDeSoporte) {
+            DB::update('UPDATE contacts SET last_message = NULL, last_time = NULL, unread = 0, assigned_to = NULL WHERE id = ?', [$id]);
+            return response()->json(['ok' => true, 'kept' => true]);
+        }
 
         // RGPD: si el contacto se dio de BAJA, NO se borra aunque se limpie el chat —
         // hay que seguir respetando la baja si vuelve a escribir. Se conserva como
