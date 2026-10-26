@@ -12,6 +12,12 @@ class LabelsController extends Controller
     {
         $action = $request->query('action', '');
 
+        // Las etiquetas son de Campañas: crearlas, borrarlas u ordenarlas exige Campañas
+        // y poder editar contactos (verlas basta con contacts.access).
+        if (!$request->isMethod('get') && !($request->user()->can('campaigns.access') && $request->user()->can('contacts.edit'))) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para gestionar etiquetas'], 403);
+        }
+
         if ($request->isMethod('get')) {
             // grupo: etiquetas excluyentes (interés, tipo); la pantalla quita las hermanas al marcar.
             $rows = DB::select('SELECT id, name, color, grupo, position FROM labels ORDER BY position ASC, name ASC');

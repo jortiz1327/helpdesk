@@ -98,7 +98,8 @@ Route::match(['get', 'post'], 'campaign_unsubscribe/{contact}', [CampaignsContro
 Route::middleware('token')->group(function () {
 
     // --- Sin permiso específico: disponible para cualquier usuario autenticado ---
-    Route::get('stats.php', [StatsController::class, 'handle']);       // dashboard
+    // Dashboard y badge del Chat en vivo de CAMPAÑAS: solo Campañas.
+    Route::get('stats.php', [StatsController::class, 'handle'])->middleware('can:campaigns.access');
     Route::get('gating.php', [GatingController::class, 'handle']);     // candados de Meta
     Route::get('media.php', [MediaController::class, 'handle']);       // proxy de multimedia
     // Manuales descargables (apartado «Ayuda»): la lista se filtra por rol dentro del controlador.
@@ -232,11 +233,13 @@ Route::middleware('token')->group(function () {
         ->middleware('can:automations.access');
 
     // --- Administración ---
+    // Analíticas = de CAMPAÑAS; Informes = del HELPDESK. Comparten analytics.view, así
+    // que cada uno exige además el acceso a su área (antes cada encargado veía las del otro).
     Route::get('analytics.php', [AnalyticsController::class, 'handle'])
-        ->middleware('can:analytics.view');
+        ->middleware(['can:analytics.view', 'can:campaigns.access']);
     // Informes del helpdesk (rendimiento: tickets, SLA, tiempos, por agente/categoría)
     Route::get('reports.php', [TicketReportsController::class, 'handle'])
-        ->middleware('can:analytics.view');
+        ->middleware(['can:analytics.view', 'can:helpdesk.access']);
     // Registro de acciones (auditoría). Solo superadmin (nadie más tiene activity.view).
     Route::get('activity.php', [\App\Http\Controllers\ActivityController::class, 'handle'])
         ->middleware('can:activity.view');

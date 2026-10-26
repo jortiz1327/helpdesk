@@ -12,6 +12,16 @@ class ContactsController extends Controller
     {
         $action = $request->query('action', '');
         $post   = $request->isMethod('post');
+        $me     = $request->user();
+
+        // Escribir exige contacts.edit (la ruta solo pide contacts.access, que es «ver»).
+        if ($post && !$me->can('contacts.edit')) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para editar contactos'], 403);
+        }
+        // Etiquetas, bajas y agendas son de CAMPAÑAS: un usuario solo de Helpdesk no las toca.
+        if ($post && in_array($action, ['bulk_label', 'set_optout', 'bulk_phonebook'], true) && !$me->can('campaigns.access')) {
+            return response()->json(['ok' => false, 'error' => 'Esta acción es de Campañas'], 403);
+        }
 
         return match (true) {
             $post && $action === 'bulk_label'     => $this->bulkLabel($request),
@@ -105,6 +115,11 @@ class ContactsController extends Controller
         $merge = DB::table('contacts')->where('id', $mergeId)->first();
         if (!$keep || !$merge) return response()->json(['ok' => false, 'error' => 'Contacto no encontrado'], 404);
 
+        // Fusionar MUEVE tickets: si alguno tiene tickets, hace falta acceso al Helpdesk.
+        if (!$r->user()->can('helpdesk.access') && DB::table('tickets')->whereIn('contact_id', [$keepId, $mergeId])->exists()) {
+            return response()->json(['ok' => false, 'error' => 'Estos contactos tienen tickets: solo se pueden fusionar desde el Helpdesk'], 403);
+        }
+
         DB::transaction(function () use ($keep, $merge, $keepId, $mergeId) {
             // 1) Todo lo que cuelga del contacto pasa al principal.
             foreach (['messages', 'tickets', 'flow_sessions', 'flow_responses', 'form_submissions'] as $t) {
@@ -170,6 +185,11 @@ class ContactsController extends Controller
          * Sin `area` se listan todos (compatibilidad).
          */
         $area = $r->query('area', '');
+        // El ÁREA la decide el servidor según los permisos, no el navegador: quien solo
+        // tiene Campañas ve los de Campañas (no los clientes de los tickets) y al revés.
+        $me = $r->user();
+        if (!$me->can('campaigns.access')) $area = 'helpdesk';
+        elseif (!$me->can('helpdesk.access')) $area = 'campaigns';
         if ($area === 'campaigns') {
             $where[] = self::SQL_CAMPANAS;
         } elseif ($area === 'helpdesk') {

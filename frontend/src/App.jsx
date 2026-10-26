@@ -720,9 +720,11 @@ export default function App() {
         };
     }, [auth.state, toast, auth.user?.id]);
 
-    // contador global de no leídos para el badge del sidebar (en cualquier vista)
+    // contador global de no leídos para el badge del sidebar (en cualquier vista). Es el
+    // del Chat en vivo de Campañas: solo para quien tiene Campañas (stats.php lo exige).
+    const verCampanas = (auth.user?.permissions || []).includes("campaigns.access");
     useEffect(() => {
-        if (auth.state !== "in") return;
+        if (auth.state !== "in" || !verCampanas) return;
         let alive = true;
         const tick = () =>
             api
@@ -738,7 +740,7 @@ export default function App() {
             alive = false;
             clearInterval(t);
         };
-    }, [auth.state]);
+    }, [auth.state, verCampanas]);
 
     // Avisos web (Nivel 1): detecta mensajes nuevos comparando last_time con unread.
     // La lista es el Chat en vivo de CAMPAÑAS (WhatsApp funcion='campanas'): solo se

@@ -21,8 +21,10 @@ class AnalyticsController extends Controller
         // Correo de CAMPAÑAS = con correo pero SIN tickets (el correo de soporte NO cuenta).
         $emailCampanas = fn ($q) => $q->whereNotNull('email')->where('email', '<>', '')
             ->whereNotExists(fn ($t) => $t->select(DB::raw(1))->from('tickets')->whereColumn('tickets.contact_id', 'contacts.id'));
-        // Contacto de CAMPAÑAS = alcanzable por WhatsApp (teléfono) o por correo no-soporte.
-        $esCampanas = fn ($q) => $q->whereNotNull('wa_id')->orWhere($emailCampanas);
+        // Contacto de CAMPAÑAS por WhatsApp = la misma regla que Contactos › Campañas (tener
+        // teléfono no basta: los clientes del portal o del WhatsApp de soporte no cuentan).
+        $waCampanas = fn ($q) => $q->whereRaw('contacts.id IN (SELECT c.id FROM contacts c WHERE ' . ContactsController::SQL_CAMPANAS . ')');
+        $esCampanas = fn ($q) => $q->where($waCampanas)->orWhere($emailCampanas);
 
         // ---- KPIs de campañas (destinatarios por estado) ----
         $r = DB::selectOne("
@@ -84,7 +86,7 @@ class AnalyticsController extends Controller
 
         // ---- Salud de la base de contactos (solo contactos de CAMPAÑAS, no soporte) ----
         $contacts = [
-            'whatsapp'  => (int) DB::table('contacts')->whereNotNull('wa_id')->count(),
+            'whatsapp'  => (int) DB::table('contacts')->where($waCampanas)->count(),
             'email'     => (int) DB::table('contacts')->where($emailCampanas)->count(),
             'optout'    => $kpi['optout_total'],
             'new_month' => (int) DB::table('contacts')->where('created_at', '>=', $mes)->where($esCampanas)->count(),
