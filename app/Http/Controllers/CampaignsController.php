@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Services\CampaignAudience;
 use App\Services\CampaignService;
 use App\Services\GatingService;
 use Illuminate\Http\Request;
@@ -59,6 +60,35 @@ class CampaignsController extends Controller
             return response()->json(['ok' => true]);
         }
 
+        // --- Audiencias (a quién enviar) ---
+        if ($request->isMethod('get') && $action === 'audience_meta') {
+            return $this->audienceMeta();
+        }
+        if ($request->isMethod('post') && $action === 'audience_save') {
+            if ($r = $this->exigir($request, 'campaigns.send')) return $r;
+            $name = mb_substr(trim((string) $request->input('name')), 0, 80);
+            $aud = CampaignAudience::normalizar($request->input('rules'));
+            if ($name === '') return response()->json(['ok' => false, 'error' => 'Ponle un nombre a la audiencia'], 400);
+            if (!$aud || in_array($aud['type'], ['audience', 'phonebook'], true)) {
+                return response()->json(['ok' => false, 'error' => 'Solo se guardan segmentos, etiquetas, provincias o «todos»'], 400);
+            }
+            $id = DB::table('campaign_audiences')->insertGetId(['name' => $name, 'rules' => json_encode($aud, JSON_UNESCAPED_UNICODE),
+                'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]);
+            return response()->json(['ok' => true, 'id' => $id]);
+        }
+        if ($request->isMethod('post') && $action === 'audience_delete') {
+            if ($r = $this->exigir($request, 'campaigns.send')) return $r;
+            DB::table('campaign_audiences')->where('id', (int) $request->input('id'))->delete();
+            return response()->json(['ok' => true]);
+        }
+
+        // Registro de consentimientos y bajas (RGPD). Solo Campañas (la ruta ya exige
+        // campaigns.access) y además quien administra los ajustes: es un dato sensible.
+        if ($request->isMethod('get') && $action === 'consent_export') {
+            if ($r = $this->exigir($request, 'settings.manage')) return $r;
+            return $this->consentExport();
+        }
+
         if ($request->isMethod('post')) {
             if ($r = $this->exigir($request, 'campaigns.send')) return $r;
             // El candado de WhatsApp no aplica a campañas de correo (SMTP propio, sin Meta).
@@ -84,7 +114,7 @@ class CampaignsController extends Controller
         if ($request->isMethod('get')) {
             $rows = DB::select("
                 SELECT c.id, c.title, c.channel, c.subject, c.template_name, c.status, c.total, c.sent, c.failed, c.scheduled_at, c.created_at,
-                       c.daily_limit, COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name,
+                       c.daily_limit, COALESCE(c.audience_desc, p.name, CONCAT('🏷 ', l.name)) AS source_name,
                        " . self::SQL_ENTREGA . "
                 FROM campaigns c
                 LEFT JOIN phonebooks p ON p.id = c.phonebook_id
@@ -106,6 +136,60 @@ class CampaignsController extends Controller
         return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
     }
 
+    /**
+     * Lo que necesita la pantalla «¿A quién se lo envías?»: etiquetas por grupo con cuántos
+     * contactos tiene cada una, provincias de los contactos de Campañas y audiencias guardadas.
+     */
+    protected function audienceMeta()
+    {
+        $labels = DB::select('SELECT l.id, l.name, l.color, l.grupo,
+                (SELECT COUNT(*) FROM contact_labels cl WHERE cl.label_id = l.id) AS contacts
+            FROM labels l ORDER BY l.position, l.name');
+        $provincias = DB::table('contacts as c')->whereRaw(\App\Http\Controllers\ContactsController::SQL_CAMPANAS)
+            ->whereNotNull('c.provincia')->where('c.provincia', '<>', '')
+            ->groupBy('c.provincia')->orderBy('c.provincia')
+            ->get([DB::raw('c.provincia AS name'), DB::raw('COUNT(*) AS contacts')]);
+        $guardadas = DB::table('campaign_audiences')->orderBy('name')->get(['id', 'name', 'rules'])
+            ->map(function ($a) {
+                $r = CampaignAudience::normalizar($a->rules);
+                return ['id' => $a->id, 'name' => $a->name, 'desc' => $r ? CampaignAudience::describir($r) : '—'];
+            });
+        $total = DB::table('contacts as c')->whereRaw(\App\Http\Controllers\ContactsController::SQL_CAMPANAS)->count();
+        return response()->json(['ok' => true, 'labels' => $labels, 'provincias' => $provincias,
+            'audiences' => $guardadas, 'all_contacts' => $total, 'grupos' => CampaignAudience::GRUPOS]);
+    }
+
+    /**
+     * CSV del registro de consentimientos y bajas (RGPD): una fila por cambio, con la
+     * situación actual del contacto. Solo contactos que tienen algún movimiento.
+     */
+    protected function consentExport()
+    {
+        $rows = DB::table('consent_log as g')->join('contacts as c', 'c.id', '=', 'g.contact_id')
+            ->leftJoin('users as u', 'u.id', '=', 'g.user_id')
+            ->orderBy('g.created_at')->orderBy('g.id')
+            ->get(['c.name', 'c.wa_id', 'c.email', 'c.opted_out', 'g.event', 'g.source', 'g.created_at', 'u.name as agente']);
+
+        $esc = function ($v) {
+            $v = (string) $v;
+            if ($v !== '' && in_array($v[0], ['=', '+', '-', '@'], true)) $v = "'" . $v;   // sin fórmulas en Excel
+            return '"' . str_replace('"', '""', $v) . '"';
+        };
+        $out = "\xEF\xBB\xBF" . implode(';', array_map($esc, ['Fecha', 'Contacto', 'Teléfono', 'Correo', 'Movimiento', 'Origen', 'Agente', 'Situación actual'])) . "\r\n";
+        foreach ($rows as $r) {
+            $out .= implode(';', array_map($esc, [
+                $r->created_at, $r->name, (string) $r->wa_id, $r->email,
+                \App\Services\ConsentLog::EVENTOS[$r->event] ?? $r->event,
+                \App\Services\ConsentLog::ORIGENES[$r->source] ?? $r->source,
+                $r->agente ?? '', (int) $r->opted_out === 1 ? 'De baja' : 'Recibe comunicaciones',
+            ])) . "\r\n";
+        }
+        return response($out)
+            ->header('Content-Type', 'text/csv; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="registro-consentimientos-' . date('Y-m-d') . '.csv"')
+            ->header('Cache-Control', 'no-store');
+    }
+
     /** Tarifa (EUR/mensaje) de una categoría de plantilla, configurable en Ajustes. */
     public static function tarifaCategoria(string $category): float
     {
@@ -125,30 +209,19 @@ class CampaignsController extends Controller
     protected function estimate(Request $request)
     {
         $category = (string) $request->query('category', '');
-        $pbId     = (int) $request->query('phonebook_id');
-        $labelId  = (int) $request->query('label_id');
+        $canal    = $request->query('channel') === 'email' ? 'email' : 'whatsapp';
+        // Misma regla que create(): audiencia, o label_id / phonebook_id sueltos.
+        $aud = CampaignAudience::normalizar($request->query('audience'));
+        if (!$aud && ($l = (int) $request->query('label_id'))) $aud = ['type' => 'labels', 'ids' => [$l], 'match' => 'any'];
+        if (!$aud && ($p = (int) $request->query('phonebook_id'))) $aud = ['type' => 'phonebook', 'id' => $p];
 
-        $recipients = 0; $excluded = 0;
-        // Correo: contactos de la etiqueta con correo (sin repetir), mismo criterio que create().
-        if ($request->query('channel') === 'email') {
-            $raw = $labelId ? DB::table('contacts as c')->join('contact_labels as cl', 'cl.contact_id', '=', 'c.id')
-                ->where('cl.label_id', $labelId)->whereNotNull('c.email')->where('c.email', '<>', '')
-                ->get(['c.email', 'c.opted_out']) : collect();
-            $ok = $raw->where('opted_out', '!=', 1)->map(fn ($r) => mb_strtolower(trim((string) $r->email)))->unique();
-            return response()->json(['ok' => true, 'recipients' => $ok->count(), 'excluded' => $raw->count() - $ok->count()]);
+        $recipients = 0; $excluded = 0; $desc = '';
+        if ($aud) {
+            [$lista, $excluded, $desc] = CampaignAudience::resolver($aud, $canal);
+            $recipients = count($lista);
         }
-        if ($pbId || $labelId) {
-            $raw = $labelId
-                ? DB::select('SELECT c.wa_id FROM contacts c JOIN contact_labels cl ON cl.contact_id = c.id WHERE cl.label_id = ?', [$labelId])
-                : DB::select('SELECT wa_id FROM phonebook_contacts WHERE phonebook_id = ?', [$pbId]);
-            $outSet = array_flip(array_map(fn ($w) => preg_replace('/\D/', '', (string) $w),
-                DB::table('contacts')->where('opted_out', 1)->pluck('wa_id')->all()));
-            foreach ($raw as $r) {
-                $wa = preg_replace('/\D/', '', (string) $r->wa_id);
-                if ($wa === '') continue;
-                if (isset($outSet[$wa])) { $excluded++; continue; }
-                $recipients++;
-            }
+        if ($canal === 'email') {
+            return response()->json(['ok' => true, 'recipients' => $recipients, 'excluded' => $excluded, 'desc' => $desc]);
         }
 
         // El COSTE solo se muestra al superadmin; al resto, el resumen sin importe.
@@ -157,6 +230,7 @@ class CampaignsController extends Controller
             'ok'         => true,
             'recipients' => $recipients,
             'excluded'   => $excluded,
+            'desc'       => $desc,
             'category'   => strtoupper($category),
             'show_cost'  => $isSuper,
             'currency'   => 'EUR',
@@ -179,7 +253,7 @@ class CampaignsController extends Controller
         $rows = DB::select("
             SELECT c.id, c.title, c.channel, c.template_name, c.category, c.unit_cost, c.status,
                    c.total, c.sent, c.failed, c.scheduled_at, c.created_at,
-                   COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name,
+                   COALESCE(c.audience_desc, p.name, CONCAT('🏷 ', l.name)) AS source_name,
                    u.name AS by_name,
                    (SELECT COUNT(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status IN ('delivered','read')) AS delivered,
                    (SELECT COUNT(*) FROM campaign_recipients r WHERE r.campaign_id = c.id AND r.status = 'read') AS read_count
@@ -238,74 +312,53 @@ class CampaignsController extends Controller
         }
         if ($title === '') return response()->json(['ok' => false, 'error' => 'Ponle un título a la campaña'], 400);
 
-        // --- Destinatarios + campos propios del canal ---
+        // --- A quién: la AUDIENCIA (regla). Compatibilidad: label_id / phonebook_id sueltos. ---
+        $aud = CampaignAudience::normalizar($request->input('audience'));
+        if (!$aud && $labelId) $aud = ['type' => 'labels', 'ids' => [$labelId], 'match' => 'any'];
+        if (!$aud && (int) $request->input('phonebook_id')) $aud = ['type' => 'phonebook', 'id' => (int) $request->input('phonebook_id')];
+        if (!$aud) return response()->json(['ok' => false, 'error' => 'Elige a quién enviar la campaña'], 400);
+        if ($channel === 'email' && $aud['type'] === 'phonebook') {
+            return response()->json(['ok' => false, 'error' => 'Las agendas son listas de teléfonos: para correo elige etiquetas, un segmento u otra audiencia'], 400);
+        }
+        [$recipients, $excluded, $audDesc] = CampaignAudience::resolver($aud, $channel);
+        if (!$recipients) {
+            return response()->json(['ok' => false, 'error' => $excluded
+                ? 'Todos los contactos de esa audiencia están dados de baja'
+                : ($channel === 'email' ? 'Ningún contacto de esa audiencia tiene correo' : 'Ningún contacto de esa audiencia tiene teléfono')], 400);
+        }
+        $origen = [
+            'audience' => json_encode($aud, JSON_UNESCAPED_UNICODE), 'audience_desc' => $audDesc,
+            'label_id' => ($aud['type'] === 'labels' && count($aud['ids']) === 1) ? $aud['ids'][0] : null,
+            'phonebook_id' => $aud['type'] === 'phonebook' ? $aud['id'] : null,
+        ];
+
+        // --- Campos propios del canal ---
         if ($channel === 'email') {
             $subject = trim((string) $request->input('subject'));
             $body    = trim((string) $request->input('body_html'));
             if ($subject === '') return response()->json(['ok' => false, 'error' => 'Ponle un asunto al correo'], 400);
             if ($body === '')    return response()->json(['ok' => false, 'error' => 'Escribe el cuerpo del correo'], 400);
-            if (!$labelId)       return response()->json(['ok' => false, 'error' => 'Elige una etiqueta de destino (se enviará a los contactos con correo de esa etiqueta)'], 400);
             if (!\App\Models\EmailAccount::where('funcion', 'campanas')->where('active', true)->whereNotNull('smtp_host')->exists()) {
                 return response()->json(['ok' => false, 'error' => 'No hay un remitente de campañas por correo (SMTP). Configúralo en Campañas → Ajustes → Correo de campañas.'], 400);
             }
-
-            // Contactos de esa etiqueta que TENGAN correo. La baja (opt-out) se comprueba por correo.
-            $raw = DB::table('contacts as c')->join('contact_labels as cl', 'cl.contact_id', '=', 'c.id')
-                ->where('cl.label_id', $labelId)->whereNotNull('c.email')->where('c.email', '<>', '')
-                ->get(['c.email', 'c.name', 'c.opted_out']);
-            if ($raw->isEmpty()) return response()->json(['ok' => false, 'error' => 'Ningún contacto de esa etiqueta tiene correo'], 400);
-
-            $recipients = [];
-            $vistos = [];
-            foreach ($raw as $r) {
-                $e = mb_strtolower(trim((string) $r->email));
-                if ((int) $r->opted_out === 1 || isset($vistos[$e])) continue;
-                $vistos[$e] = true;
-                $recipients[] = ['email' => $e, 'wa_id' => null, 'name' => $r->name ?? null];
-            }
-            $excluded = $raw->count() - count($recipients);
-            if (!$recipients) return response()->json(['ok' => false, 'error' => 'Todos los contactos de esa etiqueta están dados de baja'], 400);
-
-            $campos = [
+            $campos = $origen + [
                 'channel' => 'email', 'template_name' => null, 'language' => 'es', 'components' => '[]',
                 'subject' => mb_substr($subject, 0, 255), 'body_html' => \App\Services\HtmlSanitizer::cleanEmail($body),
-                'phonebook_id' => null, 'label_id' => $labelId,
             ];
         } else {
             $template = trim((string) $request->input('template_name'));
             $lang     = $request->input('language', 'es');
-            $pbId     = (int) $request->input('phonebook_id');
             $components = $request->input('components', []);
-            if ($template === '')    return response()->json(['ok' => false, 'error' => 'Elige una plantilla'], 400);
-            if (!$pbId && !$labelId) return response()->json(['ok' => false, 'error' => 'Elige una agenda o una etiqueta de destino'], 400);
+            if ($template === '') return response()->json(['ok' => false, 'error' => 'Elige una plantilla'], 400);
 
-            // Destinatarios: de una etiqueta (dinámico) o de una agenda (lista fija)
-            $raw = $labelId
-                ? DB::select('SELECT c.wa_id, c.name FROM contacts c JOIN contact_labels cl ON cl.contact_id = c.id WHERE cl.label_id = ?', [$labelId])
-                : DB::select('SELECT wa_id, name FROM phonebook_contacts WHERE phonebook_id = ?', [$pbId]);
-            if (!$raw) return response()->json(['ok' => false, 'error' => $labelId ? 'No hay contactos con esa etiqueta' : 'La agenda elegida no tiene contactos'], 400);
-
-            // Excluir contactos dados de baja (opt-out). La baja es SOLO de CAMPAÑAS; el envío
-            // individual de SOPORTE (SendController) NO mira opted_out (un agente puede responder
-            // un ticket aunque el contacto esté de baja). No añadir este filtro allí.
-            $outSet = array_flip(array_map(fn ($w) => preg_replace('/\D/', '', $w),
-                DB::table('contacts')->where('opted_out', 1)->pluck('wa_id')->all()));
-            $recipients = [];
-            foreach ($raw as $r) {
-                if (isset($outSet[preg_replace('/\D/', '', $r->wa_id)])) continue;
-                $recipients[] = ['email' => null, 'wa_id' => preg_replace('/\D/', '', $r->wa_id), 'name' => $r->name ?? null];
-            }
-            $excluded = count($raw) - count($recipients);
-            if (!$recipients) return response()->json(['ok' => false, 'error' => 'Todos los contactos del destino están dados de baja'], 400);
-
-            // Trazabilidad/coste: categoría de la plantilla + tarifa aplicada AHORA (así el
-            // histórico no se recalcula si luego cambian las tarifas).
+            // Las bajas (opt-out) ya las quita la audiencia. La baja es SOLO de CAMPAÑAS; el
+            // envío individual de SOPORTE (SendController) NO mira opted_out. No añadirlo allí.
+            // Trazabilidad/coste: categoría de la plantilla + tarifa aplicada AHORA.
             $cat = strtoupper((string) $request->input('category', ''));
-            $campos = [
+            $campos = $origen + [
                 'channel' => 'whatsapp', 'template_name' => $template, 'language' => $lang,
                 'components' => json_encode($components, JSON_UNESCAPED_UNICODE),
                 'subject' => null, 'body_html' => null,
-                'phonebook_id' => $pbId ?: null, 'label_id' => $labelId ?: null,
                 'category' => $cat ?: null, 'unit_cost' => self::tarifaCategoria($cat),
             ];
         }
@@ -357,7 +410,10 @@ class CampaignsController extends Controller
      */
     public function unsubscribe(Request $request, int $contact)
     {
-        DB::table('contacts')->where('id', $contact)->update(['opted_out' => 1]);
+        // Idempotente: solo la primera vez cuenta (fecha en la ficha + línea en el registro).
+        if (DB::table('contacts')->where('id', $contact)->where('opted_out', 0)->update(['opted_out' => 1, 'opted_out_at' => now()])) {
+            \App\Services\ConsentLog::anotar($contact, 'optout', 'email');
+        }
         $html = '<!doctype html><html lang="es"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>Baja confirmada</title></head>'
@@ -377,7 +433,7 @@ class CampaignsController extends Controller
     protected function detail(int $id)
     {
         $c = DB::selectOne("SELECT c.*, p.name AS phonebook_name, l.name AS label_name,
-                COALESCE(p.name, CONCAT('🏷 ', l.name)) AS source_name,
+                COALESCE(c.audience_desc, p.name, CONCAT('🏷 ', l.name)) AS source_name,
                 " . self::SQL_ENTREGA . "
             FROM campaigns c
             LEFT JOIN phonebooks p ON p.id = c.phonebook_id

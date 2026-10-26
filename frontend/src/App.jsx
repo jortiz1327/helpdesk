@@ -120,10 +120,24 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.4.1";
+const APP_VERSION = "1.4.2";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.4.2",
+        date: "26 oct 2026",
+        resumen: "Elegir a quién enviar una campaña es mucho más fácil, y registro de bajas para el RGPD.",
+        mejoras: [
+            "Nuevo «¿A quién se lo envías?» con tarjetas: por segmento (interés + tipo), etiquetas, agenda, provincia o todos.",
+            "Audiencias guardadas que se actualizan solas, p. ej. «Interés alto + No cliente».",
+            "Se ve al momento cuántos contactos recibirán la campaña.",
+            "Registro de consentimientos y bajas descargable (RGPD), solo en Campañas.",
+        ],
+        arreglos: [
+            "La baja desde el enlace del correo ahora guarda también la fecha.",
+        ],
+    },
     {
         version: "1.4.1",
         date: "26 oct 2026",

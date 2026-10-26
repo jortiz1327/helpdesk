@@ -4,6 +4,7 @@ import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
 import Select from './Select.jsx'
 import RichInput from './RichInput.jsx'
+import AudiencePicker, { valida } from './AudiencePicker.jsx'
 
 // Contacto de ejemplo para la vista previa de personalización
 const SAMPLE = { name: 'María García', wa_id: '34600112233' }
@@ -76,20 +77,14 @@ export default function SendCampaign({ onDone }) {
   // --- Campaña por CORREO (canal 'email') ---
   const [emailSubject, setEmailSubject] = useState('')
   const emailBody = useRef(null)          // RichInput
-  const [emailLabelId, setEmailLabelId] = useState('')
+  const [emailAud, setEmailAud] = useState(null)   // audiencia (a quién)
   const [emailTitle, setEmailTitle] = useState('')
   const [emailImmediate, setEmailImmediate] = useState(true)
   const [emailWhen, setEmailWhen] = useState('')
   const [emailSending, setEmailSending] = useState(false)
   const [emailTramos, setEmailTramos] = useState(false)
   const [emailPerDay, setEmailPerDay] = useState('')
-  const [emailTotal, setEmailTotal] = useState(0)   // destinatarios con correo de la etiqueta
-  useEffect(() => {
-    if (!emailLabelId) { setEmailTotal(0); return }
-    let alive = true
-    api.estimateCampaign({ channel: 'email', label_id: Number(emailLabelId) }).then((d) => { if (alive) setEmailTotal(d?.ok ? d.recipients : 0) })
-    return () => { alive = false }
-  }, [emailLabelId])
+  const [emailTotal, setEmailTotal] = useState(0)   // destinatarios con correo de la audiencia
   const [emailCfg, setEmailCfg] = useState(null)   // { ready } del remitente de campañas
   useEffect(() => { api.getEmailAccount('campanas').then((d) => setEmailCfg({ ready: !!(d.account && d.account.active && d.account.smtp_host) })) }, [])
 
@@ -98,13 +93,13 @@ export default function SendCampaign({ onDone }) {
     if (!emailSubject.trim()) { toast('Ponle un asunto al correo', 'err'); return }
     const body = emailBody.current?.getHtml() || ''
     if (!body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()) { toast('Escribe el cuerpo del correo', 'err'); return }
-    if (!emailLabelId) { toast('Elige una etiqueta de destino', 'err'); return }
+    if (!valida(emailAud)) { toast('Elige a quién enviar la campaña', 'err'); return }
     if (!emailImmediate && !emailWhen) { toast('Indica la fecha y hora de envío', 'err'); return }
     if (emailTramos && !(parseInt(emailPerDay, 10) > 0)) { toast('Indica cuántos contactos al día', 'err'); return }
     setEmailSending(true)
     const r = await api.createCampaign({
       channel: 'email', title: emailTitle, subject: emailSubject, body_html: body,
-      label_id: Number(emailLabelId),
+      audience: emailAud,
       schedule: emailImmediate ? { mode: 'now' } : { mode: 'later', at: emailWhen },
       daily_limit: emailTramos ? parseInt(emailPerDay, 10) : 0,
     })
@@ -123,11 +118,8 @@ export default function SendCampaign({ onDone }) {
 
   // Paso 2
   const [phonebooks, setPhonebooks] = useState([])
-  const [labels, setLabels] = useState([])
-  const [destType, setDestType] = useState('label') // 'label' | 'phonebook'
+  const [aud, setAud] = useState(null)   // audiencia (a quién)
   const [title, setTitle] = useState('')
-  const [pbId, setPbId] = useState('')
-  const [labelId, setLabelId] = useState('')
   const [vars, setVars] = useState({ header: [], body: [] })
   const [immediate, setImmediate] = useState(true)
   const [when, setWhen] = useState('')
@@ -138,16 +130,14 @@ export default function SendCampaign({ onDone }) {
 
   // Estimación de coste al elegir plantilla + destino (destinatarios × tarifa categoría)
   useEffect(() => {
-    if (step !== 2 || !picked) { setEstimate(null); return }
-    const dest = destType === 'label' ? { label_id: Number(labelId) } : { phonebook_id: Number(pbId) }
-    if (!dest.label_id && !dest.phonebook_id) { setEstimate(null); return }
+    if (step !== 2 || !picked || !valida(aud)) { setEstimate(null); return }
     let alive = true
     setEstimate({ loading: true })
-    api.estimateCampaign({ category: picked.category, ...dest })
+    api.estimateCampaign({ category: picked.category, audience: aud })
       .then((d) => { if (alive) setEstimate(d?.ok ? d : null) })
       .catch(() => { if (alive) setEstimate(null) })
     return () => { alive = false }
-  }, [step, picked, destType, labelId, pbId])
+  }, [step, picked, JSON.stringify(aud)])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTemplates = () => {
     setTemplates(null)
@@ -156,7 +146,6 @@ export default function SendCampaign({ onDone }) {
   useEffect(() => {
     loadTemplates()
     api.listPhonebooks().then((d) => setPhonebooks(d.phonebooks || []))
-    api.listLabels().then((d) => setLabels(d.labels || []))
   }, [])
 
   const list = useMemo(() => {
@@ -201,8 +190,7 @@ export default function SendCampaign({ onDone }) {
 
   const send = async () => {
     if (!title.trim()) { toast('Ponle un título a la campaña', 'err'); return }
-    if (destType === 'phonebook' && !pbId) { toast('Elige una agenda de contactos', 'err'); return }
-    if (destType === 'label' && !labelId) { toast('Elige una etiqueta de destino', 'err'); return }
+    if (!valida(aud)) { toast('Elige a quién enviar la campaña', 'err'); return }
     const missingFixed = (arr) => arr.some((v) => v.source === 'fixed' && !v.value.trim())
     if (headerVars > 0 && missingFixed(vars.header)) { toast('Rellena las variables de valor fijo de la cabecera', 'err'); return }
     if (bodyVars > 0 && missingFixed(vars.body)) { toast('Rellena las variables de valor fijo del mensaje', 'err'); return }
@@ -213,8 +201,7 @@ export default function SendCampaign({ onDone }) {
       title, template_name: picked.name, language: picked.language || 'es',
       category: picked.category,
       components: buildComponents(),
-      phonebook_id: destType === 'phonebook' ? Number(pbId) : 0,
-      label_id: destType === 'label' ? Number(labelId) : 0,
+      audience: aud,
       schedule: immediate ? { mode: 'now' } : { mode: 'later', at: when },
       daily_limit: tramos ? parseInt(perDay, 10) : 0,
     })
@@ -273,12 +260,9 @@ export default function SendCampaign({ onDone }) {
                 </div>
 
                 <div className="field" style={{ marginTop: 16 }}>
-                  <span className="lbl">Destino</span>
-                  <div style={{ marginTop: 4 }}>
-                    <Select block value={emailLabelId} onChange={setEmailLabelId} placeholder="Selecciona una etiqueta…"
-                      options={labels.map((l) => ({ value: l.id, label: l.name, color: l.color }))} />
-                  </div>
-                  <span className="hint" style={{ marginTop: 6 }}>Se enviará a los contactos con esta etiqueta que <b>tengan correo</b> y no estén dados de baja.{labels.length === 0 && ' No tienes etiquetas: créalas en Contactos.'}</span>
+                  <span className="lbl">¿A quién se lo envías?</span>
+                  <AudiencePicker channel="email" value={emailAud} onChange={setEmailAud}
+                    onCount={(c) => setEmailTotal(c?.recipients || 0)} phonebooks={phonebooks} />
                 </div>
 
                 <div style={{ marginTop: 16 }}>
@@ -363,28 +347,8 @@ export default function SendCampaign({ onDone }) {
                 <label className="field"><span className="lbl">Título de la campaña</span><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="p. ej. Promo verano 2026" /></label>
 
                 <div className="field" style={{ marginTop: 14 }}>
-                  <span className="lbl">Destino</span>
-                  <div className="seg">
-                    <button type="button" className={destType === 'label' ? 'on' : ''} onClick={() => setDestType('label')}><Icon.tag /> Etiqueta / sector</button>
-                    <button type="button" className={destType === 'phonebook' ? 'on' : ''} onClick={() => setDestType('phonebook')}><Icon.user /> Agenda</button>
-                  </div>
-                  {destType === 'label' ? (
-                    <>
-                      <div style={{ marginTop: 10 }}>
-                        <Select block value={labelId} onChange={setLabelId} placeholder="Selecciona una etiqueta…"
-                          options={labels.map((l) => ({ value: l.id, label: l.name, color: l.color }))} />
-                      </div>
-                      <span className="hint" style={{ marginTop: 6 }}>Se enviará a todos los contactos con esta etiqueta (dinámico).{labels.length === 0 && ' No tienes etiquetas: créalas en Contactos.'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ marginTop: 10 }}>
-                        <Select block value={pbId} onChange={setPbId} placeholder="Selecciona una agenda…"
-                          options={phonebooks.map((p) => ({ value: p.id, label: p.name, sub: `${p.contacts} contactos` }))} />
-                      </div>
-                      {phonebooks.length === 0 && <span className="hint" style={{ marginTop: 6, color: 'var(--warn, #f4b740)' }}>No tienes agendas. Crea una en «Agenda de contactos».</span>}
-                    </>
-                  )}
+                  <span className="lbl">¿A quién se lo envías?</span>
+                  <AudiencePicker channel="whatsapp" value={aud} onChange={setAud} phonebooks={phonebooks} />
                 </div>
 
                 {(headerVars > 0 || bodyVars > 0) && (
@@ -432,6 +396,7 @@ export default function SendCampaign({ onDone }) {
                     <div className="fb-set-t" style={{ marginBottom: 10 }}>Resumen del envío</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <div style={ROW}><span>Destinatarios</span><b style={{ fontVariantNumeric: 'tabular-nums' }}>{estimate.recipients.toLocaleString('es-ES')}</b></div>
+                      {estimate.desc && <div style={ROW}><span>A quién</span><span style={{ textAlign: 'right' }}>{estimate.desc}</span></div>}
                       {estimate.excluded > 0 && <div style={{ ...ROW, color: 'var(--ink-3, #888)', fontSize: 12.5 }}><span>Excluidos por baja</span><span>{estimate.excluded}</span></div>}
                       <div style={ROW}><span>Plantilla</span><span>{picked.name}</span></div>
                       <div style={ROW}><span>Categoría</span><span style={{ color: catColor(picked.category), fontWeight: 600 }}>{picked.category}{estimate.show_cost ? ` · ${estimate.rate > 0 ? `${eur(estimate.rate, 4)}/msg` : 'gratis'}` : ''}</span></div>

@@ -261,6 +261,7 @@ class WebhookController extends Controller
             if ($isAccept) {
                 if ((int) ($crow['consent'] ?? 0) !== 2) {
                     DB::update('UPDATE contacts SET consent = 2, consent_at = NOW() WHERE id = ?', [$contactId]);
+                    \App\Services\ConsentLog::anotar((int) $contactId, 'consent', 'whatsapp');
                     $ok = '✅ ¡Gracias! Has aceptado recibir nuestras comunicaciones. ¿En qué podemos ayudarte?';
                     [$rc, $rr] = $this->wa->sendText($from, $ok);
                     if ($rc >= 200 && $rc < 300 && !empty($rr['messages'][0]['id'])) {
@@ -294,9 +295,11 @@ class WebhookController extends Controller
             if ($curVal !== $want) {
                 if ($want === 1) {
                     DB::update('UPDATE contacts SET opted_out = 1, opted_out_at = NOW() WHERE id = ?', [$contactId]);
+                    \App\Services\ConsentLog::anotar((int) $contactId, 'optout', 'whatsapp');
                     $reply = '✅ Hecho. No volverás a recibir mensajes promocionales nuestros. Si cambias de idea, escribe ALTA en cualquier momento.';
                 } else {
                     DB::update('UPDATE contacts SET opted_out = 0, opted_out_at = NULL WHERE id = ?', [$contactId]);
+                    \App\Services\ConsentLog::anotar((int) $contactId, 'optin', 'whatsapp');
                     $reply = '✅ Te has vuelto a suscribir. Volverás a recibir nuestras novedades. Escribe BAJA para darte de baja cuando quieras.';
                 }
                 [$rc, $rr] = $this->wa->sendText($from, $reply);

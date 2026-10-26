@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { api } from '../api.js'
+import { api, downloadConsentLog } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import LockTip from './LockTip.jsx'
@@ -108,6 +108,7 @@ function SendSafety() {
   const toast = useToast()
   const [s, setS] = useState(null)
   const [cap, setCap] = useState('')
+  const [bajando, setBajando] = useState(false)
 
   useEffect(() => { api.getSettings().then((d) => { if (d && d.ok !== false) { setS(d); setCap(String(d.daily_send_cap ?? 0)) } }) }, [])
   if (!s) return null
@@ -117,6 +118,11 @@ function SendSafety() {
     const r = await api.saveSettings({ outbound_paused: next })
     if (r.ok) { setS((v) => ({ ...v, outbound_paused: next })); toast(next ? '⏸ Envíos PAUSADOS' : '▶ Envíos reactivados') }
     else toast(r.error || 'Error', 'err')
+  }
+  const descargar = async () => {
+    setBajando(true)
+    try { await downloadConsentLog() } catch (e) { toast(e.message || 'No se pudo descargar', 'err') }
+    setBajando(false)
   }
   const toggleLaborables = async () => {
     const next = !s.send_business_days_only
@@ -163,6 +169,14 @@ function SendSafety() {
       </div>
       <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
         Hoy llevas <b style={{ color: 'var(--ink)' }}>{s.sent_today}</b> mensaje(s) de pago{s.daily_send_cap > 0 ? ` de ${s.daily_send_cap}` : ' · sin tope'}.
+      </div>
+      <div className="safety-sep" />
+      <div className="safety-row">
+        <div className="safety-meta">
+          <b>Registro de consentimientos y bajas (RGPD)</b>
+          <span className="muted">Quién aceptó recibir campañas y quién se dio de baja, cuándo y cómo. Solo contactos de Campañas.</span>
+        </div>
+        <button className="btn ghost sm" disabled={bajando} onClick={descargar}><Icon.download /> {bajando ? 'Preparando…' : 'Descargar CSV'}</button>
       </div>
     </div>
   )

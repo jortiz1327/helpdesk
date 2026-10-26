@@ -3,6 +3,26 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.4.2] — 2026-10-26
+
+### Mejoras
+
+- **«¿A quién se lo envías?»** con tarjetas al crear una campaña (WhatsApp y correo): por
+  segmento (Interés + Tipo: dentro de un grupo vale cualquiera, entre grupos todos), por
+  etiquetas (cualquiera o todas a la vez), por agenda (solo WhatsApp), por provincia o a
+  todos los contactos de Campañas. Recuento en vivo con los excluidos por baja. Nunca
+  incluye clientes que solo son del Helpdesk.
+- **Audiencias guardadas**: la regla se guarda con nombre y se recalcula en cada envío.
+  El historial de campañas muestra a quién se envió.
+- **Registro de consentimientos y bajas (RGPD)**: cada aceptación, baja o vuelta a
+  suscribirse queda anotada con fecha y origen (WhatsApp, enlace del correo o un agente).
+  Se descarga en CSV desde «Seguridad de envíos», solo con acceso a Campañas y permiso de
+  ajustes. Las bajas que ya había entran como «anterior al registro».
+
+### Arreglos
+
+- La baja desde el enlace del correo no guardaba la fecha.
+
 ## [1.4.1] — 2026-10-26
 
 ### Mejoras

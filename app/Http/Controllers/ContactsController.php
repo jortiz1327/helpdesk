@@ -133,10 +133,13 @@ class ContactsController extends Controller
         $ids = $this->ids($r);
         $val = $r->boolean('value');
         if (!$ids) return response()->json(['ok' => false, 'error' => 'Faltan contactos'], 400);
+        // Solo los que CAMBIAN quedan en el registro de consentimientos (RGPD).
+        $cambian = DB::table('contacts')->whereIn('id', $ids)->where('opted_out', $val ? 0 : 1)->pluck('id');
         DB::table('contacts')->whereIn('id', $ids)->update(
             $val ? ['opted_out' => 1, 'opted_out_at' => now()]
                  : ['opted_out' => 0, 'opted_out_at' => null]
         );
+        foreach ($cambian as $cid) \App\Services\ConsentLog::anotar((int) $cid, $val ? 'optout' : 'optin', 'agente', (int) $r->user()->id);
         return response()->json(['ok' => true]);
     }
 

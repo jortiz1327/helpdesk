@@ -604,8 +604,16 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Estimación de coste antes de enviar: destinatarios × tarifa de la categoría
-  estimateCampaign: ({ category = '', phonebook_id = 0, label_id = 0, channel = '' }) =>
-    req(`campaigns.php?action=estimate&category=${encodeURIComponent(category)}&phonebook_id=${phonebook_id || 0}&label_id=${label_id || 0}${channel ? `&channel=${channel}` : ''}`),
+  estimateCampaign: ({ category = '', phonebook_id = 0, label_id = 0, channel = '', audience = null }) =>
+    req(`campaigns.php?action=estimate&category=${encodeURIComponent(category)}&phonebook_id=${phonebook_id || 0}&label_id=${label_id || 0}${channel ? `&channel=${channel}` : ''}${audience ? `&audience=${encodeURIComponent(JSON.stringify(audience))}` : ''}`),
+  // Audiencias de Campañas (a quién enviar) y registro RGPD (solo Campañas).
+  audienceMeta: () => req('campaigns.php?action=audience_meta'),
+  saveAudience: (name, rules) => req('campaigns.php?action=audience_save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, rules }),
+  }),
+  deleteAudience: (id) => req('campaigns.php?action=audience_delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
   // Historial/trazabilidad de campañas (con coste real)
   campaignHistory: () => req('campaigns.php?action=history'),
   runCampaign: (id) => req(`campaigns.php?action=run&id=${id}`, { method: 'POST' }),
@@ -665,4 +673,21 @@ export const mediaUrl = (id) => `${BASE}/media.php?id=${encodeURIComponent(id)}&
 // Renovar el token de medios antes de que caduque (24 h) en pestañas abiertas mucho tiempo.
 if (typeof window !== 'undefined') {
   setInterval(() => { if (getToken()) api.me() }, 6 * 60 * 60 * 1000)
+}
+
+// Registro de consentimientos y bajas (RGPD, solo Campañas). Se descarga con la sesión en
+// la cabecera —nunca con el token en la URL— y se guarda como archivo.
+export async function downloadConsentLog() {
+  const r = await fetch(`${BASE}/campaigns.php?action=consent_export`, { headers: { 'X-App-Token': getToken() } })
+  if (!r.ok) {
+    let msg = 'No se pudo descargar el registro'
+    try { msg = (await r.json()).error || msg } catch { /* respuesta no JSON */ }
+    throw new Error(msg)
+  }
+  const url = URL.createObjectURL(await r.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `registro-consentimientos-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
