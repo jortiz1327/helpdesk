@@ -30,6 +30,7 @@ class TicketActivity implements ShouldBroadcastNow
         public string $code = '',    // referencia visible (TK-2607-0001), para el aviso
         public string $subject = '', // asunto, para el aviso
         public ?int $assignedTo = null,
+        public string $channel = '', // web | email | whatsapp: cada agente pausa los avisos por canal
     ) {}
 
     /** Canal PRIVADO: hay que autenticarse para escucharlo (ver routes/channels.php). */

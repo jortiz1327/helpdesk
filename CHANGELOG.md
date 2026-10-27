@@ -3,6 +3,19 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.6] — 2026-10-27
+
+### Mejoras
+
+- **Pausa entre avisos del mismo ticket, por canal.** En «Notificaciones» cada agente elige
+  para WhatsApp, correo y web cuántos minutos esperar antes de volver a avisarle de UN MISMO
+  ticket (`users.notify_throttle`). Aplica al correo «El cliente ha respondido» (atómico con
+  `Cache::add`, `NotifyThrottle`) y al aviso/pitido del navegador. «Nuevo ticket» y «Se te ha
+  asignado» siempre avisan, pero cuentan como último aviso: el «hola» crea el ticket y el
+  «cómo va» de después ya no manda otro correo. Los demás tickets avisan con normalidad.
+- **Rango del administrador** en Configuración › Comportamiento (`notify_throttle_min` /
+  `notify_throttle_max`, por defecto 1-30 min, tope 60). Quien no ha elegido usa el mínimo.
+
 ## [1.5.5] — 2026-10-27
 
 ### Mejoras

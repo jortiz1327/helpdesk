@@ -120,10 +120,20 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.5";
+const APP_VERSION = "1.5.6";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.6",
+        date: "27 oct 2026",
+        resumen: "Pausa entre avisos del mismo ticket, por canal: tres mensajes seguidos por WhatsApp ya no son tres correos y tres pitidos.",
+        mejoras: [
+            "Notificaciones: cada agente elige, para WhatsApp, correo y web, cuántos minutos esperar antes de volver a avisarle del mismo ticket (correo y aviso del navegador).",
+            "Configuración › Comportamiento: el administrador fija el rango que pueden elegir (por defecto de 1 a 30 minutos).",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.5",
         date: "27 oct 2026",
@@ -800,6 +810,10 @@ export default function App() {
      * Aquí solo se muestran los AVISOS; cada vista se refresca por su cuenta
      * suscribiéndose con onTicketActivity().
      */
+    // Minutos entre avisos por canal: en ref para que cambiarlos no reconecte el socket.
+    const throttleRef = useRef(null);
+    throttleRef.current = auth.user?.notify_throttle || null;
+
     useEffect(() => {
         if (auth.state !== "in") return;
         connectRealtime();
@@ -831,10 +845,25 @@ export default function App() {
             }
         };
 
+        /*
+         * Pausa entre avisos del MISMO ticket (minutos por canal, en «Notificaciones»). En
+         * WhatsApp el cliente manda «hola», «cómo va», «todo bien?» seguidos: un aviso, no tres.
+         * El «nuevo ticket» siempre avisa, pero cuenta como último aviso de ese ticket.
+         */
+        const ultimoAviso = new Map(); // ticketId -> ms
+        const enPausa = (e) => {
+            const canal = ["web", "email", "whatsapp"].includes(e.channel) ? e.channel : "web";
+            const min = Number(throttleRef.current?.[canal] ?? 0);
+            const antes = ultimoAviso.get(e.ticketId);
+            return min > 0 && antes && Date.now() - antes < min * 60000;
+        };
+
         const avisar = (e) => {
             if (e.action === "poll") {
                 sondear();
             } else if (e.action === "message") {
+                if (enPausa(e)) return;
+                ultimoAviso.set(e.ticketId, Date.now());
                 toast(`💬 ${e.code}: el cliente ha respondido`);
                 fireNotification(
                     `Nueva respuesta · ${e.code}`,
@@ -842,6 +871,7 @@ export default function App() {
                     () => { setTicketsTab("tickets"); setTicketAbierto(e.ticketId); setView("tickets"); },
                 );
             } else if (e.action === "created") {
+                ultimoAviso.set(e.ticketId, Date.now());
                 toast(`🎫 Nuevo ticket ${e.code}`);
                 fireNotification(
                     `Nuevo ticket · ${e.code}`,

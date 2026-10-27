@@ -133,7 +133,7 @@ class TicketsController extends Controller
         if ($ev <= 0 || $msg <= 0) return response()->json(['cursor' => $cur, 'items' => []]);
 
         $vis = fn($q) => $this->scope($q->join('tickets as t', 't.id', '=', 'x.ticket_id')->where('t.channel', '!=', 'cron'), $me);
-        $cols = ['t.id as ticketId', 't.code', 't.subject'];
+        $cols = ['t.id as ticketId', 't.code', 't.subject', 't.channel'];
 
         $eventos = $vis(DB::table('ticket_events as x'))
             ->where('x.id', '>', $ev)->where('x.id', '<=', $cur['ev'])
@@ -148,16 +148,17 @@ class TicketsController extends Controller
             ->where('x.direction', 'in')->where('x.channel', 'whatsapp')->where('t.channel', 'whatsapp')
             ->where('x.funcion', 'soporte')   // nunca el 51 de Campañas
             ->whereNotIn('t.id', $nuevos ?: [0])   // el ticket nuevo ya avisa con «created»
-            ->groupBy('t.id', 't.code', 't.subject')->limit(50)->get($cols);
+            ->groupBy('t.id', 't.code', 't.subject', 't.channel')->limit(50)->get($cols);
 
         $items = $eventos->map(fn($e) => [
             'action' => $e->type === 'created' ? 'created' : 'assigned',
             'ticketId' => $e->ticketId,
             'code' => $e->code,
             'subject' => $e->subject,
+            'channel' => $e->channel,
             'assignedTo' => $me->id
         ])
-            ->concat($mensajes->map(fn($m) => ['action' => 'message', 'ticketId' => $m->ticketId, 'code' => $m->code, 'subject' => $m->subject]))
+            ->concat($mensajes->map(fn($m) => ['action' => 'message', 'ticketId' => $m->ticketId, 'code' => $m->code, 'subject' => $m->subject, 'channel' => $m->channel]))
             ->values();
 
         return response()->json(['cursor' => $cur, 'items' => $items]);

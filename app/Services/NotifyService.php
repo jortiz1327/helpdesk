@@ -304,6 +304,33 @@ class NotifyService
     }
 
     /**
+     * Pausa entre avisos del mismo ticket a cada AGENTE (ver NotifyThrottle). «El cliente
+     * responde» se salta si a ese agente ya se le avisó de este ticket hace menos de los
+     * minutos que eligió; «nuevo» y «asignado» siempre salen, pero cuentan como último
+     * aviso (el «hola» crea el ticket y el «cómo va» de después ya no manda otro correo).
+     * Los destinatarios que no son usuarios (el cliente) no se tocan.
+     */
+    protected function pausaEntreAvisos(string $key, array $destinos, int $ticketId, string $canal): array
+    {
+        if (!in_array($key, ['ticket_created', 'ticket_assigned', 'ticket_reply'], true)) return $destinos;
+
+        $usuarios = User::whereIn(DB::raw('LOWER(email)'), array_keys($destinos))
+            ->get(['id', 'email', 'notify_throttle'])
+            ->keyBy(fn($u) => mb_strtolower($u->email));
+
+        foreach ($destinos as $email => $nombre) {
+            $u = $usuarios->get($email);
+            if (!$u) continue;
+            if ($key === 'ticket_reply') {
+                if (!NotifyThrottle::permitirCorreo((int) $u->id, $ticketId, $canal, $u->notify_throttle)) unset($destinos[$email]);
+            } else {
+                NotifyThrottle::marcarCorreo((int) $u->id, $ticketId, $canal, $u->notify_throttle);
+            }
+        }
+        return $destinos;
+    }
+
+    /**
      * Envía el aviso de un evento sobre un ticket. Devuelve true si se llegó a enviar.
      * $key: ticket_created | ticket_closed | ticket_assigned | ticket_reply
      */
@@ -328,6 +355,9 @@ class NotifyService
 
             $acc = EmailAccount::where('funcion', 'soporte')->where('active', true)->whereNotNull('smtp_host')->orderBy('id')->first();
             if (!$acc) return false;
+
+            $destinos = $this->pausaEntreAvisos($key, $destinos, $ticketId, (string) $t->channel);
+            if (!$destinos) return false;   // todos avisados hace nada de este mismo ticket
 
             $vars = [
                 '{{codigo}}'  => (string) $t->code,

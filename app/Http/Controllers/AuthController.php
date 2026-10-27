@@ -52,6 +52,12 @@ class AuthController extends Controller
         $me->notify_assigned = $request->boolean('notify_assigned', (bool) $me->notify_assigned);
         $me->notify_reply    = $request->boolean('notify_reply', (bool) $me->notify_reply);
         $me->notify_sla      = $request->boolean('notify_sla', (bool) $me->notify_sla);
+        // Pausa entre avisos del mismo ticket, por canal: se acota al rango del admin.
+        if (is_array($request->input('notify_throttle'))) {
+            $actual = \App\Services\NotifyThrottle::deUsuario($me->notify_throttle);
+            $me->notify_throttle = json_encode(\App\Services\NotifyThrottle::deUsuario(
+                array_intersect_key($request->input('notify_throttle'), $actual) + $actual));
+        }
         $me->save();
 
         return response()->json(['ok' => true, 'user' => $this->pub($me)]);
@@ -199,6 +205,9 @@ class AuthController extends Controller
             'notify_assigned' => (bool) $u->notify_assigned,
             'notify_reply'    => (bool) $u->notify_reply,
             'notify_sla'      => (bool) $u->notify_sla,
+            // Minutos entre avisos del mismo ticket por canal, y el rango que permite el admin.
+            'notify_throttle'       => \App\Services\NotifyThrottle::deUsuario($u->notify_throttle),
+            'notify_throttle_range' => \App\Services\NotifyThrottle::rango(),
             // Token corto (24 h) y solo de descarga para las URL de adjuntos y medios.
             'media_token'     => TokenService::mediaToken($u),
         ];

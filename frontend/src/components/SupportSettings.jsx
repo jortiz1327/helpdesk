@@ -38,7 +38,7 @@ const SECCIONES = [
   ] },
   { grupo: 'Flujo de trabajo', items: [
     { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo al entrar.' },
-    { key: 'behavior',   label: 'Comportamiento',        icon: Icon.ticket,   desc: 'Estado inicial, bloqueo entre agentes, cierre automático y seguimiento sin respuesta.' },
+    { key: 'behavior',   label: 'Comportamiento',        icon: Icon.ticket,   desc: 'Estado inicial, bloqueo entre agentes, cierre automático, seguimiento sin respuesta y pausa entre avisos.' },
     { key: 'sla',        label: 'SLA',                   icon: Icon.timer,    desc: 'Relojes de respuesta y resolución, avisos por correo y escalado.' },
     { key: 'hours',      label: 'Horario de atención',   icon: Icon.clock,    desc: 'Cuándo se atiende. Sobre esto corre el reloj del SLA.' },
   ] },
@@ -781,6 +781,7 @@ function TicketBehavior() {
   const { d, f, setF, save, saving } = useAjustes([
     'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify',
     'ticket_followup_active', 'ticket_followup_days', 'ticket_followup_hours',
+    'notify_throttle_min', 'notify_throttle_max',
   ])
   if (!d || !f) return <div className="center-load"><div className="spinner" /></div>
 
@@ -864,6 +865,28 @@ function TicketBehavior() {
           {f.ticket_followup_active
             ? <>Recordatorio a los {f.ticket_followup_days} día(s) sin respuesta y resuelto {f.ticket_followup_hours} h después si sigue sin contestar.</>
             : 'Desactivado: no se envían recordatorios ni se resuelve nada automáticamente.'}
+        </p>
+      </div>
+
+      <div className="card em-card" style={{ marginTop: 16 }}>
+        <h2>Pausa entre avisos a los agentes</h2>
+        <p className="em-desc">
+          Cada agente elige en <b>Notificaciones</b>, por canal (web, correo y WhatsApp), cuántos minutos esperar antes de volver
+          a avisarle de <b>un mismo ticket</b> (correo y aviso del navegador). Así un cliente de WhatsApp que escribe tres
+          mensajes seguidos no genera tres correos y tres pitidos. Aquí se fija el rango que pueden elegir.
+        </p>
+        <div className="grid2">
+          <label className="field"><span className="lbl">Mínimo (minutos)</span>
+            <input type="number" min="0" max="60" value={f.notify_throttle_min}
+              onChange={(e) => setF((s) => ({ ...s, notify_throttle_min: e.target.value }))} /></label>
+          <label className="field"><span className="lbl">Máximo (minutos)</span>
+            <input type="number" min="0" max="60" value={f.notify_throttle_max}
+              onChange={(e) => setF((s) => ({ ...s, notify_throttle_max: e.target.value }))} /></label>
+        </div>
+        <p className="ct-hint">
+          {Number(f.notify_throttle_max) < Number(f.notify_throttle_min)
+            ? 'El máximo no puede ser menor que el mínimo.'
+            : <>Los agentes podrán elegir entre {f.notify_throttle_min} y {f.notify_throttle_max} minuto(s). Quien no haya elegido nada usa el mínimo.</>}
         </p>
       </div>
 

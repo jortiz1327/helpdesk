@@ -37,6 +37,9 @@ class TicketSettingsController extends Controller
                 'login_max_ip'       => (int) Setting::get('login_max_ip', '25'),
                 'login_lock_minutes' => (int) Setting::get('login_lock_minutes', '5'),
                 'login_lock_message' => (string) Setting::get('login_lock_message', ''),
+                // Rango en el que cada agente elige la pausa entre avisos del mismo ticket.
+                'notify_throttle_min' => \App\Services\NotifyThrottle::rango()[0],
+                'notify_throttle_max' => \App\Services\NotifyThrottle::rango()[1],
             ],
             'statuses' => TicketService::STATUSES,
             // Cuántos se cerrarían HOY con el ajuste actual: da confianza antes de guardar.
@@ -52,6 +55,19 @@ class TicketSettingsController extends Controller
      */
     protected function save(Request $request)
     {
+        // Va PRIMERO: si el rango no vale, no se guarda nada de la sección.
+        // Pausa entre avisos: de 0 a 60 min, y el máximo nunca por debajo del mínimo.
+        if ($request->has('notify_throttle_min') || $request->has('notify_throttle_max')) {
+            [$min, $max] = \App\Services\NotifyThrottle::rango();
+            $min = max(0, min(60, (int) $request->input('notify_throttle_min', $min)));
+            $max = max(0, min(60, (int) $request->input('notify_throttle_max', $max)));
+            if ($max < $min) {
+                return response()->json(['ok' => false, 'error' => 'El máximo no puede ser menor que el mínimo'], 400);
+            }
+            Setting::put('notify_throttle_min', (string) $min);
+            Setting::put('notify_throttle_max', (string) $max);
+        }
+
         if ($request->has('ticket_default_status')) {
             $status = (string) $request->input('ticket_default_status');
             if (!array_key_exists($status, TicketService::STATUSES)) {

@@ -593,6 +593,7 @@ class TicketService
                 (string) $t->code,
                 '',
                 $assignedTo ?? ($t->assigned_to ? (int) $t->assigned_to : null),
+                (string) $t->channel,   // para la pausa entre avisos de cada agente
             );
         } catch (\Throwable $e) {
             /*
