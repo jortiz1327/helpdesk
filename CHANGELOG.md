@@ -3,6 +3,37 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.0] — 2026-10-27
+
+### Mejoras
+
+- **WhatsApp de soporte (el 01) → tickets.** Los mensajes de clientes crean o alimentan
+  tickets (regla de 7 días: reabre una conversación reciente o abre una nueva). Lo que se
+  contesta desde el móvil (Coexistence) entra como «Desde el móvil». Sin bot, sin
+  consentimiento y sin correos automáticos al cliente. Interruptor «Tickets de WhatsApp»
+  (solo superadmin) y comandos `wa:import-history` y `wa:process-raw`.
+- **Responder por WhatsApp desde el ticket**, con un editor limitado a lo que admite
+  WhatsApp. Fuera de la ventana de 24 h se avisa de que solo se puede contestar desde el
+  móvil.
+- **Archivos de WhatsApp guardados 6 meses** en el servidor (`wa:media`; los vídeos no) y
+  aviso «no disponible» cuando ya no se pueden descargar.
+- **Tiempo real (Reverb)** en producción: avisos y bandeja al instante. Si el websocket
+  falla, se vuelve solo al sondeo cada 10 s. Instalación: `deploy/reverb/instalar.sh`.
+- **Avisos de tickets en modo sondeo** (ticket nuevo, asignación y respuesta del cliente
+  por WhatsApp), con resumen cuando llegan muchos de golpe.
+- **Filtro por canal** en Tickets (correo / WhatsApp / web, con el mismo criterio que la
+  etiqueta de canal).
+- **Seguimiento sin respuesta** (correo y web): recordatorio a los N días y resuelto N
+  horas después. Configurable en Comportamiento y solo para los tickets nuevos.
+
+### Arreglos
+
+- `messages.media_mime` ampliado: un Excel recibido por WhatsApp hacía fallar la
+  importación del historial.
+- Tiempo real: la autorización del canal privado iba a una ruta relativa (405) y nunca
+  se suscribía.
+- Las conversaciones anteriores de WhatsApp respetan la visibilidad del agente.
+
 ## [1.4.3] — 2026-10-26
 
 ### Seguridad (pendientes de la auditoría del 26/10)

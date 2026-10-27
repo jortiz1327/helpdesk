@@ -33,7 +33,11 @@ class TicketReplyService
      *   la respuesta programada: el cron no tiene UploadedFiles, sino ficheros ya subidos.
      *   Si se pasa, no se guarda nada nuevo y no se borran al fallar (habrá reintento).
      */
-    public function porCorreo(object $t, string $html, array $files, array $cc, array $bcc, $me, ?array $preAttachIds = null, bool $deleteAttachOnFail = true): array
+    /**
+     * @param ?object $me      null = lo envía el sistema (seguimiento automático): sin autor.
+     * @param ?string $heading Titular de la plantilla de marca (por defecto, «Se ha respondido…»).
+     */
+    public function porCorreo(object $t, string $html, array $files, array $cc, array $bcc, $me, ?array $preAttachIds = null, bool $deleteAttachOnFail = true, ?string $heading = null): array
     {
         if (!$t->contact_email) {
             return ['ok' => false, 'error' => 'El contacto no tiene dirección de correo', '_status' => 422];
@@ -89,7 +93,7 @@ class TicketReplyService
         // Plantilla de marca: envuelve la respuesta en una cabecera + tarjeta «Se ha
         // respondido a tu incidencia» (la firma y el pie los mete la propia plantilla).
         $layout = [
-            'heading' => 'Se ha respondido a tu incidencia',
+            'heading' => $heading ?? 'Se ha respondido a tu incidencia',
             'meta'    => trim(((string) $t->code) . ($t->subject ? ' · ' . (string) $t->subject : '')),
         ];
 
@@ -114,7 +118,7 @@ class TicketReplyService
         // Enviado: guardar el mensaje saliente y colgarle los adjuntos.
         $messageId = ChatService::storeMessage((int) $t->contact_id, (string) ($t->contact_wa ?? ''), 'out', 'text', $html, [
             'ticket_id'      => (int) $t->id,
-            'author_user_id' => (int) $me->id,
+            'author_user_id' => $me?->id ? (int) $me->id : null,
             'is_html'        => true,
             'channel'        => 'email',
             'status'         => 'sent',
@@ -195,7 +199,7 @@ class TicketReplyService
         }
 
         if (!$ids) return ['ok' => false, 'error' => $warnings[0] ?? 'No se envió nada', '_status' => 502];
-        $this->tickets->broadcast('message', (int) $t->id);
+        $this->tickets->broadcast('reply', (int) $t->id);   // respuesta nuestra: refresca, no avisa
         return ['ok' => true, 'id' => end($ids), 'warnings' => $warnings];
     }
 

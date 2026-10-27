@@ -120,10 +120,26 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.4.3";
+const APP_VERSION = "1.5.0";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.0",
+        date: "27 oct 2026",
+        resumen: "Los WhatsApp de soporte llegan como tickets y los avisos aparecen al instante.",
+        mejoras: [
+            "Los mensajes al WhatsApp de soporte crean tickets; lo que se contesta desde el móvil sale como «Desde el móvil».",
+            "Se puede responder por WhatsApp desde el ticket (dentro de las 24 h; después, solo desde el móvil).",
+            "Las fotos, audios y documentos de WhatsApp se guardan 6 meses.",
+            "Avisos al instante: un ticket nuevo o la respuesta de un cliente aparecen sin esperar.",
+            "Nuevo filtro por canal en Tickets (correo, WhatsApp, web).",
+            "Seguimiento automático: si el cliente no contesta en unos días, se le recuerda y luego se resuelve (configurable).",
+        ],
+        arreglos: [
+            "Las conversaciones anteriores de WhatsApp solo muestran las que el agente puede ver.",
+        ],
+    },
     {
         version: "1.4.3",
         date: "26 oct 2026",
@@ -736,8 +752,37 @@ export default function App() {
         if (auth.state !== "in") return;
         connectRealtime();
 
-        const off = onTicketActivity((e) => {
-            if (e.action === "message") {
+        /*
+         * Sin websocket (producción va por polling) el «poll» solo recarga listas: aquí se
+         * pregunta qué ha pasado desde el último vistazo y se avisa igual que en tiempo real.
+         * La primera llamada solo siembra el cursor. Si llega un aluvión (una importación),
+         * un único aviso resumen en vez de decenas.
+         */
+        let cursor = null;
+        let pidiendo = false;
+        const sondear = async () => {
+            if (pidiendo) return;
+            pidiendo = true;
+            try {
+                const d = await api.ticketActivity(cursor || {});
+                if (!d?.cursor) return;
+                const items = cursor ? d.items || [] : [];
+                cursor = d.cursor;
+                if (items.length > 3) {
+                    toast(`🎫 ${items.length} novedades en tickets`);
+                    fireNotification("Helpdesk", `${items.length} novedades en tickets`, () => { setTicketsTab("tickets"); setView("tickets"); });
+                } else items.forEach(avisar);
+            } catch {
+                /* el siguiente sondeo lo vuelve a intentar */
+            } finally {
+                pidiendo = false;
+            }
+        };
+
+        const avisar = (e) => {
+            if (e.action === "poll") {
+                sondear();
+            } else if (e.action === "message") {
                 toast(`💬 ${e.code}: el cliente ha respondido`);
                 fireNotification(
                     `Nueva respuesta · ${e.code}`,
@@ -768,7 +813,9 @@ export default function App() {
                     () => { setTicketsTab("tickets"); setTicketAbierto(e.ticketId); setView("tickets"); },
                 );
             }
-        });
+        };
+        const off = onTicketActivity(avisar);
+        sondear(); // siembra el cursor al entrar
 
         return () => {
             off();

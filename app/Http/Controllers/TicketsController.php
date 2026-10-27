@@ -73,6 +73,7 @@ class TicketsController extends Controller
             'reply'   => $this->reply($request),
             'unlock'  => $this->unlock($request),
             'heartbeat' => $this->heartbeat($request),
+            'activity'  => $this->activity($request),
             'delete'  => $this->delete($request),
             'pdf'     => $this->pdf($request),
             // Fusionar: primero se piden los candidatos, luego se ejecuta.
@@ -108,6 +109,50 @@ class TicketsController extends Controller
     {
         // Criterio de visibilidad ÚNICO (compartido con AttachmentController).
         return \App\Support\TicketVisibility::scope($query, $me);
+    }
+
+    /**
+     * AVISOS sin websocket. Con el socket caído (producción va por polling) la app solo
+     * recarga listas y nadie se entera de nada. Esto devuelve lo ocurrido desde el último
+     * cursor —tickets nuevos, asignaciones A MÍ y mensajes del cliente en WhatsApp— para
+     * lanzar los mismos avisos que el tiempo real. Sin cursor solo los siembra (no avisa
+     * de lo que ya estaba al abrir la app).
+     */
+    protected function activity(Request $request)
+    {
+        $me = $request->user();
+        $ev = (int) $request->query('ev', 0);
+        $msg = (int) $request->query('msg', 0);
+        $cur = [
+            'ev'  => (int) DB::table('ticket_events')->max('id'),
+            'msg' => (int) DB::table('messages')->max('id'),
+        ];
+        if ($ev <= 0 || $msg <= 0) return response()->json(['cursor' => $cur, 'items' => []]);
+
+        $vis = fn ($q) => $this->scope($q->join('tickets as t', 't.id', '=', 'x.ticket_id')->where('t.channel', '!=', 'cron'), $me);
+        $cols = ['t.id as ticketId', 't.code', 't.subject'];
+
+        $eventos = $vis(DB::table('ticket_events as x'))
+            ->where('x.id', '>', $ev)->where('x.id', '<=', $cur['ev'])
+            ->where(fn ($w) => $w->where('x.type', 'created')
+                ->orWhere(fn ($a) => $a->where('x.type', 'assign')->where('x.to_value', (string) $me->id)
+                    ->where(fn ($u) => $u->whereNull('x.user_id')->orWhere('x.user_id', '!=', $me->id))))
+            ->orderBy('x.id')->limit(50)->get(array_merge($cols, ['x.type']));
+
+        $nuevos = $eventos->where('type', 'created')->pluck('ticketId')->all();
+        $mensajes = $vis(DB::table('messages as x'))
+            ->where('x.id', '>', $msg)->where('x.id', '<=', $cur['msg'])
+            ->where('x.direction', 'in')->where('x.channel', 'whatsapp')->where('t.channel', 'whatsapp')
+            ->where('x.funcion', 'soporte')   // nunca el 51 de Campañas
+            ->whereNotIn('t.id', $nuevos ?: [0])   // el ticket nuevo ya avisa con «created»
+            ->groupBy('t.id', 't.code', 't.subject')->limit(50)->get($cols);
+
+        $items = $eventos->map(fn ($e) => ['action' => $e->type === 'created' ? 'created' : 'assigned',
+                'ticketId' => $e->ticketId, 'code' => $e->code, 'subject' => $e->subject, 'assignedTo' => $me->id])
+            ->concat($mensajes->map(fn ($m) => ['action' => 'message', 'ticketId' => $m->ticketId, 'code' => $m->code, 'subject' => $m->subject]))
+            ->values();
+
+        return response()->json(['cursor' => $cur, 'items' => $items]);
     }
 
     /**
@@ -238,6 +283,8 @@ class TicketsController extends Controller
         if (($lbl = (int) $request->query('label', 0)) > 0) {
             $p[] = 'etiqueta: ' . (DB::table('ticket_labels')->where('id', $lbl)->value('name') ?? $lbl);
         }
+        $ch = ['web' => 'Web', 'email' => 'Correo', 'whatsapp' => 'WhatsApp'][(string) $request->query('channel', '')] ?? null;
+        if ($ch) $p[] = "canal: {$ch}";
         return implode(' · ', $p);
     }
 
@@ -312,12 +359,21 @@ class TicketsController extends Controller
 
         foreach ([
             'priority'      => 't.priority',
-            'channel'       => 't.channel',
             'contact'       => 't.contact_id',
             'contact_email' => 'c.email',
         ] as $param => $col) {
             if (($v = $request->query($param, '')) !== '' && $v !== 'all') $q->where($col, $v);
         }
+
+        // CANAL, igual que lo enseña el badge: «Web» = creado en el portal o a mano por un
+        // agente (aunque por dentro responda por correo); «Correo» = el resto de canal email.
+        $web = fn ($w) => $w->whereIn('t.source', ['portal', 'manual'])->orWhere('t.channel', 'web');
+        match ((string) $request->query('channel', '')) {
+            'web'      => $q->where($web),
+            'email'    => $q->where('t.channel', 'email')->where(fn ($w) => $w->whereNull('t.source')->orWhereNotIn('t.source', ['portal', 'manual'])),
+            'whatsapp' => $q->where('t.channel', 'whatsapp'),
+            default    => null,
+        };
 
         // CATEGORÍA: acepta VARIAS (lista separada por comas, para quien lleva varias áreas)
         // y muestra SIEMPRE también los «sin categoría» (los nuevos sin gestionar), para que
@@ -894,7 +950,7 @@ class TicketsController extends Controller
             // Copias que ya estaban en la conversación, para proponerlas al responder.
             'cc_sugerido' => $this->ccDelHilo($messages, (string) $t->contact_email),
             // WhatsApp: ventana de 24 h y conversaciones anteriores del cliente.
-            'wa' => $t->channel === 'whatsapp' ? $this->waContexto($t) : null,
+            'wa' => $t->channel === 'whatsapp' ? $this->waContexto($t, $me) : null,
         ]);
     }
 
@@ -957,7 +1013,7 @@ class TicketsController extends Controller
         $ids = [$id];
         $fichas = [];
         if ($request->boolean('hist')) {
-            $prev = $this->waAnteriores($id);
+            $prev = $this->waAnteriores($id, $me);
             $ids = array_merge($ids, $prev->pluck('id')->all());
             foreach ($prev as $p) $fichas[$p->id] = $p;
         }
@@ -970,14 +1026,19 @@ class TicketsController extends Controller
         return response()->json(['ok' => true, 'messages' => $messages, 'more' => $more, 'tickets' => (object) $fichas]);
     }
 
-    /** Conversaciones (tickets de WhatsApp) ANTERIORES del mismo cliente, sin las fusionadas. */
-    protected function waAnteriores(int $id)
+    /**
+     * Conversaciones (tickets de WhatsApp) ANTERIORES del mismo cliente, sin las fusionadas
+     * y solo las que este usuario PUEDE ver (misma regla que la bandeja): si no, abrir un
+     * ticket propio dejaba leer conversaciones antiguas de otra área.
+     */
+    protected function waAnteriores(int $id, $me)
     {
         $t = DB::table('tickets')->where('id', $id)->first(['contact_id', 'channel']);
         if (!$t || $t->channel !== 'whatsapp') return collect();
-        return DB::table('tickets')->where('contact_id', $t->contact_id)->where('channel', 'whatsapp')
-            ->where('id', '<', $id)->whereNull('merged_into_id')
-            ->orderByDesc('id')->get(['id', 'code', 'status', 'subject']);
+        return $this->scope(DB::table('tickets as t'), $me)
+            ->where('t.contact_id', $t->contact_id)->where('t.channel', 'whatsapp')
+            ->where('t.id', '<', $id)->whereNull('t.merged_into_id')
+            ->orderByDesc('t.id')->get(['t.id', 't.code', 't.status', 't.subject']);
     }
 
     /**
@@ -985,7 +1046,7 @@ class TicketsController extends Controller
      * dentro de las 24 h desde el último mensaje del cliente; después, solo plantillas)
      * y cuántas conversaciones anteriores tiene el cliente.
      */
-    protected function waContexto(object $t): array
+    protected function waContexto(object $t, $me): array
     {
         $ultimo = DB::table('messages')->where('contact_id', $t->contact_id)->where('channel', 'whatsapp')
             ->where('funcion', 'soporte')->where('direction', 'in')->max('created_at');
@@ -993,7 +1054,7 @@ class TicketsController extends Controller
         return [
             'window_open'   => $cierra && $cierra->isFuture(),
             'window_closes' => $cierra?->toIso8601String(),
-            'previous'      => $this->waAnteriores((int) $t->id)->count(),
+            'previous'      => $this->waAnteriores((int) $t->id, $me)->count(),
         ];
     }
 

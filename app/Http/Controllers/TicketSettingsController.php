@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EmailTemplate;
 use App\Models\Setting;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
@@ -24,6 +25,11 @@ class TicketSettingsController extends Controller
                 'ticket_lock_minutes'     => (int) Setting::get('ticket_lock_minutes', '2'),
                 'ticket_autoclose_days'   => (int) Setting::get('ticket_autoclose_days', '0'),
                 'ticket_autoclose_notify' => (string) Setting::get('ticket_autoclose_notify', '0') === '1',
+                // Seguimiento sin respuesta (correo/web). El interruptor ES el de su plantilla
+                // («ticket_followup»): un solo sitio de verdad, se toque desde aquí o desde Plantillas.
+                'ticket_followup_active'  => (bool) EmailTemplate::where('key', 'ticket_followup')->value('active'),
+                'ticket_followup_days'    => (int) Setting::get('ticket_followup_days', '8'),
+                'ticket_followup_hours'   => (int) Setting::get('ticket_followup_hours', '24'),
                 // Encuesta de satisfacción (CSAT) en el portal
                 'csat_active'             => (string) Setting::get('csat_active', '1') === '1',
                 // Seguridad del acceso (fuerza bruta)
@@ -68,6 +74,17 @@ class TicketSettingsController extends Controller
         }
         if ($request->has('ticket_autoclose_notify')) {
             Setting::put('ticket_autoclose_notify', filter_var($request->input('ticket_autoclose_notify'), FILTER_VALIDATE_BOOLEAN) ? '1' : '0');
+        }
+        if ($request->has('ticket_followup_active')) {
+            EmailTemplate::where('key', 'ticket_followup')
+                ->update(['active' => filter_var($request->input('ticket_followup_active'), FILTER_VALIDATE_BOOLEAN)]);
+        }
+        // Acotados: de 1 a 90 días para el recordatorio y de 1 h a 30 días para darlo por resuelto.
+        if ($request->has('ticket_followup_days')) {
+            Setting::put('ticket_followup_days', (string) max(1, min(90, (int) $request->input('ticket_followup_days'))));
+        }
+        if ($request->has('ticket_followup_hours')) {
+            Setting::put('ticket_followup_hours', (string) max(1, min(720, (int) $request->input('ticket_followup_hours'))));
         }
         if ($request->has('csat_active')) {
             Setting::put('csat_active', filter_var($request->input('csat_active'), FILTER_VALIDATE_BOOLEAN) ? '1' : '0');

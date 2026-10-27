@@ -531,7 +531,7 @@ class TicketService
                 if (isset($cambios['prioridad'])) $partes[] = 'prioridad → <b>' . e($cambios['prioridad']) . '</b>';
                 if (isset($cambios['asignado']))  $partes[] = 'reasignado a <b>' . e($cambios['asignado']) . '</b>';
                 $this->nota($ticketId, null, '⏱️ <b>Escalado automático por SLA vencido</b> (' . e($reloj) . '): ' . implode(', ', $partes) . '.');
-                $this->broadcast('message', $ticketId);
+                $this->broadcast('updated', $ticketId);   // nota interna: no es «el cliente ha respondido»
             }
 
             return $cambios;

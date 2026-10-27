@@ -35,4 +35,11 @@ php artisan optimize
 # corresponda a tu versión/servicio de PHP:
 # sudo systemctl reload php8.2-fpm
 
+# Tiempo real: si el servicio de Reverb está instalado, se reinicia para que cargue el
+# código y la config nuevos (systemd lo vuelve a levantar solo).
+if systemctl is-active --quiet helpdesk-reverb 2>/dev/null; then
+  echo "→ Reiniciando Reverb (tiempo real)…"
+  php artisan reverb:restart
+fi
+
 echo "✓ Despliegue completado · $(git rev-parse --short HEAD) ($(git log -1 --format=%s))"

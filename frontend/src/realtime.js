@@ -59,19 +59,31 @@ export function connectRealtime() {
   if (echo) return
 
   const key  = import.meta.env.VITE_REVERB_APP_KEY
-  const host = import.meta.env.VITE_REVERB_HOST
-  // Sin clave → polling. Y si el host es LOCAL (127.0.0.1/localhost), tampoco se intenta:
-  // eso solo pasa cuando se cuela la config de desarrollo en un build de producción, y haría
-  // que el navegador del cliente pidiera permiso para «conectarse a un dispositivo de tu red
-  // local» (Private Network Access) por un websocket que nunca va a existir en su equipo.
-  const hostLocal = !host || /^(127\.0\.0\.1|localhost|0\.0\.0\.0|::1)$/i.test(host)
-  if (!key || hostLocal) { startPolling('sin websocket de producción'); return }
+  /*
+   * Host del websocket. Vacío en PRODUCCIÓN (.env.production): el MISMO dominio por el que
+   * se abre la página (el servidor atiende varios: soporte.aemegroup.com, …), y nginx lo
+   * pasa a Reverb por el 443 de siempre. En desarrollo, el de .env (127.0.0.1).
+   */
+  const esLocal = (h) => /^(127\.0\.0\.1|localhost|0\.0\.0\.0|::1|\[::1\])$/i.test(h || '')
+  const configurado = import.meta.env.VITE_REVERB_HOST || ''
+  const paginaLocal = esLocal(window.location.hostname)
+  const host = configurado || window.location.hostname
+  // Polling (sin intentar el websocket) cuando:
+  //  · no hay clave;
+  //  · la config de DESARROLLO (host local) acaba en un build abierto desde fuera: el
+  //    navegador del cliente pediría permiso para «conectarse a un dispositivo de tu red
+  //    local» (Private Network Access) por un websocket que no existe en su equipo;
+  //  · el build de PRODUCCIÓN (mismo dominio) se abre en local: ahí no hay Reverb en el 443.
+  //    Para probar el tiempo real en local: `npm run build:local`.
+  if (!key || (esLocal(configurado) && !paginaLocal) || (!configurado && paginaLocal)) {
+    startPolling('sin websocket de producción'); return
+  }
 
   try {
     echo = new Echo({
       broadcaster: 'reverb',
       key,
-      wsHost: import.meta.env.VITE_REVERB_HOST,
+      wsHost: host,
       wsPort: Number(import.meta.env.VITE_REVERB_PORT || 8080),
       wssPort: Number(import.meta.env.VITE_REVERB_PORT || 443),
       forceTLS: (import.meta.env.VITE_REVERB_SCHEME || 'http') === 'https',
@@ -79,7 +91,9 @@ export function connectRealtime() {
 
       // El canal es privado: hay que autorizarse. Nuestra auth es por TOKEN,
       // no por cookie de sesión, así que se envía en la cabecera.
-      authEndpoint: 'api/broadcasting/auth',
+      // ABSOLUTA (/api/…): relativa, desde /agentes/tickets se resolvía a
+      // /agentes/api/broadcasting/auth (405) y el canal privado nunca se autorizaba.
+      authEndpoint: '/api/broadcasting/auth',
       auth: { headers: { 'X-App-Token': getToken() } },
     })
 

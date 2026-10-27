@@ -98,7 +98,9 @@ class SoporteWhatsApp
             try { app(NotifyService::class)->ticket('ticket_reply', $ticketId); }
             catch (\Throwable $e) { Log::warning('WhatsApp soporte: aviso de respuesta falló', ['ticket' => $ticketId, 'error' => $e->getMessage()]); }
         }
-        $this->tickets->broadcast('message', $ticketId);
+        // Aviso a los agentes solo cuando escribe el CLIENTE en un ticket que ya existía (el
+        // nuevo ya avisó con «created»). Lo nuestro desde el móvil solo refresca pantallas.
+        $this->tickets->broadcast($dir === 'out' ? 'reply' : ($nuevo ? 'updated' : 'message'), $ticketId);
         return true;
     }
 

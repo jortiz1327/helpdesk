@@ -44,7 +44,7 @@ class ConfigActivity
         'email.php'            => ['section' => 'Configuración', 'tablas' => ['email_accounts'], 'settings' => ['email_footer', 'email_footer_active'], 'resumen' => 'Actualizó el buzón de correo'],
         'ticket_fields.php'    => ['section' => 'Configuración', 'tablas' => ['ticket_custom_fields'], 'resumen' => 'Actualizó los campos personalizados', 'escribe' => ['save_def', 'delete_def', 'save_values']],
         'ticket_settings.php'  => ['section' => 'Configuración', 'tablas' => [], 'settings' => ['ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days',
-                                   'ticket_autoclose_notify', 'csat_active', 'login_max_user', 'login_max_ip', 'login_lock_minutes', 'login_lock_message'],
+                                   'ticket_autoclose_notify', 'ticket_followup_days', 'ticket_followup_hours', 'csat_active', 'login_max_user', 'login_max_ip', 'login_lock_minutes', 'login_lock_message'],
                                    'resumen' => 'Actualizó el comportamiento de los tickets'],
         'features.php'         => ['section' => 'Configuración', 'tablas' => [], 'settings' => ['sla_active', 'sla_alerts_active', 'sla_escalate_active', 'csat_active',
                                    'ticket_autoclose_days', 'ticket_lock_minutes'], 'resumen' => 'Cambió funciones del sistema', 'escribe' => ['set']],
@@ -120,6 +120,7 @@ class ConfigActivity
     private const CLAVES = [
         'ticket_default_status' => 'Estado inicial de los tickets', 'ticket_lock_minutes' => 'Bloqueo entre agentes (min)',
         'ticket_autoclose_days' => 'Cierre automático (días)', 'ticket_autoclose_notify' => 'Avisar del cierre automático',
+        'ticket_followup_days' => 'Seguimiento: días sin respuesta', 'ticket_followup_hours' => 'Seguimiento: horas hasta resolver',
         'csat_active' => 'Encuesta de satisfacción', 'login_max_user' => 'Intentos máx. por usuario', 'login_max_ip' => 'Intentos máx. por IP',
         'login_lock_minutes' => 'Bloqueo de acceso (min)', 'login_lock_message' => 'Mensaje de acceso bloqueado',
         'sla_active' => 'SLA', 'sla_alerts_active' => 'Avisos de SLA', 'sla_escalate_active' => 'Escalado de SLA',

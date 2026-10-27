@@ -85,7 +85,7 @@ class SettingsController extends Controller
         }
         if (array_key_exists('wa_soporte_tickets', $in)) {
             // Solo superadmin: decide si los clientes de WhatsApp empiezan a crear tickets.
-            if (!$request->user()?->is_super) return response()->json(['ok' => false, 'error' => 'Solo superadmin'], 403);
+            if (!$request->user()?->isSuperAdmin()) return response()->json(['ok' => false, 'error' => 'Solo superadmin'], 403);
             Setting::put('wa_soporte_tickets', !empty($in['wa_soporte_tickets']) ? '1' : '0');
         }
         // Red de seguridad de envíos

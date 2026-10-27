@@ -1,11 +1,12 @@
 {
   "name": "helpdesk-frontend",
   "private": true,
-  "version": "1.4.3",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "node -e \"require('fs').rmSync('../public/assets',{recursive:true,force:true})\" && vite build",
+    "build:local": "node -e \"require('fs').rmSync('../public/assets',{recursive:true,force:true})\" && vite build --mode development",
     "preview": "vite preview"
   },
   "dependencies": {

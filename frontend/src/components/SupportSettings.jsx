@@ -38,7 +38,7 @@ const SECCIONES = [
   ] },
   { grupo: 'Flujo de trabajo', items: [
     { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo al entrar.' },
-    { key: 'behavior',   label: 'Comportamiento',        icon: Icon.ticket,   desc: 'Estado inicial, bloqueo entre agentes y cierre automático.' },
+    { key: 'behavior',   label: 'Comportamiento',        icon: Icon.ticket,   desc: 'Estado inicial, bloqueo entre agentes, cierre automático y seguimiento sin respuesta.' },
     { key: 'sla',        label: 'SLA',                   icon: Icon.timer,    desc: 'Relojes de respuesta y resolución, avisos por correo y escalado.' },
     { key: 'hours',      label: 'Horario de atención',   icon: Icon.clock,    desc: 'Cuándo se atiende. Sobre esto corre el reloj del SLA.' },
   ] },
@@ -780,6 +780,7 @@ function GuardarAjustes({ save, saving }) {
 function TicketBehavior() {
   const { d, f, setF, save, saving } = useAjustes([
     'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify',
+    'ticket_followup_active', 'ticket_followup_days', 'ticket_followup_hours',
   ])
   if (!d || !f) return <div className="center-load"><div className="spinner" /></div>
 
@@ -836,6 +837,33 @@ function TicketBehavior() {
           {Number(f.ticket_autoclose_days) > 0
             ? <>Se cierran los resueltos con más de {f.ticket_autoclose_days} día(s) sin actividad. Ahora mismo afectaría a <b>{d.autoclose_pending}</b> ticket(s).</>
             : 'Con 0 el cierre automático queda desactivado.'}
+        </p>
+      </div>
+
+      <div className="card em-card" style={{ marginTop: 16 }}>
+        <h2>Seguimiento cuando el cliente no responde</h2>
+        <p className="em-desc">
+          Si un ticket de <b>correo o web</b> sigue <b>abierto</b> y el cliente no contesta a nuestra última respuesta,
+          se le manda un recordatorio automático en el mismo hilo. Si tampoco responde a ese recordatorio,
+          el ticket pasa a <b>resuelto</b>. Nunca se aplica a WhatsApp, y solo a los tickets creados desde que se activó.
+        </p>
+        <label className="fb-req-row">
+          <span className="fb-switch"><input type="checkbox" checked={!!f.ticket_followup_active}
+            onChange={(e) => setF((s) => ({ ...s, ticket_followup_active: e.target.checked }))} /><span className={`fb-toggle ${f.ticket_followup_active ? 'on' : ''}`} /></span>
+          <span className="fb-req-label">Activar el seguimiento automático <span className="hint">· el texto se edita en Plantillas de aviso, «Seguimiento sin respuesta»</span></span>
+        </label>
+        <div className="grid2" style={{ marginTop: 8 }}>
+          <label className="field"><span className="lbl">Días sin respuesta para el recordatorio</span>
+            <input type="number" min="1" max="90" value={f.ticket_followup_days} disabled={!f.ticket_followup_active}
+              onChange={(e) => setF((s) => ({ ...s, ticket_followup_days: e.target.value }))} /></label>
+          <label className="field"><span className="lbl">Horas tras el recordatorio para resolverlo</span>
+            <input type="number" min="1" max="720" value={f.ticket_followup_hours} disabled={!f.ticket_followup_active}
+              onChange={(e) => setF((s) => ({ ...s, ticket_followup_hours: e.target.value }))} /></label>
+        </div>
+        <p className="ct-hint">
+          {f.ticket_followup_active
+            ? <>Recordatorio a los {f.ticket_followup_days} día(s) sin respuesta y resuelto {f.ticket_followup_hours} h después si sigue sin contestar.</>
+            : 'Desactivado: no se envían recordatorios ni se resuelve nada automáticamente.'}
         </p>
       </div>
 

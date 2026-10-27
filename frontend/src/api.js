@@ -146,6 +146,7 @@ export const api = {
 
   // --- Tickets (núcleo del helpdesk) ---
   listTickets: (f = {}) => req('tickets.php?action=list&' + new URLSearchParams(f)),
+  ticketActivity: (cur = {}) => req('tickets.php?action=activity&' + new URLSearchParams(cur)),
   ticketStats: (from = '', to = '') => req(`tickets.php?action=stats${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}`),
   ticketMeta: () => req('tickets.php?action=meta'),
   // Acepta id numérico o CÓDIGO (TK-…): así un enlace por código abre el ticket.

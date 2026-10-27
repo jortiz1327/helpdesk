@@ -1,0 +1,19 @@
+# Reverb (websocket del tiempo real) como servicio permanente.
+# Escucha SOLO en 127.0.0.1:8080: desde fuera se llega por nginx (443, /app/).
+# Se reinicia solo si se cae, y en cada despliegue con «php artisan reverb:restart».
+# Instalación: deploy/reverb/instalar.sh
+[Unit]
+Description=Helpdesk - Reverb (websocket del tiempo real)
+After=network.target mysql.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/helpdesk
+ExecStart=/usr/bin/php artisan reverb:start --host=127.0.0.1 --port=8080
+Restart=always
+RestartSec=3
+LimitNOFILE=10000
+
+[Install]
+WantedBy=multi-user.target

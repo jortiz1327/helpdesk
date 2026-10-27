@@ -28,6 +28,7 @@ class EmailTemplate extends Model
         'sla_warning'     => ['SLA por vencer',  'Aviso al AGENTE cuando un ticket suyo está a punto de incumplir el SLA.'],
         'sla_breach'      => ['SLA vencido',     'Aviso al AGENTE (y a los administradores) cuando un ticket incumple el SLA.'],
         'csat_survey'     => ['Encuesta de satisfacción', 'Encuesta al CLIENTE al resolver su ticket. Usa {{valoracion}} para las estrellas clicables.'],
+        'ticket_followup' => ['Seguimiento sin respuesta', 'Recordatorio al CLIENTE (correo y web, no WhatsApp) cuando lleva unos días sin contestar con el ticket abierto; si tampoco responde al recordatorio, el ticket pasa a resuelto. Los días y las horas se ajustan en Comportamiento del ticket. Sale como respuesta en el mismo hilo de correo (con el asunto de la conversación) y queda en el ticket como «Automático». Apagada, no se hace nada de esto.'],
     ];
 
     /** Variables que se pueden usar en el asunto y el contenido. */

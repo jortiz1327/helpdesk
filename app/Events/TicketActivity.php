@@ -25,7 +25,7 @@ class TicketActivity implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
-        public string $action,       // created | message | status | assigned
+        public string $action,       // created | message (escribe el cliente) | reply (nuestra) | status | assigned…
         public int $ticketId,
         public string $code = '',    // referencia visible (TK-2607-0001), para el aviso
         public string $subject = '', // asunto, para el aviso

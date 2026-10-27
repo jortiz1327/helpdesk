@@ -24,3 +24,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Informes de auditoría de seguridad (mapa de vulnerabilidades: nunca al repo)
+SECURITY-AUDIT-*.md

@@ -27,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('campaign:tick')->everyMinute()->withoutOverlapping();
         // Canal correo: sondeo del buzón IMAP → tickets
         $schedule->command('email:fetch')->everyMinute()->withoutOverlapping();
+        // Correo/web: recordatorio al cliente a los 8 días sin respuesta y resuelto 24 h después
+        $schedule->command('tickets:followup')->everyFifteenMinutes()->withoutOverlapping();
         // Cierra los tickets que llevan X días resueltos (si está configurado)
         $schedule->command('tickets:autoclose')->dailyAt('03:30')->withoutOverlapping();
         // Avisos de SLA por correo (por vencer / vencido) — si están activados
@@ -35,6 +37,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('tickets:wake')->everyFiveMinutes()->withoutOverlapping();
         // Envía las respuestas programadas que ya toca mandar
         $schedule->command('replies:send')->everyMinute()->withoutOverlapping();
+        // WhatsApp de soporte: copia de los archivos en el servidor (Meta los borra a las
+        // semanas) y borrado a los 6 meses para no llenar el disco.
+        $schedule->command('wa:media guardar')->everyMinute()->withoutOverlapping();
+        $schedule->command('wa:media purgar')->dailyAt('04:10')->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         /*

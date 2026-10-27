@@ -268,7 +268,7 @@ function resaltar(texto, aguja) {
 }
 
 // search_in: 'ficha' (código/asunto/cliente) o 'messages' (dentro de la conversación)
-const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', label: 'all', sla: 'all', org: 'all', ...VIEWS[0].f }
+const BASE_F = { q: '', search_in: 'ficha', priority: 'all', category: 'all', label: 'all', channel: 'all', sla: 'all', org: 'all', ...VIEWS[0].f }
 
 /*
  * POSPONER un ticket. Si ya está dormido, enseña hasta cuándo + «Reactivar ahora».
@@ -865,7 +865,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   }
 
   const clear = () => setF(BASE_F)
-  const refined = f.q || f.priority !== 'all' || f.category !== 'all' || f.label !== 'all' || (f.org && f.org !== 'all')   // filtros finos por encima de la vista
+  const refined = f.q || f.priority !== 'all' || f.category !== 'all' || f.label !== 'all' || (f.channel && f.channel !== 'all') || (f.org && f.org !== 'all')   // filtros finos por encima de la vista
 
   const statusOpts = [
     { value: 'open', label: 'Activos', sub: 'Sin resueltos ni cerrados' },
@@ -1029,6 +1029,16 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                   options={[{ value: 'all', label: 'Todas' }, ...meta.labels.map((l) => ({ value: String(l.id), label: l.name }))]} />
               </div>
             )}
+            {/* Canal, con el mismo criterio que el badge de la lista (Web = portal o a mano). */}
+            <div className="field"><span className="lbl">Canal</span>
+              <Select block value={f.channel || 'all'} onChange={(v) => setF((s) => ({ ...s, channel: v }))}
+                options={[
+                  { value: 'all', label: 'Todos' },
+                  { value: 'email', label: 'Correo' },
+                  { value: 'whatsapp', label: 'WhatsApp' },
+                  { value: 'web', label: 'Web' },
+                ]} />
+            </div>
             {/* Filtro por organización (grupo/marca/sede). Se oculta solo si no hay grupos. */}
             <OrgFilter value={f.org} onChange={(v) => setF((s) => ({ ...s, org: v }))} />
 
@@ -1575,6 +1585,9 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   // ficha de cada uno ({ id: {code,status,subject} }) para los separadores.
   const [hist, setHist] = useState(false)
   const [fichas, setFichas] = useState({})
+  // Foto/vídeo de WhatsApp que Meta ya no da (caducado, o sin token): id del mensaje → true.
+  const [rotos, setRotos] = useState({})
+  const roto = (id) => setRotos((r) => (r[id] ? r : { ...r, [id]: true }))
   const [loadErr, setLoadErr] = useState(false)       // no se pudo cargar el ticket (red/servidor)
   const [masOpen, setMasOpen] = useState(false)       // menú «Más ⋯» de acciones secundarias
   const masRef = useRef(null)
@@ -2155,12 +2168,14 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   const fin = !esWa || !mismoGrupo(m, next)
                   // En WhatsApp el nombre solo hace falta en lo NUESTRO y cuando cambia quién
                   // contesta: el cliente es siempre el mismo y ya sale en la cabecera.
+                  // «Desde el móvil», en cambio, va en TODOS: dice por dónde salió cada mensaje.
                   const cambiaAutor = out && !esNota && autorDe(m) !== autorOut
                   if (out && !esNota) autorOut = autorDe(m)
-                  const conNombre = !esWa || esNota || (ini && cambiaAutor)
+                  const conNombre = !esWa || esNota || (ini && cambiaAutor) || (out && !m.author_name && m.via === 'movil')
                   const conEstrella = out && !esNota && (m.body || m.type === 'text')
                   // Foto/audio/… sin archivo: el historial del móvil no lo trae (Meta no lo manda).
-                  const sinArchivo = !m.media_url && !(m.attachments || []).length && SIN_ARCHIVO[m.type]
+                  // También si el archivo no carga (Meta lo borra a las semanas): mejor el aviso que una burbuja vacía.
+                  const sinArchivo = (!m.media_url || rotos[m.id]) && !(m.attachments || []).length && SIN_ARCHIVO[m.type]
                   return (
                     <Fragment key={m.id}>
                     {cambiaTicket && (
@@ -2220,13 +2235,13 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                         )}
 
                         {/* Multimedia de WhatsApp (media_url = id de Meta; se baja por el proxy). */}
-                        {m.media_url && (m.type === 'image' || m.type === 'sticker') && (
+                        {m.media_url && !rotos[m.id] && (m.type === 'image' || m.type === 'sticker') && (
                           <a href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer" className={`tk-media-link ${m.type === 'sticker' ? 'is-sticker' : ''}`}>
-                            <img className="tk-media" src={mediaUrl(m.media_url)} loading="lazy" alt="" />
+                            <img className="tk-media" src={mediaUrl(m.media_url)} loading="lazy" alt="" onError={() => roto(m.id)} />
                           </a>
                         )}
-                        {m.media_url && m.type === 'video' && (
-                          <div className="tk-video"><video controls preload="metadata" src={mediaUrl(m.media_url)} /></div>
+                        {m.media_url && !rotos[m.id] && m.type === 'video' && (
+                          <div className="tk-video"><video controls preload="metadata" src={mediaUrl(m.media_url)} onError={() => roto(m.id)} /></div>
                         )}
                         {m.media_url && m.type === 'audio' && <WaAudio src={mediaUrl(m.media_url)} />}
                         {m.media_url && m.type === 'document' && (
