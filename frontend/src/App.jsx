@@ -120,10 +120,20 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.6";
+const APP_VERSION = "1.5.7";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.7",
+        date: "27 oct 2026",
+        resumen: "Notificaciones: activa o desactiva cada canal y elige la pausa con un deslizador.",
+        mejoras: [
+            "Notificaciones › Avisos por canal: un interruptor por canal (WhatsApp, correo, web) para recibir o no avisos de sus tickets nuevos y respuestas del cliente.",
+            "Con el canal activo, un deslizador fija los minutos de pausa entre avisos del mismo ticket.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.6",
         date: "27 oct 2026",
@@ -813,6 +823,8 @@ export default function App() {
     // Minutos entre avisos por canal: en ref para que cambiarlos no reconecte el socket.
     const throttleRef = useRef(null);
     throttleRef.current = auth.user?.notify_throttle || null;
+    const canalesRef = useRef(null);
+    canalesRef.current = auth.user?.notify_channels || null;
 
     useEffect(() => {
         if (auth.state !== "in") return;
@@ -851,9 +863,12 @@ export default function App() {
          * El «nuevo ticket» siempre avisa, pero cuenta como último aviso de ese ticket.
          */
         const ultimoAviso = new Map(); // ticketId -> ms
+        const canalDe = (e) => (["web", "email", "whatsapp"].includes(e.channel) ? e.channel : "web");
+        // Canal apagado por el agente en «Notificaciones»: sin avisos de sus tickets.
+        const apagado = (e) => canalesRef.current?.[canalDe(e)] === false;
         const enPausa = (e) => {
-            const canal = ["web", "email", "whatsapp"].includes(e.channel) ? e.channel : "web";
-            const min = Number(throttleRef.current?.[canal] ?? 0);
+            if (apagado(e)) return true;
+            const min = Number(throttleRef.current?.[canalDe(e)] ?? 0);
             const antes = ultimoAviso.get(e.ticketId);
             return min > 0 && antes && Date.now() - antes < min * 60000;
         };
@@ -871,6 +886,7 @@ export default function App() {
                     () => { setTicketsTab("tickets"); setTicketAbierto(e.ticketId); setView("tickets"); },
                 );
             } else if (e.action === "created") {
+                if (apagado(e)) return;
                 ultimoAviso.set(e.ticketId, Date.now());
                 toast(`🎫 Nuevo ticket ${e.code}`);
                 fireNotification(

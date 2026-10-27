@@ -3,6 +3,17 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.7] — 2026-10-27
+
+### Mejoras
+
+- **Avisos por canal con interruptor.** En «Notificaciones» cada canal (WhatsApp, correo, web)
+  tiene su interruptor: apagado, el agente no recibe ni correo ni aviso del navegador de
+  tickets NUEVOS ni RESPUESTAS del cliente de ese canal (la asignación sigue con su propio
+  interruptor). Se guarda como lista `off` dentro de `users.notify_throttle`.
+- **Deslizador de minutos** en lugar del desplegable: aparece solo con el canal activo, va
+  del mínimo al máximo del admin y guarda al soltar (600 ms sin moverlo).
+
 ## [1.5.6] — 2026-10-27
 
 ### Mejoras

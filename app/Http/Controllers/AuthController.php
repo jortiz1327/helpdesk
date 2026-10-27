@@ -53,10 +53,14 @@ class AuthController extends Controller
         $me->notify_reply    = $request->boolean('notify_reply', (bool) $me->notify_reply);
         $me->notify_sla      = $request->boolean('notify_sla', (bool) $me->notify_sla);
         // Pausa entre avisos del mismo ticket, por canal: se acota al rango del admin.
-        if (is_array($request->input('notify_throttle'))) {
-            $actual = \App\Services\NotifyThrottle::deUsuario($me->notify_throttle);
-            $me->notify_throttle = json_encode(\App\Services\NotifyThrottle::deUsuario(
-                array_intersect_key($request->input('notify_throttle'), $actual) + $actual));
+        // Y qué canales quiere (web / correo / WhatsApp): apagado = sin avisos de ese canal.
+        if (is_array($request->input('notify_throttle')) || is_array($request->input('notify_channels'))) {
+            $min = \App\Services\NotifyThrottle::deUsuario($me->notify_throttle);
+            $on  = \App\Services\NotifyThrottle::activos($me->notify_throttle);
+            $min = array_intersect_key((array) $request->input('notify_throttle', []), $min) + $min;
+            $on  = array_map(fn($v) => filter_var($v, FILTER_VALIDATE_BOOLEAN),
+                       array_intersect_key((array) $request->input('notify_channels', []), $on)) + $on;
+            $me->notify_throttle = \App\Services\NotifyThrottle::empaquetar($min, $on);
         }
         $me->save();
 
@@ -208,6 +212,7 @@ class AuthController extends Controller
             // Minutos entre avisos del mismo ticket por canal, y el rango que permite el admin.
             'notify_throttle'       => \App\Services\NotifyThrottle::deUsuario($u->notify_throttle),
             'notify_throttle_range' => \App\Services\NotifyThrottle::rango(),
+            'notify_channels'       => \App\Services\NotifyThrottle::activos($u->notify_throttle),
             // Token corto (24 h) y solo de descarga para las URL de adjuntos y medios.
             'media_token'     => TokenService::mediaToken($u),
         ];

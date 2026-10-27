@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
 import { api } from '../api.js'
-import Select from './Select.jsx'
 import { getNotify, setNotify, notifySupported, notifyPermission, requestNotifyPermission, fireNotification } from '../notify.js'
 
 function Toggle({ on, onChange, disabled }) {
@@ -41,17 +40,31 @@ export default function WebNotifications({ user, onUser }) {
   // Pausa entre avisos del mismo ticket, por canal de entrada (minutos, dentro del rango del admin).
   const [minRango, maxRango] = user?.notify_throttle_range || [1, 30]
   const [pausa, setPausa] = useState(user?.notify_throttle || { web: minRango, email: minRango, whatsapp: minRango })
-  const guardarPausa = async (canal, val) => {
+  const [canales, setCanales] = useState(user?.notify_channels || { web: true, email: true, whatsapp: true })
+  const guardarCanales = async (patch) => {
+    const r = await api.saveNotifyPrefs({ ...mail, ...patch })
+    if (r?.ok) { onUser?.(r.user); setPausa(r.user.notify_throttle); setCanales(r.user.notify_channels); return true }
+    toast(r?.error || 'No se pudo guardar', 'err')
+    return false
+  }
+  const activarCanal = async (canal, on) => {
+    const antes = canales
+    setCanales({ ...canales, [canal]: on })
+    if (await guardarCanales({ notify_channels: { [canal]: on } })) toast(on ? 'Avisos activados' : 'Avisos desactivados')
+    else setCanales(antes)
+  }
+  // El deslizador guarda al soltarlo (no en cada paso): así no son 20 peticiones por arrastre.
+  const timerPausa = useRef(null)
+  const moverPausa = (canal, val) => {
     const next = { ...pausa, [canal]: Number(val) }
     setPausa(next)
-    const r = await api.saveNotifyPrefs({ ...mail, notify_throttle: next })
-    if (r?.ok) { onUser?.(r.user); setPausa(r.user.notify_throttle); toast('Pausa guardada') }
-    else { setPausa(pausa); toast(r?.error || 'No se pudo guardar', 'err') }
+    clearTimeout(timerPausa.current)
+    timerPausa.current = setTimeout(async () => {
+      if (await guardarCanales({ notify_throttle: next })) toast('Pausa guardada')
+    }, 600)
   }
-  const opcionesPausa = (actual) =>
-    [...new Set([minRango, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, maxRango, Number(actual)])]
-      .filter((n) => n >= minRango && n <= maxRango).sort((a, b) => a - b)
-      .map((n) => ({ value: n, label: n === 0 ? 'Sin pausa' : n === 1 ? '1 minuto' : `${n} minutos` }))
+  useEffect(() => () => clearTimeout(timerPausa.current), [])
+  const minutos = (n) => (n === 0 ? 'Sin pausa' : n === 1 ? '1 minuto' : `${n} minutos`)
 
   useEffect(() => {
     const h = () => { setS(getNotify()); setPerm(notifyPermission()) }
@@ -147,18 +160,31 @@ export default function WebNotifications({ user, onUser }) {
 
           {/* Pausa entre avisos del MISMO ticket: el cliente de WhatsApp escribe «hola», «cómo
               va», «todo bien?» seguidos y eran tres correos y tres pitidos. */}
-          <h2 style={{ fontSize: 15, margin: '28px 0 4px' }}>Pausa entre avisos</h2>
+          <h2 style={{ fontSize: 15, margin: '28px 0 4px' }}>Avisos por canal</h2>
           <p className="muted" style={{ fontSize: 12.5, marginTop: 0, marginBottom: 12 }}>
-            Tras avisarte de un ticket, espera estos minutos antes de volver a avisarte <b>de ese mismo ticket</b> (por correo y en el navegador).
-            Los demás tickets avisan igual. Rango permitido: {minRango === 0 ? 'sin pausa' : `${minRango} min`} a {maxRango} min.
+            Elige de qué canales quieres avisos de tickets nuevos y respuestas del cliente (por correo y en el navegador).
+            Con el canal activo, desliza para fijar cuántos minutos esperar antes de volver a avisarte <b>del mismo ticket</b>;
+            los demás tickets avisan igual. Que te asignen un ticket se avisa siempre (interruptor de arriba).
           </p>
           {[['whatsapp', 'WhatsApp', 'Los clientes suelen mandar varios mensajes seguidos', Icon.whatsapp],
-            ['email', 'Correo', 'Respuestas del cliente por correo', Icon.mail],
+            ['email', 'Correo', 'Tickets y respuestas que llegan por correo', Icon.mail],
             ['web', 'Web', 'Tickets del portal y formularios', Icon.globe]].map(([canal, titulo, desc, Ico]) => (
-            <div className="wn-row" key={canal}>
-              <span className="wn-ico"><Ico /></span>
-              <div className="wn-meta"><b>{titulo}</b><span>{desc}</span></div>
-              <Select sm value={pausa[canal]} onChange={(v) => guardarPausa(canal, v)} options={opcionesPausa(pausa[canal])} />
+            <div className={`wn-row wn-canal ${canales[canal] ? '' : 'off'}`} key={canal}>
+              <div className="wn-canal-top">
+                <span className="wn-ico"><Ico /></span>
+                <div className="wn-meta"><b>{titulo}</b><span>{canales[canal] ? desc : 'Sin avisos de este canal'}</span></div>
+                <Toggle on={!!canales[canal]} onChange={(v) => activarCanal(canal, v)} />
+              </div>
+              {canales[canal] && maxRango > minRango && (
+                <div className="wn-slider">
+                  <span className="wn-slider-lbl">Pausa entre avisos del mismo ticket</span>
+                  <input type="range" min={minRango} max={maxRango} step="1" value={pausa[canal]}
+                    style={{ '--p': `${((pausa[canal] - minRango) / (maxRango - minRango)) * 100}%` }}
+                    onChange={(e) => moverPausa(canal, e.target.value)} aria-label={`Pausa de ${titulo} en minutos`} />
+                  <b className="wn-slider-val">{minutos(Number(pausa[canal]))}</b>
+                  <span className="wn-slider-ends"><span>{minutos(minRango)}</span><span>{maxRango} min</span></span>
+                </div>
+              )}
             </div>
           ))}
         </div>

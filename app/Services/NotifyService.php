@@ -308,6 +308,7 @@ class NotifyService
      * responde» se salta si a ese agente ya se le avisó de este ticket hace menos de los
      * minutos que eligió; «nuevo» y «asignado» siempre salen, pero cuentan como último
      * aviso (el «hola» crea el ticket y el «cómo va» de después ya no manda otro correo).
+     * Si el agente APAGÓ ese canal, no recibe ni «nuevo» ni «responde» de sus tickets.
      * Los destinatarios que no son usuarios (el cliente) no se tocan.
      */
     protected function pausaEntreAvisos(string $key, array $destinos, int $ticketId, string $canal): array
@@ -321,6 +322,11 @@ class NotifyService
         foreach ($destinos as $email => $nombre) {
             $u = $usuarios->get($email);
             if (!$u) continue;
+            // Canal apagado por el agente: ni «nuevo» ni «responde» (la asignación tiene su propio interruptor).
+            if ($key !== 'ticket_assigned' && !NotifyThrottle::activos($u->notify_throttle)[NotifyThrottle::canal($canal)]) {
+                unset($destinos[$email]);
+                continue;
+            }
             if ($key === 'ticket_reply') {
                 if (!NotifyThrottle::permitirCorreo((int) $u->id, $ticketId, $canal, $u->notify_throttle)) unset($destinos[$email]);
             } else {
