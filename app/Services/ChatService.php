@@ -54,6 +54,27 @@ class ChatService
         }
     }
 
+    /**
+     * ¿Está abierta la VENTANA DE 24 H con este contacto en el WhatsApp de Campañas? Solo
+     * la abre un mensaje DEL CLIENTE: lo que escribimos nosotros (web o móvil) no cuenta.
+     * Fuera de ella Meta acepta el envío pero luego lo da por fallido (131047): solo valen
+     * las plantillas.
+     */
+    public static function ventanaAbierta(int $contactId): bool
+    {
+        return DB::table('messages')->where('contact_id', $contactId)->where('direction', 'in')
+            ->where('channel', 'whatsapp')->where('funcion', 'campanas')
+            ->where('created_at', '>=', now()->subHours(24))->exists();
+    }
+
+    /** Respuesta de error al intentar escribir con la ventana cerrada (o null si está abierta). */
+    public static function guardVentana(int $contactId): ?\Illuminate\Http\JsonResponse
+    {
+        if (self::ventanaAbierta($contactId)) return null;
+        return response()->json(['ok' => false, 'window_closed' => true,
+            'error' => 'Han pasado más de 24 h desde el último mensaje del cliente: WhatsApp no lo entregaría. Envía una plantilla o escríbele desde el móvil.'], 422);
+    }
+
     /** Inserta un mensaje y actualiza el resumen del contacto. Devuelve el id. */
     public static function storeMessage(int $contactId, string $waId, string $direction, string $type, string $body, array $opts = []): int
     {

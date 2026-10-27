@@ -29,6 +29,9 @@ class SendController extends Controller
             $contactId = ChatService::upsertContact($to);
         }
 
+        // Fuera de la ventana de 24 h solo valen plantillas (lo demás Meta lo da por fallido).
+        if ($type !== 'template' && ($cerrada = ChatService::guardVentana($contactId))) return $cerrada;
+
         $payload = null;
 
         if ($type === 'template') {

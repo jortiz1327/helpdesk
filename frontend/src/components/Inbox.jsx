@@ -7,6 +7,7 @@ import TemplatePicker from './TemplatePicker.jsx'
 import InteractiveBuilder from './InteractiveBuilder.jsx'
 import FormPicker from './FormPicker.jsx'
 import ChatInfo from './ChatInfo.jsx'
+import WaAudio from './WaAudio.jsx'
 import Select from './Select.jsx'
 import ChatFilters, { filtrosGuardados, filtrosParaApi, cuantosFiltros } from './ChatFilters.jsx'
 
@@ -98,7 +99,7 @@ function Bubble({ m, onCtx }) {
       {m.type === 'template' && <span className="bubble-tag"><Icon.templates style={{ width: 11, height: 11, fill: 'currentColor', verticalAlign: '-1px' }} /> Plantilla</span>}
       {isImg && <img className="media" src={mediaUrl(m.media_url)} loading="lazy" alt="" />}
       {isVideo && <video className="media" controls src={mediaUrl(m.media_url)} />}
-      {isAudio && <audio className="media-audio" controls src={mediaUrl(m.media_url)} />}
+      {isAudio && <WaAudio src={mediaUrl(m.media_url)} />}
       {isDoc && (
         <a className="doc" href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer">
           <Icon.file style={{ width: 16, height: 16, fill: 'currentColor' }} /> Abrir documento
@@ -590,7 +591,14 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
 
             {waLocked
               ? <div className="window-banner locked"><Icon.lock style={{ width: 15, height: 15, fill: 'currentColor', verticalAlign: '-2px' }} /> WhatsApp no está configurado en este entorno: la conversación es de solo lectura.</div>
-              : windowClosed && <div className="window-banner">⚠️ Ventana de 24 h cerrada. Solo puedes enviar plantillas aprobadas.</div>}
+              : windowClosed && (
+                <div className="window-banner closed">
+                  <Icon.lock style={{ width: 15, height: 15, fill: 'currentColor', flex: 'none' }} />
+                  <span><b>Solo puedes escribirle desde el móvil o con una plantilla.</b> {lastIn
+                    ? 'Han pasado más de 24 h desde su último mensaje y WhatsApp no entregaría lo que escribas aquí.'
+                    : 'Este cliente todavía no te ha escrito, así que WhatsApp no entregaría lo que escribas aquí.'} Cuando conteste, se desbloquea solo.</span>
+                </div>
+              )}
 
             <div className="composer">
               <div className="cmp-tools">
@@ -619,10 +627,12 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
                 <button className="round tpl" title="Enviar plantilla" disabled={waLocked} onClick={() => setPickerOpen(true)}><Icon.templates /></button>
                 <button className="round" title="Enviar formulario" disabled={windowClosed || waLocked} onClick={() => setFormPicker(true)}><Icon.forms /></button>
               </div>
-              <textarea placeholder={waLocked ? 'WhatsApp no configurado' : 'Escribe un mensaje'} value={draft} rows={1} disabled={waLocked}
+              {/* Ventana cerrada: no se deja escribir (Meta lo aceptaría y luego lo daría por fallido). */}
+              <textarea placeholder={waLocked ? 'WhatsApp no configurado' : windowClosed ? 'Ventana cerrada · usa una plantilla' :'Escribe un mensaje'}
+                value={draft} rows={1} disabled={waLocked || windowClosed}
                 onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
-              <button className="round send" title="Enviar" disabled={!draft.trim() || sending || waLocked} onClick={send}><Icon.send /></button>
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!windowClosed) send() } }} />
+              <button className="round send" title="Enviar" disabled={!draft.trim() || sending || waLocked || windowClosed} onClick={send}><Icon.send /></button>
               <input ref={fileRef} type="file" hidden onChange={onFileChosen} />
             </div>
           </>

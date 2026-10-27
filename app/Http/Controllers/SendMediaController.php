@@ -31,6 +31,7 @@ class SendMediaController extends Controller
         if (!$file || !$file->isValid()) return response()->json(['error' => 'No se recibió el archivo'], 400);
 
         if (!$contactId) $contactId = ChatService::upsertContact($to);
+        if ($cerrada = ChatService::guardVentana($contactId)) return $cerrada;   // ventana de 24 h
 
         $mime  = $file->getClientMimeType() ?: 'application/octet-stream';
         $fname = $file->getClientOriginalName() ?: 'archivo';

@@ -3,6 +3,21 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.5] — 2026-10-27
+
+### Mejoras
+
+- **Notas de voz en el Chat en vivo** con el reproductor de soporte (`WaAudio`) en vez del
+  `<audio>` nativo del navegador.
+
+### Arreglos
+
+- **Ventana de 24 h en Campañas.** Se podía escribir fuera de ella: Meta aceptaba el envío y
+  luego lo daba por fallido (❌). Ahora el editor se bloquea con aviso (como en Helpdesk) y
+  el servidor lo rechaza también (`ChatService::guardVentana`, 422) en texto, botones/listas,
+  adjuntos y formularios. Las plantillas siguen permitidas. Solo abre la ventana un mensaje
+  del CLIENTE al número de Campañas (lo que escribimos, o lo que escribe al 01, no cuenta).
+
 ## [1.5.4] — 2026-10-27
 
 ### Mejoras

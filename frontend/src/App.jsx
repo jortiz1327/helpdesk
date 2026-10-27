@@ -120,10 +120,21 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.4";
+const APP_VERSION = "1.5.5";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.5",
+        date: "27 oct 2026",
+        resumen: "Chat en vivo: candado de 24 h como en Helpdesk y el reproductor de audio de soporte.",
+        mejoras: [
+            "Chat en vivo (Campañas): las notas de voz usan el mismo reproductor que los tickets de soporte.",
+        ],
+        arreglos: [
+            "Chat en vivo: con la ventana de 24 h cerrada ya no se puede escribir texto, adjuntar ni mandar botones o formularios (WhatsApp los daba por fallidos). Solo plantillas, o escribir desde el móvil.",
+        ],
+    },
     {
         version: "1.5.4",
         date: "27 oct 2026",

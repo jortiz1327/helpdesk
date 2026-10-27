@@ -88,6 +88,7 @@ class FormsController extends Controller
             if (!$to && $contactId) $to = DB::table('contacts')->where('id', $contactId)->value('wa_id');
             if (!$to) return response()->json(['ok' => false, 'error' => 'Falta el destinatario'], 400);
             if (!$contactId) $contactId = ChatService::upsertContact($to);
+            if ($cerrada = ChatService::guardVentana($contactId)) return $cerrada;   // ventana de 24 h
             $token = 'f' . $id . '_' . $contactId;
             $cta = mb_substr(trim((string) $request->input('cta')) ?: 'Ver formulario', 0, 30);
             $body = trim((string) $request->input('body')) ?: (trim($form->description ?? '') ?: '¡Hola! Pulsa abajo para rellenar nuestro formulario.');

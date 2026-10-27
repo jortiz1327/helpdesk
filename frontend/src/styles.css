@@ -353,6 +353,9 @@ input, textarea, select { font-family: inherit; }
 
 .window-banner { background: rgba(244, 183, 64, 0.12); color: #e8b34a; font-size: 12.5px; font-weight: 500; padding: 9px 22px; text-align: center; border-top: 1px solid rgba(244, 183, 64, 0.2); z-index: 2; }
 .window-banner.locked { background: var(--hover); color: var(--ink-2); border-top-color: var(--line); }
+.window-banner.closed { display: flex; align-items: flex-start; gap: 9px; text-align: left; line-height: 1.45; }
+.window-banner.closed svg { margin-top: 2px; }
+:root[data-theme="light"] .window-banner { color: #8a5a00; }
 
 .composer { background: var(--panel); border-top: 1px solid var(--line); padding: 12px 18px; display: flex; gap: 10px; align-items: flex-end; z-index: 3; }
 .composer .round { width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; transition: 0.14s; }
