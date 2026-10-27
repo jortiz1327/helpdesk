@@ -86,11 +86,15 @@ function Bubble({ m, onCtx }) {
   const isAudio = m.type === 'audio' && m.media_url
   const isDoc = m.type === 'document' && m.media_url
   const ix = m.type === 'interactive' && m.payload
+  // De dónde salió lo NUESTRO: del móvil (Coexistence), de la web (un agente) o solo
+  // (bot, campaña, consentimiento). Cada origen con su icono y su color.
+  const origen = m.direction !== 'out' ? null : m.via === 'movil' ? 'movil' : m.sent_by_name ? 'web' : 'auto'
+  const ic = { width: 11, height: 11, fill: 'currentColor', verticalAlign: '-1px' }
   return (
-    <div className={`bubble ${m.direction === 'in' ? 'in' : 'out'}`} onContextMenu={onCtx ? (e) => onCtx(e, m) : undefined}>
-      {m.direction === 'out' && (m.sent_by_name
-        ? <span className="bubble-by">{m.sent_by_name}</span>
-        : m.via === 'movil' && <span className="bubble-by"><Icon.phone style={{ width: 11, height: 11, fill: 'currentColor', verticalAlign: '-1px' }} /> Desde el móvil</span>)}
+    <div className={`bubble ${m.direction === 'in' ? 'in' : 'out'}${origen ? ` o-${origen}` : ''}`} onContextMenu={onCtx ? (e) => onCtx(e, m) : undefined}>
+      {origen === 'movil' && <span className="bubble-by by-movil"><Icon.phone style={ic} /> Desde el móvil</span>}
+      {origen === 'web' && <span className="bubble-by by-web"><Icon.globe style={ic} /> {m.sent_by_name} · web</span>}
+      {origen === 'auto' && <span className="bubble-by by-auto"><Icon.bolt style={ic} /> Automático</span>}
       {m.type === 'template' && <span className="bubble-tag"><Icon.templates style={{ width: 11, height: 11, fill: 'currentColor', verticalAlign: '-1px' }} /> Plantilla</span>}
       {isImg && <img className="media" src={mediaUrl(m.media_url)} loading="lazy" alt="" />}
       {isVideo && <video className="media" controls src={mediaUrl(m.media_url)} />}

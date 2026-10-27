@@ -3,6 +3,14 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.4] — 2026-10-27
+
+### Mejoras
+
+- **Chat en vivo: origen de cada mensaje nuestro.** «Desde el móvil» (Coexistence) con
+  burbuja ámbar y filete a la izquierda; «Nombre · web» cuando lo envía un agente desde
+  el Helpdesk; «Automático» para el bot, el consentimiento y las campañas. Claro y oscuro.
+
 ## [1.5.3] — 2026-10-27
 
 ### Mejoras

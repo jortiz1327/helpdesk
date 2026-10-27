@@ -120,10 +120,19 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.3";
+const APP_VERSION = "1.5.4";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.4",
+        date: "27 oct 2026",
+        resumen: "En el Chat en vivo se ve de un vistazo si un mensaje salió del móvil, de la web o del bot.",
+        mejoras: [
+            "Chat en vivo (Campañas): cada mensaje nuestro dice de dónde salió: «Desde el móvil» (burbuja ámbar), «Nombre · web» o «Automático» (bot y campañas).",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.3",
         date: "27 oct 2026",

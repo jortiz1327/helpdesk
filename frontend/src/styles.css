@@ -1588,6 +1588,16 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .assignee-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); padding: 2px 7px; border-radius: 20px; }
 .bubble-by { display: block; font-size: 11px; font-weight: 700; color: var(--primary); margin-bottom: 2px; }
 .bubble.out .bubble-by { color: #0a6b53; }
+/* Origen de lo nuestro en el Chat en vivo: web (agente), móvil (Coexistence) o automático. */
+.bubble-by.by-web, .bubble-by.by-movil, .bubble-by.by-auto { display: flex; width: fit-content; align-items: center; gap: 4px; }
+/* Móvil: burbuja ámbar con filete a la izquierda, para distinguirla de un vistazo. */
+.bubble.out.o-movil { background: color-mix(in oklab, var(--bubble-out) 70%, #5a3d10); box-shadow: inset 3px 0 0 #e8a33d; }
+.bubble.out .bubble-by.by-movil { color: #f2b45a; }
+.bubble.out .bubble-by.by-web { color: #7fd8bf; }
+.bubble.out .bubble-by.by-auto { color: inherit; opacity: .7; font-weight: 600; }
+:root[data-theme="light"] .bubble.out.o-movil { background: color-mix(in oklab, var(--bubble-out) 55%, #fff4dc); }
+:root[data-theme="light"] .bubble.out .bubble-by.by-movil { color: #9a5b00; }
+:root[data-theme="light"] .bubble.out .bubble-by.by-web { color: #0a6b53; }
 .bubble-tag { display: flex; width: fit-content; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; opacity: 0.6; margin-bottom: 4px; }
 .ft-bot { display: flex; align-items: center; gap: 7px; }
 .ft-bot-t { font-size: 12px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
