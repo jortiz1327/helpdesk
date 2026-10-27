@@ -36,6 +36,10 @@ poner REVERB_SCHEME http
 poner REVERB_SERVER_HOST 127.0.0.1
 poner REVERB_SERVER_PORT 8080
 
+# La config en caché aún no tiene las REVERB_* nuevas: regenerarla ANTES de arrancar
+# Reverb (si no, rechaza la clave con «Application does not exist»).
+php artisan optimize:clear >/dev/null && php artisan optimize >/dev/null
+
 echo "→ servicio systemd"
 install -m 644 "$APP/deploy/reverb/helpdesk-reverb.service" /etc/systemd/system/helpdesk-reverb.service
 systemctl daemon-reload
