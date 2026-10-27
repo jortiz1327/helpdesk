@@ -163,8 +163,8 @@ export default function Contacts({ onOpen, area = '' }) {
                 {sel.size === 2 && <>
                   <span className="bulk-sep" />
                   <button className="btn sm" onClick={() => setMerging([...sel].map((id) => contacts.find((c) => c.id === id)).filter(Boolean))}
-                    title="El mismo cliente duplicado (uno por WhatsApp y otro por correo): únelos en uno solo">
-                    <Icon.user /> Fusionar
+                    title="El mismo cliente en dos fichas (uno por WhatsApp y otro por correo): únelas en una sola">
+                    <Icon.user /> Unir fichas
                   </button>
                 </>}
               </div>
@@ -286,8 +286,9 @@ function ContactDuplicates({ pairs, onClose, onMerge, onIgnored }) {
   const ficha = (c) => (
     <div className="dup-card">
       <b>{c.name || '—'}</b>
-      <small>{[c.wa_id ? `+${c.wa_id}` : null, c.email].filter(Boolean).join(' · ')}</small>
+      <small>{c.wa_id ? <><Icon.phone /> +{c.wa_id}</> : <><Icon.mail /> {c.email}</>}</small>
       <small className="dup-meta">{c.tickets ? `${c.tickets} ticket${c.tickets > 1 ? 's' : ''}` : 'sin tickets'}</small>
+      <TicketsDeFicha c={c} />
     </div>
   )
 
@@ -296,7 +297,10 @@ function ContactDuplicates({ pairs, onClose, onMerge, onIgnored }) {
       <div className="modal" style={{ maxWidth: 680 }}>
         <div className="modal-h"><h3>Posibles duplicados</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
         <div className="modal-body">
-          <p className="ct-hint" style={{ marginTop: 0 }}>Mismo nombre, una ficha solo con teléfono y otra solo con correo. Si son la misma persona, fusiónalas: su historial se une en una sola ficha.</p>
+          <p className="ct-hint" style={{ marginTop: 0 }}>
+            Mismo nombre: una ficha escribió por <b>WhatsApp</b> y otra por <b>correo</b>. Si es la misma persona, únelas:
+            la ficha tendrá <b>su teléfono y su correo</b>, y todos sus tickets juntos (no se pierde nada).
+            Un nombre solo no basta —hay muchos «Juan Pérez»—: abre sus tickets para comprobarlo.</p>
           {pairs.map((p) => (
             <div key={`${p.a.id}-${p.b.id}`} className="dup-row">
               {ficha(p.a)}
@@ -304,7 +308,7 @@ function ContactDuplicates({ pairs, onClose, onMerge, onIgnored }) {
               {ficha(p.b)}
               <div className="dup-acts">
                 {p.motivo === 'nombre_corto' && <span className="pill sm" title="Solo coincide un nombre corto: revisa bien">Revisar</span>}
-                <button className="btn sm" onClick={() => onMerge(p)}>Fusionar</button>
+                <button className="btn sm" onClick={() => onMerge(p)}>Unir fichas…</button>
                 <button className="btn ghost sm" onClick={() => ignorar(p)}>No es la misma persona</button>
               </div>
             </div>
@@ -315,14 +319,46 @@ function ContactDuplicates({ pairs, onClose, onMerge, onIgnored }) {
   )
 }
 
+/** Últimos tickets de una ficha, como enlaces (pestaña nueva) para comprobar quién es. */
+function TicketsDeFicha({ c }) {
+  const ts = c.recent || []
+  if (!ts.length) return null
+  return (
+    <ul className="dup-tks">
+      {ts.map((t) => (
+        <li key={t.code}>
+          <a href={`/agentes/tickets/${encodeURIComponent(t.code)}`} target="_blank" rel="noreferrer" title="Abrir el ticket en otra pestaña">
+            {t.channel === 'whatsapp' ? <Icon.whatsapp /> : t.channel === 'email' ? <Icon.mail /> : <Icon.ticket />}
+            <span className="dup-tk-code">{t.code}</span>
+            <span className="dup-tk-sub">{t.subject || 'Sin asunto'}</span>
+          </a>
+        </li>
+      ))}
+      {c.tickets > ts.length && <li className="dup-tk-more">y {c.tickets - ts.length} más</li>}
+    </ul>
+  )
+}
+
 /* --------------------------- Fusionar contactos ---------------------------
- * El mismo cliente puede acabar duplicado: un contacto creado por WhatsApp y otro
- * por correo. Como no comparten ningún dato, no hay forma de detectarlo solo: se
- * eligen los dos a mano y se decide CUÁL SE QUEDA.
+ * El mismo cliente puede acabar en dos fichas: una por WhatsApp (teléfono) y otra
+ * por correo. Unirlas NO pierde nada: la ficha resultante se queda con el teléfono
+ * Y el correo, y con todos los tickets. Solo hay que decidir algo cuando chocan los
+ * datos (dos nombres distintos, dos correos o dos teléfonos): manda el de la ficha
+ * elegida y el otro se descarta.
  * ------------------------------------------------------------------------- */
-function ContactMerge({ pair, onClose, onMerged }) {
+function ContactMerge({ pair: pair0, onClose, onMerged }) {
   const toast = useToast()
-  const [keepId, setKeepId] = useState(pair[0].id)
+  // Abierto desde la lista (no desde «Posibles duplicados») no trae sus tickets: se piden.
+  const [extra, setExtra] = useState(null)
+  useEffect(() => {
+    if (pair0.every((c) => c.recent)) return
+    let vivo = true
+    api.mergePreview(pair0[0].id, pair0[1].id).then((r) => { if (vivo && r?.ok) setExtra(r.contacts || {}) })
+    return () => { vivo = false }
+  }, [pair0])
+  const pair = useMemo(() => pair0.map((c) => ({ ...c, ...(extra?.[c.id] || {}) })), [pair0, extra])
+  // Por defecto se queda la ficha con más tickets (lo normal es que sea la «buena»).
+  const [keepId, setKeepId] = useState(() => ((pair[1].tickets || 0) > (pair[0].tickets || 0) ? pair[1] : pair[0]).id)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -334,45 +370,74 @@ function ContactMerge({ pair, onClose, onMerged }) {
   const keep = pair.find((c) => c.id === keepId)
   const gone = pair.find((c) => c.id !== keepId)
   const datos = (c) => [c.wa_id ? `+${c.wa_id}` : null, c.email].filter(Boolean).join(' · ') || 'sin datos'
-  // Lo que el principal NO tiene y sí aporta el otro: eso es lo que se hereda.
-  const hereda = ['name', 'email', 'wa_id'].filter((k) => !keep?.[k] && gone?.[k])
+  // Resultado: lo de la ficha que se queda y, en sus huecos, lo de la otra (como el servidor).
+  const res = { name: keep?.name || gone?.name, email: keep?.email || gone?.email, wa_id: keep?.wa_id || gone?.wa_id }
+  const sabeTickets = pair.every((c) => typeof c.tickets === 'number')
+  const totalTickets = (pair[0].tickets || 0) + (pair[1].tickets || 0)
+  // Datos que CHOCAN (los dos tienen uno distinto): ahí sí se pierde el de la otra ficha.
+  const norm = (s) => (s || '').trim().toLowerCase()
   const ETIQ = { name: 'nombre', email: 'correo', wa_id: 'teléfono' }
+  const choques = ['name', 'email', 'wa_id'].filter((k) => pair[0][k] && pair[1][k] && norm(pair[0][k]) !== norm(pair[1][k]))
 
   const doMerge = async () => {
     setBusy(true)
     const r = await api.mergeContacts(keepId, gone.id)
     setBusy(false)
-    if (r.ok) { toast('Contactos fusionados'); onMerged() }
+    if (r.ok) { toast('Fichas unidas'); onMerged() }
     else toast(r.error || 'No se pudo fusionar', 'err')
   }
 
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 560 }}>
-        <div className="modal-h"><h3>Fusionar contactos</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-h"><h3>Unir en una sola ficha</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
         <div className="modal-body">
-          <p className="ct-hint" style={{ marginTop: 0 }}>Elige cuál se queda. El otro se elimina y toda su actividad pasa al primero.</p>
-          <div className="mg-opts">
+          <p className="ct-hint" style={{ marginTop: 0 }}>Las dos fichas pasan a ser una: <b>se suman sus datos y todos sus tickets</b>, mensajes y etiquetas.</p>
+
+          {/* Las dos fichas, con sus tickets para comprobar que es la misma persona. */}
+          <div className="mg-pair">
             {pair.map((c) => (
-              <label key={c.id} className={`mg-opt ${c.id === keepId ? 'on' : ''}`}>
-                <input type="radio" name="keep" checked={c.id === keepId} onChange={() => setKeepId(c.id)} />
-                <span className="mg-tx">
-                  <b>{c.name || '—'}</b>
-                  <small>{datos(c)}</small>
-                </span>
-                {c.id === keepId && <span className="pill sm">Se queda</span>}
-              </label>
+              <div key={c.id} className="mg-card">
+                <b>{c.name || '—'}</b>
+                <small>{datos(c)}</small>
+                {sabeTickets && <small className="dup-meta">{c.tickets ? `${c.tickets} ticket${c.tickets > 1 ? 's' : ''}` : 'sin tickets'}</small>}
+                <TicketsDeFicha c={c} />
+              </div>
             ))}
           </div>
+
+          {/* Solo se elige algo si los datos chocan; si se complementan, no hay nada que decidir. */}
+          {choques.length > 0 && (
+            <div className="mg-choque">
+              <b>Tienen distinto {choques.map((k) => ETIQ[k]).join(', ')}. ¿Cuál se queda?</b>
+              <div className="mg-opts">
+                {pair.map((c) => (
+                  <label key={c.id} className={`mg-opt ${c.id === keepId ? 'on' : ''}`}>
+                    <input type="radio" name="keep" checked={c.id === keepId} onChange={() => setKeepId(c.id)} />
+                    <span className="mg-tx"><b>{choques.map((k) => (k === 'wa_id' ? `+${c[k]}` : c[k])).join(' · ')}</b></span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mg-sum">
-            <div><b>{gone?.name || 'El otro contacto'}</b> se elimina; sus mensajes, tickets y etiquetas pasan a <b>{keep?.name || 'el principal'}</b>.</div>
-            {hereda.length > 0 && <div>Además, <b>{keep?.name || 'el principal'}</b> heredará su {hereda.map((k) => ETIQ[k]).join(' y ')}.</div>}
-            <div className="mg-warn">Esta acción no se puede deshacer.</div>
+            <div className="mg-res-h">Así queda la ficha</div>
+            <div className="mg-res">
+              <b>{res.name || 'Sin nombre'}</b>
+              {res.wa_id && <span><Icon.phone /> +{res.wa_id}</span>}
+              {res.email && <span><Icon.mail /> {res.email}</span>}
+              {sabeTickets && <span><Icon.ticket /> {totalTickets} ticket{totalTickets === 1 ? '' : 's'}</span>}
+            </div>
+            {choques.length > 0 && gone && (
+              <div>Se descarta {choques.map((k) => `${k === 'name' ? 'el nombre' : k === 'email' ? 'el correo' : 'el teléfono'} «${k === 'wa_id' ? '+' + gone[k] : gone[k]}»`).join(' y ')}.</div>
+            )}
+            <div className="mg-warn">No se puede deshacer: revisa antes sus tickets si dudas de que sea la misma persona.</div>
           </div>
         </div>
         <div className="modal-foot">
           <button className="btn ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn" onClick={doMerge} disabled={busy}>{busy ? 'Fusionando…' : 'Fusionar'}</button>
+          <button className="btn" onClick={doMerge} disabled={busy}>{busy ? 'Uniendo…' : 'Unir fichas'}</button>
         </div>
       </div>
     </div>

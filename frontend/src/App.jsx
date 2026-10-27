@@ -120,10 +120,20 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.5.2";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.2",
+        date: "27 oct 2026",
+        resumen: "Unir fichas de un mismo cliente es más claro y seguro.",
+        mejoras: [
+            "Posibles duplicados: cada ficha muestra sus últimos tickets (con enlace) para comprobar que es la misma persona antes de unirlas.",
+            "«Unir fichas» enseña cómo queda la ficha: con su teléfono y su correo, y todos los tickets juntos. Solo pregunta cuál se queda si los datos chocan (dos nombres, dos correos o dos teléfonos distintos).",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.1",
         date: "27 oct 2026",

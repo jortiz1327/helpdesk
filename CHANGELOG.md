@@ -3,6 +3,19 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.2] — 2026-10-27
+
+### Mejoras
+
+- **Unir fichas (antes «Fusionar»).** El diálogo decía «elige cuál se queda, el otro se
+  elimina» y parecía que se perdía una de las dos. Ahora enseña la ficha resultante
+  (teléfono Y correo, y el total de tickets) y solo pide elegir cuando los datos chocan
+  (dos nombres, correos o teléfonos distintos), diciendo qué se descarta.
+- **Comprobar antes de unir.** En «Posibles duplicados» y en el diálogo de unir, cada
+  ficha muestra sus 4 últimos tickets con enlace (pestaña nueva): un nombre solo no basta
+  para saber si es la misma persona. Solo los tickets que ese agente puede ver
+  (`contacts.php?action=merge_preview` cuando se abre desde la lista).
+
 ## [1.5.1] — 2026-10-27
 
 ### Mejoras

@@ -25,6 +25,7 @@ class ContactsController extends Controller
 
         return match (true) {
             $action === 'duplicates'              => $this->duplicados($request),
+            $action === 'merge_preview'           => $this->vistaFusion($request),
             $post && $action === 'ignore_duplicate' => $this->ignorarDuplicado($request),
             $post && $action === 'bulk_label'     => $this->bulkLabel($request),
             $post && $action === 'set_optout'     => $this->setOptout($request),
@@ -85,8 +86,10 @@ class ContactsController extends Controller
         $tickets = DB::table('tickets')->whereIn('contact_id', $ids)->groupBy('contact_id')->selectRaw('contact_id, COUNT(*) n')->pluck('n', 'contact_id');
         $soporte = DB::table('messages')->whereIn('contact_id', $ids)->where('funcion', 'soporte')->distinct()->pluck('contact_id')->flip();
         $puedeVer = fn ($c) => (isset($tickets[$c->id]) || isset($soporte[$c->id])) ? $me->can('helpdesk.access') : $me->can('campaigns.access');
+        $recientes = $this->ticketsRecientes($ids->all(), $me);
         $ficha = fn ($c) => ['id' => (int) $c->id, 'name' => $c->name, 'email' => $c->email, 'wa_id' => $c->wa_id,
-            'tickets' => (int) ($tickets[$c->id] ?? 0), 'created_at' => $c->created_at];
+            'tickets' => (int) ($tickets[$c->id] ?? 0), 'created_at' => $c->created_at,
+            'recent' => $recientes[$c->id] ?? []];
 
         $out = [];
         foreach ($pares as [$t, $e, $motivo]) {
@@ -94,6 +97,34 @@ class ContactsController extends Controller
             $out[] = ['a' => $ficha($e), 'b' => $ficha($t), 'motivo' => $motivo];
         }
         return response()->json(['ok' => true, 'pairs' => $out]);
+    }
+
+    /**
+     * Últimos tickets (4) de cada contacto, para comprobar antes de fusionar que es la
+     * misma persona (un nombre solo no basta: hay muchos «Juan Pérez»). Solo los que este
+     * agente puede ver, y nada sin acceso al Helpdesk. [contact_id => [tickets]]
+     */
+    protected function ticketsRecientes(array $ids, $me): \Illuminate\Support\Collection
+    {
+        if (!$ids || !$me->can('helpdesk.access')) return collect();
+        return \App\Support\TicketVisibility::scope(DB::table('tickets as t')->whereIn('t.contact_id', $ids)->whereNull('t.merged_into_id'), $me)
+            ->orderByDesc('t.id')->get(['t.contact_id', 't.code', 't.subject', 't.channel', 't.status', 't.created_at'])
+            ->groupBy('contact_id')->map(fn ($g) => $g->take(4)->values());
+    }
+
+    /** Para el diálogo de fusionar abierto desde la lista: nº de tickets y los últimos de cada uno. */
+    protected function vistaFusion(Request $r)
+    {
+        $me  = $r->user();
+        $ids = array_slice(array_values(array_filter(array_map('intval', explode(',', (string) $r->query('ids', ''))))), 0, 2);
+        if (count($ids) !== 2 || !$me->can('contacts.edit')) return response()->json(['ok' => true, 'contacts' => []]);
+        $n = $me->can('helpdesk.access')
+            ? DB::table('tickets')->whereIn('contact_id', $ids)->groupBy('contact_id')->selectRaw('contact_id, COUNT(*) n')->pluck('n', 'contact_id')
+            : collect();
+        $rec = $this->ticketsRecientes($ids, $me);
+        $out = [];
+        foreach ($ids as $id) $out[$id] = ['tickets' => (int) ($n[$id] ?? 0), 'recent' => $rec[$id] ?? []];
+        return response()->json(['ok' => true, 'contacts' => $out]);
     }
 
     /** «No son la misma persona»: ese par deja de sugerirse. */

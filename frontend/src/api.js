@@ -555,6 +555,8 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contact_ids, label_id, mode }),
   }),
   // Fusionar dos contactos duplicados (el mismo cliente por WhatsApp y por correo)
+  // Nº de tickets y los últimos de dos contactos (para revisar antes de unirlos).
+  mergePreview: (a, b) => req(`contacts.php?action=merge_preview&ids=${Number(a)},${Number(b)}`),
   mergeContacts: (keep_id, merge_id) => req('contacts.php?action=merge', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keep_id, merge_id }),
   }),
