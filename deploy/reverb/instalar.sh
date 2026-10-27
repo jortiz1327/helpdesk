@@ -43,7 +43,8 @@ systemctl enable --now helpdesk-reverb
 systemctl restart helpdesk-reverb
 
 echo "→ nginx"
-SITIO=/etc/nginx/sites-enabled/helpdesk
+# El archivo real (sites-enabled suele ser un enlace: «sed -i» lo convertiría en copia).
+SITIO="$(readlink -f /etc/nginx/sites-enabled/helpdesk)"
 SNIP=/etc/nginx/snippets/helpdesk-reverb.conf
 COPIA="/root/nginx-helpdesk.antes-reverb.$(date +%Y%m%d%H%M%S)"
 cp -p "$SITIO" "$COPIA"
