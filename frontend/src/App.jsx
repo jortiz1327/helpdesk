@@ -120,10 +120,21 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.5.1";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.1",
+        date: "27 oct 2026",
+        resumen: "Los tickets de WhatsApp se reparten como los de correo y web, y las fotos con texto se ven bien.",
+        mejoras: [
+            "WhatsApp: si el cliente escribe en un ticket que no tiene responsable (por ejemplo, los del historial importado), se asigna en ese momento al agente de guardia, igual que un ticket nuevo.",
+        ],
+        arreglos: [
+            "WhatsApp: el texto de una foto salía al lado de la imagen, apretado contra el borde; ahora va debajo, como en el móvil.",
+        ],
+    },
     {
         version: "1.5.0",
         date: "27 oct 2026",

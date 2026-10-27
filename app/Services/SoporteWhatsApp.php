@@ -95,6 +95,10 @@ class SoporteWhatsApp
             // Contestar desde el móvil también es atender: cuenta como primera respuesta.
             $this->tickets->markFirstResponse($ticketId);
         } elseif (!$nuevo) {
+            // Escribe el cliente en un ticket que ya existía y que NO tiene responsable (los
+            // del historial importado nacieron así): se reparte ahora, con la misma lógica
+            // que un ticket nuevo (turno de guardia). Si ya tiene responsable, no se toca.
+            app(ShiftService::class)->asignarSiProcede($ticketId);
             try { app(NotifyService::class)->ticket('ticket_reply', $ticketId); }
             catch (\Throwable $e) { Log::warning('WhatsApp soporte: aviso de respuesta falló', ['ticket' => $ticketId, 'error' => $e->getMessage()]); }
         }

@@ -2176,6 +2176,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   // Foto/audio/… sin archivo: el historial del móvil no lo trae (Meta no lo manda).
                   // También si el archivo no carga (Meta lo borra a las semanas): mejor el aviso que una burbuja vacía.
                   const sinArchivo = (!m.media_url || rotos[m.id]) && !(m.attachments || []).length && SIN_ARCHIVO[m.type]
+                  const fotoVisible = m.media_url && !rotos[m.id] && (m.type === 'image' || m.type === 'sticker')
+                  const pieDeFoto = fotoVisible && !Number(m.is_html) && !!m.body
                   return (
                     <Fragment key={m.id}>
                     {cambiaTicket && (
@@ -2235,10 +2237,15 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                         )}
 
                         {/* Multimedia de WhatsApp (media_url = id de Meta; se baja por el proxy). */}
-                        {m.media_url && !rotos[m.id] && (m.type === 'image' || m.type === 'sticker') && (
-                          <a href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer" className={`tk-media-link ${m.type === 'sticker' ? 'is-sticker' : ''}`}>
-                            <img className="tk-media" src={mediaUrl(m.media_url)} loading="lazy" alt="" onError={() => roto(m.id)} />
-                          </a>
+                        {fotoVisible && (
+                          // Foto con texto: el pie va DEBAJO y del ancho de la foto (como en WhatsApp),
+                          // no al lado, donde quedaba apretado contra el borde.
+                          <div className={pieDeFoto ? 'wa-fig' : undefined}>
+                            <a href={mediaUrl(m.media_url)} target="_blank" rel="noreferrer" className={`tk-media-link ${m.type === 'sticker' ? 'is-sticker' : ''}`}>
+                              <img className="tk-media" src={mediaUrl(m.media_url)} loading="lazy" alt="" onError={() => roto(m.id)} />
+                            </a>
+                            {pieDeFoto && <div className="wa-cap">{esWa ? waTexto(m.body) : m.body}</div>}
+                          </div>
                         )}
                         {m.media_url && !rotos[m.id] && m.type === 'video' && (
                           <div className="tk-video"><video controls preload="metadata" src={mediaUrl(m.media_url)} onError={() => roto(m.id)} /></div>
@@ -2266,6 +2273,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                           /* is_html = HTML ya saneado en el servidor. Si no, texto plano
                              (WhatsApp/correo) y React lo escapa solo. El «[tipo]» solo se
                              muestra si NO hay ni texto ni multimedia. */
+                          : pieDeFoto ? null
                           : Number(m.is_html)
                             ? <div className={`b-html${m.channel === 'email' ? ' b-email' : ''}`} dangerouslySetInnerHTML={{ __html: m.body }} />
                             : m.body

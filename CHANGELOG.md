@@ -3,6 +3,21 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.1] — 2026-10-27
+
+### Mejoras
+
+- **WhatsApp: reparto igual que correo y web.** Los tickets nuevos ya pasaban por las
+  reglas y el turno de guardia; ahora, además, si el cliente escribe en un ticket de
+  WhatsApp que existe pero no tiene responsable (los 46 abiertos del historial
+  importado nacieron así), se reparte en ese momento al de guardia. Si ya tiene
+  responsable no se toca, y lo que se contesta desde el móvil no reparte.
+
+### Arreglos
+
+- **Foto con texto en WhatsApp:** el pie salía a la derecha de la imagen, apretado y
+  cortado; ahora va debajo y del ancho de la foto, como en el móvil.
+
 ## [1.5.0] — 2026-10-27
 
 ### Mejoras

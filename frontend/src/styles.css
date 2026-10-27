@@ -1992,6 +1992,11 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tk-media { max-width: 260px; max-height: 340px; border-radius: 14px; display: block; cursor: zoom-in;
   border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(16,30,51,.10); transition: transform .14s, box-shadow .14s; background: var(--panel-2); }
 .tk-media-link:hover .tk-media { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16,30,51,.16); }
+/* Foto con pie: el bloque mide lo que la foto y el texto se ajusta debajo. `contain`
+   hace que el texto no cuente para el ancho (si no, se estira o se parte letra a letra). */
+.wa-fig { display: grid; width: fit-content; min-width: min(180px, 100%); max-width: 100%; }
+.wa-fig .tk-media-link { display: block; }
+.wa-cap { margin-top: 5px; contain: inline-size; overflow-wrap: anywhere; }
 .tk-media-link.is-sticker .tk-media { max-width: 130px; max-height: 130px; border: 0; box-shadow: none; background: none; cursor: pointer; }
 
 .tk-video { max-width: 300px; margin: 2px 0; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(16,30,51,.10); line-height: 0; }
