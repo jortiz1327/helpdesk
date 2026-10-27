@@ -843,7 +843,7 @@ function TicketBehavior() {
       <div className="card em-card" style={{ marginTop: 16 }}>
         <h2>Seguimiento cuando el cliente no responde</h2>
         <p className="em-desc">
-          Si un ticket de <b>correo o web</b> sigue <b>abierto</b> y el cliente no contesta a nuestra última respuesta,
+          Si un ticket de <b>correo o web</b> de la categoría <b>Soporte</b> sigue <b>abierto</b> y el cliente no contesta a nuestra última respuesta,
           se le manda un recordatorio automático en el mismo hilo. Si tampoco responde a ese recordatorio,
           el ticket pasa a <b>resuelto</b>. Nunca se aplica a WhatsApp, y solo a los tickets creados desde que se activó.
         </p>

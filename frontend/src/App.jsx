@@ -127,9 +127,11 @@ const VERSIONS = [
     {
         version: "1.5.1",
         date: "27 oct 2026",
-        resumen: "Los tickets de WhatsApp se reparten como los de correo y web, y las fotos con texto se ven bien.",
+        resumen: "WhatsApp: reparto como correo y web, nombre del cliente desde el ticket y fotos con texto bien. El seguimiento automático, solo en Soporte.",
         mejoras: [
             "WhatsApp: si el cliente escribe en un ticket que no tiene responsable (por ejemplo, los del historial importado), se asigna en ese momento al agente de guardia, igual que un ticket nuevo.",
+            "WhatsApp: el lápiz junto al cliente ahora sirve para ponerle nombre (y, si quieres, correo) en vez de «Cambiar solicitante».",
+            "El recordatorio a los 8 días y el cierre 24 h después solo se aplican a tickets de la categoría Soporte.",
         ],
         arreglos: [
             "WhatsApp: el texto de una foto salía al lado de la imagen, apretado contra el borde; ahora va debajo, como en el móvil.",

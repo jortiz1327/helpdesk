@@ -12,6 +12,12 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
   WhatsApp que existe pero no tiene responsable (los 46 abiertos del historial
   importado nacieron así), se reparte en ese momento al de guardia. Si ya tiene
   responsable no se toca, y lo que se contesta desde el móvil no reparte.
+- **WhatsApp: «Datos del cliente».** En un ticket de WhatsApp el lápiz ya no abre
+  «Cambiar solicitante» (la conversación es de ese teléfono): edita el nombre y, opcional,
+  el correo del MISMO cliente. Si ese correo es de otra ficha sin teléfono (escribió antes
+  por correo o web), se unen; si es de una ficha con otro teléfono, no se toca nada.
+- **Seguimiento automático solo en Soporte:** el recordatorio a los 8 días y el resuelto
+  24 h después ya no se aplican a Garantías, Pedidos y facturas ni a tickets sin categoría.
 
 ### Arreglos
 

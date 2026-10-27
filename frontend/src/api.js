@@ -395,6 +395,10 @@ export const api = {
   unsnoozeTicket: (id) => req('tickets.php?action=unsnooze', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
+  // Ticket de WhatsApp: nombre y correo (opcional) del MISMO cliente.
+  setContactInfo: (id, name, email) => req('tickets.php?action=set_contact_info', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, name, email }),
+  }),
   // Cambiar el solicitante (correo del cliente) de un ticket.
   setRequester: (id, email, name) => req('tickets.php?action=set_requester', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, email, name }),

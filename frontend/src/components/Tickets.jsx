@@ -1880,8 +1880,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   <small>{t.contact_email || 'Sin correo'}</small>
                 </div>
                 {can('tickets.reply') && (
-                  <button className="tkm-cli-edit" title="Cambiar solicitante (corregir el correo)"
-                    onClick={() => setEditReq({ email: t.contact_email || '', name: t.contact_name || '' })}>
+                  <button className="tkm-cli-edit" title={t.channel === 'whatsapp' ? 'Editar nombre y correo del cliente' : 'Cambiar solicitante (corregir el correo)'}
+                    onClick={() => setEditReq({ email: t.contact_email || '', name: t.contact_name || '', wa: t.channel === 'whatsapp' })}>
                     <Icon.pencil />
                   </button>
                 )}
@@ -2504,7 +2504,43 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
       )}
 
       {/* Se cerró fuera de plazo: se ofrece dejar constancia del motivo. */}
-      {editReq && (
+      {/* WhatsApp: la conversación es de ese teléfono, así que no se cambia de cliente:
+          se completan SUS datos (nombre y, si se quiere, correo). */}
+      {editReq?.wa && (() => {
+        const email = (editReq.email || '').trim()
+        const emailOk = !email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
+        const puede = emailOk && (editReq.name.trim() || email) && !editReq.busy
+        return (
+          <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setEditReq(null)}>
+            <div className="modal" style={{ maxWidth: 440 }}>
+              <div className="modal-h"><h3>Datos del cliente</h3>
+                <button className="icon-btn" onClick={() => setEditReq(null)}>✕</button></div>
+              <div className="modal-body">
+                <p className="cfg-hint">Ponle nombre al cliente de <b>+{t?.contact_wa}</b>. Se guarda en su ficha y lo verás en todos sus tickets.</p>
+                <label className="field"><span className="lbl">Nombre</span>
+                  <input autoFocus value={editReq.name} maxLength={120}
+                    onChange={(e) => setEditReq((s) => ({ ...s, name: e.target.value }))} placeholder="Nombre del cliente" /></label>
+                <label className="field"><span className="lbl">Correo <span className="hint">(opcional)</span></span>
+                  <input type="email" value={editReq.email}
+                    onChange={(e) => setEditReq((s) => ({ ...s, email: e.target.value }))} placeholder="cliente@empresa.com" />
+                  {!emailOk && <small className="lnk-err" style={{ marginTop: 4 }}>El correo no es válido</small>}</label>
+                <p className="cfg-hint" style={{ marginBottom: 0 }}>Por WhatsApp no se le manda ningún correo automático; el correo sirve para reconocerle si también escribe por correo o por la web.</p>
+              </div>
+              <div className="modal-foot">
+                <button className="btn ghost" onClick={() => setEditReq(null)}>Cancelar</button>
+                <button className="btn" disabled={!puede}
+                  onClick={async () => {
+                    setEditReq((s) => ({ ...s, busy: true }))
+                    const r = await api.setContactInfo(id, editReq.name.trim(), email)
+                    if (r?.ok) { setEditReq(null); toast(r.merged ? 'Datos guardados: tenía otra ficha con ese correo y se han unido' : 'Datos del cliente guardados'); load(); onChange?.() }
+                    else { setEditReq((s) => ({ ...s, busy: false })); toast(r?.error || 'No se pudo guardar', 'err') }
+                  }}>{editReq.busy ? 'Guardando…' : 'Guardar'}</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+      {editReq && !editReq.wa && (
         <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setEditReq(null)}>
           <div className="modal" style={{ maxWidth: 440 }}>
             <div className="modal-h"><h3>Cambiar solicitante</h3>

@@ -11,7 +11,8 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
- * SEGUIMIENTO AUTOMÁTICO de tickets de CORREO y WEB (nunca WhatsApp ni avisos de cron).
+ * SEGUIMIENTO AUTOMÁTICO de tickets de CORREO y WEB de la categoría SOPORTE (nunca
+ * WhatsApp ni avisos de cron; ni garantías, pedidos o tickets sin categoría).
  *
  *   1. Ticket «abierto», lo último lo dijimos nosotros y el cliente lleva N días sin
  *      contestar (8 por defecto) → se le manda el recordatorio (plantilla «ticket_followup»),
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\DB;
 class TicketsFollowup extends Command
 {
     public const MARCA = 'seguimiento';   // messages.payload {"auto":"seguimiento"}
+    public const CATEGORIA = 'soporte';   // ticket_categories.key: la única categoría con seguimiento
 
     protected $signature = 'tickets:followup {--dry : Solo enseña qué haría, sin enviar ni cambiar nada}';
 
@@ -44,8 +46,17 @@ class TicketsFollowup extends Command
         $dias  = max(1, (int) Setting::get('ticket_followup_days', '8'));
         $horas = max(1, (int) Setting::get('ticket_followup_hours', '24'));
 
+        // Solo la categoría SOPORTE (por su clave, estable aunque se cambie el nombre): en
+        // garantías o pedidos un silencio del cliente no significa que esté resuelto.
+        $soporte = DB::table('ticket_categories')->where('key', self::CATEGORIA)->value('id');
+        if (!$soporte) {
+            $this->line('No existe la categoría «' . self::CATEGORIA . '»: no se hace seguimiento.');
+            return self::SUCCESS;
+        }
+
         $ids = DB::table('tickets')
             ->where('status', 'abierto')
+            ->where('category_id', $soporte)
             ->whereIn('channel', ['email', 'web'])
             ->where('last_direction', 'out')
             ->whereNull('snoozed_at')->whereNull('merged_into_id')

@@ -58,6 +58,7 @@ class TicketsController extends Controller
             'snooze'   => $this->snoozeTicket($request),
             'unsnooze' => $this->unsnoozeTicket($request),
             'set_requester' => $this->setRequester($request),
+            'set_contact_info' => $this->setContactInfo($request),
             'contact_open' => $this->contactOpen($request),
             'sched_cancel' => $this->cancelScheduled($request),
             'category' => $this->setCategory($request),
@@ -1652,6 +1653,76 @@ class TicketsController extends Controller
         $this->tickets->broadcast('updated', $id);
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * DATOS DEL CLIENTE en un ticket de WHATSAPP. Ahí «cambiar el solicitante» no tiene
+     * sentido (la conversación es de ese teléfono): se edita el MISMO contacto —nombre y,
+     * si se quiere, correo—. Si el correo ya es de otra ficha SIN teléfono, es la misma
+     * persona (escribió antes por correo o web) y se fusiona aquí; si esa ficha tiene
+     * OTRO teléfono, son personas distintas y no se toca nada.
+     */
+    protected function setContactInfo(Request $request)
+    {
+        $me = $request->user();
+        if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        if (!$me->can('tickets.reply')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
+
+        $id = (int) $request->input('id');
+        if (!(clone $this->baseQuery($me))->where('t.id', $id)->exists()) {
+            return response()->json(['ok' => false, 'error' => 'No tienes acceso a ese ticket'], 403);
+        }
+        $t = DB::table('tickets')->where('id', $id)->first(['channel', 'contact_id']);
+        if ($t->channel !== 'whatsapp' || !$t->contact_id) {
+            return response()->json(['ok' => false, 'error' => 'Solo para tickets de WhatsApp'], 400);
+        }
+        $cid = (int) $t->contact_id;
+        $c = DB::table('contacts')->where('id', $cid)->first(['name', 'email']);
+
+        $name  = trim((string) $request->input('name', ''));
+        $email = mb_strtolower(trim((string) $request->input('email', '')));
+        if ($name === '' && $email === '') {
+            return response()->json(['ok' => false, 'error' => 'Escribe al menos el nombre'], 400);
+        }
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json(['ok' => false, 'error' => 'El correo no es válido'], 400);
+        }
+        if (mb_strlen($name) > 120) $name = mb_substr($name, 0, 120);
+
+        $cambiaCorreo = $email !== '' && $email !== mb_strtolower((string) $c->email);
+        $fusionar = null;
+        if ($cambiaCorreo) {
+            /*
+             * El correo es la identidad del cliente en el portal: cambiarlo solo lo puede
+             * quien tiene Helpdesk y ve TODOS los tickets de las fichas implicadas (igual
+             * que en la ficha del contacto). Si no, se podría entrar al portal como él.
+             */
+            $otro = DB::table('contacts')->where('email', $email)->where('id', '!=', $cid)->first(['id', 'wa_id']);
+            if ($otro && $otro->wa_id) {
+                return response()->json(['ok' => false, 'error' => 'Ese correo ya es de otro cliente con otro teléfono. Si es la misma persona, fusiónalos desde Contactos.'], 409);
+            }
+            foreach (array_filter([$cid, $otro->id ?? null]) as $ficha) {
+                $total = DB::table('tickets')->where('contact_id', $ficha)->count();
+                $visibles = \App\Support\TicketVisibility::scope(DB::table('tickets as t')->where('t.contact_id', $ficha), $me)->count();
+                if (!$me->can('helpdesk.access') || $visibles < $total) {
+                    return response()->json(['ok' => false, 'error' => 'Ese cliente tiene tickets que no puedes ver: no puedes cambiar su correo'], 403);
+                }
+            }
+            $fusionar = $otro ? (int) $otro->id : null;
+        }
+
+        DB::transaction(function () use ($cid, $name, $email, $cambiaCorreo, $fusionar) {
+            // La otra ficha (solo correo) se funde en esta: sus tickets y datos pasan aquí.
+            if ($fusionar) app(\App\Services\ContactMergeService::class)->fusionar($cid, $fusionar);
+            $upd = [];
+            if ($name !== '') $upd['name'] = $name;
+            if ($cambiaCorreo) $upd['email'] = $email;
+            if ($upd) DB::table('contacts')->where('id', $cid)->update($upd);
+        });
+
+        if ($cambiaCorreo) $this->tickets->event($id, 'requester', $c->email ?: '—', $email, (int) $me->id);
+        $this->tickets->broadcast('updated', $id);
+        return response()->json(['ok' => true, 'merged' => (bool) $fusionar]);
     }
 
     /** Reactivar ahora un ticket dormido (vuelve a la cola). */
