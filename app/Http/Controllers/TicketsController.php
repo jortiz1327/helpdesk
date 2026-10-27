@@ -30,7 +30,7 @@ class TicketsController extends Controller
      * nunca discrepen: lo que no cuenta, tampoco se lista, y al revés.
      */
     protected const SQL_DESPIERTO =
-        '(t.snoozed_at IS NULL OR ((t.snoozed_until IS NULL OR t.snoozed_until <= NOW()) AND t.snooze_wake_on_reply = 0))';
+    '(t.snoozed_at IS NULL OR ((t.snoozed_until IS NULL OR t.snoozed_until <= NOW()) AND t.snooze_wake_on_reply = 0))';
 
     /** Tamaño de página del hilo de mensajes (los últimos N al abrir; el resto, bajo demanda). */
     protected const MSG_PAGE = 60;
@@ -86,10 +86,12 @@ class TicketsController extends Controller
         // Tras una acción que muta tickets (y solo si salió bien), invalida los
         // contadores cacheados de TODOS los agentes subiendo la versión global: así el
         // reload inmediato del frontend ve los números frescos, no los de hasta 15 s antes.
-        if (in_array($action, self::MUTA_CONTADORES, true)
+        if (
+            in_array($action, self::MUTA_CONTADORES, true)
             && $resp instanceof \Illuminate\Http\JsonResponse
             && $resp->getStatusCode() >= 200 && $resp->getStatusCode() < 300
-            && ($resp->getData(true)['ok'] ?? true) !== false) {
+            && ($resp->getData(true)['ok'] ?? true) !== false
+        ) {
             TicketCounters::bump();
         }
 
@@ -130,14 +132,14 @@ class TicketsController extends Controller
         ];
         if ($ev <= 0 || $msg <= 0) return response()->json(['cursor' => $cur, 'items' => []]);
 
-        $vis = fn ($q) => $this->scope($q->join('tickets as t', 't.id', '=', 'x.ticket_id')->where('t.channel', '!=', 'cron'), $me);
+        $vis = fn($q) => $this->scope($q->join('tickets as t', 't.id', '=', 'x.ticket_id')->where('t.channel', '!=', 'cron'), $me);
         $cols = ['t.id as ticketId', 't.code', 't.subject'];
 
         $eventos = $vis(DB::table('ticket_events as x'))
             ->where('x.id', '>', $ev)->where('x.id', '<=', $cur['ev'])
-            ->where(fn ($w) => $w->where('x.type', 'created')
-                ->orWhere(fn ($a) => $a->where('x.type', 'assign')->where('x.to_value', (string) $me->id)
-                    ->where(fn ($u) => $u->whereNull('x.user_id')->orWhere('x.user_id', '!=', $me->id))))
+            ->where(fn($w) => $w->where('x.type', 'created')
+                ->orWhere(fn($a) => $a->where('x.type', 'assign')->where('x.to_value', (string) $me->id)
+                    ->where(fn($u) => $u->whereNull('x.user_id')->orWhere('x.user_id', '!=', $me->id))))
             ->orderBy('x.id')->limit(50)->get(array_merge($cols, ['x.type']));
 
         $nuevos = $eventos->where('type', 'created')->pluck('ticketId')->all();
@@ -148,9 +150,14 @@ class TicketsController extends Controller
             ->whereNotIn('t.id', $nuevos ?: [0])   // el ticket nuevo ya avisa con «created»
             ->groupBy('t.id', 't.code', 't.subject')->limit(50)->get($cols);
 
-        $items = $eventos->map(fn ($e) => ['action' => $e->type === 'created' ? 'created' : 'assigned',
-                'ticketId' => $e->ticketId, 'code' => $e->code, 'subject' => $e->subject, 'assignedTo' => $me->id])
-            ->concat($mensajes->map(fn ($m) => ['action' => 'message', 'ticketId' => $m->ticketId, 'code' => $m->code, 'subject' => $m->subject]))
+        $items = $eventos->map(fn($e) => [
+            'action' => $e->type === 'created' ? 'created' : 'assigned',
+            'ticketId' => $e->ticketId,
+            'code' => $e->code,
+            'subject' => $e->subject,
+            'assignedTo' => $me->id
+        ])
+            ->concat($mensajes->map(fn($m) => ['action' => 'message', 'ticketId' => $m->ticketId, 'code' => $m->code, 'subject' => $m->subject]))
             ->values();
 
         return response()->json(['cursor' => $cur, 'items' => $items]);
@@ -194,9 +201,9 @@ class TicketsController extends Controller
         if (!$oid) return;
         match ($nivel) {
             'sede'  => $q->where('c.sede_id', $oid),
-            'marca' => $q->whereIn('c.sede_id', fn ($sub) => $sub->select('id')->from('sedes')->where('marca_id', $oid)),
-            'grupo' => $q->whereIn('c.sede_id', fn ($sub) => $sub->select('s.id')->from('sedes as s')
-                            ->join('marcas as m', 'm.id', '=', 's.marca_id')->where('m.grupo_id', $oid)),
+            'marca' => $q->whereIn('c.sede_id', fn($sub) => $sub->select('id')->from('sedes')->where('marca_id', $oid)),
+            'grupo' => $q->whereIn('c.sede_id', fn($sub) => $sub->select('s.id')->from('sedes as s')
+                ->join('marcas as m', 'm.id', '=', 's.marca_id')->where('m.grupo_id', $oid)),
             default => null,
         };
     }
@@ -221,11 +228,23 @@ class TicketsController extends Controller
         $rows  = $q->orderByDesc('t.last_message_at')->orderByDesc('t.id')
             ->limit($cap)
             ->get([
-                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.source',
-                't.created_at', 't.first_response_at', 't.resolved_at',
-                't.sla_response_due_at', 't.sla_resolve_due_at',
-                'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
-                'cat.name as category_name', 'u.name as agent_name',
+                't.id',
+                't.code',
+                't.subject',
+                't.status',
+                't.priority',
+                't.channel',
+                't.source',
+                't.created_at',
+                't.first_response_at',
+                't.resolved_at',
+                't.sla_response_due_at',
+                't.sla_resolve_due_at',
+                'c.name as contact_name',
+                'c.email as contact_email',
+                'c.wa_id as contact_wa',
+                'cat.name as category_name',
+                'u.name as agent_name',
             ]);
 
         // Etiquetas de cada ticket, en una consulta.
@@ -334,14 +353,14 @@ class TicketsController extends Controller
                             ? $cc->whereRaw('MATCH(name, email) AGAINST (? IN BOOLEAN MODE)', [$termino])
                             : $cc->where('name', 'like', $like);
                         $cc->orWhere('wa_id', 'like', $like)
-                           ->orWhere('email', 'like', $like);
+                            ->orWhere('email', 'like', $like);
                     });
                 });
             });
         } elseif ($s !== '') {
             $q->whereExists(function ($w) use ($s) {
                 $w->select(DB::raw(1))->from('messages as ms')
-                  ->whereColumn('ms.ticket_id', 't.id');
+                    ->whereColumn('ms.ticket_id', 't.id');
                 [$termino, $afinar] = $this->terminoTextoCompleto($s);
                 if ($termino) $w->whereRaw('MATCH(ms.body) AGAINST (? IN BOOLEAN MODE)', [$termino]);
                 if ($afinar)  $w->where('ms.body', 'like', "%$s%");
@@ -358,20 +377,22 @@ class TicketsController extends Controller
             }
         }
 
-        foreach ([
-            'priority'      => 't.priority',
-            'contact'       => 't.contact_id',
-            'contact_email' => 'c.email',
-        ] as $param => $col) {
+        foreach (
+            [
+                'priority'      => 't.priority',
+                'contact'       => 't.contact_id',
+                'contact_email' => 'c.email',
+            ] as $param => $col
+        ) {
             if (($v = $request->query($param, '')) !== '' && $v !== 'all') $q->where($col, $v);
         }
 
         // CANAL, igual que lo enseña el badge: «Web» = creado en el portal o a mano por un
         // agente (aunque por dentro responda por correo); «Correo» = el resto de canal email.
-        $web = fn ($w) => $w->whereIn('t.source', ['portal', 'manual'])->orWhere('t.channel', 'web');
+        $web = fn($w) => $w->whereIn('t.source', ['portal', 'manual'])->orWhere('t.channel', 'web');
         match ((string) $request->query('channel', '')) {
             'web'      => $q->where($web),
-            'email'    => $q->where('t.channel', 'email')->where(fn ($w) => $w->whereNull('t.source')->orWhereNotIn('t.source', ['portal', 'manual'])),
+            'email'    => $q->where('t.channel', 'email')->where(fn($w) => $w->whereNull('t.source')->orWhereNotIn('t.source', ['portal', 'manual'])),
             'whatsapp' => $q->where('t.channel', 'whatsapp'),
             default    => null,
         };
@@ -382,7 +403,7 @@ class TicketsController extends Controller
         $cat = (string) $request->query('category', '');
         if ($cat !== '' && $cat !== 'all') {
             $ids = array_values(array_filter(array_map('intval', explode(',', $cat))));
-            if ($ids) $q->where(fn ($w) => $w->whereIn('t.category_id', $ids)->orWhereNull('t.category_id'));
+            if ($ids) $q->where(fn($w) => $w->whereIn('t.category_id', $ids)->orWhereNull('t.category_id'));
         }
         if (!$soloEstructural && ($a = $request->query('assigned', '')) !== '' && $a !== 'all') {
             match (true) {
@@ -402,12 +423,12 @@ class TicketsController extends Controller
 
         if (!$soloEstructural && $request->query('sla') === 'late' && SlaService::activo()) {
             $q->whereIn('t.status', TicketService::OPEN_STATUSES)
-              ->whereNull('t.sla_paused_since')   // en pausa ≠ vencido (reloj parado)
-              ->where(function ($w) {
-                  $w->where('t.sla_resolve_due_at', '<', now())
-                    ->orWhere(fn ($x) => $x->where('t.sla_response_due_at', '<', now())
-                                           ->whereNull('t.first_response_at'));
-              });
+                ->whereNull('t.sla_paused_since')   // en pausa ≠ vencido (reloj parado)
+                ->where(function ($w) {
+                    $w->where('t.sla_resolve_due_at', '<', now())
+                        ->orWhere(fn($x) => $x->where('t.sla_response_due_at', '<', now())
+                            ->whereNull('t.first_response_at'));
+                });
         }
 
         if (!$soloEstructural) {
@@ -481,26 +502,51 @@ class TicketsController extends Controller
             // mes con una respuesta de hace un minuto tiene que salir el primero.
             ->orderByDesc('t.last_message_at')
             ->orderByDesc('t.id')   // desempate estable: sin él, dos tickets con la misma
-                                    // hora pueden bailar entre páginas y salir repetidos
+            // hora pueden bailar entre páginas y salir repetidos
             ->forPage($pagina, $porPagina)
             ->get([
-                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.source',
-                't.created_at', 't.last_message_at', 't.first_response_at', 't.resolved_at', 't.opened_at',
+                't.id',
+                't.code',
+                't.subject',
+                't.status',
+                't.priority',
+                't.channel',
+                't.source',
+                't.created_at',
+                't.last_message_at',
+                't.first_response_at',
+                't.resolved_at',
+                't.opened_at',
                 't.assigned_to',
                 // `contact_id` y `merged_into_id`: la lista necesita saber si dos
                 // tickets marcados son del mismo cliente (para poder fusionarlos) y
                 // si alguno ya está fusionado.
-                't.contact_id', 't.merged_into_id', 't.category_id',
-                'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
-                'cat.name as category_name', 'cat.color as category_color',
-                'cat.sla_response_hours', 'cat.sla_resolve_hours', 't.sla_paused_minutes', 't.sla_paused_since',
-                'pri.sla_response_mins as pri_response_mins', 'pri.sla_resolve_mins as pri_resolve_mins',
-                'u.name as agent_name', 'u.email as agent_email',
+                't.contact_id',
+                't.merged_into_id',
+                't.category_id',
+                'c.name as contact_name',
+                'c.email as contact_email',
+                'c.wa_id as contact_wa',
+                'cat.name as category_name',
+                'cat.color as category_color',
+                'cat.sla_response_hours',
+                'cat.sla_resolve_hours',
+                't.sla_paused_minutes',
+                't.sla_paused_since',
+                'pri.sla_response_mins as pri_response_mins',
+                'pri.sla_resolve_mins as pri_resolve_mins',
+                'u.name as agent_name',
+                'u.email as agent_email',
                 't.last_direction',
                 // Posponer: el chip «💤 hasta …» y su motivo.
-                't.snoozed_until', 't.snooze_wake_on_reply', 't.snoozed_by', 't.snooze_reason',
+                't.snoozed_until',
+                't.snooze_wake_on_reply',
+                't.snoozed_by',
+                't.snooze_reason',
                 // Presencia: quién lo tiene abierto y desde cuándo (vigencia la calcula el front).
-                't.locked_by', 't.locked_at', 'lk.name as locked_name',
+                't.locked_by',
+                't.locked_at',
+                'lk.name as locked_name',
             ]);
 
         /*
@@ -585,12 +631,12 @@ class TicketsController extends Controller
         $limpio = trim(preg_replace('/[+\-><()~*"@]+/u', ' ', $s) ?? '');
         $palabras = preg_split('/\s+/u', $limpio, -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
-        $largas = array_values(array_filter($palabras, fn ($p) => mb_strlen($p) >= 3));
+        $largas = array_values(array_filter($palabras, fn($p) => mb_strlen($p) >= 3));
         if (!$largas) return [null, true];                       // todo corto: solo LIKE
 
         if (count($palabras) === 1) return [$largas[0] . '*', false];
 
-        $termino = implode(' ', array_map(fn ($p) => '+' . $p . '*', $largas));
+        $termino = implode(' ', array_map(fn($p) => '+' . $p . '*', $largas));
         return [$termino, true];
     }
 
@@ -630,7 +676,7 @@ class TicketsController extends Controller
          * TRAS CADA ACCIÓN se sube la versión (TicketCounters::bump), así que el reload
          * inmediato del propio agente ya ve el número fresco, no uno de hasta 15 s antes.
          */
-        return Cache::remember(TicketCounters::key((int) $me->id), 15, fn () => $this->calcularCounts($me));
+        return Cache::remember(TicketCounters::key((int) $me->id), 15, fn() => $this->calcularCounts($me));
     }
 
     /**
@@ -731,8 +777,16 @@ class TicketsController extends Controller
             ->orderByDesc('t.last_message_at')
             ->limit(5)
             ->get([
-                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.source',
-                'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
+                't.id',
+                't.code',
+                't.subject',
+                't.status',
+                't.priority',
+                't.channel',
+                't.source',
+                'c.name as contact_name',
+                'c.email as contact_email',
+                'c.wa_id as contact_wa',
             ]);
 
         return response()->json([
@@ -742,7 +796,7 @@ class TicketsController extends Controller
             'open'      => array_sum(array_intersect_key($byStatusAll, array_flip(TicketService::OPEN_STATUSES))),
             'resolved'  => $byStatusAll['resuelto'] + $byStatusAll['cerrado'],
             'urgent'    => (clone $this->baseQuery($me))->where('t.priority', TicketService::topPriorityKey() ?? 'urgente')
-                                ->whereIn('t.status', TicketService::OPEN_STATUSES)->count(),
+                ->whereIn('t.status', TicketService::OPEN_STATUSES)->count(),
             // El gráfico «Tickets por estado» respeta el rango de fechas pedido.
             'by_status' => $byStatus,
             'recent'    => $recent,
@@ -770,11 +824,13 @@ class TicketsController extends Controller
         // el nombre del inactivo en los tickets históricos.
         // Categorías («áreas») que atiende cada agente, en UNA consulta (sin N+1).
         $catsByUser = DB::table('user_ticket_categories')->get()
-            ->groupBy('user_id')->map(fn ($g) => $g->pluck('category_id')->map('intval')->values()->all());
+            ->groupBy('user_id')->map(fn($g) => $g->pluck('category_id')->map('intval')->values()->all());
         $users = User::with('roles.permissions', 'permissions')->orderByRaw('name IS NULL, name ASC, email ASC')->get()
-            ->filter(fn ($u) => $u->can('helpdesk.access'))
-            ->map(fn ($u) => [
-                'id' => (int) $u->id, 'name' => $u->name ?: $u->email, 'active' => (bool) $u->active,
+            ->filter(fn($u) => $u->can('helpdesk.access'))
+            ->map(fn($u) => [
+                'id' => (int) $u->id,
+                'name' => $u->name ?: $u->email,
+                'active' => (bool) $u->active,
                 'assignable' => $u->assignable !== false,   // false = no sale al elegir a quién asignar
                 // Sus áreas: el frontend las usa para mantener coherentes categoría↔asignado.
                 'category_ids' => $catsByUser->get($u->id, []),
@@ -810,13 +866,13 @@ class TicketsController extends Controller
         $t  = (clone $this->baseQuery($me))->where('t.id', $id)->first(['t.id']);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
-        $pedidos = collect($request->input('label_ids', []))->map(fn ($x) => (int) $x)->filter()->unique();
+        $pedidos = collect($request->input('label_ids', []))->map(fn($x) => (int) $x)->filter()->unique();
         $validos = \App\Models\TicketLabel::whereIn('id', $pedidos)->pluck('id')->all();
 
         DB::table('ticket_label_ticket')->where('ticket_id', $id)->delete();
         if ($validos) {
             DB::table('ticket_label_ticket')->insert(
-                array_map(fn ($lid) => ['ticket_id' => $id, 'label_id' => $lid], $validos),
+                array_map(fn($lid) => ['ticket_id' => $id, 'label_id' => $lid], $validos),
             );
         }
 
@@ -852,11 +908,20 @@ class TicketsController extends Controller
         $t = (clone $this->baseQuery($me))
             ->leftJoin('sedes as sede', 'sede.id', '=', 'c.sede_id')   // nombre de la sede para {{sede}}
             ->where('t.id', $id)->first([
-                't.*', 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa', 'c.sede_id as contact_sede_id',
+                't.*',
+                'c.name as contact_name',
+                'c.email as contact_email',
+                'c.wa_id as contact_wa',
+                'c.sede_id as contact_sede_id',
                 'sede.name as contact_sede_name',
-                'cat.name as category_name', 'cat.color as category_color',
-                'cat.sla_response_hours', 'cat.sla_resolve_hours', 't.sla_paused_minutes', 't.sla_paused_since',
-                'pri.sla_response_mins as pri_response_mins', 'pri.sla_resolve_mins as pri_resolve_mins',
+                'cat.name as category_name',
+                'cat.color as category_color',
+                'cat.sla_response_hours',
+                'cat.sla_resolve_hours',
+                't.sla_paused_minutes',
+                't.sla_paused_since',
+                'pri.sla_response_mins as pri_response_mins',
+                'pri.sla_resolve_mins as pri_resolve_mins',
                 'u.name as agent_name',
             ]);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
@@ -892,7 +957,7 @@ class TicketsController extends Controller
         $defsCampos = DB::table('ticket_custom_fields')->where('active', 1)
             ->orderBy('position')->orderBy('id')->get(['id', 'key', 'label', 'type', 'options', 'required']);
         $valsCampos = DB::table('ticket_field_values')->where('ticket_id', $id)->pluck('value', 'field_id');
-        $t->custom_fields = $defsCampos->map(fn ($d) => [
+        $t->custom_fields = $defsCampos->map(fn($d) => [
             'id'       => (int) $d->id,
             'label'    => $d->label,
             'type'     => $d->type,
@@ -919,7 +984,7 @@ class TicketsController extends Controller
 
         // En los eventos de ASIGNACIÓN, from/to son IDs de usuario → se resuelven a nombres
         // para que el historial diga «asignado a Pedro», no «asignado a 3».
-        $userIds = $events->where('type', 'assign')->flatMap(fn ($e) => [$e->from_value, $e->to_value])->filter()->unique();
+        $userIds = $events->where('type', 'assign')->flatMap(fn($e) => [$e->from_value, $e->to_value])->filter()->unique();
         $names = $userIds->isNotEmpty()
             ? DB::table('users')->whereIn('id', $userIds)->pluck('name', 'id')
             : collect();
@@ -945,7 +1010,11 @@ class TicketsController extends Controller
             : $lockSvc->acquire($id, (int) $me->id);
 
         return response()->json([
-            'ok' => true, 'ticket' => $t, 'messages' => $messages, 'events' => $events, 'lock' => $lock,
+            'ok' => true,
+            'ticket' => $t,
+            'messages' => $messages,
+            'events' => $events,
+            'lock' => $lock,
             // ¿Hay mensajes anteriores a la página cargada? (para el botón «cargar más»).
             'messages_more' => $totalMsg > $messages->count(),
             // Copias que ya estaban en la conversación, para proponerlas al responder.
@@ -972,15 +1041,29 @@ class TicketsController extends Controller
 
         $messages = $q->orderByDesc('m.id')->limit($limit)
             ->get([
-                'm.id', 'm.ticket_id', 'm.direction', 'm.channel', 'm.type', 'm.body', 'm.is_html', 'm.is_internal_note',
-                'm.media_url', 'm.media_mime', 'm.status', 'm.author_user_id', 'm.created_at',
-                'm.cc', 'm.bcc', 'm.payload',
-                'au.name as author_name', 'au.email as author_email',
+                'm.id',
+                'm.ticket_id',
+                'm.direction',
+                'm.channel',
+                'm.type',
+                'm.body',
+                'm.is_html',
+                'm.is_internal_note',
+                'm.media_url',
+                'm.media_mime',
+                'm.status',
+                'm.author_user_id',
+                'm.created_at',
+                'm.cc',
+                'm.bcc',
+                'm.payload',
+                'au.name as author_name',
+                'au.email as author_email',
             ])
             ->reverse()->values();   // se leyó desc (para el LIMIT); se pinta asc
 
         $byMessage = [];
-        foreach (array_unique($messages->pluck('ticket_id')->map(fn ($x) => (int) $x)->all()) as $tid) {
+        foreach (array_unique($messages->pluck('ticket_id')->map(fn($x) => (int) $x)->all()) as $tid) {
             $byMessage += $this->attachments->forTicket($tid);
         }
         // Qué mensajes están marcados como «respuesta efectiva» (⭐), para pintar la estrella rellena.
@@ -1142,7 +1225,7 @@ class TicketsController extends Controller
             // Solo compañeros activos que PUEDEN ver el ticket: la mención lleva un extracto,
             // y no debe llegarle a alguien de Campañas ni a quien no tiene acceso a ese ticket.
             $validos  = User::whereIn('id', $mentions)->where('active', true)->get()
-                ->filter(fn ($u) => $u->can('helpdesk.access') && \App\Support\TicketVisibility::puedeVer($u, (int) $t->id))
+                ->filter(fn($u) => $u->can('helpdesk.access') && \App\Support\TicketVisibility::puedeVer($u, (int) $t->id))
                 ->pluck('id');
             $extracto = mb_substr(trim(HtmlSanitizer::toText($html)), 0, 140);
             $cuerpo   = "{$me->name} te mencionó en {$t->code}" . ($extracto !== '' ? ": «{$extracto}»" : '');
@@ -1169,9 +1252,20 @@ class TicketsController extends Controller
         $data = $request->validate(['id' => ['required', 'integer']], ['id.required' => 'Falta el ticket']);
         $id = (int) $data['id'];
         $t  = (clone $this->baseQuery($me))->where('t.id', $id)
-            ->first(['t.id', 't.code', 't.subject', 't.channel', 't.status', 't.contact_id', 't.assigned_to',
-                     'c.email as contact_email', 'c.name as contact_name', 'c.wa_id as contact_wa',
-                     'cat.signature as cat_signature', 'cat.name as category_name']);
+            ->first([
+                't.id',
+                't.code',
+                't.subject',
+                't.channel',
+                't.status',
+                't.contact_id',
+                't.assigned_to',
+                'c.email as contact_email',
+                'c.name as contact_name',
+                'c.wa_id as contact_wa',
+                'cat.signature as cat_signature',
+                'cat.name as category_name'
+            ]);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
         if ($bloqueo = $this->exigePrioridad($id)) return $bloqueo;   // triaje: prioridad primero
 
@@ -1188,8 +1282,11 @@ class TicketsController extends Controller
                 $t->assigned_to = (int) $me->id;
             } elseif ($asignado !== (int) $me->id) {
                 $otro = DB::table('users')->where('id', $asignado)->value('name') ?: 'otro agente';
-                return response()->json(['ok' => false, 'needs_assign' => true,
-                    'error' => "Este ticket lo tiene {$otro}. Asígnatelo para poder responder."], 403);
+                return response()->json([
+                    'ok' => false,
+                    'needs_assign' => true,
+                    'error' => "Este ticket lo tiene {$otro}. Asígnatelo para poder responder."
+                ], 403);
             }
         }
 
@@ -1258,7 +1355,11 @@ class TicketsController extends Controller
             'business' => $bh->proximaApertura(now()),                          // próxima apertura
             'tomorrow' => $bh->proximaApertura(now()->addDay()->startOfDay()),  // mañana, al abrir
             'custom'   => (function () use ($custom) {
-                try { $d = \Illuminate\Support\Carbon::parse((string) $custom); } catch (\Throwable $e) { return null; }
+                try {
+                    $d = \Illuminate\Support\Carbon::parse((string) $custom);
+                } catch (\Throwable $e) {
+                    return null;
+                }
                 return $d->isFuture() ? $d : null;
             })(),
             default => null,
@@ -1400,7 +1501,10 @@ class TicketsController extends Controller
         }
 
         [$ok, $error] = $this->tickets->merge(
-            $principal, $absorbido, (int) $me->id, (string) $request->input('reason', ''),
+            $principal,
+            $absorbido,
+            (int) $me->id,
+            (string) $request->input('reason', ''),
         );
         if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
 
@@ -1420,7 +1524,12 @@ class TicketsController extends Controller
 
         // Ficheros de adjuntos en disco (la cascada de BD no borra los ficheros).
         $paths = DB::table('attachments')->where('ticket_id', $id)->pluck('path');
-        foreach ($paths as $p) { try { Storage::disk('local')->delete($p); } catch (\Throwable $e) { /* ignora */ } }
+        foreach ($paths as $p) {
+            try {
+                Storage::disk('local')->delete($p);
+            } catch (\Throwable $e) { /* ignora */
+            }
+        }
 
         DB::table('tickets')->where('id', $id)->delete(); // cascada: messages, ticket_events, attachments
 
@@ -1443,8 +1552,12 @@ class TicketsController extends Controller
         $anon       = filter_var($request->input('anon', false), FILTER_VALIDATE_BOOLEAN);
 
         $t = (clone $this->baseQuery($me))->where('t.id', $id)->first([
-            't.*', 'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_wa',
-            'cat.name as category_name', 'u.name as agent_name',
+            't.*',
+            'c.name as contact_name',
+            'c.email as contact_email',
+            'c.wa_id as contact_wa',
+            'cat.name as category_name',
+            'u.name as agent_name',
         ]);
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
@@ -1563,8 +1676,11 @@ class TicketsController extends Controller
     private function exigePrioridad(int $ticketId)
     {
         if (DB::table('tickets')->where('id', $ticketId)->value('priority') === TicketService::SIN_PRIORIDAD) {
-            return response()->json(['ok' => false, 'needs_priority' => true,
-                'error' => 'Ponle una prioridad al ticket antes de responder, asignarlo, posponerlo o añadir notas.'], 422);
+            return response()->json([
+                'ok' => false,
+                'needs_priority' => true,
+                'error' => 'Ponle una prioridad al ticket antes de responder, asignarlo, posponerlo o añadir notas.'
+            ], 422);
         }
         return null;
     }
@@ -1595,13 +1711,18 @@ class TicketsController extends Controller
             // «Hasta que responda» con lo último del CLIENTE = callejón sin salida: él
             // espera nuestra respuesta y nosotros la suya, así que nunca despertaría.
             if (DB::table('tickets')->where('id', $id)->value('last_direction') === 'in') {
-                return response()->json(['ok' => false,
-                    'error' => 'El cliente espera tu respuesta: contéstale primero o pospónlo hasta una fecha.'], 422);
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'El cliente espera tu respuesta: contéstale primero o pospónlo hasta una fecha.'
+                ], 422);
             }
             $wakeOnReply = true;
         } elseif ($preset === 'custom') {
-            try { $until = \Illuminate\Support\Carbon::parse((string) $request->input('until', '')); }
-            catch (\Throwable $e) { $until = null; }
+            try {
+                $until = \Illuminate\Support\Carbon::parse((string) $request->input('until', ''));
+            } catch (\Throwable $e) {
+                $until = null;
+            }
             if (!$until || $until->isPast()) {
                 return response()->json(['ok' => false, 'error' => 'Elige una fecha futura'], 400);
             }
@@ -1753,8 +1874,11 @@ class TicketsController extends Controller
         if ($email === '' && $phone === '') return response()->json(['ok' => true, 'tickets' => []]);
 
         $cid = DB::table('contacts')
-            ->when($email !== '', fn ($q) => $q->where('email', mb_strtolower($email)),   // _ci: usa el índice
-                fn ($q) => $q->where('wa_id', $phone))
+            ->when(
+                $email !== '',
+                fn($q) => $q->where('email', mb_strtolower($email)),   // _ci: usa el índice
+                fn($q) => $q->where('wa_id', $phone)
+            )
             ->value('id');
         if (!$cid) return response()->json(['ok' => true, 'tickets' => []]);
 
@@ -1801,8 +1925,9 @@ class TicketsController extends Controller
             if (!$me->can('tickets.close')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
             $st = (string) $request->input('status');
             if (!array_key_exists($st, TicketService::STATUSES)) return response()->json(['ok' => false, 'error' => 'Estado no válido'], 400);
-            foreach ($visible as $tid) { if ($this->tickets->setStatus($tid, $st, (int) $me->id)) $n++; }
-
+            foreach ($visible as $tid) {
+                if ($this->tickets->setStatus($tid, $st, (int) $me->id)) $n++;
+            }
         } elseif ($op === 'assign') {
             $uid = $request->input('user_id');
             $target = $uid ? (int) $uid : null;
@@ -1811,8 +1936,10 @@ class TicketsController extends Controller
                 return response()->json(['ok' => false, 'error' => 'Solo puedes cogerte tickets a ti mismo'], 403);
             }
             if ($bloqueo = $this->noAsignable($target)) return $bloqueo;
-            foreach ($visible as $tid) { $this->tickets->assign($tid, $target, (int) $me->id); $n++; }
-
+            foreach ($visible as $tid) {
+                $this->tickets->assign($tid, $target, (int) $me->id);
+                $n++;
+            }
         } elseif ($op === 'label') {
             // Poner o quitar UNA etiqueta a los seleccionados (etiquetar = cualquier agente).
             $labelId = (int) $request->input('label_id');
@@ -1828,7 +1955,6 @@ class TicketsController extends Controller
                 }
                 $n++;
             }
-
         } elseif ($op === 'restore') {
             // DESHACER un cambio de estado en lote: cada ticket vuelve a SU estado previo
             // (heterogéneo). `states` = [{id, status}, …] que capturó el frontend.
@@ -1836,19 +1962,21 @@ class TicketsController extends Controller
             foreach ((array) $request->input('states', []) as $s) {
                 $tid = (int) ($s['id'] ?? 0);
                 $st  = (string) ($s['status'] ?? '');
-                if ($tid && array_key_exists($st, TicketService::STATUSES)
+                if (
+                    $tid && array_key_exists($st, TicketService::STATUSES)
                     && in_array($tid, $visible, true)
-                    && $this->tickets->setStatus($tid, $st, (int) $me->id)) $n++;
+                    && $this->tickets->setStatus($tid, $st, (int) $me->id)
+                ) $n++;
             }
-
         } elseif ($op === 'priority') {
             if (!$me->can('tickets.categorize')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
             $pr = (string) $request->input('priority');
             if (!array_key_exists($pr, TicketService::priorities())) {
                 return response()->json(['ok' => false, 'error' => 'Prioridad no válida'], 400);
             }
-            foreach ($visible as $tid) { if ($this->tickets->setPriority($tid, $pr, (int) $me->id)) $n++; }
-
+            foreach ($visible as $tid) {
+                if ($this->tickets->setPriority($tid, $pr, (int) $me->id)) $n++;
+            }
         } elseif ($op === 'category') {
             if (!$me->can('tickets.categorize')) return response()->json(['ok' => false, 'error' => 'Sin permiso'], 403);
             $catId = $request->input('category_id');
@@ -1856,8 +1984,10 @@ class TicketsController extends Controller
             if ($catId && !DB::table('ticket_categories')->where('id', $catId)->exists()) {
                 return response()->json(['ok' => false, 'error' => 'Categoría no válida'], 400);
             }
-            foreach ($visible as $tid) { $this->tickets->setCategory($tid, $catId, (int) $me->id); $n++; }
-
+            foreach ($visible as $tid) {
+                $this->tickets->setCategory($tid, $catId, (int) $me->id);
+                $n++;
+            }
         } elseif ($op === 'merge') {
             // Fusión en lote: todos los seleccionados en UNO. Deben ser del MISMO cliente
             // (como la fusión individual) y el principal es el más antiguo (id menor).
@@ -1877,11 +2007,11 @@ class TicketsController extends Controller
             $errores = [];
             foreach ($visible as $tid) {
                 [$ok, $err] = $this->tickets->merge($principal, $tid, (int) $me->id, $motivo);
-                if ($ok) $n++; else $errores[] = $err;
+                if ($ok) $n++;
+                else $errores[] = $err;
             }
             if ($n === 0) return response()->json(['ok' => false, 'error' => $errores[0] ?? 'No se pudo fusionar'], 400);
             return response()->json(['ok' => true, 'affected' => $n, 'principal' => $principal, 'warnings' => $errores]);
-
         } else {
             return response()->json(['ok' => false, 'error' => 'Operación no válida'], 400);
         }
@@ -1984,7 +2114,7 @@ class TicketsController extends Controller
                 'subject'     => $subject,
                 'category_id' => $request->input('category_id') ?: null,
                 'priority'    => in_array($request->input('priority'), array_keys(TicketService::priorities()), true)
-                                    ? $request->input('priority') : 'media',
+                    ? $request->input('priority') : 'media',
                 'assigned_to' => $assignee,
                 'user_id'     => (int) $me->id,
                 // Contexto para las reglas automáticas
@@ -2076,7 +2206,7 @@ class TicketsController extends Controller
         // Se listan TODOS los del helpdesk, incluidos los que aún no tienen ningún
         // ticket: un agente a cero es justo al que hay que darle trabajo.
         $agents = User::with('roles.permissions', 'permissions')->orderByRaw('name IS NULL, name ASC, email ASC')->get()
-            ->filter(fn ($u) => $u->can('helpdesk.access'))
+            ->filter(fn($u) => $u->can('helpdesk.access'))
             ->map(function ($u) use ($stats) {
                 $s = $stats[$u->id] ?? null;
                 $total    = (int) ($s->total ?? 0);
@@ -2134,9 +2264,18 @@ class TicketsController extends Controller
             ->orderByDesc('t.ended_at')
             ->limit(100)
             ->get([
-                't.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.source',
-                't.opened_at', 't.resolved_at', 't.closed_at',
-                'c.name as contact_name', 'c.email as contact_email',
+                't.id',
+                't.code',
+                't.subject',
+                't.status',
+                't.priority',
+                't.channel',
+                't.source',
+                't.opened_at',
+                't.resolved_at',
+                't.closed_at',
+                'c.name as contact_name',
+                'c.email as contact_email',
                 'cat.name as category_name',
             ]);
 
@@ -2159,8 +2298,8 @@ class TicketsController extends Controller
         return response()->json([
             'ok'     => true,
             'canned' => DB::table('canned_responses')->where('active', 1)
-                            ->orderBy('position')->orderBy('id')
-                            ->get(['id', 'shortcut', 'title', 'body']),
+                ->orderBy('position')->orderBy('id')
+                ->get(['id', 'shortcut', 'title', 'body']),
         ]);
     }
 

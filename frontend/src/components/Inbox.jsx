@@ -88,7 +88,9 @@ function Bubble({ m, onCtx }) {
   const ix = m.type === 'interactive' && m.payload
   return (
     <div className={`bubble ${m.direction === 'in' ? 'in' : 'out'}`} onContextMenu={onCtx ? (e) => onCtx(e, m) : undefined}>
-      {m.direction === 'out' && m.sent_by_name && <span className="bubble-by">{m.sent_by_name}</span>}
+      {m.direction === 'out' && (m.sent_by_name
+        ? <span className="bubble-by">{m.sent_by_name}</span>
+        : m.via === 'movil' && <span className="bubble-by"><Icon.phone style={{ width: 11, height: 11, fill: 'currentColor', verticalAlign: '-1px' }} /> Desde el móvil</span>)}
       {m.type === 'template' && <span className="bubble-tag"><Icon.templates style={{ width: 11, height: 11, fill: 'currentColor', verticalAlign: '-1px' }} /> Plantilla</span>}
       {isImg && <img className="media" src={mediaUrl(m.media_url)} loading="lazy" alt="" />}
       {isVideo && <video className="media" controls src={mediaUrl(m.media_url)} />}

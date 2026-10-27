@@ -3,6 +3,16 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.3] — 2026-10-27
+
+### Mejoras
+
+- **Chat en vivo de Campañas con Coexistence.** Lo que se contesta desde el móvil del 51
+  (evento `smb_message_echoes`) entra en la conversación como mensaje nuestro, marcado
+  «Desde el móvil». Sin bot, consentimiento ni BAJA/ALTA, no suma «no leídos» y no se
+  duplica si Meta reintenta. Requiere que la app de Meta «CRM CAMPAÑAS» esté suscrita al
+  campo `smb_message_echoes` (la de soporte ya lo estaba).
+
 ## [1.5.2] — 2026-10-27
 
 ### Mejoras

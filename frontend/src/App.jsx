@@ -120,10 +120,19 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.2";
+const APP_VERSION = "1.5.3";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.3",
+        date: "27 oct 2026",
+        resumen: "El Chat en vivo de Campañas muestra también lo que contestas desde el móvil.",
+        mejoras: [
+            "Chat en vivo (Campañas): los mensajes que envías desde la app de WhatsApp Business del móvil aparecen en la conversación, marcados «Desde el móvil».",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.2",
         date: "27 oct 2026",

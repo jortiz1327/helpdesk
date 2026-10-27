@@ -333,7 +333,7 @@ class ConversationController extends Controller
         // Solo mensajes de WhatsApp: los de correo/soporte viven en su ticket, no aquí.
         $messages = DB::select("SELECT m.*, u.name AS sent_by_name FROM messages m LEFT JOIN users u ON u.id = m.sent_by WHERE m.contact_id = ? AND m.channel = 'whatsapp' AND m.funcion = 'campanas' ORDER BY m.id ASC LIMIT 500", [$contactId]);
 
-        return response()->json(['contact' => $contact, 'messages' => $messages]);
+        return response()->json(['contact' => $contact, 'messages' => self::conVia($messages)]);
     }
 
     protected function poll(Request $r)
@@ -341,6 +341,15 @@ class ConversationController extends Controller
         $contactId = (int) $r->query('contact_id', 0);
         $afterId   = (int) $r->query('after', 0);
         $messages = DB::select("SELECT m.*, u.name AS sent_by_name FROM messages m LEFT JOIN users u ON u.id = m.sent_by WHERE m.contact_id = ? AND m.channel = 'whatsapp' AND m.funcion = 'campanas' AND m.id > ? ORDER BY m.id ASC", [$contactId, $afterId]);
-        return response()->json(['messages' => $messages]);
+        return response()->json(['messages' => self::conVia($messages)]);
+    }
+
+    /** `via` = 'movil' en lo enviado desde el móvil (Coexistence), para pintarlo así en el chat. */
+    protected static function conVia(array $messages): array
+    {
+        foreach ($messages as $m) {
+            $m->via = ($m->direction === 'out' && $m->payload && str_contains((string) $m->payload, '"_via":"movil"')) ? 'movil' : null;
+        }
+        return $messages;
     }
 }

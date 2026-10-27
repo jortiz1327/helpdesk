@@ -176,10 +176,40 @@ class WebhookController extends Controller
                 foreach ($value['messages'] ?? [] as $msg) {
                     $this->handleIncoming($msg, $contactNames, $funcion);
                 }
+                // Coexistence: lo que se contesta DESDE EL MÓVIL (app WhatsApp Business) llega
+                // aparte, como «eco». Va al chat tal cual: sin bot, ni consentimiento, ni bajas.
+                foreach ($value['message_echoes'] ?? [] as $msg) {
+                    $this->handleEcho($msg, $funcion);
+                }
 
                 $this->handleStatuses($value['statuses'] ?? []);
             }
         }
+    }
+
+    /**
+     * Mensaje enviado desde el MÓVIL del número de Campañas (Coexistence): se guarda en el
+     * Chat en vivo como nuestro, marcado «Desde el móvil» (payload `_via`), para que la web
+     * enseñe la conversación entera. Mismo mapeo de tipos que el WhatsApp de soporte.
+     */
+    protected function handleEcho(array $msg, string $funcion): void
+    {
+        $to    = (string) ($msg['to'] ?? '');
+        $wamid = (string) ($msg['id'] ?? '');
+        if ($to === '' || $wamid === '' || DB::table('messages')->where('wamid', $wamid)->exists()) return;
+
+        [$tipo, $body, $media] = SoporteWhatsApp::contenido($msg);
+        if ($tipo === null) return;   // reacciones, ediciones, errores…
+
+        ChatService::storeMessage(ChatService::upsertContact($to), $to, 'out', $tipo, (string) ($body ?? ''), [
+            'channel'    => 'whatsapp',
+            'funcion'    => $funcion,
+            'wamid'      => $wamid,
+            'status'     => 'sent',
+            'media_url'  => $media['id'] ?? null,
+            'media_mime' => $media['mime_type'] ?? null,
+            'payload'    => $msg + ['_via' => 'movil'],
+        ]);
     }
 
     protected function handleIncoming(array $msg, array $contactNames, string $funcion = 'campanas'): void
