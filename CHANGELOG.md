@@ -3,6 +3,17 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.11] — 2026-10-28
+
+### Mejoras
+
+- **`tickets:followup` cierra directamente**: a los N días (8) sin respuesta del cliente se le
+  manda la plantilla «ticket_followup» (titular «Tu incidencia se ha cerrado») y el ticket
+  pasa a **cerrado** en el acto, sin el correo de «Ticket cerrado» ni la encuesta
+  (`setStatus(..., notify: false)`). Desaparece el paso de recordatorio + resuelto a las 24 h
+  y su ajuste de horas en Comportamiento. Los recordatorios enviados antes del cambio se
+  cierran sin más correo a las 24 h (en producción no había ninguno pendiente).
+
 ## [1.5.10] — 2026-10-28
 
 ### Mejoras

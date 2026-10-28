@@ -780,7 +780,7 @@ function GuardarAjustes({ save, saving }) {
 function TicketBehavior() {
   const { d, f, setF, save, saving } = useAjustes([
     'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify',
-    'ticket_followup_active', 'ticket_followup_days', 'ticket_followup_hours',
+    'ticket_followup_active', 'ticket_followup_days',
     'notify_throttle_min', 'notify_throttle_max',
     'stale_alert_active', 'stale_alert_days', 'stale_alert_hour',
   ])
@@ -843,29 +843,26 @@ function TicketBehavior() {
       </div>
 
       <div className="card em-card" style={{ marginTop: 16 }}>
-        <h2>Seguimiento cuando el cliente no responde</h2>
+        <h2>Cierre cuando el cliente no responde</h2>
         <p className="em-desc">
-          Si un ticket de <b>correo o web</b> de la categoría <b>Soporte</b> sigue <b>abierto</b> y el cliente no contesta a nuestra última respuesta,
-          se le manda un recordatorio automático en el mismo hilo. Si tampoco responde a ese recordatorio,
-          el ticket pasa a <b>resuelto</b>. Nunca se aplica a WhatsApp, y solo a los tickets creados desde que se activó.
+          Si un ticket de <b>correo o web</b> de la categoría <b>Soporte</b> sigue <b>abierto</b> y el cliente no contesta a nuestra última respuesta
+          en estos días, se le manda un aviso de cierre en el mismo hilo y el ticket pasa a <b>cerrado</b>. Si después contesta, se reabre solo.
+          Nunca se aplica a WhatsApp, y solo a los tickets creados desde que se activó.
         </p>
         <label className="fb-req-row">
           <span className="fb-switch"><input type="checkbox" checked={!!f.ticket_followup_active}
             onChange={(e) => setF((s) => ({ ...s, ticket_followup_active: e.target.checked }))} /><span className={`fb-toggle ${f.ticket_followup_active ? 'on' : ''}`} /></span>
-          <span className="fb-req-label">Activar el seguimiento automático <span className="hint">· el texto se edita en Plantillas de aviso, «Seguimiento sin respuesta»</span></span>
+          <span className="fb-req-label">Activar el cierre automático <span className="hint">· el texto se edita en Plantillas de aviso, «Seguimiento sin respuesta»</span></span>
         </label>
         <div className="grid2" style={{ marginTop: 8 }}>
-          <label className="field"><span className="lbl">Días sin respuesta para el recordatorio</span>
+          <label className="field"><span className="lbl">Días sin respuesta del cliente</span>
             <input type="number" min="1" max="90" value={f.ticket_followup_days} disabled={!f.ticket_followup_active}
               onChange={(e) => setF((s) => ({ ...s, ticket_followup_days: e.target.value }))} /></label>
-          <label className="field"><span className="lbl">Horas tras el recordatorio para resolverlo</span>
-            <input type="number" min="1" max="720" value={f.ticket_followup_hours} disabled={!f.ticket_followup_active}
-              onChange={(e) => setF((s) => ({ ...s, ticket_followup_hours: e.target.value }))} /></label>
         </div>
         <p className="ct-hint">
           {f.ticket_followup_active
-            ? <>Recordatorio a los {f.ticket_followup_days} día(s) sin respuesta y resuelto {f.ticket_followup_hours} h después si sigue sin contestar.</>
-            : 'Desactivado: no se envían recordatorios ni se resuelve nada automáticamente.'}
+            ? <>A los {f.ticket_followup_days} día(s) sin respuesta del cliente se le avisa y el ticket se cierra.</>
+            : 'Desactivado: no se avisa ni se cierra nada automáticamente.'}
         </p>
       </div>
 

@@ -120,10 +120,19 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.10";
+const APP_VERSION = "1.5.11";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.11",
+        date: "28 oct 2026",
+        resumen: "Los tickets sin respuesta del cliente se cierran directamente a los 8 días.",
+        mejoras: [
+            "Tickets de correo y web de Soporte: si el cliente no contesta en 8 días, recibe el aviso de cierre y el ticket pasa a Cerrado en ese momento (antes era un recordatorio y se resolvía 24 h después). Si luego contesta, se reabre solo.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.10",
         date: "28 oct 2026",
