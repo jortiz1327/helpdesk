@@ -14,6 +14,15 @@ class ConversationController extends Controller
         $action = $request->query('action', 'list');
         $post   = $request->isMethod('post');
 
+        // El Chat en vivo es de Campañas: solo abre fichas de Campañas. Un cliente que
+        // solo es de Soporte (tickets, WhatsApp del 01) no se lee ni se toca desde aquí.
+        if (in_array($action, ['mark', 'to_ticket', 'assign', 'delete', 'messages', 'poll'], true)) {
+            $cid = (int) $request->input('contact_id', 0);
+            if ($cid && !DB::table('contacts')->where('id', $cid)->where('en_campanas', 1)->exists()) {
+                return response()->json(['ok' => false, 'error' => 'Contacto no encontrado'], 404);
+            }
+        }
+
         return match (true) {
             $action === 'mark'   && $post => $this->mark($request),
             $action === 'agents'          => $this->agents(),
@@ -96,7 +105,7 @@ class ConversationController extends Controller
          * y leer las incidencias de ese cliente.
          */
         if (!($contact->email ?? '')) {
-            if (DB::table('tickets')->where('contact_id', $id)->exists()) {
+            if ((int) ($contact->en_soporte ?? 0) === 1 || DB::table('tickets')->where('contact_id', $id)->exists()) {
                 return response()->json(['ok' => false, 'error' => 'Este cliente ya tiene tickets de soporte y no tiene correo: pide a Soporte que lo complete en su ficha.'], 409);
             }
             if (DB::table('contacts')->where('email', $email)->where('id', '<>', $id)->exists()) {
@@ -205,6 +214,9 @@ class ConversationController extends Controller
             if ($cc) DB::table('contacts')->where('id', $id)->update(['country_code' => $cc]);
         }
 
+        // Abrir una conversación con ese número la trae a Campañas (es una acción deliberada).
+        \App\Support\ContactArea::campanas($id);
+
         $c = DB::table('contacts')->where('id', $id)->first(['id', 'wa_id', 'name', 'assigned_to']);
 
         // ¿Ya tenía conversación de campañas? El front lo usa para avisar de si es nueva.
@@ -233,7 +245,9 @@ class ConversationController extends Controller
         $esDeSoporte = DB::table('tickets')->where('contact_id', $id)->exists()
             || DB::table('messages')->where('contact_id', $id)->exists();
         if ($esDeSoporte) {
-            DB::update('UPDATE contacts SET last_message = NULL, last_time = NULL, unread = 0, assigned_to = NULL WHERE id = ?', [$id]);
+            // Borrar su conversación es sacarlo de Campañas: deja de salir en sus listas y
+            // audiencias (la única vez que una marca de área se quita).
+            DB::update('UPDATE contacts SET last_message = NULL, last_time = NULL, unread = 0, assigned_to = NULL, en_campanas = 0 WHERE id = ?', [$id]);
             return response()->json(['ok' => true, 'kept' => true]);
         }
 

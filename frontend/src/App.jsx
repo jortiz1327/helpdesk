@@ -120,10 +120,22 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.13";
+const APP_VERSION = "1.5.14";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.14",
+        date: "28 oct 2026",
+        resumen: "Cada ficha de contacto sabe si es de Soporte, de Campañas o de las dos.",
+        mejoras: [
+            "Cada área ve y edita solo sus contactos; el correo y el teléfono de un cliente de soporte solo se cambian desde el Helpdesk.",
+            "El Chat en vivo de Campañas ya no abre clientes que solo son de soporte.",
+        ],
+        arreglos: [
+            "Borrar el último ticket de un cliente ya no lo pasa a la lista de Campañas.",
+        ],
+    },
     {
         version: "1.5.13",
         date: "28 oct 2026",

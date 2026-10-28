@@ -178,6 +178,6 @@ class SoporteWhatsApp
             if ($nombre && !$c->name) DB::table('contacts')->where('id', $c->id)->update(['name' => $nombre]);
             return (int) $c->id;
         }
-        return (int) DB::table('contacts')->insertGetId(['wa_id' => $waId, 'name' => $nombre ?: null, 'created_at' => now()]);
+        return (int) DB::table('contacts')->insertGetId(['wa_id' => $waId, 'name' => $nombre ?: null, 'en_soporte' => 1, 'created_at' => now()]);
     }
 }

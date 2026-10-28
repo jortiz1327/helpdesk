@@ -3,6 +3,29 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.14] — 2026-10-28
+
+### Mejoras
+
+- **Área de la ficha guardada** (`contacts.en_soporte`, `contacts.en_campanas`, `App\Support\ContactArea`).
+  Antes se deducía en cada consulta («tiene tickets», «tiene teléfono»…). La migración la rellena
+  con la misma regla (`SQL_CAMPANAS_DEDUCIDO`): las audiencias de campañas no cambian.
+- Se marca sola y no se desmarca: Soporte con un ticket (alta, cambio de solicitante, fusión) o un
+  mensaje del 01; Campañas con un WhatsApp del 51, una etiqueta, un alta con teléfono fuera de
+  Soporte o «nueva conversación». Excepción: borrar la conversación de Campañas de un cliente de
+  soporte lo saca de Campañas.
+- `ContactsController::SQL_CAMPANAS` = `c.en_campanas = 1` (audiencias, agendas, estadísticas), y la
+  lista «helpdesk» usa `c.en_soporte = 1`.
+- Acceso por área: `contact.php` (guardar, etiquetas) solo en fichas del área de quien edita; correo
+  y teléfono de una ficha de Soporte solo con `helpdesk.access`. `contacts.php` (etiquetas, bajas y
+  agendas en lote, fusión, duplicados) con la misma regla. `conversations.php` solo abre fichas de
+  Campañas (404 si no).
+
+### Arreglos
+
+- Borrar el último ticket de un cliente ya no lo pasa a Campañas.
+- Tests: `ContactAreaTest` (9).
+
 ## [1.5.13] — 2026-10-28
 
 Correcciones de la auditoría de seguridad del 2026-10-28 (bloque crítico/alto).

@@ -1808,6 +1808,7 @@ class TicketsController extends Controller
         }
 
         DB::table('tickets')->where('id', $id)->update(['contact_id' => $nuevo]);
+        \App\Support\ContactArea::soporte((int) $nuevo);
         $this->tickets->event($id, 'requester', $antiguo, $email, (int) $me->id);
         $this->tickets->broadcast('updated', $id);
 

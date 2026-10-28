@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ContactArea;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -19,6 +20,13 @@ class ContactController extends Controller
 
         $id = (int) $request->input('contact_id', 0);
         if (!$id) return response()->json(['ok' => false, 'error' => 'Falta contact_id'], 400);
+
+        // Solo fichas del área de quien edita (Soporte con Helpdesk, Campañas con Campañas).
+        $ficha = DB::table('contacts')->where('id', $id)->first(['id', 'email', 'wa_id', 'en_soporte', 'en_campanas']);
+        if (!$ficha) return response()->json(['ok' => false, 'error' => 'Contacto no encontrado'], 404);
+        if (!ContactArea::puedeVer($request->user(), $ficha)) {
+            return response()->json(['ok' => false, 'error' => 'Este contacto es de otra área'], 403);
+        }
 
         if ($action === 'save' && $request->isMethod('post')) {
             $data = $request->all();
@@ -95,6 +103,14 @@ class ContactController extends Controller
                 $upd['wa_id']        = $wa;
             }
 
+            // Correo y teléfono son la llave del portal y del WhatsApp de soporte: en una
+            // ficha de Soporte solo los cambia quien tiene Helpdesk.
+            $cambiaCorreo = array_key_exists('email', $upd) && $upd['email'] !== (mb_strtolower((string) $ficha->email) ?: null);
+            $cambiaTel    = array_key_exists('wa_id', $upd) && $upd['wa_id'] !== ($ficha->wa_id ?: null);
+            if (($cambiaCorreo || $cambiaTel) && !ContactArea::puedeIdentidad($request->user(), $ficha)) {
+                return response()->json(['ok' => false, 'error' => 'Es un cliente de soporte: su correo y su teléfono solo se cambian desde el Helpdesk'], 403);
+            }
+
             // Un contacto sin correo NI teléfono se quedaría inlocalizable.
             if (array_key_exists('email', $upd) || array_key_exists('wa_id', $upd)) {
                 $c = DB::table('contacts')->where('id', $id)->first(['email', 'wa_id']);
@@ -106,6 +122,7 @@ class ContactController extends Controller
             }
 
             if ($upd) DB::table('contacts')->where('id', $id)->update($upd);
+            if ($cambiaTel) ContactArea::porTelefono($id);
 
             return response()->json(['ok' => true]);
         }
@@ -117,6 +134,7 @@ class ContactController extends Controller
             if ($labelIds) {
                 $rows = array_map(fn ($lid) => ['contact_id' => $id, 'label_id' => $lid], $labelIds);
                 DB::table('contact_labels')->insertOrIgnore($rows);
+                ContactArea::campanas($id);   // las etiquetas son de Campañas
             }
             return response()->json(['ok' => true]);
         }
@@ -164,6 +182,7 @@ class ContactController extends Controller
             'note'         => '[añadido a mano]',
             'created_at'   => now(),
         ]);
+        ContactArea::porTelefono($id);
         return response()->json(['ok' => true, 'id' => $id]);
     }
 
@@ -213,6 +232,11 @@ class ContactController extends Controller
             // insertOrIgnore: ya se han filtrado los existentes; esto solo evita que una
             // carrera (dos altas del mismo correo a la vez) tumbe el lote por el índice único.
             foreach (array_chunk($rows, 500) as $lote) DB::table('contacts')->insertOrIgnore($lote);
+            if ($tipo === 'whatsapp' && $rows) {
+                foreach (array_chunk(array_column($rows, 'wa_id'), 500) as $lote) {
+                    ContactArea::porTelefono(DB::table('contacts')->whereIn('wa_id', $lote)->pluck('id')->all());
+                }
+            }
         }
 
         return response()->json(['ok' => true, 'added' => count($rows), 'dup' => $dup, 'invalid' => $inval]);
@@ -312,7 +336,7 @@ class ContactController extends Controller
             // Un cliente con tickets de soporte NO se toca desde una importación: su correo y
             // su teléfono son la llave del portal y del WhatsApp de soporte, y quien importa
             // (también Campañas) podría poner los suyos y leer sus incidencias.
-            if ($c && DB::table('tickets')->where('contact_id', $c->id)->exists()) {
+            if ($c && ((int) $c->en_soporte === 1 || DB::table('tickets')->where('contact_id', $c->id)->exists())) {
                 $protected++;
                 continue;
             }
@@ -338,6 +362,7 @@ class ContactController extends Controller
                 ]);
                 $added++;
             }
+            ContactArea::porTelefono($cid);
 
             // Sector → etiqueta (crear si no existe) y asignar al contacto.
             $sector = $val($row, 'sector');
@@ -360,6 +385,7 @@ class ContactController extends Controller
                 if ($key !== '') {
                     \App\Models\Label::quitarHermanas([$cid], $labelCache[$key]);   // p. ej. «Cliente» quita «Excliente»
                     DB::table('contact_labels')->insertOrIgnore(['contact_id' => $cid, 'label_id' => $labelCache[$key]]);
+                    ContactArea::campanas($cid);
                 }
             }
         }

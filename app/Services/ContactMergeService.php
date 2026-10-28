@@ -51,6 +51,10 @@ class ContactMergeService
             $upd['unread'] = (int) $keep->unread + (int) $merge->unread;
             // Si cualquiera de los dos se dio de baja, la baja manda (más conservador).
             if ((int) $merge->opted_out === 1) $upd['opted_out'] = 1;
+            // Área: la ficha unida es de todas las áreas de las dos.
+            foreach (['en_soporte', 'en_campanas'] as $col) {
+                if ((int) ($merge->$col ?? 0) === 1) $upd[$col] = 1;
+            }
 
             // wa_id y email son únicos: se liberan del absorbido ANTES de copiarlos.
             DB::table('contacts')->where('id', $mergeId)->update(['wa_id' => null, 'email' => null]);

@@ -261,7 +261,10 @@ class FlowEngine
         }
         DB::table('contact_labels')->where('contact_id', $contactId)->delete();
         $rows = array_map(fn ($lid) => ['contact_id' => $contactId, 'label_id' => $lid], $set);
-        if ($rows) DB::table('contact_labels')->insertOrIgnore($rows);
+        if ($rows) {
+            DB::table('contact_labels')->insertOrIgnore($rows);
+            \App\Support\ContactArea::campanas($contactId);   // las etiquetas son de Campañas
+        }
     }
 
     /**

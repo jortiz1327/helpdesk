@@ -87,10 +87,16 @@ class ContactIdentityGuardTest extends TestCase
     {
         [$cid] = $this->victima();
         $token = $this->tokenCon(['campaigns.access']);
-
-        $this->withHeader('X-App-Token', $token)->postJson('/api/conversations.php?action=to_ticket', [
+        $pedir = fn () => $this->withHeader('X-App-Token', $token)->postJson('/api/conversations.php?action=to_ticket', [
             'contact_id' => $cid, 'email' => 'campanas@x.com', 'subject' => 'Escalado',
-        ])->assertStatus(409);
+        ]);
+
+        // Solo de Soporte: el Chat en vivo ni lo encuentra.
+        DB::table('contacts')->where('id', $cid)->update(['en_soporte' => 1]);
+        $pedir()->assertStatus(404);
+        // De las dos áreas (también habló con el 51): se encuentra, pero el correo no se pone.
+        DB::table('contacts')->where('id', $cid)->update(['en_campanas' => 1]);
+        $pedir()->assertStatus(409);
 
         $this->assertNull(DB::table('contacts')->where('id', $cid)->value('email'));
         $this->assertSame(1, DB::table('tickets')->count());
@@ -98,7 +104,7 @@ class ContactIdentityGuardTest extends TestCase
 
     public function test_campanas_si_convierte_un_chat_sin_historial_de_soporte(): void
     {
-        $cid = DB::table('contacts')->insertGetId(['name' => 'Lead', 'wa_id' => '34600555444']);
+        $cid = DB::table('contacts')->insertGetId(['name' => 'Lead', 'wa_id' => '34600555444', 'en_campanas' => 1]);
         $token = $this->tokenCon(['campaigns.access']);
 
         $this->withHeader('X-App-Token', $token)->postJson('/api/conversations.php?action=to_ticket', [

@@ -184,6 +184,7 @@ class TicketService
         ]);
 
         $this->event($id, 'created', null, $data['channel'] ?? 'whatsapp', $data['user_id'] ?? null);
+        \App\Support\ContactArea::soporte((int) $data['contact_id']);   // quien abre un ticket es de Soporte
 
         /*
          * Los AVISOS DE CRON se quedan aquí: no son un ticket de cliente. Nada de

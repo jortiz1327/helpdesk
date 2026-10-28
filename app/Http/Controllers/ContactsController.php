@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ContactArea;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -37,17 +38,17 @@ class ContactsController extends Controller
     }
 
     /**
-     * ¿El contacto `c` es de CAMPAÑAS? Si ha hablado con el WhatsApp de Campañas, tiene
-     * alguna etiqueta (las etiquetas son de Campañas), o tiene número y NO es del Helpdesk
-     * (p. ej. alta a mano). Tener teléfono no basta: un ticket del portal con teléfono o un
-     * cliente del WhatsApp de soporte NO es de Campañas. Única definición: la usan esta
-     * lista y la importación a agendas («Todos mis contactos»).
+     * ¿El contacto `c` es de CAMPAÑAS? Lo dice su marca de área (ver ContactArea). La usan
+     * esta lista, las audiencias, las agendas («Todos mis contactos») y las estadísticas.
      */
-    public const SQL_CAMPANAS = "(EXISTS (SELECT 1 FROM messages mw WHERE mw.contact_id = c.id AND mw.channel = 'whatsapp' AND mw.funcion = 'campanas')
-                OR EXISTS (SELECT 1 FROM contact_labels clc WHERE clc.contact_id = c.id)
-                OR (c.wa_id IS NOT NULL
-                    AND NOT EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)
-                    AND NOT EXISTS (SELECT 1 FROM messages ms WHERE ms.contact_id = c.id AND ms.funcion = 'soporte')))";
+    public const SQL_CAMPANAS = ContactArea::SQL_CAMPANAS;
+
+    /** 403 si alguna de las fichas es de un área a la que el usuario no tiene acceso. */
+    protected function fueraDeArea(Request $r, array $ids): ?\Illuminate\Http\JsonResponse
+    {
+        if (!ContactArea::noVisibles($r->user(), $ids)) return null;
+        return response()->json(['ok' => false, 'error' => 'Hay contactos de otra área en la selección'], 403);
+    }
 
     /**
      * POSIBLES DUPLICADOS: la misma persona en dos fichas. Lo inequívoco (mismo correo o
@@ -84,8 +85,9 @@ class ContactsController extends Controller
         // Datos de cada ficha + a qué área pertenece (para no enseñar clientes de otra área).
         $ids = collect($pares)->flatMap(fn ($p) => [$p[0]->id, $p[1]->id])->unique()->values();
         $tickets = DB::table('tickets')->whereIn('contact_id', $ids)->groupBy('contact_id')->selectRaw('contact_id, COUNT(*) n')->pluck('n', 'contact_id');
-        $soporte = DB::table('messages')->whereIn('contact_id', $ids)->where('funcion', 'soporte')->distinct()->pluck('contact_id')->flip();
-        $puedeVer = fn ($c) => (isset($tickets[$c->id]) || isset($soporte[$c->id])) ? $me->can('helpdesk.access') : $me->can('campaigns.access');
+        // Unir cambia la identidad de las dos fichas: hace falta poder hacerlo en ambas.
+        $areas = DB::table('contacts')->whereIn('id', $ids)->get(['id', 'en_soporte', 'en_campanas'])->keyBy('id');
+        $puedeVer = fn ($c) => isset($areas[$c->id]) && ContactArea::puedeIdentidad($me, $areas[$c->id]);
         $recientes = $this->ticketsRecientes($ids->all(), $me);
         $ficha = fn ($c) => ['id' => (int) $c->id, 'name' => $c->name, 'email' => $c->email, 'wa_id' => $c->wa_id,
             'tickets' => (int) ($tickets[$c->id] ?? 0), 'created_at' => $c->created_at,
@@ -148,11 +150,13 @@ class ContactsController extends Controller
         $label = (int) $r->input('label_id');
         $mode  = $r->input('mode', 'add') === 'remove' ? 'remove' : 'add';
         if (!$ids || !$label) return response()->json(['ok' => false, 'error' => 'Faltan contactos o etiqueta'], 400);
+        if ($no = $this->fueraDeArea($r, $ids)) return $no;
 
         if ($mode === 'add') {
             \App\Models\Label::quitarHermanas($ids, $label);   // excluyentes: fuera las del mismo grupo
             $rows = array_map(fn ($cid) => ['contact_id' => $cid, 'label_id' => $label], $ids);
             $n = DB::table('contact_labels')->insertOrIgnore($rows);
+            ContactArea::campanas($ids);   // las etiquetas son de Campañas
             return response()->json(['ok' => true, 'changed' => $n]);
         }
         $n = DB::table('contact_labels')->where('label_id', $label)->whereIn('contact_id', $ids)->delete();
@@ -164,6 +168,7 @@ class ContactsController extends Controller
         $ids = $this->ids($r);
         $val = $r->boolean('value');
         if (!$ids) return response()->json(['ok' => false, 'error' => 'Faltan contactos'], 400);
+        if ($no = $this->fueraDeArea($r, $ids)) return $no;
         // Solo los que CAMBIAN quedan en el registro de consentimientos (RGPD).
         $cambian = DB::table('contacts')->whereIn('id', $ids)->where('opted_out', $val ? 0 : 1)->pluck('id');
         DB::table('contacts')->whereIn('id', $ids)->update(
@@ -179,6 +184,7 @@ class ContactsController extends Controller
         $ids = $this->ids($r);
         $pb  = (int) $r->input('phonebook_id');
         if (!$ids || !$pb) return response()->json(['ok' => false, 'error' => 'Faltan contactos o agenda'], 400);
+        if ($no = $this->fueraDeArea($r, $ids)) return $no;
 
         $rows = DB::table('contacts')->whereIn('id', $ids)->get(['wa_id', 'name']);
         $insert = $rows->map(fn ($c) => ['phonebook_id' => $pb, 'wa_id' => $c->wa_id, 'name' => $c->name])->all();
@@ -213,6 +219,10 @@ class ContactsController extends Controller
         if (!$r->user()->can('helpdesk.access') && DB::table('tickets')->whereIn('contact_id', [$keepId, $mergeId])->exists()) {
             return response()->json(['ok' => false, 'error' => 'Estos contactos tienen tickets: solo se pueden fusionar desde el Helpdesk'], 403);
         }
+        // Y cambia la identidad de las dos: cada ficha, de un área de quien fusiona.
+        if (!ContactArea::puedeIdentidad($r->user(), $keep) || !ContactArea::puedeIdentidad($r->user(), $merge)) {
+            return response()->json(['ok' => false, 'error' => 'Alguna de las fichas es de otra área: no puedes fusionarlas'], 403);
+        }
 
         app(\App\Services\ContactMergeService::class)->fusionar($keepId, $mergeId);
         return response()->json(['ok' => true]);
@@ -235,10 +245,10 @@ class ContactsController extends Controller
         }
 
         /*
-         * SEPARACIÓN POR ÁREA (por actividad):
-         *   · campaigns → contactos con mensajes de WhatsApp (a los que se difunde).
-         *   · helpdesk  → contactos que han abierto algún ticket (los de soporte).
-         * Sin `area` se listan todos (compatibilidad).
+         * SEPARACIÓN POR ÁREA (marca de la ficha, ver ContactArea):
+         *   · campaigns → fichas de Campañas (a las que se difunde).
+         *   · helpdesk  → fichas de Soporte (tickets o WhatsApp del 01).
+         * Sin `area` se listan todos (quien tiene las dos áreas).
          */
         $area = $r->query('area', '');
         // El ÁREA la decide el servidor según los permisos, no el navegador: quien solo
@@ -249,7 +259,7 @@ class ContactsController extends Controller
         if ($area === 'campaigns') {
             $where[] = self::SQL_CAMPANAS;
         } elseif ($area === 'helpdesk') {
-            $where[] = 'EXISTS (SELECT 1 FROM tickets tk WHERE tk.contact_id = c.id)';
+            $where[] = ContactArea::SQL_SOPORTE;
         }
         if ($labelId) { $where[] = 'EXISTS (SELECT 1 FROM contact_labels cl2 WHERE cl2.contact_id = c.id AND cl2.label_id = ?)'; $params[] = $labelId; }
         if ($optout === '1') $where[] = 'c.opted_out = 1';

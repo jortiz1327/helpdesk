@@ -114,6 +114,14 @@ class ChatService
 
         $msg = Message::create($attrs);
 
+        // Área de la ficha: lo que cuelga de un ticket o pasa por el 01 es de Soporte; el
+        // resto del WhatsApp (el 51: chat, campañas, bot) es de Campañas.
+        if (!empty($opts['ticket_id']) || $attrs['funcion'] === 'soporte') {
+            \App\Support\ContactArea::soporte($contactId);
+        } elseif ($attrs['channel'] === 'whatsapp' && $attrs['funcion'] === 'campanas') {
+            \App\Support\ContactArea::campanas($contactId);
+        }
+
         // El resumen del contacto (last_message/last_time/unread) es el de la vista
         // «Chat en vivo» de Campañas, que es SOLO WhatsApp. Los mensajes de correo/web
         // (soporte) NO lo tocan: su actividad vive en el ticket, no en esa bandeja.
