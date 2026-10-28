@@ -587,6 +587,18 @@ class TicketsController extends Controller
             ->whereIn('ticket_id', $ids)->pluck('ticket_id')->flip()->all() : [];
         foreach ($rows as $t) $t->mentioned = isset($mencion[$t->id]);
 
+        // WhatsApp: ¿sigue abierta la ventana de 24 h? Una consulta para toda la página. Va
+        // por CLIENTE (como el bloqueo al responder): un mensaje suyo en otro ticket también la abre.
+        $waContactos = $rows->where('channel', 'whatsapp')->pluck('contact_id')->filter()->unique()->values()->all();
+        $ultimoIn = $waContactos ? DB::table('messages')->whereIn('contact_id', $waContactos)
+            ->where('channel', 'whatsapp')->where('funcion', 'soporte')->where('direction', 'in')
+            ->groupBy('contact_id')->selectRaw('contact_id, MAX(created_at) ultimo')->pluck('ultimo', 'contact_id')->all() : [];
+        foreach ($rows as $t) {
+            if ($t->channel !== 'whatsapp') continue;
+            $u = $ultimoIn[$t->contact_id] ?? null;
+            $t->wa_last_in = $u ? \Illuminate\Support\Carbon::parse($u)->toIso8601String() : null;
+        }
+
         // Los tiempos solo se calculan (y se envían) a quien tiene permiso para verlos.
         $canTimes = $me->can('tickets.view_times');
         $sla = app(SlaService::class);

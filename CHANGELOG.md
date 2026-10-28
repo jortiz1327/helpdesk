@@ -3,6 +3,23 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.8] — 2026-10-28
+
+### Mejoras
+
+- **Badge de WhatsApp en ámbar con la ventana de 24 h cerrada** (lista de tickets y ficha),
+  solo en tickets activos (no resueltos ni cerrados). Tooltip con la fecha del último mensaje
+  del cliente, o hasta cuándo se puede contestar si sigue abierta. La lista trae
+  `wa_last_in` por ticket (una consulta por página, por cliente, como el bloqueo al responder).
+
+### Arreglos
+
+- **Nombre del agente en tickets de WhatsApp:** salía solo cuando cambiaba quién contestaba;
+  si el mismo agente volvía a responder tras el cliente, la tanda salía sin nombre. Ahora va
+  al principio de cada tanda de respuestas.
+- **Chat en vivo de Campañas:** el mensaje enviado desde la web se pintaba sin `sent_by_name`
+  y salía «Automático» hasta recargar. Ahora lleva el nombre de quien lo envía.
+
 ## [1.5.7] — 2026-10-27
 
 ### Mejoras

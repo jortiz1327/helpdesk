@@ -113,7 +113,7 @@ function Bubble({ m, onCtx }) {
 
 const TABS = [{ k: 'all', t: 'Todos' }, { k: 'unread', t: 'No leídos' }, { k: 'read', t: 'Leídos' }]
 
-export default function Inbox({ onUnread, initialContactId, onOpened }) {
+export default function Inbox({ user, onUnread, initialContactId, onOpened }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [convs, setConvs] = useState(null)
@@ -293,9 +293,10 @@ export default function Inbox({ onUnread, initialContactId, onOpened }) {
   const nowStamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Madrid' })
 
   // Añade un mensaje saliente al hilo usando su id real, y adelanta lastIdRef
-  // para que el polling no lo vuelva a insertar (evita duplicados).
+  // para que el polling no lo vuelva a insertar (evita duplicados). Lleva el nombre de
+  // quien lo envía: sin él, la burbuja salía como «Automático» hasta recargar el chat.
   const pushOut = (msg) => {
-    setMessages((m) => [...m, msg])
+    setMessages((m) => [...m, { sent_by_name: user?.name || 'Tú', ...msg }])
     if (typeof msg.id === 'number') lastIdRef.current = Math.max(lastIdRef.current, msg.id)
     scrollDown()
   }

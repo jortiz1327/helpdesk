@@ -2272,6 +2272,9 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 :root[data-theme="light"] .chip.ch-web      { background: #eef2ff; color: #4338ca; }
 :root[data-theme="light"] .chip.ch-email    { background: #e0f2fe; color: #0369a1; }
 :root[data-theme="light"] .chip.ch-whatsapp { background: #e7f9ee; color: #0f7a3d; }
+/* WhatsApp con la ventana de 24 h cerrada: ámbar, para ver de un vistazo que hay que ir por otro canal. */
+.chip.ch-whatsapp.ch-wa-cerrada { background: rgba(245, 158, 11, 0.18); color: #fbbf24; cursor: help; }
+:root[data-theme="light"] .chip.ch-whatsapp.ch-wa-cerrada { background: #fef3c7; color: #b45309; }
 
 /* --- Nuevo ticket --- */
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }

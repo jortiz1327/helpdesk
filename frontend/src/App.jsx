@@ -120,10 +120,22 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.7";
+const APP_VERSION = "1.5.8";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.8",
+        date: "28 oct 2026",
+        resumen: "WhatsApp: badge ámbar cuando han pasado 24 h y el nombre de quién contesta en cada respuesta.",
+        mejoras: [
+            "Tickets de WhatsApp: el badge del canal se pone ámbar cuando el cliente lleva más de 24 h sin escribir (ya no se le puede contestar desde aquí). El tooltip dice desde cuándo y vuelve a verde en cuanto el cliente escribe.",
+        ],
+        arreglos: [
+            "Tickets de WhatsApp: el nombre del agente sale al principio de cada respuesta, no solo cuando cambia quién contesta.",
+            "Chat en vivo (Campañas): lo que envías desde la web sale con tu nombre al momento, no como «Automático» hasta recargar.",
+        ],
+    },
     {
         version: "1.5.7",
         date: "27 oct 2026",
@@ -1449,6 +1461,7 @@ export default function App() {
                         {view === "forms" && <Forms />}
                         {view === "inbox" && (
                             <Inbox
+                                user={auth.user}
                                 onUnread={setUnread}
                                 initialContactId={openTarget}
                                 onOpened={() => setOpenTarget(null)}

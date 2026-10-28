@@ -1189,7 +1189,8 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                           <input type="checkbox" checked={sel.has(t.id)} onChange={() => toggleSel(t.id)} />
                         </td>
                         <td className="tk-code">{t.code}</td>
-                        <td><ChannelBadge channel={t.channel} source={t.source} /></td>
+                        <td><ChannelBadge channel={t.channel} source={t.source}
+                          lastIn={t.channel === 'whatsapp' && !['resuelto', 'cerrado'].includes(t.status) ? t.wa_last_in : undefined} /></td>
                         <td className="tk-cli"><b>{nombreContacto(t.contact_name, t.contact_wa)}</b><small>{t.contact_email || (t.contact_wa && t.contact_name ? fmtTel(t.contact_wa) : t.contact_wa ? 'WhatsApp' : '—')}</small></td>
                         <td className="tk-subj">
                           {waiting && <span className="dot-wait" title="El cliente escribió lo último: sin responder" />}
@@ -1967,7 +1968,10 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
               {/* PROPIEDADES compactas: una línea cada una. */}
               <div className="tkm-props">
                 <div className="tkm-row"><span>Referencia</span><b className="tk-code">{t.code}</b></div>
-                <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} source={t.source} /></div>
+                <div className="tkm-row"><span>Origen</span><ChannelBadge channel={t.channel} source={t.source}
+                  lastIn={t.channel === 'whatsapp' && d.wa && !['resuelto', 'cerrado'].includes(t.status)
+                    ? (d.wa.window_closes ? new Date(new Date(d.wa.window_closes).getTime() - 24 * 3600 * 1000).toISOString() : null)
+                    : undefined} /></div>
                 <div className="tkm-row"><span>Prioridad</span>
                   {can('tickets.categorize') ? (
                     <Select value={t.priority && t.priority !== 'sin_asignar' ? t.priority : ''}
@@ -2149,9 +2153,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                     && a.author_user_id === b.author_user_id && a.via === b.via
                     && fmtDateShort(a.created_at) === fmtDateShort(b.created_at)
                     && parseDate(b.created_at) - parseDate(a.created_at) <= 5 * 60 * 1000
-                  const autorDe = (x) => `${x.author_user_id || ''}|${x.via || ''}`
                   let sepPuesto = false
-                  let autorOut = null   // quién contestó la última vez (para no repetir su nombre)
                   return mensajes.map((m, i) => {
                   const out = m.direction === 'out'
                   const esNota = nota(m)
@@ -2166,12 +2168,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   const nuevoDia = esWa && (!prev || fmtDateShort(prev.created_at) !== fmtDateShort(m.created_at))
                   const ini = !esWa || sep || !mismoGrupo(prev, m)
                   const fin = !esWa || !mismoGrupo(m, next)
-                  // En WhatsApp el nombre solo hace falta en lo NUESTRO y cuando cambia quién
-                  // contesta: el cliente es siempre el mismo y ya sale en la cabecera.
-                  // «Desde el móvil», en cambio, va en TODOS: dice por dónde salió cada mensaje.
-                  const cambiaAutor = out && !esNota && autorDe(m) !== autorOut
-                  if (out && !esNota) autorOut = autorDe(m)
-                  const conNombre = !esWa || esNota || (ini && cambiaAutor) || (out && !m.author_name && m.via === 'movil')
+                  // En WhatsApp el nombre solo hace falta en lo NUESTRO: el cliente es siempre el
+                  // mismo y ya sale en la cabecera. Va al principio de cada tanda de respuestas
+                  // (antes solo cuando cambiaba quién contestaba, y entre varios agentes no se
+                  // sabía quién había escrito). «Desde el móvil» va en TODOS: dice por dónde salió.
+                  const conNombre = !esWa || esNota || (out && ini) || (out && !m.author_name && m.via === 'movil')
                   const conEstrella = out && !esNota && (m.body || m.type === 'text')
                   // Foto/audio/… sin archivo: el historial del móvil no lo trae (Meta no lo manda).
                   // También si el archivo no carga (Meta lo borra a las semanas): mejor el aviso que una burbuja vacía.
