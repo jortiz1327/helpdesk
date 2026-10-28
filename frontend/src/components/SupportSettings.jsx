@@ -38,7 +38,7 @@ const SECCIONES = [
   ] },
   { grupo: 'Flujo de trabajo', items: [
     { key: 'rules',      label: 'Reglas automáticas',    icon: Icon.settings, desc: 'Asignar, categorizar y priorizar solo al entrar.' },
-    { key: 'behavior',   label: 'Comportamiento',        icon: Icon.ticket,   desc: 'Estado inicial, bloqueo entre agentes, cierre automático, seguimiento sin respuesta y pausa entre avisos.' },
+    { key: 'behavior',   label: 'Comportamiento',        icon: Icon.ticket,   desc: 'Estado inicial, bloqueo entre agentes, cierre automático, seguimiento sin respuesta, aviso de tickets sin contestar y pausa entre avisos.' },
     { key: 'sla',        label: 'SLA',                   icon: Icon.timer,    desc: 'Relojes de respuesta y resolución, avisos por correo y escalado.' },
     { key: 'hours',      label: 'Horario de atención',   icon: Icon.clock,    desc: 'Cuándo se atiende. Sobre esto corre el reloj del SLA.' },
   ] },
@@ -782,6 +782,7 @@ function TicketBehavior() {
     'ticket_default_status', 'ticket_lock_minutes', 'ticket_autoclose_days', 'ticket_autoclose_notify',
     'ticket_followup_active', 'ticket_followup_days', 'ticket_followup_hours',
     'notify_throttle_min', 'notify_throttle_max',
+    'stale_alert_active', 'stale_alert_days', 'stale_alert_hour',
   ])
   if (!d || !f) return <div className="center-load"><div className="spinner" /></div>
 
@@ -865,6 +866,33 @@ function TicketBehavior() {
           {f.ticket_followup_active
             ? <>Recordatorio a los {f.ticket_followup_days} día(s) sin respuesta y resuelto {f.ticket_followup_hours} h después si sigue sin contestar.</>
             : 'Desactivado: no se envían recordatorios ni se resuelve nada automáticamente.'}
+        </p>
+      </div>
+
+      <div className="card em-card" style={{ marginTop: 16 }}>
+        <h2>Aviso de tickets sin contestar</h2>
+        <p className="em-desc">
+          Cada día laborable se manda <b>un correo</b> a quien esté <b>de turno</b> con los tickets cuyo último mensaje es del
+          cliente y llevan estos días sin respuesta (en estado <b>Nuevo</b> o <b>Abierto</b>; nunca crones ni pospuestos), para
+          que los conteste, los resuelva o los pase a <b>Planificado</b>. Ni fines de semana ni festivos, y si no hay ninguno no se manda nada.
+        </p>
+        <label className="fb-req-row">
+          <span className="fb-switch"><input type="checkbox" checked={!!f.stale_alert_active}
+            onChange={(e) => setF((s) => ({ ...s, stale_alert_active: e.target.checked }))} /><span className={`fb-toggle ${f.stale_alert_active ? 'on' : ''}`} /></span>
+          <span className="fb-req-label">Enviar el aviso diario al turno</span>
+        </label>
+        <div className="grid2" style={{ marginTop: 8 }}>
+          <label className="field"><span className="lbl">Días sin contestar</span>
+            <input type="number" min="1" max="60" value={f.stale_alert_days}
+              onChange={(e) => setF((s) => ({ ...s, stale_alert_days: e.target.value }))} /></label>
+          <label className="field"><span className="lbl">Hora del envío</span>
+            <input type="time" value={f.stale_alert_hour} disabled={!f.stale_alert_active}
+              onChange={(e) => setF((s) => ({ ...s, stale_alert_hour: e.target.value }))} /></label>
+        </div>
+        <p className="ct-hint">
+          {f.stale_alert_active
+            ? <>De lunes a viernes laborables a las {f.stale_alert_hour}, con los tickets que llevan más de {f.stale_alert_days} día(s) esperando. Si nadie cubre el turno, va a los administradores.</>
+            : 'Desactivado: no se manda el aviso.'}
         </p>
       </div>
 

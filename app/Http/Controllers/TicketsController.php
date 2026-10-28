@@ -29,7 +29,7 @@ class TicketsController extends Controller
      * Se comparte entre la cola (aplicarFiltros) y los contadores (counts) para que
      * nunca discrepen: lo que no cuenta, tampoco se lista, y al revés.
      */
-    protected const SQL_DESPIERTO =
+    public const SQL_DESPIERTO =
     '(t.snoozed_at IS NULL OR ((t.snoozed_until IS NULL OR t.snoozed_until <= NOW()) AND t.snooze_wake_on_reply = 0))';
 
     /** Tamaño de página del hilo de mensajes (los últimos N al abrir; el resto, bajo demanda). */

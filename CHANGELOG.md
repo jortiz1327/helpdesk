@@ -3,6 +3,21 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.10] — 2026-10-28
+
+### Mejoras
+
+- **Aviso diario de tickets sin contestar** (`tickets:stale-digest`, cada 15 min; decide él):
+  un solo correo a todo el equipo que cubre el turno en ese momento (cuadrante, con
+  sustitutos; si no hay nadie, a los administradores de soporte) con los tickets en
+  **nuevo** o **abierto** cuyo último mensaje público es del cliente y lleva X días (4 por
+  defecto). Fuera crones, pospuestos y fusionados; las notas internas no cuentan como
+  respuesta. Solo días laborables (ni sábados, ni domingos, ni festivos de «Horario de
+  atención»), desde la hora fijada (07:30) y una vez al día; si no hay ninguno, no se manda.
+  Criterio en `StaleTickets`. Sin vista en la app, a propósito.
+- Ajustes en **Comportamiento**: `stale_alert_active`, `stale_alert_days` (1-60) y
+  `stale_alert_hour` (HH:MM, se valida antes de guardar nada de la sección).
+
 ## [1.5.9] — 2026-10-28
 
 ### Mejoras

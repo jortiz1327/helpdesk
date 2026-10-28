@@ -29,6 +29,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('email:fetch')->everyMinute()->withoutOverlapping();
         // Correo/web: recordatorio al cliente a los 8 días sin respuesta y resuelto 24 h después
         $schedule->command('tickets:followup')->everyFifteenMinutes()->withoutOverlapping();
+        // Correo diario al turno con los tickets que esperan respuesta hace X días. Corre
+        // cada 15 min y él decide: solo laborables, desde la hora fijada y una vez al día.
+        $schedule->command('tickets:stale-digest')->everyFifteenMinutes()->withoutOverlapping();
         // Cierra los tickets que llevan X días resueltos (si está configurado)
         $schedule->command('tickets:autoclose')->dailyAt('03:30')->withoutOverlapping();
         // Avisos de SLA por correo (por vencer / vencido) — si están activados

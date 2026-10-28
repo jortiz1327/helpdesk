@@ -120,10 +120,20 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.9";
+const APP_VERSION = "1.5.10";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.10",
+        date: "28 oct 2026",
+        resumen: "Correo diario al turno con los tickets que llevan días sin contestar.",
+        mejoras: [
+            "Cada día laborable, quien está de turno recibe un correo con los tickets en los que el cliente lleva más de 4 días esperando respuesta, para contestarlos, resolverlos o pasarlos a Planificado. Ni fines de semana ni festivos, y si no hay ninguno no llega nada.",
+            "Configuración › Comportamiento: activar el aviso, los días y la hora del envío.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.9",
         date: "28 oct 2026",

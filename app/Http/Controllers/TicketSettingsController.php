@@ -40,6 +40,10 @@ class TicketSettingsController extends Controller
                 // Rango en el que cada agente elige la pausa entre avisos del mismo ticket.
                 'notify_throttle_min' => \App\Services\NotifyThrottle::rango()[0],
                 'notify_throttle_max' => \App\Services\NotifyThrottle::rango()[1],
+                // Correo diario al turno con los tickets que esperan respuesta hace X días.
+                'stale_alert_active' => (string) Setting::get('stale_alert_active', '1') === '1',
+                'stale_alert_days'   => \App\Services\StaleTickets::dias(),
+                'stale_alert_hour'   => \App\Console\Commands\TicketsStaleDigest::hora(),
             ],
             'statuses' => TicketService::STATUSES,
             // Cuántos se cerrarían HOY con el ajuste actual: da confianza antes de guardar.
@@ -55,7 +59,11 @@ class TicketSettingsController extends Controller
      */
     protected function save(Request $request)
     {
-        // Va PRIMERO: si el rango no vale, no se guarda nada de la sección.
+        // Las validaciones van PRIMERO: si algo no vale, no se guarda nada de la sección.
+        if ($request->has('stale_alert_hour') && !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string) $request->input('stale_alert_hour'))) {
+            return response()->json(['ok' => false, 'error' => 'La hora del aviso no es válida'], 400);
+        }
+
         // Pausa entre avisos: de 0 a 60 min, y el máximo nunca por debajo del mínimo.
         if ($request->has('notify_throttle_min') || $request->has('notify_throttle_max')) {
             [$min, $max] = \App\Services\NotifyThrottle::rango();
@@ -102,6 +110,13 @@ class TicketSettingsController extends Controller
         if ($request->has('ticket_followup_hours')) {
             Setting::put('ticket_followup_hours', (string) max(1, min(720, (int) $request->input('ticket_followup_hours'))));
         }
+        if ($request->has('stale_alert_active')) {
+            Setting::put('stale_alert_active', filter_var($request->input('stale_alert_active'), FILTER_VALIDATE_BOOLEAN) ? '1' : '0');
+        }
+        if ($request->has('stale_alert_days')) {
+            Setting::put('stale_alert_days', (string) max(1, min(60, (int) $request->input('stale_alert_days'))));
+        }
+        if ($request->has('stale_alert_hour')) Setting::put('stale_alert_hour', (string) $request->input('stale_alert_hour'));
         if ($request->has('csat_active')) {
             Setting::put('csat_active', filter_var($request->input('csat_active'), FILTER_VALIDATE_BOOLEAN) ? '1' : '0');
         }
