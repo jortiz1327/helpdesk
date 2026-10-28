@@ -120,10 +120,22 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.8";
+const APP_VERSION = "1.5.9";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.9",
+        date: "28 oct 2026",
+        resumen: "Barra de consumo de WhatsApp en Tickets y tooltips propios en toda la web.",
+        mejoras: [
+            "Tickets: en la cabecera, una barra con los mensajes de WhatsApp enviados este mes frente a los 1.000 gratuitos de Meta. Va de verde a burdeos; al pasar el ratón dice cuántos van y cuántos quedan.",
+            "Tooltips propios en toda la plataforma en lugar de los del navegador.",
+        ],
+        arreglos: [
+            "Respuestas por correo: las direcciones en copia (Cc) ya se leen bien sobre la burbuja azul.",
+        ],
+    },
     {
         version: "1.5.8",
         date: "28 oct 2026",

@@ -75,6 +75,7 @@ class TicketsController extends Controller
             'unlock'  => $this->unlock($request),
             'heartbeat' => $this->heartbeat($request),
             'activity'  => $this->activity($request),
+            'wa_usage'  => $this->waUso(),
             'delete'  => $this->delete($request),
             'pdf'     => $this->pdf($request),
             // Fusionar: primero se piden los candidatos, luego se ejecuta.
@@ -162,6 +163,28 @@ class TicketsController extends Controller
             ->values();
 
         return response()->json(['cursor' => $cur, 'items' => $items]);
+    }
+
+    /** Mensajes gratuitos de servicio al mes por número (Meta, desde octubre de 2026). */
+    public const WA_GRATIS_MES = 1000;
+
+    /**
+     * Consumo del mes del WhatsApp de soporte frente a los 1.000 mensajes gratuitos de Meta.
+     * Cuenta lo enviado POR LA API (Helpdesk), no lo escrito desde el móvil (Coexistence),
+     * que Meta no documenta que cuente; los fallidos tampoco (Meta solo cobra lo entregado).
+     * Cacheado un minuto: lo pide la cabecera de todos los agentes.
+     */
+    protected function waUso()
+    {
+        $inicio = now()->startOfMonth();
+        $enviados = (int) cache()->remember('wa_uso_mes:' . $inicio->format('Y-m'), 60, fn() =>
+            DB::table('messages')->where('created_at', '>=', $inicio)
+                ->where('direction', 'out')->where('channel', 'whatsapp')->where('funcion', 'soporte')
+                ->where('is_internal_note', 0)->where('status', '!=', 'failed')
+                ->where(fn($w) => $w->whereNull('payload')->orWhere('payload', 'not like', '%"_via":"movil"%'))
+                ->count());
+
+        return response()->json(['ok' => true, 'sent' => $enviados, 'limit' => self::WA_GRATIS_MES]);
     }
 
     /**

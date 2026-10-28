@@ -19,8 +19,9 @@ const root = ReactDOM.createRoot(document.getElementById('root'))
 
 if (esAgentes) {
   import('./styles.css')
-  import('./App.jsx').then(({ default: App }) => {
-    root.render(<React.StrictMode><ErrorBoundary><App /></ErrorBoundary></React.StrictMode>)
+  // TipLayer: los tooltips propios sustituyen a los nativos del navegador en toda la app.
+  Promise.all([import('./App.jsx'), import('./components/TipLayer.jsx')]).then(([{ default: App }, { default: TipLayer }]) => {
+    root.render(<React.StrictMode><ErrorBoundary><App /><TipLayer /></ErrorBoundary></React.StrictMode>)
   })
 } else {
   import('./portal/portal.css')

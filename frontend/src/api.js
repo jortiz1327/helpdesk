@@ -147,6 +147,8 @@ export const api = {
   // --- Tickets (núcleo del helpdesk) ---
   listTickets: (f = {}) => req('tickets.php?action=list&' + new URLSearchParams(f)),
   ticketActivity: (cur = {}) => req('tickets.php?action=activity&' + new URLSearchParams(cur)),
+  // Mensajes de WhatsApp de soporte enviados este mes frente a los gratuitos de Meta.
+  waUsage: () => req('tickets.php?action=wa_usage'),
   ticketStats: (from = '', to = '') => req(`tickets.php?action=stats${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}`),
   ticketMeta: () => req('tickets.php?action=meta'),
   // Acepta id numérico o CÓDIGO (TK-…): así un enlace por código abre el ticket.

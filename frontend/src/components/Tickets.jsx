@@ -6,6 +6,7 @@ import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import ChannelBadge from './ChannelBadge.jsx'
+import WaUsageMeter from './WaUsageMeter.jsx'
 import SedeField from './SedeField.jsx'
 import OrgFilter from './OrgFilter.jsx'
 import Composer from './Composer.jsx'
@@ -879,11 +880,11 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
       <header className="page-head">
         <span className="sc-ic"><Icon.ticket style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Gestión de tickets</h1></div>
-        <span className="sub">
-          · {tab === 'agents' ? 'Carga de trabajo y disponibilidad del equipo'
-            : tab === 'cron' ? 'Tareas programadas que fallan, agrupadas por cron'
-            : 'Administra y da seguimiento a los tickets de soporte'}
-        </span>
+        {tab === 'tickets'
+          ? <WaUsageMeter />
+          : <span className="sub">
+              · {tab === 'agents' ? 'Carga de trabajo y disponibilidad del equipo' : 'Tareas programadas que fallan, agrupadas por cron'}
+            </span>}
         <div className="spacer" />
 
         <div className="seg">

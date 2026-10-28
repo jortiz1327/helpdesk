@@ -506,6 +506,30 @@ input, textarea, select { font-family: inherit; }
 .page-head { height: var(--topbar-h); background: var(--panel); border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 26px; gap: 12px; flex-shrink: 0; }
 .page-head h1 { font-size: 17px; font-weight: 700; }
 .page-head .sub { font-size: 12.5px; color: var(--ink-2); }
+
+/* Consumo del mes de WhatsApp frente a los 1.000 gratuitos (cabecera de Tickets). */
+.wa-meter { display: inline-flex; align-items: center; gap: 9px; margin-left: 6px; padding: 5px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); flex: none; }
+.page-head:has(.wa-meter) h1 { white-space: nowrap; }   /* que el título no se parta en tres líneas */
+@media (max-width: 1280px) { .wa-meter-lbl { display: none; } .wa-meter-bar { width: 90px; } }
+.wa-meter-lbl { font-size: 11.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.wa-meter-lbl::first-letter { text-transform: uppercase; }
+.wa-meter-bar { position: relative; width: 120px; height: 7px; border-radius: 7px; background: var(--line); overflow: hidden; }
+.wa-meter-fill { position: absolute; inset: 0 auto 0 0; min-width: 4px; border-radius: inherit; transition: width .5s ease, background .5s ease; }
+.wa-meter.over { border-color: hsl(345 78% 30% / .55); }
+.wa-meter.over .wa-meter-bar { box-shadow: 0 0 0 2px hsl(345 78% 30% / .25); }
+
+/* Tooltip propio (TipLayer): sustituye al nativo del navegador en toda la app. */
+.tip-layer { position: fixed; z-index: 10000; max-width: 300px; padding: 7px 10px; border-radius: 8px; pointer-events: none;
+  background: #1c242c; color: #f1f5f9; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 12px; line-height: 1.45; font-weight: 500; white-space: pre-line; overflow-wrap: anywhere;
+  opacity: 0; transform: translateY(3px); transition: opacity .12s ease, transform .12s ease; }
+.tip-layer.abajo { transform: translateY(-3px); }
+.tip-layer.on { opacity: 1; transform: none; }
+.tip-layer::after { content: ''; position: absolute; left: var(--flecha); top: 100%; width: 8px; height: 8px; margin-left: -4px; margin-top: -4px;
+  background: inherit; border-right: inherit; border-bottom: inherit; transform: rotate(45deg); }
+.tip-layer.abajo::after { top: 0; transform: rotate(225deg); }
+:root[data-theme="light"] .tip-layer { background: #1f2937; border-color: transparent; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.22); }
+@media (prefers-reduced-motion: reduce) { .tip-layer { transition: none; transform: none; } }
 .page-head .spacer { flex: 1; }
 .page-scroll { flex: 1; overflow-y: auto; }
 .page { max-width: 1080px; margin: 0 auto; padding: 28px; }
@@ -1926,7 +1950,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .optout-check input:checked + .optout-box { background: var(--primary); border-color: var(--primary); }
 .optout-check input:checked + .optout-box::after { content: ''; position: absolute; left: 6px; top: 2px; width: 4px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .optout-label { font-size: 13.5px; font-weight: 500; }
-.help-tip { position: relative; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--line-2); color: var(--ink-2); font-size: 11px; font-weight: 800; cursor: help; flex: none; outline: none; }
+.help-tip { position: relative; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--line-2); color: var(--ink-2); font-size: 11px; font-weight: 800; cursor: default; flex: none; outline: none; }
 .help-tip:hover, .help-tip:focus { background: var(--primary-soft); color: var(--primary); }
 .help-bubble { position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%); width: 264px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 11px; padding: 11px 13px; font-size: 12px; font-weight: 400; color: var(--ink); line-height: 1.5; box-shadow: var(--shadow); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.15s; z-index: 200; text-align: left; }
 .help-bubble::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: var(--panel-2); }
@@ -1937,7 +1961,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .gated-wrap { position: relative; display: inline-flex; align-items: center; gap: 6px; }
 .btn.gated { opacity: 0.6; cursor: not-allowed; }
 .btn.gated svg { fill: var(--warn); }
-.lock-tip { position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: rgba(244, 183, 64, 0.14); cursor: help; outline: none; }
+.lock-tip { position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: rgba(244, 183, 64, 0.14); cursor: default; outline: none; }
 .lock-tip > svg { width: 14px; height: 14px; fill: var(--warn); }
 .lock-tip:hover, .lock-tip:focus { background: rgba(244, 183, 64, 0.24); }
 .lock-bubble { position: fixed; transform: translate(-50%, -100%); margin-top: -10px; width: 290px; background: var(--panel-2); border: 1px solid var(--warn); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); pointer-events: none; z-index: 300; text-align: left; animation: seldrop 0.13s ease; }
@@ -2273,7 +2297,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 :root[data-theme="light"] .chip.ch-email    { background: #e0f2fe; color: #0369a1; }
 :root[data-theme="light"] .chip.ch-whatsapp { background: #e7f9ee; color: #0f7a3d; }
 /* WhatsApp con la ventana de 24 h cerrada: ámbar, para ver de un vistazo que hay que ir por otro canal. */
-.chip.ch-whatsapp.ch-wa-cerrada { background: rgba(245, 158, 11, 0.18); color: #fbbf24; cursor: help; }
+.chip.ch-whatsapp.ch-wa-cerrada { background: rgba(245, 158, 11, 0.18); color: #fbbf24; cursor: default; }
 :root[data-theme="light"] .chip.ch-whatsapp.ch-wa-cerrada { background: #fef3c7; color: #b45309; }
 
 /* --- Nuevo ticket --- */
@@ -3191,6 +3215,11 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 /* Copias mostradas dentro de la burbuja del hilo */
 .b-cc { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-2); }
 .b-cc b { font-weight: 800; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; margin-right: 3px; }
+/* En nuestras respuestas (burbuja azul) el gris de --ink-2 no se leía: blanco translúcido. */
+.tk-msg.out:not(.note) .b-cc { color: rgba(255, 255, 255, 0.88); border-top-color: rgba(255, 255, 255, 0.28); }
+.tk-msg.out:not(.note) .b-cc b { color: #fff; }
+.is-wa .tk-msg.out:not(.note) .b-cc { color: var(--ink-2); border-top-color: var(--line); }
+.is-wa .tk-msg.out:not(.note) .b-cc b { color: inherit; }
 
 /* --- «En copia» en la ficha del ticket: quién más sigue la conversación --- */
 .tkm-cc { margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
@@ -3721,7 +3750,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .lm-desc { margin: 0 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--ink-3); }
 
 /* ---- Pista informativa (?) reutilizable ---- */
-.info-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin-left: 3px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--line-2); cursor: help; vertical-align: middle; }
+.info-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin-left: 3px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--line-2); cursor: default; vertical-align: middle; }
 .info-tip-q { font-size: 10px; font-weight: 800; color: var(--ink-3); line-height: 1; }
 .info-tip:hover, .info-tip:focus-visible { outline: none; border-color: var(--primary); }
 .info-tip:hover .info-tip-q, .info-tip:focus-visible .info-tip-q { color: var(--primary); }

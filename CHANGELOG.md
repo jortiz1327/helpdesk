@@ -3,6 +3,22 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.9] — 2026-10-28
+
+### Mejoras
+
+- **Consumo de WhatsApp del mes** en la cabecera de Tickets (sustituye al subtítulo): barra
+  frente a los 1.000 mensajes de servicio gratuitos de Meta, de verde a burdeos
+  (`WaUsageMeter`, `tickets.php?action=wa_usage`, cacheado 60 s). Cuenta lo enviado por la API
+  desde el Helpdesk, sin lo escrito desde el móvil ni los fallidos.
+- **Tooltips propios en toda la app de agentes** (`TipLayer`): cualquier `title` se muestra con
+  un tooltip de la marca (arriba o abajo según quepa, sin salirse de la pantalla) en lugar del
+  nativo del navegador. Fuera el cursor de interrogación (`cursor: help`).
+
+### Arreglos
+
+- **Cc en respuestas por correo:** el gris no se leía sobre la burbuja azul; ahora blanco.
+
 ## [1.5.8] — 2026-10-28
 
 ### Mejoras
