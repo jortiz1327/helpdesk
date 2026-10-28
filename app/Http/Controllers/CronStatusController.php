@@ -17,6 +17,11 @@ class CronStatusController extends Controller
 {
     public function handle(Request $request)
     {
+        // Próximos envíos automáticos a clientes (7 días): solo consulta.
+        if ($request->query('action') === 'upcoming') {
+            return response()->json(['ok' => true, 'items' => app(\App\Services\UpcomingSends::class)->lista(168)]);
+        }
+
         $ultimo = Setting::get('cron_last_run');
         $hace   = $ultimo ? (int) round(max(0, now()->diffInSeconds($ultimo, true))) : null;
 
@@ -40,6 +45,10 @@ class CronStatusController extends Controller
                  'last' => null, 'off' => (int) Setting::get('ticket_autoclose_days', '0') === 0],
                 ['name' => 'Avisos de SLA por correo',            'schedule' => 'Cada 5 minutos',
                  'last' => null, 'off' => (string) Setting::get('sla_alerts_active', '1') !== '1'],
+                ['name' => 'Cierre por falta de respuesta del cliente', 'schedule' => 'Cada 15 minutos',
+                 'last' => null, 'off' => !\App\Models\EmailTemplate::where('key', 'ticket_followup')->value('active')],
+                ['name' => 'Aviso al turno de tickets sin contestar', 'schedule' => 'Días laborables a las ' . \App\Console\Commands\TicketsStaleDigest::hora(),
+                 'last' => null, 'off' => (string) Setting::get('stale_alert_active', '1') !== '1'],
             ],
         ]);
     }

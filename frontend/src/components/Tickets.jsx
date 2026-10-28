@@ -1964,6 +1964,19 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                     <button onClick={reactivar}>Reactivar</button>
                   </div>
                 )}
+
+                {/* Envío AUTOMÁTICO previsto al cliente (cierre por falta de respuesta…): que el
+                    agente sepa qué va a pasar y que contestar o planificar lo frena. */}
+                {(t.upcoming || []).map((u) => (
+                  <div key={u.tipo} className="tkm-auto">
+                    <Icon.clock />
+                    <span>
+                      {u.tipo === 'cierre' ? 'Se cerrará automáticamente avisando al cliente' : 'Se cerrará automáticamente (resuelto) avisando al cliente'}{' '}
+                      <b>{u.inmediato ? 'en los próximos minutos' : '~ ' + fmtDate(u.at, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b>.
+                      {u.tipo === 'cierre' && ' Contestar al cliente, planificarlo o posponerlo lo evita.'}
+                    </span>
+                  </div>
+                ))}
               </div>
 
               {/* PROPIEDADES compactas: una línea cada una. */}

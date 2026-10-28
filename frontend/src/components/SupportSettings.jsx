@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
-import { fmtDate } from '../util.js'
+import { fmtDate, parseDate } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
@@ -1280,11 +1280,79 @@ function CronStatus() {
         </table>
       </div>
     </div>
+    <ProximosEnvios />
     </>
   )
 }
 
 const fmtFecha = (s) => fmtDate(s, { dateStyle: 'short', timeStyle: 'short' })
+
+/* --------------------------- Próximos envíos a clientes ---------------------------
+ * Lo que va a salir SOLO hacia clientes en los próximos 7 días (cierre por falta de
+ * respuesta, respuestas programadas, cierre de resueltos con aviso). Solo consulta:
+ * para frenar uno basta con contestar al cliente, planificarlo o posponerlo.
+ * ------------------------------------------------------------------------- */
+const TIPO_ENVIO = {
+  cierre:     { c: '#e11d48', aprox: true },
+  programada: { c: '#2563eb', aprox: false },
+  autocierre: { c: '#7c3aed', aprox: true },
+}
+
+function ProximosEnvios() {
+  const [items, setItems] = useState(null)
+  useEffect(() => {
+    let vivo = true
+    const cargar = () => api.upcomingSends().then((r) => { if (vivo && r?.ok) setItems(r.items) }).catch(() => {})
+    cargar()
+    const t = setInterval(cargar, 60000)
+    return () => { vivo = false; clearInterval(t) }
+  }, [])
+
+  if (!items) return null
+  const limite = Date.now() + 24 * 3600 * 1000
+  const pronto = items.filter((i) => parseDate(i.at)?.getTime() <= limite)
+  const luego = items.filter((i) => parseDate(i.at)?.getTime() > limite)
+  const cuando = (i) => i.inmediato
+    ? 'En la próxima pasada'
+    : (TIPO_ENVIO[i.tipo]?.aprox ? '~ ' : '') + fmtDate(i.at, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+  const tabla = (lista) => (
+    <div className="card" style={{ padding: 0, overflowX: 'auto', marginTop: 8 }}>
+      <table className="tk-table env-table">
+        <thead><tr><th>Cuándo</th><th>Envío</th><th>Ticket</th><th>Cliente</th><th>Asignado</th></tr></thead>
+        <tbody>
+          {lista.map((i, k) => (
+            <tr key={k}>
+              <td className={`env-when ${i.inmediato ? 'now' : ''}`}>{cuando(i)}</td>
+              <td><span className="env-tipo" style={{ '--c': TIPO_ENVIO[i.tipo]?.c }}>{i.label}</span>
+                {i.por && <div className="muted env-por">por {i.por}</div>}</td>
+              <td><a className="tk-code" href={`/agentes/tickets/${encodeURIComponent(i.code)}`}>{i.code}</a>
+                <div className="env-subj">{i.subject}</div></td>
+              <td>{i.cliente}{i.email && i.cliente !== i.email && <div className="muted env-por">{i.email}</div>}</td>
+              <td className="muted">{i.agente || 'Sin asignar'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
+  return (
+    <div className="card em-card" style={{ marginTop: 16 }}>
+      <h2>Próximos envíos a clientes
+        <span className={`env-count ${pronto.length ? 'on' : ''}`}>{pronto.length} en las próximas 24 h</span>
+      </h2>
+      <p className="em-desc">
+        Correos que saldrán <b>solos</b> hacia clientes en los próximos 7 días. Para frenar un cierre por falta de
+        respuesta basta con <b>contestar al cliente</b>, pasar el ticket a <b>Planificado</b> o <b>posponerlo</b>. Las
+        respuestas programadas se cancelan desde el propio ticket. Las horas con «~» son aproximadas (la tarea pasa cada 15 minutos).
+      </p>
+      {!items.length && <p className="ct-hint">No hay ningún envío automático previsto esta semana.</p>}
+      {pronto.length > 0 && <><div className="env-grupo">Próximas 24 h</div>{tabla(pronto)}</>}
+      {luego.length > 0 && <><div className="env-grupo">Resto de la semana</div>{tabla(luego)}</>}
+    </div>
+  )
+}
 
 /* ------------------------------- Prioridades -------------------------------
  * Antes eran una lista fija en el código; ahora se configuran. La CLAVE de cada

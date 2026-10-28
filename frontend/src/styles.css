@@ -1833,6 +1833,24 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .cron-state svg { width: 16px; height: 16px; fill: currentColor; flex: 0 0 16px; }
 .cron-state.ok  { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4); color: #4ecfa0; }
 .cron-state.bad { background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); color: #e8a33d; }
+
+/* Próximos envíos a clientes (Tareas programadas) */
+.env-count { margin-left: 10px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; vertical-align: middle; background: var(--line); color: var(--text-3, #8a94a6); }
+.env-count.on { background: rgba(225, 29, 72, 0.14); color: #e11d48; }
+.env-grupo { margin-top: 14px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3, #8a94a6); }
+.env-table td { vertical-align: top; }
+.env-when { white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; }
+.env-when.now { color: #e11d48; }
+.env-tipo { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap;
+  color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
+.env-tipo::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.env-subj { margin-top: 2px; font-size: 12.5px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.env-por { font-size: 12px; margin-top: 2px; }
+/* Ficha del ticket: «se cerrará automáticamente el …» */
+.tkm-auto { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 2px; padding: 9px 11px; border-radius: 10px; font-size: 12.5px; line-height: 1.45;
+  background: rgba(225, 29, 72, 0.08); border: 1px solid rgba(225, 29, 72, 0.25); color: var(--text); }
+.tkm-auto b { color: #e11d48; }
+.tkm-auto svg { width: 15px; height: 15px; flex: 0 0 15px; margin-top: 1px; fill: #e11d48; }
 :root[data-theme="light"] .cron-state.ok  { background: #ecfdf5; border-color: #7bd8b0; color: #047857; }
 :root[data-theme="light"] .cron-state.bad { background: #fff8ec; border-color: #f5c877; color: #92600c; }
 

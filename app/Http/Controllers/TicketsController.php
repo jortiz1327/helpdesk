@@ -988,6 +988,8 @@ class TicketsController extends Controller
 
         // Respuestas PROGRAMADAS pendientes (para el bloque «saldrá a las…» del hilo).
         $t->scheduled = app(\App\Services\ScheduledReplyService::class)->pendingFor($id);
+        // Envíos AUTOMÁTICOS al cliente pendientes (cierre por falta de respuesta…), para la ficha.
+        $t->upcoming = app(\App\Services\UpcomingSends::class)->deTicket($id);
 
         // Campos personalizados (globales) + el valor que tenga este ticket en cada uno.
         $defsCampos = DB::table('ticket_custom_fields')->where('active', 1)

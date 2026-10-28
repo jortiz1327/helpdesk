@@ -272,6 +272,8 @@ export const api = {
   }),
   // Estado del planificador (cron)
   getCronStatus: () => req('cron_status.php'),
+  // Próximos envíos automáticos a clientes (7 días): cierres por falta de respuesta, programadas…
+  upcomingSends: () => req('cron_status.php?action=upcoming'),
   // Ajustes generales del ticket (estado por defecto, bloqueo)
   getTicketSettings: () => req('ticket_settings.php'),
   saveTicketSettings: (payload) => req('ticket_settings.php', {

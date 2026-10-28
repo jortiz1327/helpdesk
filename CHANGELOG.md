@@ -3,6 +3,20 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.12] — 2026-10-28
+
+### Mejoras
+
+- **Próximos envíos a clientes** (`UpcomingSends`, `cron_status.php?action=upcoming`): tarjeta en
+  Tareas programadas con lo que saldrá solo en 7 días, separado en próximas 24 h y resto de la
+  semana: cierre por falta de respuesta (hora aproximada), respuestas programadas y cierre de
+  resueltos con aviso (si está activo). Solo consulta.
+- **Ficha del ticket**: aviso «Se cerrará automáticamente avisando al cliente ~ fecha» y cómo
+  evitarlo (`upcoming` en el detalle).
+- `tickets:followup` usa `UpcomingSends::cierres()`: el mismo cálculo que se enseña es el que
+  envía. Un ticket cuyo último mensaje ya es el aviso automático no se vuelve a avisar.
+- Tareas programadas lista también el cierre por falta de respuesta y el aviso al turno.
+
 ## [1.5.11] — 2026-10-28
 
 ### Mejoras

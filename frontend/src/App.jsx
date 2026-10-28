@@ -120,10 +120,20 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.11";
+const APP_VERSION = "1.5.12";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.12",
+        date: "28 oct 2026",
+        resumen: "Próximos envíos automáticos a clientes, en Configuración y en la ficha del ticket.",
+        mejoras: [
+            "Configuración › Tareas programadas: «Próximos envíos a clientes» con lo que saldrá solo esta semana (cierres por falta de respuesta, respuestas programadas…), separando las próximas 24 h.",
+            "En la ficha del ticket, un aviso de cuándo se cerrará automáticamente y cómo evitarlo.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.11",
         date: "28 oct 2026",
