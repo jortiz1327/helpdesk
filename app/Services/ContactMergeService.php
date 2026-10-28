@@ -63,23 +63,22 @@ class ContactMergeService
     }
 
     /**
-     * Pone el teléfono a un contacto SIN crear duplicados. Si ese número ya es de otra ficha
-     * que solo tiene teléfono (p. ej. un cliente que escribió por WhatsApp), es la MISMA
-     * persona: se fusiona en esta. Si la otra ficha tiene su propio correo, son personas
-     * distintas con el mismo número: no se toca nada. Nunca pisa un teléfono ya guardado.
+     * Pone el teléfono a un contacto SIN crear duplicados y SIN fusionar nunca. Que alguien
+     * escriba un número no prueba que sea suyo: fusionar aquí daba a quien lo tecleara los
+     * tickets y los WhatsApp de esa otra ficha (y borraba contactos de Campañas). Si el
+     * número ya es de otra ficha, no se toca nada y se devuelve su id para avisar; la unión
+     * la decide un agente desde Contactos («Unir fichas»). Nunca pisa un teléfono guardado.
      */
-    public function asignarTelefono(int $contactId, ?string $telefono): void
+    public function asignarTelefono(int $contactId, ?string $telefono): ?int
     {
         $tel = Telefono::normalizar($telefono);
-        if (!$tel) return;
+        if (!$tel) return null;
         $c = DB::table('contacts')->where('id', $contactId)->first(['wa_id']);
-        if (!$c || !empty($c->wa_id)) return;
+        if (!$c || !empty($c->wa_id)) return null;
 
-        $otro = DB::table('contacts')->where('wa_id', $tel)->where('id', '<>', $contactId)->first(['id', 'email']);
-        if (!$otro) {
-            DB::table('contacts')->where('id', $contactId)->update(['wa_id' => $tel]);
-        } elseif (empty($otro->email)) {
-            $this->fusionar($contactId, (int) $otro->id);   // trae su teléfono, chats y tickets
-        }
+        $otro = DB::table('contacts')->where('wa_id', $tel)->where('id', '<>', $contactId)->value('id');
+        if ($otro) return (int) $otro;
+        DB::table('contacts')->where('id', $contactId)->update(['wa_id' => $tel]);
+        return null;
     }
 }

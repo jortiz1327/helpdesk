@@ -88,16 +88,32 @@ class ConversationController extends Controller
         $contact = DB::table('contacts')->where('id', $id)->first();
         if (!$contact) return response()->json(['ok' => false, 'error' => 'Contacto no encontrado'], 404);
 
-        // Si el contacto no tiene correo, se le pone el indicado (el ticket se sigue por email).
-        if (!($contact->email ?? '')) DB::table('contacts')->where('id', $id)->update(['email' => $email]);
+        /*
+         * El correo de la ficha es la llave del portal (quien lo controle ve TODOS sus
+         * tickets). Desde Campañas solo se pone si la ficha no tiene correo NI tickets de
+         * soporte, y si ese correo no es ya de otra ficha. Si el cliente ya es de soporte,
+         * su correo lo completa Soporte; si no, cualquiera de Campañas podría poner el suyo
+         * y leer las incidencias de ese cliente.
+         */
+        if (!($contact->email ?? '')) {
+            if (DB::table('tickets')->where('contact_id', $id)->exists()) {
+                return response()->json(['ok' => false, 'error' => 'Este cliente ya tiene tickets de soporte y no tiene correo: pide a Soporte que lo complete en su ficha.'], 409);
+            }
+            if (DB::table('contacts')->where('email', $email)->where('id', '<>', $id)->exists()) {
+                return response()->json(['ok' => false, 'error' => 'Ese correo ya es de otro contacto. Si es la misma persona, que Soporte una las fichas.'], 409);
+            }
+            DB::table('contacts')->where('id', $id)->update(['email' => $email]);
+        }
         $emailFinal = ($contact->email ?? '') ?: $email;
 
-        // Contenido del ticket: un mensaje o la transcripción de la conversación.
+        // Contenido del ticket: un mensaje o la transcripción de la conversación. SOLO
+        // mensajes de Campañas: los del WhatsApp de Soporte (01) no salen por aquí.
+        $deCampanas = fn ($q) => $q->where('funcion', '<>', 'soporte')->orWhereNull('funcion');
         if ($scope === 'message' && $msgId) {
-            $m = DB::table('messages')->where('id', $msgId)->where('contact_id', $id)->first(['body', 'type']);
+            $m = DB::table('messages')->where('id', $msgId)->where('contact_id', $id)->where($deCampanas)->first(['body', 'type']);
             $cuerpo = $m ? (trim((string) $m->body) ?: '[' . $m->type . ']') : '';
         } else {
-            $msgs = DB::table('messages')->where('contact_id', $id)->where('channel', 'whatsapp')
+            $msgs = DB::table('messages')->where('contact_id', $id)->where('channel', 'whatsapp')->where($deCampanas)
                 ->whereNull('ticket_id')->orderBy('created_at')->limit(200)->get(['direction', 'body', 'type', 'created_at']);
             $lineas = [];
             foreach ($msgs as $mm) {

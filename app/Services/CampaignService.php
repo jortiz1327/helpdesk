@@ -14,6 +14,19 @@ class CampaignService
     /** Reintentos por destinatario ante errores transitorios de Meta (429 / 5xx). */
     public const MAX_REINTENTOS = 5;
 
+    /**
+     * Vida del candado de envío y hasta cuándo se empiezan envíos con él. Cada envío puede
+     * tardar hasta el timeout HTTP (30 s) o SMTP: una tanda de 30 podía pasar de los 300 s
+     * del candado, otro proceso entraba y mandaba (y pagaba) otra vez las mismas filas.
+     * Ahora no se empieza un envío pasados CORTE_SEG: lo que queda sigue en el próximo tick,
+     * con margen de sobra para que el último termine antes de que caduque el candado.
+     */
+    protected const CANDADO_SEG = 900;
+    protected const CORTE_SEG = 600;
+
+    /** Momento (microtime) a partir del cual esta tanda ya no empieza envíos. */
+    protected float $corte = 0;
+
     public function __construct(protected WhatsAppService $wa) {}
 
     /** Recalcula sent/failed de una campaña a partir de sus destinatarios. */
@@ -97,15 +110,16 @@ class CampaignService
 
         // CANDADO por campaña: solo un proceso la envía a la vez, venga del cron o de un
         // envío inmediato (o un doble clic). Sin esto, dos procesos leen los mismos
-        // 'pending' y envían —y PAGAN— dos veces. TTL 300s: si el proceso muere, el candado
-        // caduca solo y la campaña se reanuda en el siguiente tick.
-        $lock = Cache::lock("campaign:send:{$campaignId}", 300);
+        // 'pending' y envían —y PAGAN— dos veces. Si el proceso muere, el candado caduca
+        // solo (CANDADO_SEG) y la campaña se reanuda en un tick posterior.
+        $lock = Cache::lock("campaign:send:{$campaignId}", self::CANDADO_SEG);
         if (!$lock->get()) {
             $pending = DB::table('campaign_recipients')->where('campaign_id', $campaignId)->where('status', 'pending')->count();
             return [0, 0, $pending];   // otro proceso ya la está enviando
         }
 
         try {
+        $this->corte = microtime(true) + self::CORTE_SEG;
         $limit = max(1, $limit);
 
         /*
@@ -172,6 +186,7 @@ class CampaignService
             $sent = 0;
             $failed = 0;
             foreach ($recipients as $r) {
+                if (microtime(true) > $this->corte) break;   // el resto, en el próximo tick
                 if (isset($bajas[preg_replace('/\D/', '', (string) $r->wa_id)])) {
                     DB::table('campaign_recipients')->where('id', $r->id)
                         ->update(['status' => 'skipped', 'error' => 'Dado de baja', 'sent_at' => now()]);
@@ -243,6 +258,7 @@ class CampaignService
         $sent = 0;
         $failed = 0;
         foreach ($recipients as $r) {
+            if (microtime(true) > $this->corte) break;   // el resto, en el próximo tick
             $email = mb_strtolower(trim((string) $r->email));
             $c = $contactos[$email] ?? null;
             if ($c && (int) $c->opted_out === 1) {

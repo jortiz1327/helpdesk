@@ -3,6 +3,28 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.13] — 2026-10-28
+
+Correcciones de la auditoría de seguridad del 2026-10-28 (bloque crítico/alto).
+
+### Arreglos
+
+- **Portal público** (crítico): `ContactMergeService::asignarTelefono` ya NO fusiona fichas. Antes,
+  crear un ticket con tu correo y el teléfono de otro cliente unía su ficha a la tuya (sus tickets
+  en tu portal, sus WhatsApp en tu ficha, contactos de Campañas borrados). Ahora solo guarda el
+  teléfono si está libre y devuelve el id de la ficha que lo tiene.
+- **Alta de ticket por agente**: mismo cambio; si el teléfono es de otra ficha se crea el ticket sin
+  él y se devuelve un aviso (`warnings`). La unión, desde «Unir fichas».
+- **`flow:tick`**: los mensajes de flujos (Campañas) ya no se guardan en el ticket abierto del
+  contacto (`ticket_id` null). Alteraban `last_direction`, SLA, el aviso al turno y el cierre a 8 días.
+- **`conversations.php?action=to_ticket`**: no pone correo a una ficha que ya tiene tickets (409) ni
+  un correo que es de otra ficha (409). La transcripción excluye mensajes del WhatsApp de Soporte.
+- **Importar contactos**: nunca fusiona; las fichas con tickets se omiten (`protected` en la
+  respuesta y en el resumen).
+- **Campañas**: el candado de envío pasa a 900 s y no se empieza un envío pasados 600 s de tanda
+  (antes una tanda lenta podía superar los 300 s del candado y otro proceso reenviar).
+- Tests: `ContactIdentityGuardTest` (7).
+
 ## [1.5.12] — 2026-10-28
 
 ### Mejoras

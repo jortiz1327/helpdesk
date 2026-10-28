@@ -469,8 +469,9 @@ class PortalService
         // nombre con lo que escriba un anónimo. Solo se usa el nombre para crearlo nuevo.
         $contactId = ChatService::upsertContactByEmail($email, $data['name'] ?? null, false);
 
-        // Teléfono que apunta el cliente: con prefijo y sin duplicar. Si ese número ya era de
-        // una ficha solo-teléfono (le escribió por WhatsApp), es él: se une a esta.
+        // Teléfono que apunta el cliente: con prefijo y sin duplicar. Si ese número ya es de
+        // otra ficha NO se une (es un formulario anónimo: cualquiera puede teclear cualquier
+        // número); solo se guarda si está libre.
         if ($contactId) app(ContactMergeService::class)->asignarTelefono((int) $contactId, $data['phone'] ?? null);
 
         // Categoría: solo se acepta si existe y está activa; si no, sin categoría.

@@ -2121,10 +2121,14 @@ class TicketsController extends Controller
                 if (!$contactId) throw $e;
             }
         }
-        // Teléfono sin duplicar: si ya era de una ficha solo-teléfono (WhatsApp), es la
-        // misma persona y se une a esta. Nunca pisa un teléfono ya guardado.
+        // Teléfono sin duplicar ni fusionar: si ya es de otra ficha se deja como está y se
+        // avisa (si son la misma persona, se unen desde Contactos con vista previa).
+        $avisos = [];
         if ($phone !== '' && $email !== '') {
-            app(\App\Services\ContactMergeService::class)->asignarTelefono((int) $contactId, $phone);
+            $otra = app(\App\Services\ContactMergeService::class)->asignarTelefono((int) $contactId, $phone);
+            if ($otra) {
+                $avisos[] = 'El teléfono ya pertenece a otra ficha de contacto: no se ha añadido. Si es la misma persona, únelas desde Contactos.';
+            }
         }
 
         // Solo quien tiene permiso puede asignar a otro; el resto crea sin asignar.
@@ -2188,7 +2192,7 @@ class TicketsController extends Controller
         }
 
         $code = DB::table('tickets')->where('id', $ticketId)->value('code');
-        return response()->json(['ok' => true, 'id' => $ticketId, 'code' => $code, 'warnings' => $errors]);
+        return response()->json(['ok' => true, 'id' => $ticketId, 'code' => $code, 'warnings' => array_merge($avisos, $errors)]);
     }
 
     /**

@@ -120,10 +120,25 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.12";
+const APP_VERSION = "1.5.13";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.13",
+        date: "28 oct 2026",
+        resumen: "Más seguridad en las fichas de cliente y separación entre Campañas y Soporte.",
+        mejoras: [
+            "Al crear un ticket con un teléfono que ya es de otra ficha, se avisa en vez de unirlas: la unión se hace desde Contactos.",
+            "Importar contactos ya no modifica a clientes con tickets de soporte (el resumen dice cuántos se han omitido).",
+        ],
+        arreglos: [
+            "El formulario público ya no une fichas por el teléfono que se escriba.",
+            "Los mensajes automáticos de Campañas ya no aparecen dentro de tickets de soporte.",
+            "Convertir un chat de Campañas en ticket no cambia el correo de un cliente de soporte.",
+            "Una campaña larga ya no puede enviarse dos veces al mismo destinatario.",
+        ],
+    },
     {
         version: "1.5.12",
         date: "28 oct 2026",

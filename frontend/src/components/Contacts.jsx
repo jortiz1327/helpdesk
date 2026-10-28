@@ -631,6 +631,7 @@ function ImportContacts({ onClose, onDone }) {
     if (r.reused) p.push(`${r.reused} actualizado${r.reused === 1 ? '' : 's'}`)
     if (r.tags_new) p.push(`${r.tags_new} etiqueta${r.tags_new === 1 ? '' : 's'} creada${r.tags_new === 1 ? '' : 's'}`)
     if (r.invalid) p.push(`${r.invalid} fila${r.invalid === 1 ? '' : 's'} sin correo ni teléfono`)
+    if (r.protected) p.push(`${r.protected} omitido${r.protected === 1 ? '' : 's'} (clientes con tickets de soporte)`)
     toast(p.join(' · '))
     onDone()
   }

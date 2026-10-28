@@ -278,7 +278,7 @@ class ContactController extends Controller
         }
         $val = fn ($row, $campo) => isset($col[$campo]) ? trim((string) ($row[$col[$campo]] ?? '')) : '';
 
-        $added = 0; $reused = 0; $invalid = 0; $tagsNew = 0;
+        $added = 0; $reused = 0; $invalid = 0; $tagsNew = 0; $protected = 0;
         $labelCache = [];
         $colores = ['#12925a', '#124e86', '#b8722a', '#7c3aed', '#0ea5b7', '#d0503f', '#a0d911', '#e056fd', '#f59e0b', '#2dd4bf'];
 
@@ -303,17 +303,18 @@ class ContactController extends Controller
             ];
 
             // Dedup: por teléfono, luego por correo. Reutiliza rellenando solo huecos.
+            // NUNCA fusiona fichas: que una fila junte un teléfono y un correo no prueba que
+            // sean la misma persona (la unión la decide un agente desde «Unir fichas»).
             $c = null;
             if ($wa) $c = DB::table('contacts')->where('wa_id', $wa)->first();
             if (!$c && $email !== '') $c = DB::table('contacts')->where('email', $email)->first();
-            // La fila dice que ese teléfono y ese correo son la MISMA persona: si hoy son dos
-            // fichas (una con el teléfono y otra solo con el correo), se unen en la del correo.
-            if ($c && $wa && $email !== '' && empty($c->email)) {
-                $porCorreo = DB::table('contacts')->where('email', $email)->where('id', '!=', $c->id)->first(['id', 'wa_id']);
-                if ($porCorreo && empty($porCorreo->wa_id)) {
-                    app(\App\Services\ContactMergeService::class)->fusionar((int) $porCorreo->id, (int) $c->id);
-                    $c = DB::table('contacts')->where('id', $porCorreo->id)->first();
-                }
+
+            // Un cliente con tickets de soporte NO se toca desde una importación: su correo y
+            // su teléfono son la llave del portal y del WhatsApp de soporte, y quien importa
+            // (también Campañas) podría poner los suyos y leer sus incidencias.
+            if ($c && DB::table('tickets')->where('contact_id', $c->id)->exists()) {
+                $protected++;
+                continue;
             }
 
             if ($c) {
@@ -363,6 +364,6 @@ class ContactController extends Controller
             }
         }
 
-        return response()->json(['ok' => true, 'added' => $added, 'reused' => $reused, 'invalid' => $invalid, 'tags_new' => $tagsNew]);
+        return response()->json(['ok' => true, 'added' => $added, 'reused' => $reused, 'invalid' => $invalid, 'tags_new' => $tagsNew, 'protected' => $protected]);
     }
 }
