@@ -22,6 +22,7 @@ return [
         'helpdesk'    => ['label' => 'Helpdesk',          'access' => 'helpdesk.access'],
         'contacts'    => ['label' => 'Contactos',         'access' => 'contacts.access'],
         'campaigns'   => ['label' => 'Campañas',          'access' => 'campaigns.access'],
+        'warranties'  => ['label' => 'Gestión de garantías', 'access' => 'warranties.access'],
         'automations' => ['label' => 'Automatizaciones',  'access' => 'automations.access'],
         'shifts'      => ['label' => 'Turnos',            'access' => 'shifts.access'],
         'admin'       => ['label' => 'Administración',    'access' => 'admin.access'],
@@ -56,6 +57,9 @@ return [
         'campaigns.delete'   => ['Eliminar campañas',                          'campaigns'],
         'templates.manage'   => ['Gestionar plantillas de WhatsApp',           'campaigns'],
         'forms.manage'       => ['Gestionar formularios',                      'campaigns'],
+
+        // --- Gestión de garantías (área propia, de momento sin pantallas) ---
+        'warranties.access'  => ['Acceder a Gestión de garantías',             'warranties'],
 
         // --- Automatizaciones / bots ---
         'automations.access' => ['Acceder a automatizaciones',                 'automations'],

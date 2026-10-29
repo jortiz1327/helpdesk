@@ -36,6 +36,7 @@ import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
 import MorningBriefing from "./components/MorningBriefing.jsx";
 import AreaChooser from "./components/AreaChooser.jsx";
+import Warranties from "./components/Warranties.jsx";
 import Users from "./components/Users.jsx";
 import Analytics from "./components/Analytics.jsx";
 import { notifyActive, getNotify, fireNotification } from "./notify.js";
@@ -617,6 +618,30 @@ const AREAS = [
                 ],
             },
             CONTACTS_GROUP,
+        ],
+    },
+    {
+        // Tercera área. De momento sin contenido: solo su portada (oculta en el menú,
+        // que así muestra únicamente Ayuda y Administración).
+        key: "warranties",
+        label: "Gestión de garantías",
+        icon: Icon.shield,
+        perm: "warranties.access",
+        home: "warranties",
+        groups: [
+            {
+                title: "Garantías",
+                items: [
+                    {
+                        key: "warranties",
+                        label: "Gestión de garantías",
+                        icon: Icon.shield,
+                        perm: "warranties.access",
+                        color: "#f59e0b",
+                        hidden: true,
+                    },
+                ],
+            },
         ],
     },
 ];
@@ -1513,6 +1538,7 @@ export default function App() {
                         {view === "wa_config" && <Settings />}
                         {view === "campaign_email_cfg" && <CampaignEmailSettings />}
                         {view === "help" && <Manuals />}
+                        {view === "warranties" && <Warranties />}
                         {view === "tickets" && (
                             <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} onTicketCode={setTicketCode} />
                         )}

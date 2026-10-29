@@ -147,7 +147,7 @@ input, textarea, select { font-family: inherit; }
 .chooser-hi { display: inline-block; font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #6c8896; margin-bottom: 10px; }
 .chooser-head h1 { font-size: clamp(26px, 4vw, 40px); font-weight: 800; letter-spacing: -0.02em; }
 .chooser-head p { color: #93a3ac; margin-top: 8px; font-size: 15px; }
-.chooser-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+.chooser-grid { flex: 1; display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); min-height: 0; }
 .chooser-panel { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 13px; padding: 6vh 5.5vw; text-align: left; border: none; background: transparent; border-right: 1px solid rgba(255,255,255,0.06); transition: transform 0.2s; cursor: pointer; }
 .chooser-panel:last-child { border-right: none; }
 /* Brillo del panel: radial centrado que se desvanece DENTRO del panel (transparent 55%),

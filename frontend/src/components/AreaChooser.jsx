@@ -1,8 +1,8 @@
 import { Icon } from '../icons.jsx'
 
 /*
- * Pantalla de bienvenida del superadmin: elige entre Helpdesk y Campañas, tipo
- * «píldoras de Matrix» a pantalla completa (dos mitades 50/50). Solo se muestra a
+ * Pantalla de bienvenida del superadmin: elige entre Helpdesk, Campañas y Gestión
+ * de garantías, tipo «píldoras de Matrix» a pantalla completa (una columna por área). Solo se muestra a
  * quien tiene acceso a más de un área; los demás entran directos a la suya.
  * Después de elegir se puede seguir cambiando con el selector del sidebar.
  */
@@ -19,6 +19,12 @@ const META = {
     c1: '#0ea5a4', c2: '#16a34a', glow: 'rgba(15,164,146,0.42)',
     points: ['Envío de campañas y plantillas', 'Chat en vivo y automatizaciones', 'Agenda de contactos y formularios'],
     art: 'send',
+  },
+  warranties: {
+    tagline: 'Garantías de los productos',
+    c1: '#f59e0b', c2: '#d97706', glow: 'rgba(245,158,11,0.40)',
+    points: [],
+    art: 'bars',
   },
 }
 
@@ -57,7 +63,7 @@ export default function AreaChooser({ areas, user, onPick }) {
         <p>Elige un área para empezar. Podrás cambiar cuando quieras desde el menú.</p>
       </div>
 
-      <div className="chooser-grid">
+      <div className="chooser-grid" style={{ '--n': areas.length }}>
         {areas.map((a) => {
           const m = META[a.key] || { c1: '#2563eb', c2: '#1d4ed8', glow: 'rgba(37,99,235,0.42)', points: [] }
           return (
