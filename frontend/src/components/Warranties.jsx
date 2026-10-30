@@ -4,6 +4,7 @@ import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import { FichaDispositivo } from './Devices.jsx'
+import WarrantyDocuments from './WarrantyDocuments.jsx'
 
 /* -------------------------------------------------------------------------
  * GARANTÍAS (Gestión de garantías). Expedientes G-AAAA-NNNN.
@@ -515,8 +516,8 @@ function ResDetalle({ rv, it }) {
   if (it.batch_code) partes.push(`Remesa ${it.batch_code} (${rv?.batch_statuses?.[it.batch_status] || it.batch_status})${it.zkong_result ? `: ${rv?.zkong_results?.[it.zkong_result] || it.zkong_result}${it.zkong_result_note ? ` — ${it.zkong_result_note}` : ''}` : ''}`)
   if (it.resolution === 'danada' && it.broken_cases?.length) partes.push(it.broken_cases.map((k) => rv?.broken_cases?.[k] || k).join(', '))
   if (it.resolution_note) partes.push(it.resolution_note)
-  if (!partes.length && !it.reviewed_by_name) return null
-  return <p className="wr-res-det">{partes.join(' · ')}{it.reviewed_by_name ? <span className="dev-mute">{partes.length ? ' — ' : ''}{it.reviewed_by_name}, {fechaHora(it.reviewed_at)}</span> : null}</p>
+  if (!partes.length && !it.reviewed_by_name && !it.coverage) return null
+  return <p className="wr-res-det">{it.coverage ? <span className={`wr-cov cov-${it.coverage}`}>{rv?.coverages?.[it.coverage] || it.coverage}</span> : null}{partes.join(' · ')}{it.reviewed_by_name ? <span className="dev-mute">{partes.length ? ' — ' : ''}{it.reviewed_by_name}, {fechaHora(it.reviewed_at)}</span> : null}</p>
 }
 
 /* Hueco de una foto: vacío acepta clic, arrastrar un fichero o una imagen del ticket, y
@@ -559,11 +560,17 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
   const uno = iniciales.length === 1 ? iniciales[0] : null
   const [items, setItems] = useState(iniciales)
   const [paso, setPaso] = useState(!preset && uno && pideFotos(rv, uno) ? 'fotos' : 'solucion')
-  const [f, setF] = useState(() => ({
-    resolution: preset || (uno && uno.resolution !== 'pendiente' ? uno.resolution : ''),
-    note: uno?.resolution_note || '', broken_cases: uno?.broken_cases || [], battery_changed: !!uno?.battery_changed,
-    zkong_decision: uno?.zkong_decision || 'decidir', zkong_issue: uno?.zkong_issue || '',
-  }))
+  const [f, setF] = useState(() => {
+    const resolution = preset || (uno && uno.resolution !== 'pendiente' ? uno.resolution : '')
+    return {
+      resolution, coverage: (!preset && uno?.coverage) || rv.default_coverage?.[resolution] || '',
+      note: uno?.resolution_note || '', broken_cases: uno?.broken_cases || [], battery_changed: !!uno?.battery_changed,
+      zkong_decision: uno?.zkong_decision || 'decidir', zkong_issue: uno?.zkong_issue || '',
+    }
+  })
+  // Quién paga se propone según la solución hasta que el técnico lo cambia a mano.
+  const [covAMano, setCovAMano] = useState(!preset && !!uno?.coverage && uno.coverage !== rv.default_coverage?.[uno.resolution])
+  const elegirSolucion = (k) => set({ resolution: k, ...(covAMano ? {} : { coverage: rv.default_coverage?.[k] || '' }) })
   const [guardando, setGuardando] = useState(false)
   const [cambios, setCambios] = useState(false)
   const [galeria, setGaleria] = useState(w.ticket_id ? null : [])
@@ -620,7 +627,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
   const pendientes = huecos.filter((h) => !h.lleno).length
 
   const toggleCaso = (k) => set({ broken_cases: f.broken_cases.includes(k) ? f.broken_cases.filter((x) => x !== k) : [...f.broken_cases, k] })
-  const faltaAlgo = !f.resolution || (f.resolution === 'danada' && !f.broken_cases.length) || (f.resolution === 'desechada' && !f.note.trim())
+  const faltaAlgo = !f.resolution || !f.coverage || (f.resolution === 'danada' && !f.broken_cases.length) || (f.resolution === 'desechada' && !f.note.trim())
     || (rv.resolutions[f.resolution]?.zkong && f.zkong_decision === 'enviar' && !f.zkong_issue.trim())
 
   return (
@@ -646,7 +653,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
                 const ui = RES_UI[k] || RES_UI.pendiente
                 const Ic = ui.ic
                 return (
-                  <button key={k} type="button" className={`wr-res-card c-${ui.c}${f.resolution === k ? ' on' : ''}`} onClick={() => set({ resolution: k })}>
+                  <button key={k} type="button" className={`wr-res-card c-${ui.c}${f.resolution === k ? ' on' : ''}`} onClick={() => elegirSolucion(k)}>
                     <span className="ic"><Ic /></span>
                     <span className="tx">
                       <b>{r.label}</b>
@@ -663,6 +670,17 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
               })}
             </div>
 
+            {f.resolution && (
+              <div className="wr-rev-sec">
+                <label>¿Quién paga? <span className="req">*</span>
+                  <span className="dev-mute"> — {!f.coverage ? 'elígelo según el motivo' : f.coverage === rv.default_coverage?.[f.resolution] ? 'lo propuesto para esta solución' : 'elegido a mano'}</span></label>
+                <div className="wr-seg">
+                  {Object.entries(rv.coverages || {}).map(([k, l]) => (
+                    <button key={k} type="button" className={f.coverage === k ? `on cov-${k}` : ''} onClick={() => { setCovAMano(k !== rv.default_coverage?.[f.resolution]); set({ coverage: k }) }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             {f.resolution === 'bateria' && (
               <label className="wr-check"><input type="checkbox" checked={f.battery_changed} onChange={(e) => set({ battery_changed: e.target.checked })} /> Se le han cambiado las pilas</label>
             )}
@@ -922,7 +940,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   )
 }
 
-const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const toast = useToast()
@@ -1006,11 +1024,8 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
       </div>
 
       <div className="wr-tabs" role="tablist">
-        {[['resumen', 'Resumen', Icon.doc], ['productos', `Productos${d.items.length ? ` (${d.items.length})` : ''}`, Icon.tag], ['seguimiento', `Seguimiento${d.notes.length ? ` (${d.notes.length})` : ''}`, Icon.chat], ['historial', 'Historial', Icon.clock]].map(([k, l, Ic]) => (
+        {[['resumen', 'Resumen', Icon.doc], ['productos', `Productos${d.items.length ? ` (${d.items.length})` : ''}`, Icon.tag], ['documentos', 'Documentos', Icon.file], ['seguimiento', `Seguimiento${d.notes.length ? ` (${d.notes.length})` : ''}`, Icon.chat], ['historial', 'Historial', Icon.clock]].map(([k, l, Ic]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Ic /> {l}</button>
-        ))}
-        {[['Documentos', Icon.file]].map(([l, Ic]) => (
-          <button key={l} disabled title="Próximamente"><Ic /> {l} <em>Pronto</em></button>
         ))}
       </div>
 
@@ -1034,6 +1049,8 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
         )}
 
         {tab === 'productos' && <Productos w={w} items={d.items} opts={opts} onReload={cargar} onChanged={onChanged} />}
+
+        {tab === 'documentos' && <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} />}
 
         {tab === 'seguimiento' && (
           <>

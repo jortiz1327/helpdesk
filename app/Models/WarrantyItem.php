@@ -41,6 +41,20 @@ class WarrantyItem extends Model
         'desechada'    => ['label' => 'Desechada',              'photos' => false, 'zkong' => false],
     ];
 
+    // Quién paga cada dispositivo: decide en qué presupuesto o albarán va.
+    public const COVERAGES = [
+        'garantia' => 'Garantía',
+        'cliente'  => 'Paga el cliente',
+        'pilas'    => 'Pilas',
+    ];
+
+    // Lo que se propone según la solución (el técnico lo cambia si hace falta). Desechada
+    // no tiene propuesta: depende del motivo, así que se elige siempre.
+    public const DEFAULT_COVERAGE = [
+        'correcta' => 'garantia', 'recuperada' => 'garantia', 'reparada' => 'garantia',
+        'no_reproduce' => 'garantia', 'defectuosa' => 'garantia', 'danada' => 'cliente', 'bateria' => 'pilas',
+    ];
+
     // Las que pueden ir a ZKONG: qué se hace con ellas.
     public const ZKONG_DECISIONS = [
         'decidir'   => 'Pendiente de decidir',

@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
+import Select from './Select.jsx'
 
 /* -------------------------------------------------------------------------
  * CONFIGURACIÓN de Gestión de garantías (permiso warranties.config).
  * Estados (nombre, color, si cuentan como cerrada, orden), categorías, reglas de alerta
- * (días de aviso y de crítico) y plantillas de diagnóstico para la revisión.
+ * (días de aviso y de crítico), plantillas de diagnóstico para la revisión, tarifa de
+ * los documentos y ajustes de los documentos y del correo de resolución.
  * ---------------------------------------------------------------------- */
 
 const PALETA = ['#64748b', '#94a3b8', '#2563eb', '#0891b2', '#4f46e5', '#7c3aed', '#9333ea', '#c27803', '#ea580c', '#e11d48', '#dc2626', '#12925a', '#16a34a']
@@ -209,6 +211,105 @@ function Plantillas({ list, hacer }) {
   )
 }
 
+/* Tarifa de los documentos: precio por referencia AEME (etiquetas y antenas), por tipo
+   de pila y conceptos sueltos. Las referencias que salen en las garantías y aún no
+   tienen precio aparecen debajo para ponérselo. El precio se guarda al salir del campo. */
+const TIPOS_PRECIO = { product: 'Producto', battery: 'Pila', service: 'Concepto' }
+const eur = (n) => Number(n || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
+
+function Precio({ value, onSave }) {
+  const [v, setV] = useState(value == null ? '' : String(value).replace('.', ','))
+  useEffect(() => setV(value == null ? '' : String(value).replace('.', ',')), [value])
+  const guardar = () => { const n = v.trim().replace(',', '.'); if (n !== '' && Number(n) !== Number(value)) onSave(n) }
+  return <span className="ws-precio"><input inputMode="decimal" value={v} placeholder="0,00" onChange={(e) => setV(e.target.value)} onBlur={guardar} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} /> €</span>
+}
+
+function Tarifa({ list, hints, hacer }) {
+  const [filtro, setFiltro] = useState('')
+  const [nuevo, setNuevo] = useState(null)   // { kind, ref, label, price }
+  const crear = async () => { if (await hacer('price_save', nuevo, 'Precio guardado')) setNuevo(null) }
+  const filas = [...list, ...hints.map((h) => ({ ...h, id: 0, price: null }))].filter((p) => !filtro || p.kind === filtro)
+  const n = (k) => list.filter((p) => p.kind === k).length + hints.filter((h) => h.kind === k).length
+  return (
+    <Card icon={Icon.tag} title="Tarifa" sub="Precios de los presupuestos y albaranes. Lo que cubre la garantía sale a 0 € aunque tenga precio."
+      action={<button className="btn sm" onClick={() => setNuevo({ kind: 'service', ref: '', label: '', price: '' })}><Icon.plus /> Nuevo precio</button>}>
+      {nuevo && (
+        <div className="ws-edit ws-precio-new">
+          <div className="ws-add grow">
+            <Select sm value={nuevo.kind} onChange={(k) => setNuevo({ ...nuevo, kind: k })} options={Object.entries(TIPOS_PRECIO).map(([value, label]) => ({ value, label }))} />
+            {nuevo.kind !== 'service' ? <input value={nuevo.ref} maxLength={80} placeholder={nuevo.kind === 'battery' ? 'Tipo (CR2450)' : 'Referencia AEME'} onChange={(e) => setNuevo({ ...nuevo, ref: e.target.value })} /> : null}
+            <input value={nuevo.label} maxLength={160} placeholder={nuevo.kind === 'service' ? 'Concepto (Mano de obra…)' : 'Descripción (opcional)'} onChange={(e) => setNuevo({ ...nuevo, label: e.target.value })} />
+            <input className="ws-precio-in" inputMode="decimal" value={nuevo.price} placeholder="0,00 €" onChange={(e) => setNuevo({ ...nuevo, price: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && crear()} />
+          </div>
+          <div className="ws-edit-f"><span /><button className="btn ghost sm" onClick={() => setNuevo(null)}>Cancelar</button><button className="btn sm" disabled={!String(nuevo.price).trim() || !(nuevo.kind === 'service' ? nuevo.label : nuevo.ref).trim()} onClick={crear}>Guardar</button></div>
+        </div>
+      )}
+      <div className="wr-chips sm">
+        <button className={!filtro ? 'on' : ''} onClick={() => setFiltro('')}>Todos</button>
+        {Object.entries(TIPOS_PRECIO).map(([k, l]) => n(k) ? <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(filtro === k ? '' : k)}>{l}s ({n(k)})</button> : null)}
+        {hints.length ? <span className="ws-hint-n"><Icon.warn /> {hints.length} sin precio</span> : null}
+      </div>
+      <div className="dev-table-wrap keep wt-wrap">
+        <table className="dev-table ws-tarifa">
+          <thead><tr><th>Tipo</th><th>Referencia</th><th>Descripción</th><th className="r">Precio sin IVA</th><th /></tr></thead>
+          <tbody>
+            {filas.map((p) => (
+              <tr key={`${p.kind}|${p.ref}`} className={p.id ? '' : 'hint'}>
+                <td><span className="dev-mute">{TIPOS_PRECIO[p.kind]}</span></td>
+                <td><b className={p.kind === 'service' ? '' : 'mono'}>{p.kind === 'service' ? '—' : p.ref}</b></td>
+                <td>{p.label || <span className="dev-mute">—</span>}{!p.id && p.used ? <span className="dev-mute"> · en {p.used} {p.used === 1 ? 'dispositivo' : 'dispositivos'}</span> : null}</td>
+                <td className="r"><Precio value={p.price} onSave={(price) => hacer('price_save', { id: p.id, kind: p.kind, ref: p.ref, label: p.label || '', price }, 'Precio guardado')} /></td>
+                <td className="ws-acts">{p.id ? <button className="icon-btn" title="Quitar de la tarifa" onClick={() => hacer('price_delete', { id: p.id }, 'Precio quitado', `¿Quitar ${p.kind === 'service' ? `«${p.label}»` : p.ref} de la tarifa?`)}><Icon.trash /></button> : <em className="ws-tag off">Sin precio</em>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!filas.length ? <p className="dev-mute" style={{ padding: 12 }}>Nada en la tarifa todavía.</p> : null}
+      </div>
+    </Card>
+  )
+}
+
+const VARIABLES = [['{codigo}', 'Nº de garantía'], ['{cliente}', 'Cliente'], ['{proyecto}', 'Hotel o tienda'], ['{resumen}', 'Resultado de la revisión'], ['{documentos}', 'Presupuestos y albaranes'], ['{agente}', 'Quien lo prepara'], ['{fecha}', 'Hoy']]
+
+function Documentos({ docs, hacer }) {
+  const [v, setV] = useState(docs)
+  useEffect(() => setV(docs), [docs])
+  const set = (grupo, c) => setV((x) => ({ ...x, [grupo]: { ...x[grupo], ...c } }))
+  const cambiado = JSON.stringify(v) !== JSON.stringify(docs)
+  const campo = (grupo, k, label, props = {}) => (
+    <div className="field"><span className="lbl">{label}</span>
+      {props.rows ? <textarea rows={props.rows} value={v[grupo]?.[k] ?? ''} maxLength={props.max} onChange={(e) => set(grupo, { [k]: e.target.value })} />
+        : <input value={v[grupo]?.[k] ?? ''} maxLength={props.max} type={props.type || 'text'} onChange={(e) => set(grupo, { [k]: e.target.value })} />}
+    </div>
+  )
+  return (
+    <Card icon={Icon.file} title="Documentos y correo de resolución" sub="Lo que sale en la cabecera y el pie de los presupuestos, albaranes e informes, y la plantilla del correo al cliente.">
+      <div className="ws-docs">
+        <div>
+          <h4 className="ws-sub">Empresa</h4>
+          <div className="grid2">{campo('company', 'name', 'Nombre', { max: 120 })}{campo('company', 'tax_id', 'CIF', { max: 30 })}</div>
+          {campo('company', 'address', 'Dirección', { rows: 2, max: 300 })}
+          <div className="grid2">{campo('company', 'email', 'Correo', { max: 120 })}{campo('company', 'phone', 'Teléfono', { max: 40 })}</div>
+          <h4 className="ws-sub">Presupuestos</h4>
+          <div className="grid2">{campo('documents', 'vat', 'IVA (%)', { type: 'number' })}{campo('documents', 'validity_days', 'Validez (días)', { type: 'number' })}</div>
+          {campo('documents', 'conditions', 'Condiciones (nota de cada presupuesto nuevo)', { rows: 3, max: 3000 })}
+        </div>
+        <div>
+          <h4 className="ws-sub">Correo de resolución</h4>
+          {campo('resolution_email', 'subject', 'Asunto', { max: 200 })}
+          {campo('resolution_email', 'body', 'Texto', { rows: 11, max: 5000 })}
+          <div className="ws-vars">{VARIABLES.map(([k, l]) => <span key={k} title={l}><code>{k}</code> {l}</span>)}</div>
+        </div>
+      </div>
+      <div className="ws-foot">
+        <span className="dev-mute">El correo se rellena en la pestaña Documentos de cada garantía, para copiarlo.</span>
+        <button className="btn" disabled={!cambiado} onClick={() => hacer('docs_save', v, 'Ajustes de documentos guardados')}><Icon.save /> Guardar</button>
+      </div>
+    </Card>
+  )
+}
+
 export default function WarrantySettings() {
   const toast = useToast()
   const confirm = useConfirm()
@@ -231,7 +332,7 @@ export default function WarrantySettings() {
       <header className="page-head">
         <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Configuración</h1></div>
-        <span className="sub">· Estados, categorías, alertas y plantillas de Gestión de garantías</span>
+        <span className="sub">· Estados, categorías, alertas, plantillas, tarifa y documentos de Gestión de garantías</span>
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
         {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
@@ -247,6 +348,8 @@ export default function WarrantySettings() {
             </div>
             <Alertas list={d.alerts} hacer={hacer} />
             <Plantillas list={d.templates} hacer={hacer} />
+            <Tarifa list={d.prices} hints={d.price_hints} hacer={hacer} />
+            <Documentos docs={d.docs} hacer={hacer} />
           </>
         )}
       </div></div>

@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Warranty;
+use App\Models\WarrantyDocument;
 use App\Models\WarrantyItem;
+use App\Services\WarrantyDocuments;
 use App\Models\ZkongBatch;
 use App\Services\AemePortal;
 use App\Services\WarrantyAlerts;
@@ -279,7 +281,8 @@ class WarrantiesController extends Controller
             'last_commu_at' => $i->last_commu_at?->toDateTimeString(), 'server_model' => $i->server_model,
             'aeme_ref' => $i->aeme_ref, 'product_name' => $i->product_name, 'model_manual' => $i->model_manual,
             'warnings' => $i->warnings ?? [], 'checked_at' => $i->checked_at?->toDateTimeString(),
-            'resolution' => $i->resolution, 'resolution_note' => $i->resolution_note,
+            'resolution' => $i->resolution, 'coverage' => $i->coverage, 'resolution_note' => $i->resolution_note,
+            'device_model_id' => $i->device_model_id,
             'broken_cases' => $i->broken_cases ?? [], 'battery_changed' => $i->battery_changed,
             'zkong_decision' => $i->zkong_decision, 'zkong_issue' => $i->zkong_issue,
             'reviewed_at' => $i->reviewed_at?->toDateTimeString(), 'reviewed_by_name' => $i->reviewed_by_name,
@@ -314,10 +317,15 @@ class WarrantiesController extends Controller
         $decision = (string) $request->input('zkong_decision', 'decidir');
         $fallo = $this->texto($request->input('zkong_issue'), 500);
 
+        // Quién paga: lo elegido o, si no, lo que se propone para la solución.
+        $cov = (string) $request->input('coverage', '');
+        $cov = isset(WarrantyItem::COVERAGES[$cov]) ? $cov : (WarrantyItem::DEFAULT_COVERAGE[$res] ?? null);
+
         $zk = WarrantyItem::RESOLUTIONS[$res]['zkong'];
         $error = match (true) {
             $res === 'danada' && ! $casos                    => 'Indica por qué está dañada (al menos un motivo)',
             $res === 'desechada' && ! $nota                  => 'Indica por qué se desecha',
+            $res !== 'pendiente' && ! $cov                   => 'Indica quién paga: garantía, cliente o pilas',
             $zk && ! isset(WarrantyItem::ZKONG_DECISIONS[$decision]) => 'Decisión de ZKONG no válida',
             $zk && $decision === 'enviar' && ! $fallo        => 'Describe el fallo para el RMA de ZKONG',
             default => null,
@@ -337,6 +345,7 @@ class WarrantiesController extends Controller
         $pendiente = $res === 'pendiente';
         $datos = [
             'resolution'      => $res,
+            'coverage'        => $pendiente ? null : $cov,
             'resolution_note' => $nota,
             'broken_cases'    => $res === 'danada' ? $casos : null,
             'battery_changed' => $res === 'bateria' && $request->boolean('battery_changed'),
@@ -585,6 +594,7 @@ class WarrantiesController extends Controller
         }
         $id = (int) $request->input('id');
         WarrantyPhotos::purgeFiles(WarrantyItem::where('warranty_id', $id)->pluck('id')->all());
+        WarrantyDocuments::purgeFiles($id);
         Warranty::where('id', $id)->delete();
         return response()->json(['ok' => true]);
     }
@@ -610,6 +620,12 @@ class WarrantiesController extends Controller
                 'photo_types'  => WarrantyItem::PHOTO_TYPES,
                 'batch_statuses' => ZkongBatch::STATUSES,
                 'zkong_results'  => ZkongBatch::RESULTS,
+                'coverages'        => WarrantyItem::COVERAGES,
+                'default_coverage' => WarrantyItem::DEFAULT_COVERAGE,
+            ],
+            'documents'  => [
+                'kinds'    => collect(WarrantyDocument::KINDS)->map(fn ($k, $key) => ['label' => $k['label'], 'statuses' => $k['statuses'], 'generated' => in_array($key, WarrantyDocument::GENERATED, true)])->all(),
+                'statuses' => WarrantyDocument::STATUSES,
             ],
         ]);
     }

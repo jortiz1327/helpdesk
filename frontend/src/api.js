@@ -425,6 +425,33 @@ export const api = {
   }),
   warrantyTeam: () => req('warranties.php?action=team'),
   warrantyReport: (params) => req('warranties.php?action=report&' + new URLSearchParams(params).toString()),
+  // Documentos de una garantía: warrantyDocsDo('generate', {...}) y demás acciones POST.
+  warrantyDocs: (id) => req(`warranty_docs.php?id=${id}`),
+  warrantyDoc: (id) => req(`warranty_docs.php?action=get&id=${id}`),
+  warrantyDocsDo: (action, payload) => postJson(`warranty_docs.php?action=${action}`, payload),
+  uploadWarrantyDoc: (fields, file) => {
+    const fd = new FormData()
+    Object.entries(fields).forEach(([k, v]) => fd.append(k, v ?? ''))
+    fd.append('file', file)
+    return req('warranty_docs.php?action=upload', { method: 'POST', body: fd })
+  },
+  warrantyResolutionEmail: (id) => req(`warranty_docs.php?action=email&id=${id}`),
+  warrantyDocDownload: async (id) => {
+    try {
+      const r = await fetch(`${BASE}/warranty_docs.php?action=download&id=${id}`, { headers: { 'X-App-Token': getToken() } })
+      if (!r.ok) {
+        let error = 'No se pudo descargar'
+        try { error = (await r.json()).error || error } catch { /* no-json */ }
+        return { ok: false, error }
+      }
+      const cd = r.headers.get('Content-Disposition') || ''
+      const utf = cd.match(/filename\*=UTF-8''([^;]+)/)
+      const filename = utf ? decodeURIComponent(utf[1]) : (cd.match(/filename="?([^"]+)"?/) || [])[1] || 'documento'
+      return { ok: true, blob: await r.blob(), filename }
+    } catch {
+      return { ok: false, error: 'Sin conexión al descargar' }
+    }
+  },
   // Configuración de garantías: warrantySettingsDo('status_save', {...}) y demás acciones.
   warrantySettings: () => req('warranty_settings.php'),
   warrantySettingsDo: (action, payload) => postJson(`warranty_settings.php?action=${action}`, payload),
