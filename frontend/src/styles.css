@@ -726,9 +726,9 @@ input, textarea, select { font-family: inherit; }
 /* Solicitante @aemegroup.com: fila resaltada y triángulo (responder = escribir a un compañero). */
 .tk-row.internal > td { background: rgba(245, 158, 11, .13); }
 .tk-row.internal > td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
-.tk-internal { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 4px;
-  background: #f59e0b; color: #fff; font-size: 12px; line-height: 1; vertical-align: -3px; cursor: help; }
-.tk-internal-mail { color: #b45309 !important; font-weight: 700; }
+.tk-internal { display: inline-flex; margin-right: 5px; vertical-align: -0.15em; cursor: help; }
+.tk-internal svg { width: 1.05em; height: 1.05em; fill: #d97706; }
+.tk-internal-mail { color: #b45309 !important; font-weight: 600; }
 
 /* ---- Recibimiento matutino (MorningBriefing) ---- */
 .mb-overlay { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center;

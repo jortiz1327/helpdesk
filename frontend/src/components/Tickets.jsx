@@ -31,7 +31,7 @@ const DOMINIO_INTERNO = '@aemegroup.com'
 const esInterno = (email) => !!email && String(email).trim().toLowerCase().endsWith(DOMINIO_INTERNO)
 const AvisoInterno = () => (
   <span className="tk-internal" title={`El correo de este ticket es de ${DOMINIO_INTERNO}: al responder le escribes a alguien de la empresa, no al cliente`}
-    aria-label="Correo interno">⚠</span>
+    aria-label="Correo interno"><Icon.warn /></span>
 )
 
 /* Fila «fantasma» mientras carga la bandeja: imita las columnas con shimmer, en vez
