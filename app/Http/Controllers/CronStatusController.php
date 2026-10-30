@@ -17,9 +17,9 @@ class CronStatusController extends Controller
 {
     public function handle(Request $request)
     {
-        // Próximos envíos automáticos a clientes (7 días): solo consulta.
+        // Próximos envíos automáticos a clientes (los que salen en menos de 4 días): solo consulta.
         if ($request->query('action') === 'upcoming') {
-            return response()->json(['ok' => true, 'items' => app(\App\Services\UpcomingSends::class)->lista(168)]);
+            return response()->json(['ok' => true, 'items' => app(\App\Services\UpcomingSends::class)->lista(96)]);
         }
 
         $ultimo = Setting::get('cron_last_run');

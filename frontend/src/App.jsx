@@ -156,7 +156,7 @@ const VERSIONS = [
         date: "28 oct 2026",
         resumen: "Próximos envíos automáticos a clientes, en Configuración y en la ficha del ticket.",
         mejoras: [
-            "Configuración › Tareas programadas: «Próximos envíos a clientes» con lo que saldrá solo esta semana (cierres por falta de respuesta, respuestas programadas…), separando las próximas 24 h.",
+            "Configuración › Tareas programadas: «Próximos envíos a clientes» con lo que saldrá solo en los próximos 4 días (cierres por falta de respuesta, respuestas programadas…), separando las próximas 24 h.",
             "En la ficha del ticket, un aviso de cuándo se cerrará automáticamente y cómo evitarlo.",
         ],
         arreglos: [],
