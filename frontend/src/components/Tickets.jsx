@@ -25,6 +25,15 @@ const teclaAbrir = (fn) => (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() }
 }
 
+/* El solicitante es de la CASA (@aemegroup.com): responder le escribe a un compañero, no
+   al cliente. Se marca en la tabla y se pide confirmación antes de enviarle nada. */
+const DOMINIO_INTERNO = '@aemegroup.com'
+const esInterno = (email) => !!email && String(email).trim().toLowerCase().endsWith(DOMINIO_INTERNO)
+const AvisoInterno = () => (
+  <span className="tk-internal" title={`El correo de este ticket es de ${DOMINIO_INTERNO}: al responder le escribes a alguien de la empresa, no al cliente`}
+    aria-label="Correo interno">⚠</span>
+)
+
 /* Fila «fantasma» mientras carga la bandeja: imita las columnas con shimmer, en vez
    de un spinner que sustituye toda la tabla. Se siente más rápida y no salta el layout. */
 function SkelRow({ canTimes }) {
@@ -1183,7 +1192,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                       && t.locked_at && (Date.now() - parseDate(t.locked_at).getTime()) < lockMin * 60000)
                       ? t.locked_name : null
                     return (
-                      <tr key={t.id} className={`tk-row ${waiting ? 'wait' : ''} ${sleeping ? 'sleeping' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
+                      <tr key={t.id} className={`tk-row ${waiting ? 'wait' : ''} ${sleeping ? 'sleeping' : ''} ${esInterno(t.contact_email) ? 'internal' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
                         tabIndex={0} onKeyDown={teclaAbrir(() => setOpen(t.id))}
                         aria-label={`Ticket ${t.code}, ${nombreContacto(t.contact_name, t.contact_wa, 'sin nombre')}: ${t.subject || 'sin asunto'}. Pulsa Intro para abrir.`}>
                         <td className="tk-chk" onClick={(e) => e.stopPropagation()}>
@@ -1192,7 +1201,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                         <td className="tk-code">{t.code}</td>
                         <td><ChannelBadge channel={t.channel} source={t.source}
                           lastIn={t.channel === 'whatsapp' && !['resuelto', 'cerrado'].includes(t.status) ? t.wa_last_in : undefined} /></td>
-                        <td className="tk-cli"><b>{nombreContacto(t.contact_name, t.contact_wa)}</b><small>{t.contact_email || (t.contact_wa && t.contact_name ? fmtTel(t.contact_wa) : t.contact_wa ? 'WhatsApp' : '—')}</small></td>
+                        <td className="tk-cli"><b>{esInterno(t.contact_email) && <AvisoInterno />}{nombreContacto(t.contact_name, t.contact_wa)}</b><small>{t.contact_email || (t.contact_wa && t.contact_name ? fmtTel(t.contact_wa) : t.contact_wa ? 'WhatsApp' : '—')}</small></td>
                         <td className="tk-subj">
                           {waiting && <span className="dot-wait" title="El cliente escribió lo último: sin responder" />}
                           {t.subject}
@@ -1878,8 +1887,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
               <div className="tkm-cli">
                 <span className="tkm-av">{t.contact_name ? t.contact_name.slice(0, 1).toUpperCase() : t.contact_wa ? <Icon.phone /> : '?'}</span>
                 <div className="tkm-cli-tx">
-                  <b>{nombreContacto(t.contact_name, t.contact_wa)}</b>
-                  <small>{t.contact_email || 'Sin correo'}</small>
+                  <b>{esInterno(t.contact_email) && <AvisoInterno />}{nombreContacto(t.contact_name, t.contact_wa)}</b>
+                  <small className={esInterno(t.contact_email) ? 'tk-internal-mail' : ''}>{t.contact_email || 'Sin correo'}</small>
                 </div>
                 {can('tickets.reply') && (
                   <button className="tkm-cli-edit" title={t.channel === 'whatsapp' ? 'Editar nombre y correo del cliente' : 'Cambiar solicitante (corregir el correo)'}
@@ -2457,6 +2466,16 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                       else toast(r.error || 'No se pudo guardar la nota', 'err')
                       return r.ok
                     } else {
+                      // Correo a alguien de la casa: confirmar. «Modificar» devuelve false y el
+                      // compositor conserva lo escrito.
+                      if (d.ticket.channel === 'email' && esInterno(d.ticket.contact_email)) {
+                        const seguir = await confirm({
+                          title: 'Vas a escribir a alguien de la empresa',
+                          message: `El correo de este ticket es ${d.ticket.contact_email}, de ${DOMINIO_INTERNO}: la respuesta le llegará a un compañero, no al cliente. ¿Seguro que quieres enviarla o prefieres modificarla?`,
+                          confirmText: 'Sí, enviar', cancelText: 'Modificar',
+                        })
+                        if (!seguir) return false
+                      }
                       const r = await api.ticketReply(id, html, files, cc, bcc, schedule, send_at)
                       if (r.ok) {
                         if (r.scheduled) toast(`⏱ Respuesta programada para ${fmtDate(r.send_at)}`)

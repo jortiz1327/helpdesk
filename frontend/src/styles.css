@@ -723,6 +723,12 @@ input, textarea, select { font-family: inherit; }
   border-radius: 6px; font-size: 11px; font-weight: 700; background: #eef1f6; color: #64748b;
   white-space: nowrap; flex: 0 0 auto; }
 .tk-row.sleeping { opacity: .72; }
+/* Solicitante @aemegroup.com: fila resaltada y triángulo (responder = escribir a un compañero). */
+.tk-row.internal > td { background: rgba(245, 158, 11, .13); }
+.tk-row.internal > td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
+.tk-internal { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 4px;
+  background: #f59e0b; color: #fff; font-size: 12px; line-height: 1; vertical-align: -3px; cursor: help; }
+.tk-internal-mail { color: #b45309 !important; font-weight: 700; }
 
 /* ---- Recibimiento matutino (MorningBriefing) ---- */
 .mb-overlay { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center;
