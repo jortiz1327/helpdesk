@@ -425,6 +425,9 @@ export const api = {
   }),
   warrantyTeam: () => req('warranties.php?action=team'),
   warrantyReport: (params) => req('warranties.php?action=report&' + new URLSearchParams(params).toString()),
+  // Catálogo de modelos: deviceCatalogDo('save' | 'delete', {...}).
+  deviceCatalog: () => req('device_catalog.php'),
+  deviceCatalogDo: (action, payload) => postJson(`device_catalog.php?action=${action}`, payload),
   // Documentos de una garantía: warrantyDocsDo('generate', {...}) y demás acciones POST.
   warrantyDocs: (id) => req(`warranty_docs.php?id=${id}`),
   warrantyDoc: (id) => req(`warranty_docs.php?action=get&id=${id}`),

@@ -4910,3 +4910,54 @@ button.dev-code:hover { text-decoration: underline; }
 .ws-vars { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--ink-3); }
 .ws-vars code { font-size: 11.5px; padding: 1px 5px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); }
 @media (max-width: 980px) { .ws-docs { grid-template-columns: 1fr; } }
+
+/* Garantías · Catálogo de modelos */
+.dc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.dc-bar .spacer { flex: 1; }
+.dc-search input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 13.5px; color: var(--ink); }
+.dc-table td { height: auto; padding-top: 10px; padding-bottom: 10px; vertical-align: top; }
+.dc-table th.c, .dc-table td.c { text-align: center; }
+.dc-mod { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dc-mod b { font-size: 15px; font-variant-numeric: tabular-nums; min-width: 42px; }
+.dc-mod .dev-mute { font-size: 12.5px; }
+.dc-bat { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 12.5px; color: #a16207; white-space: nowrap; }
+.dc-bat svg { width: 13px; height: 13px; fill: currentColor; }
+.dc-pairs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.dc-pairs li { display: grid; grid-template-columns: minmax(150px, auto) 14px minmax(90px, auto) minmax(0, 1fr); align-items: center; gap: 8px; font-size: 12.5px; }
+.dc-pairs li > svg { width: 12px; height: 12px; fill: var(--ink-3); }
+.dc-pairs .mono { display: inline-flex; align-items: center; gap: 4px; }
+.dc-out { color: #b45309; }
+.dc-out svg { width: 12px; height: 12px; fill: currentColor; }
+.dc-pname { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-unmapped { margin-top: 16px; }
+.dc-unmapped h3 svg { fill: #d97706 !important; }
+.dc-un-list { list-style: none; margin: 0; padding: 0; }
+.dc-un-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.dc-un-list li .dc-pname { flex: 1; min-width: 160px; color: var(--ink-2); }
+.dc-un-acts { display: inline-flex; align-items: center; gap: 8px; }
+.modal.dc-modal { max-width: 760px; }
+.dc-grid { display: grid; grid-template-columns: 110px 1fr 1fr 1fr; gap: 12px; }
+.dc-grid .field { margin-bottom: 12px; }
+.dc-grid .field input { padding: 8px 11px; font-size: 13px; }
+.dc-pilas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; margin-bottom: 16px; border-radius: 11px; background: var(--panel-2); border: 1px solid var(--line); }
+.dc-pilas .wr-check { margin: 0; }
+.dc-pilas label:not(.wr-check) { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.dc-pilas input:not([type=checkbox]) { height: 32px; padding: 0 8px; width: 110px; }
+.dc-pilas input[type=number] { width: 64px; }
+.dc-chip { padding: 3px 9px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--panel); border: 1px solid var(--line); }
+.dc-chip:hover { border-color: var(--primary); color: var(--primary); }
+.dc-tip { margin: -4px 0 10px; font-size: 12.5px; line-height: 1.5; }
+.dc-refs { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.dc-refs > .dev-btn { align-self: flex-start; }
+.dc-refs-h, .dc-ref { display: grid; grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1.3fr) 32px; align-items: center; gap: 8px; }
+.dc-refs-h span { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.dc-ref input { height: 36px; padding: 0 10px; font-size: 13px; font-family: var(--mono, monospace); }
+.dc-ref .dc-link { width: 14px; height: 14px; fill: var(--ink-3); }
+.dc-ref .icon-btn { width: 32px; height: 32px; }
+.dc-del { margin-right: auto; color: var(--danger); }
+.dc-del svg { fill: currentColor; }
+@media (max-width: 760px) { .dc-grid { grid-template-columns: 1fr 1fr; } .dc-pairs li { grid-template-columns: auto 14px auto; } .dc-pairs .dc-pname { grid-column: 1 / -1; } }
+.dc-table td:first-child { min-width: 250px; }
+.dc-mod { flex-wrap: nowrap; white-space: nowrap; }
+.dc-pilas input:not([type=checkbox]), .dc-ref input { border: 1.5px solid var(--line-2); border-radius: 9px; background: var(--panel); color: var(--ink); }
+.dc-pilas input:focus, .dc-ref input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }

@@ -40,6 +40,7 @@ import Devices from "./components/Devices.jsx";
 import Zkong from "./components/Zkong.jsx";
 import WarrantySettings from "./components/WarrantySettings.jsx";
 import { WarrantyTeam, WarrantyReports } from "./components/WarrantyTeam.jsx";
+import DeviceCatalog from "./components/DeviceCatalog.jsx";
 import ZkongServers from "./components/ZkongServers.jsx";
 import Warranties from "./components/Warranties.jsx";
 import Users from "./components/Users.jsx";
@@ -686,6 +687,14 @@ const AREAS = [
                         icon: Icon.shield,
                         perm: "warranties.access",
                         color: "#f59e0b",
+                    },
+                    {
+                        // Modelos, pilas y referencias ZKONG ↔ AEME (editar: warranties.config).
+                        key: "device_catalog",
+                        label: "Catálogo",
+                        icon: Icon.catalog,
+                        perm: "warranties.access",
+                        color: "#7c3aed",
                     },
                 ],
             },
@@ -1621,6 +1630,7 @@ export default function App() {
                                 onOpenTicket={can("helpdesk.access") ? (id) => { setTicketGarantia(id); setView("garantias_tickets"); } : null} />
                         )}
                         {view === "warranty_settings" && can("warranties.config") && <WarrantySettings />}
+                        {view === "device_catalog" && can("warranties.access") && <DeviceCatalog />}
                         {view === "garantias_equipo" && can("warranties.access") && (
                             <WarrantyTeam onFilter={(f) => { setGarantiaFiltro({ ...f }); setView("garantias"); }} />
                         )}
