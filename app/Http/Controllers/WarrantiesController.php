@@ -7,6 +7,7 @@ use App\Models\Warranty;
 use App\Models\WarrantyItem;
 use App\Services\AemePortal;
 use App\Services\WarrantyLabels;
+use App\Services\WarrantyPhotos;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +43,11 @@ class WarrantiesController extends Controller
             'catalog'         => response()->json(['ok' => true, 'models' => $this->labels()->catalog()]),
             'portal_clients'  => $this->portalClients(),
             'portal_projects' => $this->portalProjects($request),
+            'review'            => $this->review($request),
+            'photo_upload'      => $this->photoUpload($request),
+            'photo_from_ticket' => $this->photoFromTicket($request),
+            'photo_delete'      => $this->photoDelete($request),
+            'ticket_images'     => $this->ticketImages($request),
             default   => $this->list($request),
         };
     }
@@ -229,6 +235,7 @@ class WarrantiesController extends Controller
     private function labelDelete(Request $request)
     {
         $item = WarrantyItem::findOrFail((int) $request->input('item_id'));
+        WarrantyPhotos::purgeFiles([$item->id]);
         $item->delete();
         $this->evento($item->warranty_id, $request->user()->id, 'items', null, '−1: ' . $item->code);
         Warranty::whereKey($item->warranty_id)->update(['last_activity_at' => now()]);
@@ -244,13 +251,150 @@ class WarrantiesController extends Controller
 
     private function items(int $warrantyId): array
     {
-        return WarrantyItem::where('warranty_id', $warrantyId)->orderBy('id')->get()->map(fn ($i) => [
+        $items = WarrantyItem::query()->leftJoin('users as r', 'r.id', '=', 'warranty_items.reviewed_by')
+            ->where('warranty_id', $warrantyId)->orderBy('warranty_items.id')
+            ->get(['warranty_items.*', 'r.name as reviewed_by_name']);
+        $fotos = WarrantyPhotos::forItems($items->pluck('id')->all());
+
+        return $items->map(fn ($i) => [
             'id' => $i->id, 'code' => $i->code, 'kind' => $i->kind, 'lookup_state' => $i->lookup_state, 'server' => $i->server,
             'store_name' => $i->store_name, 'merchant_name' => $i->merchant_name, 'online' => $i->online,
             'last_commu_at' => $i->last_commu_at?->toDateTimeString(), 'server_model' => $i->server_model,
             'aeme_ref' => $i->aeme_ref, 'product_name' => $i->product_name, 'model_manual' => $i->model_manual,
             'warnings' => $i->warnings ?? [], 'checked_at' => $i->checked_at?->toDateTimeString(),
+            'resolution' => $i->resolution, 'resolution_note' => $i->resolution_note,
+            'broken_cases' => $i->broken_cases ?? [], 'battery_changed' => $i->battery_changed,
+            'zkong_decision' => $i->zkong_decision, 'zkong_issue' => $i->zkong_issue,
+            'reviewed_at' => $i->reviewed_at?->toDateTimeString(), 'reviewed_by_name' => $i->reviewed_by_name,
+            'photos' => $fotos[$i->id] ?? [],
         ])->all();
+    }
+
+    /* --- Revisión de los dispositivos --- */
+
+    /**
+     * Marca uno o varios dispositivos con una solución. Lo que acompaña a cada solución
+     * (motivos del daño, decisión y fallo para ZKONG…) se valida aquí; las fotos NO bloquean (se marcan diez como defectuosas y luego se
+     * van subiendo): la ficha las muestra como pendientes hasta que estén todas.
+     */
+    private function review(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        $ids = array_map('intval', (array) $request->input('item_ids', []));
+        $items = WarrantyItem::where('warranty_id', $w->id)->whereIn('id', $ids)->get();
+        if ($items->isEmpty()) {
+            return response()->json(['ok' => false, 'error' => 'Elige al menos un dispositivo'], 400);
+        }
+        $res = (string) $request->input('resolution');
+        if (! isset(WarrantyItem::RESOLUTIONS[$res])) {
+            return response()->json(['ok' => false, 'error' => 'Solución no válida'], 400);
+        }
+
+        $nota = $this->texto($request->input('note'), 2000);
+        $casos = array_values(array_intersect(array_keys(WarrantyItem::BROKEN_CASES), (array) $request->input('broken_cases', [])));
+        $decision = (string) $request->input('zkong_decision', 'decidir');
+        $fallo = $this->texto($request->input('zkong_issue'), 500);
+
+        $zk = WarrantyItem::RESOLUTIONS[$res]['zkong'];
+        $error = match (true) {
+            $res === 'danada' && ! $casos                    => 'Indica por qué está dañada (al menos un motivo)',
+            $res === 'desechada' && ! $nota                  => 'Indica por qué se desecha',
+            $zk && ! isset(WarrantyItem::ZKONG_DECISIONS[$decision]) => 'Decisión de ZKONG no válida',
+            $zk && $decision === 'enviar' && ! $fallo        => 'Describe el fallo para el RMA de ZKONG',
+            default => null,
+        };
+        if ($error) {
+            return response()->json(['ok' => false, 'error' => $error], 400);
+        }
+
+        $pendiente = $res === 'pendiente';
+        $datos = [
+            'resolution'      => $res,
+            'resolution_note' => $nota,
+            'broken_cases'    => $res === 'danada' ? $casos : null,
+            'battery_changed' => $res === 'bateria' && $request->boolean('battery_changed'),
+            'zkong_decision'  => $zk ? $decision : null,
+            'zkong_issue'     => $zk ? $fallo : null,
+            'reviewed_at'     => $pendiente ? null : now(),
+            'reviewed_by'     => $pendiente ? null : $request->user()->id,
+        ];
+        WarrantyItem::whereIn('id', $items->pluck('id'))->update(
+            array_merge($datos, ['broken_cases' => $datos['broken_cases'] ? json_encode($datos['broken_cases']) : null])
+        );
+
+        $this->evento($w->id, $request->user()->id, 'review', null,
+            WarrantyItem::RESOLUTIONS[$res]['label'] . ' (' . $items->count() . '): ' . $this->lista($items->pluck('code')->all()));
+        $w->forceFill(['last_activity_at' => now()])->save();
+
+        return response()->json(['ok' => true, 'items' => $this->items($w->id)]);
+    }
+
+    /** El dispositivo de una petición y el tipo de foto, comprobando que ese tipo existe para él. */
+    private function fotoDe(Request $request): array
+    {
+        $item = WarrantyItem::findOrFail((int) $request->input('item_id'));
+        $type = (string) $request->input('type');
+        if (! isset(WarrantyItem::photoTypes($item->kind)[$type])) {
+            abort(response()->json(['ok' => false, 'error' => 'Tipo de foto no válido'], 400));
+        }
+        return [$item, $type];
+    }
+
+    private function photoUpload(Request $request)
+    {
+        [$item, $type] = $this->fotoDe($request);
+        $file = $request->file('file');
+        $error = $file ? WarrantyPhotos::upload($item, $type, $file, $request->user()->id) : 'Falta la foto';
+        return $this->trasFoto($item, $error);
+    }
+
+    private function photoFromTicket(Request $request)
+    {
+        [$item, $type] = $this->fotoDe($request);
+        $w = Warranty::findOrFail($item->warranty_id);
+        $error = WarrantyPhotos::fromTicket($w, $item, $type, (string) $request->input('src'), $request->user()->id);
+        return $this->trasFoto($item, $error);
+    }
+
+    private function photoDelete(Request $request)
+    {
+        $p = WarrantyPhotos::delete((int) $request->input('photo_id'));
+        $item = $p ? WarrantyItem::find($p->warranty_item_id) : null;
+        return $item ? $this->trasFoto($item, null) : response()->json(['ok' => false, 'error' => 'La foto ya no está'], 404);
+    }
+
+    private function trasFoto(WarrantyItem $item, ?string $error)
+    {
+        if ($error) {
+            return response()->json(['ok' => false, 'error' => $error], 400);
+        }
+        Warranty::whereKey($item->warranty_id)->update(['last_activity_at' => now()]);
+        return response()->json(['ok' => true, 'photos' => WarrantyPhotos::forItems([$item->id])[$item->id] ?? []]);
+    }
+
+    private function ticketImages(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->query('id'));
+        return response()->json(['ok' => true, 'images' => WarrantyPhotos::ticketImages($w)]);
+    }
+
+    /**
+     * warranty_photo.php — sirve una foto de un dispositivo (?id=) o una imagen del ticket
+     * de una garantía (?w=&src=). Va por ?token= de medios para poder usarse en <img>.
+     */
+    public function photo(Request $request)
+    {
+        if ($request->filled('id')) {
+            $f = WarrantyPhotos::file((int) $request->query('id'));
+            if (! $f) abort(404);
+            return response()->file($f[0], ['Content-Type' => $f[1], 'Content-Disposition' => 'inline',
+                'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=31536000']);
+        }
+        $w = Warranty::find((int) $request->query('w'));
+        $img = $w ? WarrantyPhotos::ticketImage($w, (string) $request->query('src')) : null;
+        if (! $img) abort(404);
+        return response($img[0], 200, ['Content-Type' => $img[1], 'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=86400']);
     }
 
     // Clientes del portal AEME. available=false si no está configurado o no responde:
@@ -395,7 +539,9 @@ class WarrantiesController extends Controller
         if (! $request->user()->isSuperAdmin()) {
             return response()->json(['ok' => false, 'error' => 'Solo el superadministrador puede borrar garantías'], 403);
         }
-        Warranty::where('id', (int) $request->input('id'))->delete();
+        $id = (int) $request->input('id');
+        WarrantyPhotos::purgeFiles(WarrantyItem::where('warranty_id', $id)->pluck('id')->all());
+        Warranty::where('id', $id)->delete();
         return response()->json(['ok' => true]);
     }
 
@@ -413,6 +559,12 @@ class WarrantiesController extends Controller
             'categories' => $cats,
             'agents'     => $this->agentes()->map(fn ($n, $id) => ['id' => $id, 'name' => $n])->values(),
             'stale_days' => self::STALE_DAYS,
+            'review'     => [
+                'resolutions'  => WarrantyItem::RESOLUTIONS,
+                'zkong'        => WarrantyItem::ZKONG_DECISIONS,
+                'broken_cases' => WarrantyItem::BROKEN_CASES,
+                'photo_types'  => WarrantyItem::PHOTO_TYPES,
+            ],
         ]);
     }
 

@@ -404,6 +404,16 @@ export const api = {
   warrantyCatalog: () => req('warranties.php?action=catalog'),
   portalClients: () => req('warranties.php?action=portal_clients'),
   portalProjects: (clientId) => req(`warranties.php?action=portal_projects&client_id=${clientId}`),
+  reviewWarrantyItems: (payload) => postJson('warranties.php?action=review', payload),
+  uploadWarrantyPhoto: (item_id, type, file) => {
+    const fd = new FormData(); fd.append('item_id', item_id); fd.append('type', type); fd.append('file', file)
+    return req('warranties.php?action=photo_upload', { method: 'POST', body: fd })
+  },
+  warrantyPhotoFromTicket: (item_id, type, src) => postJson('warranties.php?action=photo_from_ticket', { item_id, type, src }),
+  deleteWarrantyPhoto: (photo_id) => postJson('warranties.php?action=photo_delete', { photo_id }),
+  warrantyTicketImages: (id) => req(`warranties.php?action=ticket_images&id=${id}`),
+  warrantyPhotoUrl: (id) => `${BASE}/warranty_photo.php?id=${id}&token=${encodeURIComponent(getMediaToken())}`,
+  warrantyTicketImageUrl: (w, src) => `${BASE}/warranty_photo.php?w=${w}&src=${encodeURIComponent(src)}&token=${encodeURIComponent(getMediaToken())}`,
   saveWarranty: (payload) => req('warranties.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),

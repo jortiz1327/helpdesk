@@ -284,6 +284,84 @@ class WarrantiesTest extends TestCase
         $this->assertSame(2, collect($this->getJson('/api/warranties.php', $h)->json('rows'))->firstWhere('id', $w['id'])['labels_count']);
     }
 
+    public function test_revision_por_dispositivo_con_fotos_y_las_imagenes_del_ticket(): void
+    {
+        config(['database.connections.portal_aeme.host' => '']);
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$u, $h] = $this->agente();
+        $this->zkong([
+            '8E9749440' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
+            '854A49907' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
+            'A0A3B85B5F7F' => ['APP02', 'Sol Centro', null, true],
+        ]);
+
+        // Ticket con una foto del cliente (y un PDF que no cuenta como imagen).
+        $cid = DB::table('contacts')->insertGetId(['name' => 'C', 'email' => 'c@x.com']);
+        $tid = DB::table('tickets')->insertGetId(['code' => 'TK-1', 'subject' => 'Rotas', 'status' => 'abierto', 'priority' => 'media',
+            'channel' => 'email', 'contact_id' => $cid, 'opened_at' => now(), 'last_message_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        $jpg = \Illuminate\Http\UploadedFile::fake()->image('rota.jpg', 40, 30)->get();
+        \Illuminate\Support\Facades\Storage::disk('local')->put('attachments/x/rota.jpg', $jpg);
+        \Illuminate\Support\Facades\Storage::disk('local')->put('attachments/x/doc.pdf', '%PDF-1.4');
+        $foto = DB::table('attachments')->insertGetId(['ticket_id' => $tid, 'name' => 'rota.jpg', 'path' => 'attachments/x/rota.jpg', 'mime' => 'image/jpeg', 'size' => strlen($jpg)]);
+        DB::table('attachments')->insert(['ticket_id' => $tid, 'name' => 'doc.pdf', 'path' => 'attachments/x/doc.pdf', 'mime' => 'application/pdf', 'size' => 8]);
+        $otroTicket = DB::table('tickets')->insertGetId(['code' => 'TK-2', 'subject' => 'Otro', 'status' => 'abierto', 'priority' => 'media',
+            'channel' => 'email', 'contact_id' => $cid, 'opened_at' => now(), 'last_message_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        $ajena = DB::table('attachments')->insertGetId(['ticket_id' => $otroTicket, 'name' => 'a.jpg', 'path' => 'attachments/x/rota.jpg', 'mime' => 'image/jpeg', 'size' => 1]);
+
+        $w = $this->crear($h, ['ticket_code' => 'TK-1', 'labels' => "8E9749440\n854A49907\nA0A3B85B5F7F"]);
+        $items = collect($this->getJson("/api/warranties.php?action=get&id={$w['id']}", $h)->json('items'))->keyBy('code');
+        $this->assertSame('pendiente', $items['8E9749440']['resolution']);
+        $ids = [$items['8E9749440']['id'], $items['854A49907']['id']];
+        $ap = $items['A0A3B85B5F7F']['id'];
+
+        // Lo que pide cada solución.
+        $rev = fn (array $d) => $this->postJson('/api/warranties.php?action=review', $d + ['id' => $w['id'], 'item_ids' => $ids], $h);
+        $rev(['resolution' => 'danada'])->assertStatus(400);
+        $rev(['resolution' => 'desechada'])->assertStatus(400);
+        $rev(['resolution' => 'defectuosa', 'zkong_decision' => 'enviar'])->assertStatus(400);
+        $rev(['resolution' => 'inventada'])->assertStatus(400);
+
+        // Varias de golpe: batería (sin fotos) y luego defectuosas (piden fotos).
+        $r = $rev(['resolution' => 'bateria', 'battery_changed' => true])->assertOk()->json('items');
+        $this->assertSame(['bateria', true], [$r[0]['resolution'], $r[0]['battery_changed']]);
+        $r = collect($rev(['resolution' => 'defectuosa', 'zkong_decision' => 'enviar', 'zkong_issue' => 'No enciende'])->assertOk()->json('items'))->keyBy('code');
+        $this->assertSame(['defectuosa', 'enviar', 'No enciende', false, 'Ana'], [$r['8E9749440']['resolution'], $r['8E9749440']['zkong_decision'], $r['8E9749440']['zkong_issue'], $r['8E9749440']['battery_changed'], $r['8E9749440']['reviewed_by_name']]);
+        $this->assertSame('pendiente', $r['A0A3B85B5F7F']['resolution']);
+        $this->postJson('/api/warranties.php?action=review', ['id' => $w['id'], 'item_ids' => [$ap], 'resolution' => 'danada', 'broken_cases' => ['liquids', 'inventado']], $h)->assertOk();
+        $this->assertSame(['liquids'], \App\Models\WarrantyItem::find($ap)->broken_cases);
+
+        // Imágenes del ticket: solo las imágenes de SU ticket.
+        $imgs = $this->getJson("/api/warranties.php?action=ticket_images&id={$w['id']}", $h)->assertOk()->json('images');
+        $this->assertSame(["a:{$foto}"], array_column($imgs, 'src'));
+        $media = TokenService::mediaToken($u);
+        $this->get("/api/warranty_photo.php?w={$w['id']}&src=a:{$foto}&token={$media}")->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+        $this->get("/api/warranty_photo.php?w={$w['id']}&src=a:{$ajena}&token={$media}")->assertNotFound();
+
+        // Fotos: subida, desde el ticket, tipo que no es de una antena, y sustituir.
+        $foto1 = fn ($item, $type, $file) => $this->post('/api/warranties.php?action=photo_upload', ['item_id' => $item, 'type' => $type, 'file' => $file], $h);
+        $foto1($ids[0], 'front', \Illuminate\Http\UploadedFile::fake()->image('f.png'))->assertOk();
+        $foto1($ids[0], 'front', \Illuminate\Http\UploadedFile::fake()->create('virus.jpg', 10, 'image/jpeg'))->assertStatus(400);   // no es una imagen de verdad
+        $foto1($ap, 'back_batteries', \Illuminate\Http\UploadedFile::fake()->image('f.png'))->assertStatus(400);                    // las antenas no tienen pilas
+        $this->postJson('/api/warranties.php?action=photo_from_ticket', ['item_id' => $ids[0], 'type' => 'back_batteries', 'src' => "a:{$ajena}"], $h)->assertStatus(400);
+        $p = $this->postJson('/api/warranties.php?action=photo_from_ticket', ['item_id' => $ids[0], 'type' => 'back_batteries', 'src' => "a:{$foto}"], $h)->assertOk()->json('photos');
+        $this->assertSame(['front', 'back_batteries'], array_column($p, 'type'));
+        $this->assertSame([null, "a:{$foto}"], array_column($p, 'source'));
+        $foto1($ids[0], 'front', \Illuminate\Http\UploadedFile::fake()->image('g.jpg'))->assertOk();
+        $this->assertSame(2, DB::table('warranty_item_photos')->where('warranty_item_id', $ids[0])->count());
+        $this->assertCount(2, \Illuminate\Support\Facades\Storage::disk('local')->files('warranty_photos/' . date('Y/m')));   // la sustituida se borró
+
+        $pid = DB::table('warranty_item_photos')->where('warranty_item_id', $ids[0])->where('type', 'front')->value('id');
+        $this->get("/api/warranty_photo.php?id={$pid}&token={$media}")->assertOk();
+        $this->get("/api/warranty_photo.php?id={$pid}&token=" . TokenService::make($u))->assertUnauthorized();   // por URL solo el de medios
+        $this->postJson('/api/warranties.php?action=photo_delete', ['photo_id' => $pid], $h)->assertOk()->assertJsonCount(1, 'photos');
+
+        // Historial y quitar el dispositivo se lleva sus ficheros.
+        $ev = collect($this->getJson("/api/warranties.php?action=get&id={$w['id']}", $h)->json('events'))->where('field', 'review')->pluck('to_value')->all();
+        $this->assertContains('Defectuosa (2): 8E9749440, 854A49907', $ev);
+        $this->postJson('/api/warranties.php?action=label_delete', ['item_id' => $ids[0]], $h)->assertOk();
+        $this->assertSame([], \Illuminate\Support\Facades\Storage::disk('local')->files('warranty_photos/' . date('Y/m')));
+    }
+
     public function test_solo_superadmin_borra(): void
     {
         [, $h] = $this->agente();

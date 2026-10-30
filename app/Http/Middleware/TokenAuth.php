@@ -19,7 +19,7 @@ class TokenAuth
             // Por URL (?token=) solo entra el token de MEDIOS, y solo para descargar: las
             // URL quedan en logs e historial, y ahí no debe ir el token de sesión de 30 días.
             $descarga = $request->isMethod('get')
-                && in_array($request->path(), ['api/attachment.php', 'api/media.php', 'api/responses.php'], true);
+                && in_array($request->path(), ['api/attachment.php', 'api/media.php', 'api/responses.php', 'api/warranty_photo.php'], true);
             $user = $descarga ? TokenService::verify((string) $request->query('token'), 'media') : null;
         }
         if (!$user) {

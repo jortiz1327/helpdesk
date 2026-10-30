@@ -456,7 +456,286 @@ function Comprobador({ contexto, value, onChange, autoFocus }) {
 }
 const COMP_VACIO = { text: '', results: null, invalid: [], manual: {}, checked: null }
 
-function Productos({ w, items, onReload, onChanged }) {
+/* ---- Revisión de los dispositivos ----
+ * Cada etiqueta o antena acaba con una solución. Las que no cubre o cubre la garantía
+ * de verdad (defectuosa, dañada por el cliente) piden fotos: tres en las etiquetas
+ * (frontal con el código, trasera con pilas y sin pilas), dos en las antenas. Las
+ * fotos se suben, se pegan o se arrastran desde las imágenes que mandó el cliente al
+ * ticket. Los textos y lo que pide cada solución vienen del servidor (opts.review). */
+const RES_UI = {
+  pendiente:    { c: 'gray',   ic: Icon.clock,   d: 'Todavía sin revisar' },
+  correcta:     { c: 'green',  ic: Icon.check,   d: 'Funciona bien, no tenía fallo' },
+  bateria:      { c: 'amber',  ic: Icon.bolt,    d: 'Eran las pilas' },
+  recuperada:   { c: 'blue',   ic: Icon.refresh, d: 'Revinculada o actualizada desde el servidor' },
+  reparada:     { c: 'indigo', ic: Icon.settings, d: 'Arreglada por el equipo' },
+  no_reproduce: { c: 'purple', ic: Icon.eye,     d: 'Probada y el fallo no aparece' },
+  defectuosa:   { c: 'red',    ic: Icon.warn,    d: 'Fallo de fábrica (pantalla rojiza…): la cubre la garantía' },
+  danada:       { c: 'orange', ic: Icon.shield,  d: 'Golpes, líquidos, mal uso…: no la cubre' },
+  desechada:    { c: 'gray',   ic: Icon.trash,   d: 'Se retira y no vuelve' },
+}
+const RAPIDAS = ['correcta', 'bateria', 'defectuosa', 'danada']   // en la barra de selección
+
+const tiposFoto = (rv, it) => Object.entries(rv?.photo_types?.[it.kind] || rv?.photo_types?.esl || {})
+const pideFotos = (rv, it) => !!rv?.resolutions?.[it.resolution]?.photos
+const fotosDe = (rv, it) => { const t = tiposFoto(rv, it).map(([k]) => k); return { hay: (it.photos || []).filter((p) => t.includes(p.type)).length, total: t.length } }
+const faltanFotos = (rv, it) => { if (!pideFotos(rv, it)) return false; const f = fotosDe(rv, it); return f.hay < f.total }
+
+function ResPill({ rv, it, onClick }) {
+  const ui = RES_UI[it.resolution] || RES_UI.pendiente
+  const f = pideFotos(rv, it) ? fotosDe(rv, it) : null
+  const Ic = ui.ic
+  return (
+    <button type="button" className={`wr-res c-${ui.c}`} onClick={onClick} title="Revisar">
+      <Ic /> <span>{rv?.resolutions?.[it.resolution]?.label || it.resolution}</span>
+      {f ? <em className={f.hay < f.total ? 'falta' : ''}><Icon.image /> {f.hay}/{f.total}</em> : null}
+    </button>
+  )
+}
+
+/* Lo que se sabe de la revisión, en una línea: «Pilas cambiadas», «Enviar a ZKONG: no enciende»… */
+function ResDetalle({ rv, it }) {
+  const partes = []
+  if (it.resolution === 'bateria' && it.battery_changed) partes.push('Pilas cambiadas')
+  if (it.zkong_decision) partes.push(`${rv?.zkong?.[it.zkong_decision] || it.zkong_decision}${it.zkong_issue ? `: ${it.zkong_issue}` : ''}`)
+  if (it.resolution === 'danada' && it.broken_cases?.length) partes.push(it.broken_cases.map((k) => rv?.broken_cases?.[k] || k).join(', '))
+  if (it.resolution_note) partes.push(it.resolution_note)
+  if (!partes.length && !it.reviewed_by_name) return null
+  return <p className="wr-res-det">{partes.join(' · ')}{it.reviewed_by_name ? <span className="dev-mute">{partes.length ? ' — ' : ''}{it.reviewed_by_name}, {fechaHora(it.reviewed_at)}</span> : null}</p>
+}
+
+/* Hueco de una foto: vacío acepta clic, arrastrar un fichero o una imagen del ticket, y
+   pegar (Ctrl+V) cuando está activo; lleno enseña la miniatura con «quitar». */
+function FotoSlot({ label, photo, active, busy, onActivate, onFile, onSrc, onDelete }) {
+  const input = useRef(null)
+  const [encima, setEncima] = useState(false)
+  const soltar = (e) => {
+    e.preventDefault(); setEncima(false)
+    const src = e.dataTransfer.getData('text/x-wr-src')
+    if (src) onSrc(src)
+    else if (e.dataTransfer.files?.[0]) onFile(e.dataTransfer.files[0])
+  }
+  return (
+    <div className={`wr-slot${photo ? ' has' : ''}${active ? ' on' : ''}${encima ? ' over' : ''}${busy ? ' busy' : ''}`}
+      onClick={() => { onActivate(); if (!photo && !busy) input.current?.click() }}
+      onDragOver={(e) => { e.preventDefault(); setEncima(true) }} onDragLeave={() => setEncima(false)} onDrop={soltar}>
+      {photo
+        ? <>
+            <img src={api.warrantyPhotoUrl(photo.id)} alt={label} loading="lazy" />
+            <div className="wr-slot-acts">
+              <a className="icon-btn" href={api.warrantyPhotoUrl(photo.id)} target="_blank" rel="noreferrer" title="Ver en grande" onClick={(e) => e.stopPropagation()}><Icon.eye /></a>
+              <button type="button" className="icon-btn" title="Cambiar" onClick={(e) => { e.stopPropagation(); input.current?.click() }}><Icon.upload /></button>
+              <button type="button" className="icon-btn" title="Quitar" onClick={(e) => { e.stopPropagation(); onDelete() }}><Icon.trash /></button>
+            </div>
+            {photo.source ? <em className="wr-slot-src">Del ticket</em> : null}
+          </>
+        : <div className="wr-slot-empty">{busy ? <div className="spinner sm" /> : <Icon.upload />}<small>{busy ? 'Subiendo…' : active ? 'Suelta, pega o haz clic' : 'Añadir'}</small></div>}
+      <span className="wr-slot-l">{label}</span>
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onFile(f) }} />
+    </div>
+  )
+}
+
+// preset: la solución elegida en la barra de selección. Un dispositivo que ya pide fotos
+// abre directamente en las fotos.
+function Revisar({ w, rv, items: iniciales, preset, onClose, onSaved }) {
+  const toast = useToast()
+  const uno = iniciales.length === 1 ? iniciales[0] : null
+  const [items, setItems] = useState(iniciales)
+  const [paso, setPaso] = useState(!preset && uno && pideFotos(rv, uno) ? 'fotos' : 'solucion')
+  const [f, setF] = useState(() => ({
+    resolution: preset || (uno && uno.resolution !== 'pendiente' ? uno.resolution : ''),
+    note: uno?.resolution_note || '', broken_cases: uno?.broken_cases || [], battery_changed: !!uno?.battery_changed,
+    zkong_decision: uno?.zkong_decision || 'decidir', zkong_issue: uno?.zkong_issue || '',
+  }))
+  const [guardando, setGuardando] = useState(false)
+  const [cambios, setCambios] = useState(false)
+  const [galeria, setGaleria] = useState(w.ticket_id ? null : [])
+  const [activo, setActivo] = useState(null)       // «itemId|tipo» al que van las fotos pegadas o elegidas
+  const [subiendo, setSubiendo] = useState('')
+  const set = (c) => setF((s) => ({ ...s, ...c }))
+  const conFotos = items.filter((it) => pideFotos(rv, it))
+  const res = rv.resolutions[f.resolution]
+
+  useEffect(() => { if (paso === 'fotos' && galeria === null) api.warrantyTicketImages(w.id).then((r) => setGaleria(r.ok ? r.images : [])) }, [paso, galeria, w.id])
+
+  // Primer hueco vacío (para que pegar o elegir una imagen del ticket vaya solo a su sitio).
+  const huecos = conFotos.flatMap((it) => tiposFoto(rv, it).map(([t]) => ({ key: `${it.id}|${t}`, it, t, lleno: (it.photos || []).some((p) => p.type === t) })))
+  const siguiente = (desde) => { const i = huecos.findIndex((h) => h.key === desde); return [...huecos.slice(i + 1), ...huecos.slice(0, i + 1)].find((h) => !h.lleno && h.key !== desde)?.key || null }
+  useEffect(() => { if (paso === 'fotos' && !activo) setActivo(huecos.find((h) => !h.lleno)?.key || null) }, [paso, activo, huecos.length])
+
+  const tras = (it, r, key) => {
+    setSubiendo('')
+    if (!r.ok) { toast(r.error || 'No se pudo guardar la foto', 'err'); return }
+    setCambios(true)
+    setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, photos: r.photos } : x)))
+    if (key) setActivo(siguiente(key))
+  }
+  const subir = async (it, t, file) => { const key = `${it.id}|${t}`; setSubiendo(key); tras(it, await api.uploadWarrantyPhoto(it.id, t, file), key) }
+  const delTicket = async (it, t, src) => { const key = `${it.id}|${t}`; setSubiendo(key); tras(it, await api.warrantyPhotoFromTicket(it.id, t, src), key) }
+  const quitar = async (it, p) => { setSubiendo(`${it.id}|${p.type}`); tras(it, await api.deleteWarrantyPhoto(p.id)); setActivo(`${it.id}|${p.type}`) }
+  const elegirDelTicket = (src) => { const h = huecos.find((x) => x.key === activo); if (h) delTicket(h.it, h.t, src); else toast('Elige primero el hueco de la foto', 'err') }
+
+  // Ctrl+V con una imagen copiada: al hueco activo.
+  useEffect(() => {
+    if (paso !== 'fotos') return
+    const pegar = (e) => {
+      const file = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith('image/'))
+      const h = huecos.find((x) => x.key === activo)
+      if (file && h) { e.preventDefault(); subir(h.it, h.t, file) }
+    }
+    window.addEventListener('paste', pegar)
+    return () => window.removeEventListener('paste', pegar)
+  })
+
+  const guardar = async () => {
+    if (!f.resolution) return
+    setGuardando(true)
+    const r = await api.reviewWarrantyItems({ id: w.id, item_ids: items.map((x) => x.id), ...f })
+    setGuardando(false)
+    if (!r.ok) { toast(r.error || 'No se pudo guardar', 'err'); return }
+    setCambios(true)
+    const nuevos = r.items.filter((x) => items.some((y) => y.id === x.id))
+    setItems(nuevos)
+    toast(`${nuevos.length === 1 ? nuevos[0].code : `${nuevos.length} dispositivos`}: ${res.label}`)
+    if (res.photos) { setActivo(null); setPaso('fotos') } else { onSaved(); onClose() }
+  }
+  const cerrar = () => { if (cambios) onSaved(); onClose() }
+  const pendientes = huecos.filter((h) => !h.lleno).length
+
+  const toggleCaso = (k) => set({ broken_cases: f.broken_cases.includes(k) ? f.broken_cases.filter((x) => x !== k) : [...f.broken_cases, k] })
+  const faltaAlgo = !f.resolution || (f.resolution === 'danada' && !f.broken_cases.length) || (f.resolution === 'desechada' && !f.note.trim())
+    || (rv.resolutions[f.resolution]?.zkong && f.zkong_decision === 'enviar' && !f.zkong_issue.trim())
+
+  return (
+    <div className="modal-bg wr-over" onClick={(e) => e.target.classList.contains('modal-bg') && cerrar()}>
+      <div className={`modal wr-rev${paso === 'fotos' ? ' wide' : ''}`} onKeyDown={(e) => { if (e.key === 'Escape') cerrar() }}>
+        <div className="modal-h">
+          <h3>{uno ? <>Revisar <span className="mono">{uno.code}</span></> : `Revisar ${items.length} dispositivos`}</h3>
+          <button className="icon-btn" onClick={cerrar} title="Cerrar (Esc)">✕</button>
+        </div>
+        {(res?.photos || conFotos.length > 0) && (
+          <div className="wr-steps">
+            <button className={paso === 'solucion' ? 'on' : ''} onClick={() => setPaso('solucion')}><b>1</b> Solución</button>
+            <i />
+            <button className={paso === 'fotos' ? 'on' : ''} disabled={!conFotos.length} onClick={() => setPaso('fotos')}><b>2</b> Fotos{huecos.length ? <em>{huecos.length - pendientes}/{huecos.length}</em> : null}</button>
+          </div>
+        )}
+
+        {paso === 'solucion' ? (
+          <div className="modal-body">
+            {!uno && <p className="wr-rev-codes mono">{items.slice(0, 12).map((x) => x.code).join(' · ')}{items.length > 12 ? ` y ${items.length - 12} más` : ''}</p>}
+            <div className="wr-res-grid">
+              {Object.entries(rv.resolutions).filter(([k]) => k !== 'pendiente').map(([k, r]) => {
+                const ui = RES_UI[k] || RES_UI.pendiente
+                const Ic = ui.ic
+                return (
+                  <button key={k} type="button" className={`wr-res-card c-${ui.c}${f.resolution === k ? ' on' : ''}`} onClick={() => set({ resolution: k })}>
+                    <span className="ic"><Ic /></span>
+                    <span className="tx">
+                      <b>{r.label}</b>
+                      <small>{ui.d}</small>
+                      {r.photos || r.zkong ? (
+                        <span className="req-l">
+                          {r.photos ? <span><Icon.image /> Con fotos</span> : null}
+                          {r.zkong ? <span><Icon.send /> ZKONG</span> : null}
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {f.resolution === 'bateria' && (
+              <label className="wr-check"><input type="checkbox" checked={f.battery_changed} onChange={(e) => set({ battery_changed: e.target.checked })} /> Se le han cambiado las pilas</label>
+            )}
+            {res?.zkong && (
+              <div className="wr-rev-sec">
+                <label>¿Se manda a ZKONG?</label>
+                <div className="wr-seg">
+                  {Object.entries(rv.zkong).map(([k, l]) => <button key={k} type="button" className={f.zkong_decision === k ? 'on' : ''} onClick={() => set({ zkong_decision: k })}>{l}</button>)}
+                </div>
+                <label>Fallo {f.zkong_decision === 'enviar' ? <span className="req">*</span> : null} <span className="dev-mute">— va en el RMA de ZKONG («Issue Description»)</span></label>
+                <input value={f.zkong_issue} maxLength={500} onChange={(e) => set({ zkong_issue: e.target.value })} placeholder="No enciende, pantalla rota de fábrica, no vincula…" />
+              </div>
+            )}
+            {f.resolution === 'danada' && (
+              <div className="wr-rev-sec">
+                <label>Por qué no la cubre la garantía <span className="req">*</span></label>
+                <div className="wr-casos">
+                  {Object.entries(rv.broken_cases).map(([k, l]) => <button key={k} type="button" className={f.broken_cases.includes(k) ? 'on' : ''} onClick={() => toggleCaso(k)}>{f.broken_cases.includes(k) ? <Icon.check /> : null}{l}</button>)}
+                </div>
+              </div>
+            )}
+            {f.resolution && (
+              <div className="wr-rev-sec">
+                <label>{f.resolution === 'desechada' ? <>Por qué se desecha <span className="req">*</span></> : 'Comentario'}</label>
+                <textarea rows={2} value={f.note} onChange={(e) => set({ note: e.target.value })} placeholder="Opcional: lo que se ha visto o hecho"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !faltaAlgo) guardar() }} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="modal-body wr-fotos">
+            <div className="wr-fotos-l">
+              <p className="dev-mute wr-fotos-tip">{w.ticket_id ? 'Elige un hueco y haz clic en una imagen del ticket, arrástrala, pega con Ctrl+V o sube un fichero.' : 'Haz clic en un hueco para subir la foto, arrástrala o pégala con Ctrl+V.'}</p>
+              {conFotos.map((it) => (
+                <div key={it.id} className="wr-fotos-it">
+                  <div className="wr-fotos-ith"><b className="mono">{it.code}</b>{it.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}<span className="dev-mute">{productoDe(it)}</span>
+                    <ResPill rv={rv} it={it} onClick={() => setPaso('solucion')} /></div>
+                  <div className="wr-slots">
+                    {tiposFoto(rv, it).map(([t, l]) => {
+                      const key = `${it.id}|${t}`
+                      return <FotoSlot key={t} label={l} photo={(it.photos || []).find((p) => p.type === t)} active={activo === key} busy={subiendo === key}
+                        onActivate={() => setActivo(key)} onFile={(file) => subir(it, t, file)} onSrc={(src) => delTicket(it, t, src)}
+                        onDelete={() => quitar(it, (it.photos || []).find((p) => p.type === t))} />
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {w.ticket_id ? (
+              <aside className="wr-gal">
+                <h4><Icon.ticket /> Imágenes del ticket {w.ticket_code ? <span className="mono">{w.ticket_code}</span> : null}</h4>
+                {galeria === null ? <div className="spinner sm" /> : !galeria.length ? <p className="dev-mute">El cliente no ha mandado imágenes en el ticket.</p> : (
+                  <div className="wr-gal-grid">
+                    {galeria.map((g) => (
+                      <button key={g.src} type="button" draggable title={`${g.name} · ${g.from === 'cliente' ? 'del cliente' : 'del equipo'} · ${fechaHora(g.at)}`}
+                        onDragStart={(e) => e.dataTransfer.setData('text/x-wr-src', g.src)} onClick={() => elegirDelTicket(g.src)}>
+                        <img src={api.warrantyTicketImageUrl(w.id, g.src)} alt={g.name} loading="lazy"
+                          onError={(e) => { e.currentTarget.parentElement.hidden = true }} />
+                        {g.from !== 'cliente' ? <em>Equipo</em> : null}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </aside>
+            ) : null}
+          </div>
+        )}
+
+        <div className="modal-foot">
+          {paso === 'solucion' ? (
+            <>
+              <button className="btn ghost" onClick={cerrar}>Cancelar</button>
+              <button className="btn" disabled={guardando || faltaAlgo} onClick={guardar}>
+                {guardando ? 'Guardando…' : res?.photos ? <>Guardar y añadir fotos <Icon.arrowRight /></> : items.length > 1 ? `Marcar ${items.length}` : 'Guardar'}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className={`wr-fotos-sum${pendientes ? '' : ' ok'}`}>{pendientes ? `Faltan ${pendientes} ${pendientes === 1 ? 'foto' : 'fotos'}` : <><Icon.check /> Todas las fotos</>}</span>
+              <button className="btn" onClick={cerrar}>{pendientes ? 'Seguir luego' : 'Listo'}</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Productos({ w, items, opts, onReload, onChanged }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [panel, setPanel] = useState(!items.length)
@@ -464,6 +743,10 @@ function Productos({ w, items, onReload, onChanged }) {
   const [ocupado, setOcupado] = useState('')
   const [ficha, setFicha] = useState(null)
   const [filtro, setFiltro] = useState('')
+  const [rev, setRev] = useState('')               // filtro por revisión
+  const [sel, setSel] = useState(() => new Set())
+  const [revisar, setRevisar] = useState(null)     // { items, preset }
+  const rv = opts?.review
 
   const anadir = async () => {
     setOcupado('add')
@@ -491,8 +774,11 @@ function Productos({ w, items, onReload, onChanged }) {
   }
   const exportar = () => {
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const cab = ['Código', 'Tipo', 'Referencia AEME', 'Producto', 'Modelo en el servidor', 'Servidor', 'Tienda', 'Conectada', 'Última comunicación', 'Avisos']
-    const lineas = items.map((i) => [i.code, i.kind === 'ap' ? 'Antena' : 'Etiqueta', i.aeme_ref, i.product_name, i.server_model, i.server, i.store_name, i.online == null ? '' : i.online ? 'Sí' : 'No', fechaHora(i.last_commu_at), (i.warnings || []).map((a) => a.text).join(' | ')])
+    const cab = ['Código', 'Tipo', 'Referencia AEME', 'Producto', 'Modelo en el servidor', 'Servidor', 'Tienda', 'Conectada', 'Última comunicación', 'Avisos', 'Revisión', 'Detalle de la revisión', 'Fotos']
+    const lineas = items.map((i) => [i.code, i.kind === 'ap' ? 'Antena' : 'Etiqueta', i.aeme_ref, i.product_name, i.server_model, i.server, i.store_name, i.online == null ? '' : i.online ? 'Sí' : 'No', fechaHora(i.last_commu_at), (i.warnings || []).map((a) => a.text).join(' | '),
+      rv?.resolutions?.[i.resolution]?.label || i.resolution,
+      [i.battery_changed ? 'Pilas cambiadas' : '', i.zkong_decision ? rv?.zkong?.[i.zkong_decision] : '', i.zkong_issue, (i.broken_cases || []).map((k) => rv?.broken_cases?.[k] || k).join(', '), i.resolution_note].filter(Boolean).join(' · '),
+      pideFotos(rv, i) ? `${fotosDe(rv, i).hay}/${fotosDe(rv, i).total}` : ''])
     const blob = new Blob(['﻿' + [cab.map(esc).join(';'), ...lineas.map((l) => l.map(esc).join(';'))].join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob); a.download = `${w.code}-etiquetas.csv`; a.click()
@@ -504,8 +790,19 @@ function Productos({ w, items, onReload, onChanged }) {
   items.forEach((i) => { const k = productoDe(i); porProducto[k] = (porProducto[k] || 0) + 1 })
   const conectadas = items.filter((i) => i.online).length
   const conAvisos = items.filter((i) => estadoEtiqueta(i) !== 'ok').length
-  const listado = items.filter((i) => !filtro || (filtro === 'avisos' ? estadoEtiqueta(i) !== 'ok' : productoDe(i) === filtro))
+  const porRes = {}
+  items.forEach((i) => { porRes[i.resolution] = (porRes[i.resolution] || 0) + 1 })
+  const revisadas = items.length - (porRes.pendiente || 0)
+  const sinFotos = items.filter((i) => faltanFotos(rv, i)).length
+  const listado = items.filter((i) => (!filtro || (filtro === 'avisos' ? estadoEtiqueta(i) !== 'ok' : productoDe(i) === filtro))
+    && (!rev || (rev === 'fotos' ? faltanFotos(rv, i) : i.resolution === rev)))
   const nuevas = comp.results && comp.checked === comp.text ? comp.results.filter((r) => !r.blocked && !r.already).length : null
+
+  const elegidas = items.filter((i) => sel.has(i.id))
+  const todasVisibles = listado.length > 0 && listado.every((i) => sel.has(i.id))
+  const marcar = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const marcarVisibles = () => setSel((s) => { const n = new Set(s); listado.forEach((i) => (todasVisibles ? n.delete(i.id) : n.add(i.id))); return n })
+  const trasRevisar = () => { setSel(new Set()); onReload(); onChanged() }
 
   return (
     <>
@@ -534,34 +831,74 @@ function Productos({ w, items, onReload, onChanged }) {
 
       {items.length > 0 && (
         <>
+          {rv && (
+            <div className="wr-revbar">
+              <div className="wr-revbar-h">
+                <b>Revisión</b>
+                <span>{revisadas} de {items.length} revisadas</span>
+                {sinFotos ? <button className="wr-revbar-warn" onClick={() => setRev('fotos')}><Icon.image /> Faltan fotos en {sinFotos}</button> : null}
+              </div>
+              <div className="wr-revbar-bar">
+                {Object.keys(rv.resolutions).filter((k) => k !== 'pendiente' && porRes[k]).map((k) => (
+                  <i key={k} className={`c-${RES_UI[k]?.c || 'gray'}`} style={{ width: `${(porRes[k] / items.length) * 100}%` }} title={`${rv.resolutions[k].label}: ${porRes[k]}`} />
+                ))}
+              </div>
+              <div className="wr-chips sm">
+                <button className={!rev ? 'on' : ''} onClick={() => setRev('')}>Todas</button>
+                {Object.keys(rv.resolutions).filter((k) => porRes[k]).map((k) => (
+                  <button key={k} className={rev === k ? 'on' : ''} onClick={() => setRev(rev === k ? '' : k)}><i className={`wr-cdot c-${RES_UI[k]?.c || 'gray'}`} />{rv.resolutions[k].label} ({porRes[k]})</button>
+                ))}
+                {sinFotos ? <button className={rev === 'fotos' ? 'on' : ''} onClick={() => setRev(rev === 'fotos' ? '' : 'fotos')}><Icon.image /> Faltan fotos ({sinFotos})</button> : null}
+              </div>
+            </div>
+          )}
           <div className="wr-chips sm">
-            <button className={!filtro ? 'on' : ''} onClick={() => setFiltro('')}>Todas ({items.length})</button>
+            <button className={!filtro ? 'on' : ''} onClick={() => setFiltro('')}>Todos los productos</button>
             {conAvisos ? <button className={filtro === 'avisos' ? 'on' : ''} onClick={() => setFiltro('avisos')}>Con avisos ({conAvisos})</button> : null}
             {Object.entries(porProducto).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
-              <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(k)}>{k} ×{n}</button>
+              <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(filtro === k ? '' : k)}>{k} ×{n}</button>
             ))}
           </div>
-          <ul className="wr-lbls big">
+          {rv && listado.length > 0 && (
+            <label className="wr-selall"><input type="checkbox" checked={todasVisibles} onChange={marcarVisibles} />
+              {todasVisibles ? 'Quitar la selección' : `Seleccionar ${listado.length === items.length ? 'todas' : `las ${listado.length} que se ven`}`}</label>
+          )}
+          {!listado.length ? <p className="dev-mute">Ninguna con este filtro.</p> : null}
+          <ul className={`wr-lbls big${rv ? ' rev' : ''}`}>
             {listado.map((i) => (
-              <li key={i.id} className={`st-${estadoEtiqueta(i)}`}>
+              <li key={i.id} className={`st-${estadoEtiqueta(i)}${sel.has(i.id) ? ' sel' : ''}`}>
+                {rv ? <input type="checkbox" className="wr-pick" checked={sel.has(i.id)} onChange={() => marcar(i.id)} aria-label={`Seleccionar ${i.code}`} /> : null}
                 <span className="wr-lbl-code mono"><button className="link" title="Ver ficha e historial" onClick={() => setFicha(i.code)}>{i.code}</button>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</span>
                 <Donde r={i} />
                 <Modelo r={i} onPick={(ref) => cambiarModelo(i, ref)} />
+                {rv ? <ResPill rv={rv} it={i} onClick={() => setRevisar({ items: [i] })} /> : null}
                 <button className="icon-btn" title="Quitar de la garantía" onClick={() => quitar(i)}><Icon.trash /></button>
-                <div className="full"><Avisos list={i.warnings} /></div>
+                <div className="full"><Avisos list={i.warnings} />{rv ? <ResDetalle rv={rv} it={i} /> : null}</div>
               </li>
             ))}
           </ul>
+          {elegidas.length > 0 && (
+            <div className="wr-selbar">
+              <b title="Marcar como…">{elegidas.length} {elegidas.length === 1 ? 'seleccionada' : 'seleccionadas'}:</b>
+              {RAPIDAS.map((k) => {
+                const Ic = RES_UI[k].ic
+                return <button key={k} className={`wr-res c-${RES_UI[k].c}`} onClick={() => setRevisar({ items: elegidas, preset: k })}><Ic /> <span>{rv.resolutions[k]?.label}</span></button>
+              })}
+              <button className="dev-btn" onClick={() => setRevisar({ items: elegidas })}>Otra…</button>
+              <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button>
+            </div>
+          )}
           {items[0]?.checked_at ? <p className="dev-mute wr-prod-foot">Comprobadas por última vez {fechaHora(items.reduce((a, i) => (i.checked_at > a ? i.checked_at : a), ''))}.</p> : null}
         </>
       )}
       {!items.length && !panel ? <p className="dev-mute">Todavía no hay etiquetas. Añádelas con su código.</p> : null}
       {ficha && <FichaDispositivo code={ficha} servers={[]} onClose={() => setFicha(null)} onOpen={setFicha} />}
+      {revisar && <Revisar w={w} rv={rv} items={revisar.items} preset={revisar.preset} onClose={() => setRevisar(null)} onSaved={trasRevisar} />}
     </>
   )
 }
 
-const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const toast = useToast()
@@ -672,7 +1009,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
           </dl>
         )}
 
-        {tab === 'productos' && <Productos w={w} items={d.items} onReload={cargar} onChanged={onChanged} />}
+        {tab === 'productos' && <Productos w={w} items={d.items} opts={opts} onReload={cargar} onChanged={onChanged} />}
 
         {tab === 'seguimiento' && (
           <>
