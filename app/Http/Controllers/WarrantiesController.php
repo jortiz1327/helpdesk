@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Warranty;
+use App\Models\WarrantyItem;
 use App\Services\AemePortal;
+use App\Services\WarrantyLabels;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +20,11 @@ class WarrantiesController extends Controller
     private const STALE_DAYS = 15;   // «Sin actualizar»: abiertas sin movimiento en estos días
     private const DEFAULT_CATEGORIES = ['Hoteles', 'Retail', 'Farmacia', 'Otros'];
 
+    private function labels(): WarrantyLabels
+    {
+        return app(WarrantyLabels::class);
+    }
+
     public function handle(Request $request)
     {
         return match ($request->query('action', 'list')) {
@@ -27,6 +34,12 @@ class WarrantiesController extends Controller
             'delete'  => $this->delete($request),
             'options' => $this->options(),
             'by_ticket' => $this->byTicket($request),
+            'labels_check'    => $this->labelsCheck($request),
+            'labels_add'      => $this->labelsAdd($request),
+            'labels_recheck'  => $this->labelsRecheck($request),
+            'label_model'     => $this->labelModel($request),
+            'label_delete'    => $this->labelDelete($request),
+            'catalog'         => response()->json(['ok' => true, 'models' => $this->labels()->catalog()]),
             'portal_clients'  => $this->portalClients(),
             'portal_projects' => $this->portalProjects($request),
             default   => $this->list($request),
@@ -78,7 +91,9 @@ class WarrantiesController extends Controller
         $total = (clone $q)->count();
         $rows = $q->orderBy($col, $dir)->orderByDesc('warranties.id')
             ->offset($page * $size)->limit($size)
-            ->get(['warranties.*', 'u.name as responsible_name', 't.code as ticket_code'])
+            ->select(['warranties.*', 'u.name as responsible_name', 't.code as ticket_code'])
+            ->addSelect(['labels_count' => WarrantyItem::selectRaw('count(*)')->whereColumn('warranty_id', 'warranties.id')])
+            ->get()
             ->map(fn ($w) => $this->row($w));
 
         return response()->json(['ok' => true, 'rows' => $rows, 'total' => $total, 'all' => Warranty::count()]);
@@ -105,6 +120,7 @@ class WarrantiesController extends Controller
             'closed_at'        => $w->closed_at?->toDateTimeString(),
             'last_activity_at' => $w->last_activity_at?->toDateTimeString(),
             'created_at'       => $w->created_at?->toDateTimeString(),
+            'labels_count'     => (int) ($w->labels_count ?? 0),
         ];
     }
 
@@ -131,7 +147,7 @@ class WarrantiesController extends Controller
             'description'     => $w->description,
             'ticket_subject'  => $w->ticket_subject,
             'created_by_name' => $w->created_by_name,
-        ], 'notes' => $notes, 'events' => $events]);
+        ], 'notes' => $notes, 'events' => $events, 'items' => $this->items($w->id)]);
     }
 
     // Garantías creadas a partir de un ticket (para enseñarlas en su ficha).
@@ -141,6 +157,100 @@ class WarrantiesController extends Controller
             ->get(['id', 'code', 'status'])
             ->map(fn ($w) => ['id' => $w->id, 'code' => $w->code, 'status' => $w->status, 'status_label' => Warranty::STATUSES[$w->status] ?? $w->status]);
         return response()->json(['ok' => true, 'warranties' => $rows]);
+    }
+
+    /* --- Etiquetas (productos) --- */
+
+    // Comprueba los códigos pegados sin guardar nada (en el alta y al añadir a una garantía).
+    private function labelsCheck(Request $request)
+    {
+        [$codes, $invalid] = WarrantyLabels::parse((string) $request->input('codes', ''));
+        if (count($codes) > WarrantyLabels::MAX) {
+            return response()->json(['ok' => false, 'error' => 'Como mucho ' . WarrantyLabels::MAX . ' etiquetas de una vez'], 400);
+        }
+        $w = $request->input('id') ? Warranty::find((int) $request->input('id')) : null;
+        $ctx = $w ? WarrantyLabels::contextOf($w)
+            : ['client' => (string) $request->input('client_name', ''), 'project' => (string) $request->input('project_name', '')];
+        $ya = $w ? WarrantyItem::where('warranty_id', $w->id)->pluck('code')->all() : [];
+
+        $results = $codes ? $this->labels()->check($codes, $ctx, $request->user()->id) : [];
+        foreach ($results as &$r) {
+            $r['already'] = in_array($r['code'], $ya, true);
+            $r['model_label'] = $r['aeme_ref'];
+        }
+        return response()->json(['ok' => true, 'results' => $results, 'invalid' => $invalid]);
+    }
+
+    private function labelsAdd(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        [$codes] = WarrantyLabels::parse((string) $request->input('codes', ''));
+        if (! $codes) {
+            return response()->json(['ok' => false, 'error' => 'Escribe al menos un código: etiqueta (9 letras o números) o MAC de antena (12)'], 400);
+        }
+        if (count($codes) > WarrantyLabels::MAX) {
+            return response()->json(['ok' => false, 'error' => 'Como mucho ' . WarrantyLabels::MAX . ' etiquetas de una vez'], 400);
+        }
+        $r = $this->anadirEtiquetas($w, $codes, (array) $request->input('manual', []), $request->user()->id);
+        return response()->json(['ok' => true] + $r);
+    }
+
+    private function anadirEtiquetas(Warranty $w, array $codes, array $manual, int $userId): array
+    {
+        $r = $this->labels()->add($w, $codes, $manual, $userId);
+        if ($r['added']) {
+            $this->evento($w->id, $userId, 'items', null, '+' . count($r['added']) . ': ' . $this->lista($r['added']));
+            $w->forceFill(['last_activity_at' => now()])->save();
+        }
+        return $r;
+    }
+
+    private function labelsRecheck(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        $this->labels()->recheck($w, $request->user()->id);
+        return response()->json(['ok' => true]);
+    }
+
+    private function labelModel(Request $request)
+    {
+        $item = WarrantyItem::findOrFail((int) $request->input('item_id'));
+        $antes = $item->aeme_ref;
+        if (! $this->labels()->setModel($item, (string) $request->input('aeme_ref', ''))) {
+            return response()->json(['ok' => false, 'error' => 'Ese modelo no está en el catálogo'], 400);
+        }
+        if ($antes !== $item->aeme_ref) {
+            $this->evento($item->warranty_id, $request->user()->id, 'item_model', $antes ? "{$item->code}: {$antes}" : null, "{$item->code}: {$item->aeme_ref}");
+            Warranty::whereKey($item->warranty_id)->update(['last_activity_at' => now()]);
+        }
+        return response()->json(['ok' => true]);
+    }
+
+    private function labelDelete(Request $request)
+    {
+        $item = WarrantyItem::findOrFail((int) $request->input('item_id'));
+        $item->delete();
+        $this->evento($item->warranty_id, $request->user()->id, 'items', null, '−1: ' . $item->code);
+        Warranty::whereKey($item->warranty_id)->update(['last_activity_at' => now()]);
+        return response()->json(['ok' => true]);
+    }
+
+    /** «A, B, C y 12 más» para el historial. */
+    private function lista(array $codes): string
+    {
+        $n = count($codes);
+        return implode(', ', array_slice($codes, 0, 10)) . ($n > 10 ? ' y ' . ($n - 10) . ' más' : '');
+    }
+
+    private function items(int $warrantyId): array
+    {
+        return WarrantyItem::where('warranty_id', $warrantyId)->orderBy('id')->get()->map(fn ($i) => [
+            'id' => $i->id, 'code' => $i->code, 'kind' => $i->kind, 'lookup_state' => $i->lookup_state, 'server' => $i->server,
+            'store_name' => $i->store_name, 'merchant_name' => $i->merchant_name, 'online' => $i->online,
+            'last_commu_at' => $i->last_commu_at?->toDateTimeString(), 'server_model' => $i->server_model,
+            'aeme_ref' => $i->aeme_ref, 'product_name' => $i->product_name, 'model_manual' => $i->model_manual,
+            'warnings' => $i->warnings ?? [], 'checked_at' => $i->checked_at?->toDateTimeString(),
+        ])->all();
     }
 
     // Clientes del portal AEME. available=false si no está configurado o no responde:
@@ -249,7 +359,14 @@ class WarrantiesController extends Controller
             return $w;
         });
 
-        return response()->json(['ok' => true, 'id' => $w->id, 'code' => $w->code]);
+        // En el alta llegan las etiquetas ya comprobadas en el formulario.
+        $etiquetas = ['added' => [], 'skipped' => []];
+        if (! $id && trim((string) $request->input('labels', '')) !== '') {
+            [$codes] = WarrantyLabels::parse((string) $request->input('labels'));
+            $etiquetas = $this->anadirEtiquetas($w, array_slice($codes, 0, WarrantyLabels::MAX), (array) $request->input('manual', []), $me->id);
+        }
+
+        return response()->json(['ok' => true, 'id' => $w->id, 'code' => $w->code] + $etiquetas);
     }
 
     private function note(Request $request)

@@ -1,0 +1,1533 @@
+{
+    "models": [
+        {
+            "id": 1,
+            "size": "9.70",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 2,
+            "size": "4.20",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 3,
+            "size": "7.50",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 4,
+            "size": "2.60",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 5,
+            "size": "5.80",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 6,
+            "size": "4.20",
+            "eink_colors": "BWR",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 7,
+            "size": "7.50",
+            "eink_colors": "BWR",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 8,
+            "size": "2.10",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 9,
+            "size": "3.50",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 10,
+            "size": "2.90",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 11,
+            "size": "1.80",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 1
+        },
+        {
+            "id": 12,
+            "size": "2.10",
+            "eink_colors": "BWR",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 13,
+            "size": "1.80",
+            "eink_colors": "BWR",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 1
+        },
+        {
+            "id": 14,
+            "size": "2.60",
+            "eink_colors": "BWR",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 15,
+            "size": "2.10",
+            "eink_colors": "BW",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 16,
+            "size": "2.60",
+            "eink_colors": "BW",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 17,
+            "size": "2.90",
+            "eink_colors": "BWR",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 18,
+            "size": "3.70",
+            "eink_colors": "BWR",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 19,
+            "size": "3.70",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 20,
+            "size": "11.60",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 21,
+            "size": "13.30",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 22,
+            "size": "7.50",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 23,
+            "size": "1.64",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 24,
+            "size": "1.64",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 25,
+            "size": "1.50",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 26,
+            "size": "4.30",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 27,
+            "size": "4.20",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 28,
+            "size": "2.60",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 29,
+            "size": "2.60",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 30,
+            "size": "4.37",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 31,
+            "size": "4.37",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 32,
+            "size": "7.30",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 33,
+            "size": "7.30",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 34,
+            "size": "2.13",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 35,
+            "size": "2.13",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 36,
+            "size": "8.14",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 37,
+            "size": "8.14",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 38,
+            "size": "2.13",
+            "eink_colors": "BWR",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 39,
+            "size": "1.80",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 1
+        },
+        {
+            "id": 40,
+            "size": "4.20",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 41,
+            "size": "2.90",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 42,
+            "size": "4.30",
+            "eink_colors": "BW",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 43,
+            "size": "1.80",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 44,
+            "size": null,
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 45,
+            "size": "2.90",
+            "eink_colors": "BW",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 46,
+            "size": "5.80",
+            "eink_colors": "BW",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 47,
+            "size": "4.20",
+            "eink_colors": "BW",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 48,
+            "size": "7.50",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 49,
+            "size": "4.30",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 50,
+            "size": "2.90",
+            "eink_colors": "BWRY",
+            "color": "black",
+            "variant": null,
+            "has_batteries": 1,
+            "battery_type": "CR2450",
+            "battery_quantity": 2
+        },
+        {
+            "id": 51,
+            "size": "3.70",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 52,
+            "size": "1.50",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 53,
+            "size": "5.80",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        },
+        {
+            "id": 54,
+            "size": "11.60",
+            "eink_colors": "BWRY",
+            "color": "white",
+            "variant": null,
+            "has_batteries": 0,
+            "battery_type": null,
+            "battery_quantity": null
+        }
+    ],
+    "references": [
+        {
+            "id": 1,
+            "device_model_id": 1,
+            "provider": "zkong",
+            "name": "ZKC97B-NE4 (White)",
+            "pair_id": 2
+        },
+        {
+            "id": 2,
+            "device_model_id": 1,
+            "provider": "aeme",
+            "name": "AME97B-W",
+            "pair_id": 1
+        },
+        {
+            "id": 3,
+            "device_model_id": 2,
+            "provider": "zkong",
+            "name": "ZKC42B (White)",
+            "pair_id": 4
+        },
+        {
+            "id": 4,
+            "device_model_id": 2,
+            "provider": "aeme",
+            "name": "AMC42B-W",
+            "pair_id": 3
+        },
+        {
+            "id": 5,
+            "device_model_id": 3,
+            "provider": "zkong",
+            "name": "ZKC75B (White)",
+            "pair_id": 6
+        },
+        {
+            "id": 6,
+            "device_model_id": 3,
+            "provider": "aeme",
+            "name": "AMC75B-W",
+            "pair_id": 5
+        },
+        {
+            "id": 7,
+            "device_model_id": 3,
+            "provider": "zkong",
+            "name": "ZKC75V (White)",
+            "pair_id": 8
+        },
+        {
+            "id": 8,
+            "device_model_id": 3,
+            "provider": "aeme",
+            "name": "AMC75V",
+            "pair_id": 7
+        },
+        {
+            "id": 9,
+            "device_model_id": 4,
+            "provider": "zkong",
+            "name": "ZKC26V (White)",
+            "pair_id": 10
+        },
+        {
+            "id": 10,
+            "device_model_id": 4,
+            "provider": "aeme",
+            "name": "AMC26V",
+            "pair_id": 9
+        },
+        {
+            "id": 11,
+            "device_model_id": 5,
+            "provider": "zkong",
+            "name": "ZKC58V (White)",
+            "pair_id": 12
+        },
+        {
+            "id": 12,
+            "device_model_id": 5,
+            "provider": "aeme",
+            "name": "AMC58V",
+            "pair_id": 11
+        },
+        {
+            "id": 13,
+            "device_model_id": 6,
+            "provider": "zkong",
+            "name": "ZKC42B (Black)",
+            "pair_id": 14
+        },
+        {
+            "id": 14,
+            "device_model_id": 6,
+            "provider": "aeme",
+            "name": "AMC42B-B",
+            "pair_id": 13
+        },
+        {
+            "id": 15,
+            "device_model_id": 7,
+            "provider": "zkong",
+            "name": "ZKC75B (Black)",
+            "pair_id": 16
+        },
+        {
+            "id": 16,
+            "device_model_id": 7,
+            "provider": "aeme",
+            "name": "AMC75B-B",
+            "pair_id": 15
+        },
+        {
+            "id": 17,
+            "device_model_id": 8,
+            "provider": "zkong",
+            "name": "ZKC21V (White)",
+            "pair_id": 18
+        },
+        {
+            "id": 18,
+            "device_model_id": 8,
+            "provider": "aeme",
+            "name": "AMC21V",
+            "pair_id": 17
+        },
+        {
+            "id": 19,
+            "device_model_id": 9,
+            "provider": "zkong",
+            "name": "ZKC35B-NE4 (White)",
+            "pair_id": 20
+        },
+        {
+            "id": 20,
+            "device_model_id": 9,
+            "provider": "aeme",
+            "name": "AME35B-W",
+            "pair_id": 19
+        },
+        {
+            "id": 21,
+            "device_model_id": 2,
+            "provider": "zkong",
+            "name": "ZKC42V (White)",
+            "pair_id": 22
+        },
+        {
+            "id": 22,
+            "device_model_id": 2,
+            "provider": "aeme",
+            "name": "AMC42V",
+            "pair_id": 21
+        },
+        {
+            "id": 23,
+            "device_model_id": 10,
+            "provider": "zkong",
+            "name": "ZKC29V (White)",
+            "pair_id": 24
+        },
+        {
+            "id": 24,
+            "device_model_id": 10,
+            "provider": "aeme",
+            "name": "AMC29V",
+            "pair_id": 23
+        },
+        {
+            "id": 25,
+            "device_model_id": 11,
+            "provider": "zkong",
+            "name": "ZKC18V (White)",
+            "pair_id": 26
+        },
+        {
+            "id": 26,
+            "device_model_id": 11,
+            "provider": "aeme",
+            "name": "AMC18V",
+            "pair_id": 25
+        },
+        {
+            "id": 27,
+            "device_model_id": 12,
+            "provider": "zkong",
+            "name": "ZKC21B (Black)",
+            "pair_id": 28
+        },
+        {
+            "id": 28,
+            "device_model_id": 12,
+            "provider": "aeme",
+            "name": "AMC21B-B",
+            "pair_id": 27
+        },
+        {
+            "id": 29,
+            "device_model_id": 13,
+            "provider": "zkong",
+            "name": "ZKC18B (Black)",
+            "pair_id": 30
+        },
+        {
+            "id": 30,
+            "device_model_id": 13,
+            "provider": "aeme",
+            "name": "AMC18B-B",
+            "pair_id": 29
+        },
+        {
+            "id": 31,
+            "device_model_id": 14,
+            "provider": "zkong",
+            "name": "ZKC26B (Black)",
+            "pair_id": 32
+        },
+        {
+            "id": 32,
+            "device_model_id": 14,
+            "provider": "aeme",
+            "name": "AMC26B-B",
+            "pair_id": 31
+        },
+        {
+            "id": 33,
+            "device_model_id": 15,
+            "provider": "zkong",
+            "name": "ZK21SF (White)",
+            "pair_id": 34
+        },
+        {
+            "id": 34,
+            "device_model_id": 15,
+            "provider": "aeme",
+            "name": "AM21S-F",
+            "pair_id": 33
+        },
+        {
+            "id": 35,
+            "device_model_id": 16,
+            "provider": "zkong",
+            "name": "ZK26SF (White)",
+            "pair_id": 36
+        },
+        {
+            "id": 36,
+            "device_model_id": 16,
+            "provider": "aeme",
+            "name": "AM26S-F",
+            "pair_id": 35
+        },
+        {
+            "id": 37,
+            "device_model_id": 17,
+            "provider": "zkong",
+            "name": "ZKC29B (Black)",
+            "pair_id": 38
+        },
+        {
+            "id": 38,
+            "device_model_id": 17,
+            "provider": "aeme",
+            "name": "AMC29B-B",
+            "pair_id": 37
+        },
+        {
+            "id": 39,
+            "device_model_id": 18,
+            "provider": "zkong",
+            "name": "ZKC37S (Black)",
+            "pair_id": 40
+        },
+        {
+            "id": 40,
+            "device_model_id": 18,
+            "provider": "aeme",
+            "name": "AMC37S",
+            "pair_id": 39
+        },
+        {
+            "id": 41,
+            "device_model_id": 19,
+            "provider": "zkong",
+            "name": "ZKC37V (White)",
+            "pair_id": 42
+        },
+        {
+            "id": 42,
+            "device_model_id": 19,
+            "provider": "aeme",
+            "name": "AMC37V",
+            "pair_id": 41
+        },
+        {
+            "id": 43,
+            "device_model_id": 2,
+            "provider": "zkong",
+            "name": "ZKC42V-WOOD (White)",
+            "pair_id": 44
+        },
+        {
+            "id": 44,
+            "device_model_id": 2,
+            "provider": "aeme",
+            "name": "AMC42V-WOOD",
+            "pair_id": 43
+        },
+        {
+            "id": 45,
+            "device_model_id": 20,
+            "provider": "zkong",
+            "name": "ZKC116V (White)",
+            "pair_id": 46
+        },
+        {
+            "id": 46,
+            "device_model_id": 20,
+            "provider": "aeme",
+            "name": "AMC11V",
+            "pair_id": 45
+        },
+        {
+            "id": 47,
+            "device_model_id": 21,
+            "provider": "zkong",
+            "name": "ZKC133V (White)",
+            "pair_id": 48
+        },
+        {
+            "id": 48,
+            "device_model_id": 21,
+            "provider": "aeme",
+            "name": "AMC133V",
+            "pair_id": 47
+        },
+        {
+            "id": 49,
+            "device_model_id": 5,
+            "provider": "zkong",
+            "name": "ZKC58V-D (White)",
+            "pair_id": 50
+        },
+        {
+            "id": 50,
+            "device_model_id": 5,
+            "provider": "aeme",
+            "name": "AMC58V-D",
+            "pair_id": 49
+        },
+        {
+            "id": 51,
+            "device_model_id": 3,
+            "provider": "zkong",
+            "name": "ZKC75V-D (White)",
+            "pair_id": 52
+        },
+        {
+            "id": 52,
+            "device_model_id": 3,
+            "provider": "aeme",
+            "name": "AMC75V-D",
+            "pair_id": 51
+        },
+        {
+            "id": 53,
+            "device_model_id": 22,
+            "provider": "zkong",
+            "name": "ZKC75V-DNE4 (White)",
+            "pair_id": 54
+        },
+        {
+            "id": 54,
+            "device_model_id": 22,
+            "provider": "aeme",
+            "name": "AME75V-D",
+            "pair_id": 53
+        },
+        {
+            "id": 55,
+            "device_model_id": 8,
+            "provider": "zkong",
+            "name": "ZKC21B (White)",
+            "pair_id": 56
+        },
+        {
+            "id": 56,
+            "device_model_id": 8,
+            "provider": "aeme",
+            "name": "AMC21B-W",
+            "pair_id": 55
+        },
+        {
+            "id": 57,
+            "device_model_id": 4,
+            "provider": "zkong",
+            "name": "ZKC26B (White)",
+            "pair_id": 58
+        },
+        {
+            "id": 58,
+            "device_model_id": 4,
+            "provider": "aeme",
+            "name": "AMC26B-W",
+            "pair_id": 57
+        },
+        {
+            "id": 59,
+            "device_model_id": 10,
+            "provider": "zkong",
+            "name": "ZKC29B (White)",
+            "pair_id": 60
+        },
+        {
+            "id": 60,
+            "device_model_id": 10,
+            "provider": "aeme",
+            "name": "AMC29B-W",
+            "pair_id": 59
+        },
+        {
+            "id": 61,
+            "device_model_id": 11,
+            "provider": "zkong",
+            "name": "ZKC18B (White)",
+            "pair_id": 62
+        },
+        {
+            "id": 62,
+            "device_model_id": 11,
+            "provider": "aeme",
+            "name": "AMC18B-W",
+            "pair_id": 61
+        },
+        {
+            "id": 63,
+            "device_model_id": 2,
+            "provider": "zkong",
+            "name": "ZKC42BP (White)",
+            "pair_id": 64
+        },
+        {
+            "id": 64,
+            "device_model_id": 2,
+            "provider": "aeme",
+            "name": "AM42BP",
+            "pair_id": 63
+        },
+        {
+            "id": 65,
+            "device_model_id": 23,
+            "provider": "zkong",
+            "name": "ZKE16B (White)",
+            "pair_id": 66
+        },
+        {
+            "id": 66,
+            "device_model_id": 23,
+            "provider": "aeme",
+            "name": "AME16B-W",
+            "pair_id": 65
+        },
+        {
+            "id": 67,
+            "device_model_id": 24,
+            "provider": "zkong",
+            "name": "ZKE16B (Black)",
+            "pair_id": 68
+        },
+        {
+            "id": 68,
+            "device_model_id": 24,
+            "provider": "aeme",
+            "name": "AME16B-B",
+            "pair_id": 67
+        },
+        {
+            "id": 69,
+            "device_model_id": 25,
+            "provider": "zkong",
+            "name": "ZKC15V (White)",
+            "pair_id": 70
+        },
+        {
+            "id": 70,
+            "device_model_id": 25,
+            "provider": "aeme",
+            "name": "AMC15V",
+            "pair_id": 69
+        },
+        {
+            "id": 71,
+            "device_model_id": 26,
+            "provider": "zkong",
+            "name": "ZKC43B-N (White)",
+            "pair_id": 72
+        },
+        {
+            "id": 72,
+            "device_model_id": 26,
+            "provider": "aeme",
+            "name": "AMC43B-N",
+            "pair_id": 71
+        },
+        {
+            "id": 73,
+            "device_model_id": 27,
+            "provider": "zkong",
+            "name": "ZKC42B-NE4 (Black)",
+            "pair_id": 74
+        },
+        {
+            "id": 74,
+            "device_model_id": 27,
+            "provider": "aeme",
+            "name": "AME42B-B",
+            "pair_id": 73
+        },
+        {
+            "id": 75,
+            "device_model_id": 28,
+            "provider": "zkong",
+            "name": "ZKE26B (White)",
+            "pair_id": 76
+        },
+        {
+            "id": 76,
+            "device_model_id": 28,
+            "provider": "aeme",
+            "name": "AME26B-W",
+            "pair_id": 75
+        },
+        {
+            "id": 77,
+            "device_model_id": 29,
+            "provider": "zkong",
+            "name": "ZKE26B (Black)",
+            "pair_id": 78
+        },
+        {
+            "id": 78,
+            "device_model_id": 29,
+            "provider": "aeme",
+            "name": "AME26B-B",
+            "pair_id": 77
+        },
+        {
+            "id": 79,
+            "device_model_id": 30,
+            "provider": "zkong",
+            "name": "ZKE44B (White)",
+            "pair_id": 80
+        },
+        {
+            "id": 80,
+            "device_model_id": 30,
+            "provider": "aeme",
+            "name": "AME44B-W",
+            "pair_id": 79
+        },
+        {
+            "id": 81,
+            "device_model_id": 31,
+            "provider": "zkong",
+            "name": "ZKE44B (Black)",
+            "pair_id": 82
+        },
+        {
+            "id": 82,
+            "device_model_id": 31,
+            "provider": "aeme",
+            "name": "AME44B-B",
+            "pair_id": 81
+        },
+        {
+            "id": 83,
+            "device_model_id": 32,
+            "provider": "zkong",
+            "name": "ZKE73B (White)",
+            "pair_id": 84
+        },
+        {
+            "id": 84,
+            "device_model_id": 32,
+            "provider": "aeme",
+            "name": "AME73B-W",
+            "pair_id": 83
+        },
+        {
+            "id": 85,
+            "device_model_id": 33,
+            "provider": "zkong",
+            "name": "ZKE73B (Black)",
+            "pair_id": 86
+        },
+        {
+            "id": 86,
+            "device_model_id": 33,
+            "provider": "aeme",
+            "name": "AME73B-B",
+            "pair_id": 85
+        },
+        {
+            "id": 87,
+            "device_model_id": 34,
+            "provider": "zkong",
+            "name": "ZKE21B (White)",
+            "pair_id": 88
+        },
+        {
+            "id": 88,
+            "device_model_id": 34,
+            "provider": "aeme",
+            "name": "AME21B-W",
+            "pair_id": 87
+        },
+        {
+            "id": 89,
+            "device_model_id": 35,
+            "provider": "zkong",
+            "name": "ZKE21B (Black)",
+            "pair_id": 90
+        },
+        {
+            "id": 90,
+            "device_model_id": 35,
+            "provider": "aeme",
+            "name": "AME21B-B",
+            "pair_id": 89
+        },
+        {
+            "id": 91,
+            "device_model_id": 36,
+            "provider": "zkong",
+            "name": "ZKE82B (White)",
+            "pair_id": 92
+        },
+        {
+            "id": 92,
+            "device_model_id": 36,
+            "provider": "aeme",
+            "name": "AME82B-W",
+            "pair_id": 91
+        },
+        {
+            "id": 93,
+            "device_model_id": 37,
+            "provider": "zkong",
+            "name": "ZKE82B (Black)",
+            "pair_id": 94
+        },
+        {
+            "id": 94,
+            "device_model_id": 37,
+            "provider": "aeme",
+            "name": "AME82B-B",
+            "pair_id": 93
+        },
+        {
+            "id": 95,
+            "device_model_id": 38,
+            "provider": "zkong",
+            "name": "ZKC21S (White)",
+            "pair_id": 96
+        },
+        {
+            "id": 96,
+            "device_model_id": 38,
+            "provider": "aeme",
+            "name": "AMC21S-W",
+            "pair_id": 95
+        },
+        {
+            "id": 97,
+            "device_model_id": 2,
+            "provider": "zkong",
+            "name": "ZKC42B (White) gray frame",
+            "pair_id": 98
+        },
+        {
+            "id": 98,
+            "device_model_id": 2,
+            "provider": "aeme",
+            "name": "AMC42B-W-MG",
+            "pair_id": 97
+        },
+        {
+            "id": 99,
+            "device_model_id": 28,
+            "provider": "zkong",
+            "name": "ZKC26V-NE4 (White)",
+            "pair_id": 100
+        },
+        {
+            "id": 100,
+            "device_model_id": 28,
+            "provider": "aeme",
+            "name": "AME26V",
+            "pair_id": 99
+        },
+        {
+            "id": 101,
+            "device_model_id": 39,
+            "provider": "zkong",
+            "name": "ZKC18V-NE4 (White)",
+            "pair_id": 102
+        },
+        {
+            "id": 102,
+            "device_model_id": 39,
+            "provider": "aeme",
+            "name": "AME18V",
+            "pair_id": 101
+        },
+        {
+            "id": 103,
+            "device_model_id": 40,
+            "provider": "zkong",
+            "name": "ZKC42V-NE4 (White)",
+            "pair_id": 104
+        },
+        {
+            "id": 104,
+            "device_model_id": 40,
+            "provider": "aeme",
+            "name": "AME42V",
+            "pair_id": 103
+        },
+        {
+            "id": 105,
+            "device_model_id": 41,
+            "provider": "zkong",
+            "name": "ZKC29V-NE4 (White)",
+            "pair_id": 106
+        },
+        {
+            "id": 106,
+            "device_model_id": 41,
+            "provider": "aeme",
+            "name": "AME29V",
+            "pair_id": 105
+        },
+        {
+            "id": 107,
+            "device_model_id": 42,
+            "provider": "zkong",
+            "name": "ZK43B-NJ (White)",
+            "pair_id": 108
+        },
+        {
+            "id": 108,
+            "device_model_id": 42,
+            "provider": "aeme",
+            "name": "AM43B-NJ",
+            "pair_id": 107
+        },
+        {
+            "id": 109,
+            "device_model_id": 34,
+            "provider": "zkong",
+            "name": "ZKE21V (White)",
+            "pair_id": 110
+        },
+        {
+            "id": 110,
+            "device_model_id": 34,
+            "provider": "aeme",
+            "name": "AME21V",
+            "pair_id": 109
+        },
+        {
+            "id": 111,
+            "device_model_id": 22,
+            "provider": "zkong",
+            "name": "ZKC75B-NE4 (White)",
+            "pair_id": 112
+        },
+        {
+            "id": 112,
+            "device_model_id": 22,
+            "provider": "aeme",
+            "name": "AME75B-W",
+            "pair_id": 111
+        },
+        {
+            "id": 113,
+            "device_model_id": 43,
+            "provider": "zkong",
+            "name": "ZKC18B-NE4 (Black)",
+            "pair_id": 114
+        },
+        {
+            "id": 114,
+            "device_model_id": 43,
+            "provider": "aeme",
+            "name": "AME18B-B",
+            "pair_id": 113
+        },
+        {
+            "id": 115,
+            "device_model_id": 40,
+            "provider": "zkong",
+            "name": "ZKC42B-NE4 (White)",
+            "pair_id": 141
+        },
+        {
+            "id": 116,
+            "device_model_id": 40,
+            "provider": "aeme",
+            "name": "AME42B-W",
+            "pair_id": 115
+        },
+        {
+            "id": 117,
+            "device_model_id": 45,
+            "provider": "zkong",
+            "name": "ZKC29B-NJK (White)",
+            "pair_id": 118
+        },
+        {
+            "id": 118,
+            "device_model_id": 45,
+            "provider": "aeme",
+            "name": "AMC29B-NJK",
+            "pair_id": 117
+        },
+        {
+            "id": 119,
+            "device_model_id": 46,
+            "provider": "zkong",
+            "name": "ZK58B-NJ (White)",
+            "pair_id": 120
+        },
+        {
+            "id": 120,
+            "device_model_id": 46,
+            "provider": "aeme",
+            "name": "AM58B-NJ",
+            "pair_id": 119
+        },
+        {
+            "id": 121,
+            "device_model_id": 47,
+            "provider": "zkong",
+            "name": "ZKC42BP-NE4 (White)",
+            "pair_id": 122
+        },
+        {
+            "id": 122,
+            "device_model_id": 47,
+            "provider": "aeme",
+            "name": "AME42BP",
+            "pair_id": 121
+        },
+        {
+            "id": 123,
+            "device_model_id": 48,
+            "provider": "zkong",
+            "name": "ZKC75B-NE4 (black) (Black)",
+            "pair_id": 124
+        },
+        {
+            "id": 124,
+            "device_model_id": 48,
+            "provider": "aeme",
+            "name": "AME75B-B",
+            "pair_id": 123
+        },
+        {
+            "id": 125,
+            "device_model_id": 22,
+            "provider": "zkong",
+            "name": "ZKC75V-NE4 (White)",
+            "pair_id": 126
+        },
+        {
+            "id": 126,
+            "device_model_id": 22,
+            "provider": "aeme",
+            "name": "AME75V",
+            "pair_id": 125
+        },
+        {
+            "id": 127,
+            "device_model_id": 49,
+            "provider": "zkong",
+            "name": "ZKC43B-NE4 (White)",
+            "pair_id": 128
+        },
+        {
+            "id": 128,
+            "device_model_id": 49,
+            "provider": "aeme",
+            "name": "AME43B-W",
+            "pair_id": 127
+        },
+        {
+            "id": 129,
+            "device_model_id": 50,
+            "provider": "zkong",
+            "name": "ZKC29B-NE4 (Black)",
+            "pair_id": 130
+        },
+        {
+            "id": 130,
+            "device_model_id": 50,
+            "provider": "aeme",
+            "name": "AME29B-B",
+            "pair_id": 129
+        },
+        {
+            "id": 131,
+            "device_model_id": 41,
+            "provider": "zkong",
+            "name": "ZKC29B-NE4 (White)",
+            "pair_id": 132
+        },
+        {
+            "id": 132,
+            "device_model_id": 41,
+            "provider": "aeme",
+            "name": "AME29B-W",
+            "pair_id": 131
+        },
+        {
+            "id": 133,
+            "device_model_id": 51,
+            "provider": "zkong",
+            "name": "ZKC37V E4 (White)",
+            "pair_id": 134
+        },
+        {
+            "id": 134,
+            "device_model_id": 51,
+            "provider": "aeme",
+            "name": "AME37V",
+            "pair_id": 133
+        },
+        {
+            "id": 135,
+            "device_model_id": 52,
+            "provider": "zkong",
+            "name": "ZKC15V E4 (White)",
+            "pair_id": 136
+        },
+        {
+            "id": 136,
+            "device_model_id": 52,
+            "provider": "aeme",
+            "name": "AME15V",
+            "pair_id": 135
+        },
+        {
+            "id": 137,
+            "device_model_id": 53,
+            "provider": "zkong",
+            "name": "ZKC58V E4 (White)",
+            "pair_id": 138
+        },
+        {
+            "id": 138,
+            "device_model_id": 53,
+            "provider": "aeme",
+            "name": "AME58V",
+            "pair_id": 137
+        },
+        {
+            "id": 139,
+            "device_model_id": 54,
+            "provider": "zkong",
+            "name": "ZKC116V-NE4 (White)",
+            "pair_id": 140
+        },
+        {
+            "id": 140,
+            "device_model_id": 54,
+            "provider": "aeme",
+            "name": "AME116V",
+            "pair_id": 139
+        },
+        {
+            "id": 141,
+            "device_model_id": 40,
+            "provider": "aeme",
+            "name": "AME42B-W-X",
+            "pair_id": 115
+        }
+    ]
+}

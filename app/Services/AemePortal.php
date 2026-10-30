@@ -61,6 +61,59 @@ class AemePortal
         return self::bases($rows);
     }
 
+    // Categorías del portal: etiquetas electrónicas y puntos de acceso (antenas).
+    public const CAT_ESL = 8;
+    public const CAT_AP = 115;
+
+    /**
+     * Etiquetas y antenas del portal, para elegir el producto de una garantía:
+     * [['ref', 'name', 'kind' => esl|ap]], o null si el portal no está o no responde.
+     */
+    public static function products(): ?array
+    {
+        if (! self::configured()) {
+            return null;
+        }
+        if ($list = Cache::get('portal_aeme.products')) {
+            return $list;
+        }
+        try {
+            $list = DB::connection('portal_aeme')->table('items')
+                ->whereIn('item_categoryid', [self::CAT_ESL, self::CAT_AP])->where('item_ref', '!=', '')
+                ->orderBy('item_ref')->get(['item_ref', 'item_name', 'item_categoryid'])
+                ->map(fn ($i) => ['ref' => strtoupper(trim($i->item_ref)), 'name' => trim((string) $i->item_name), 'kind' => (int) $i->item_categoryid === self::CAT_AP ? 'ap' : 'esl'])
+                ->values()->all();
+        } catch (Throwable $e) {
+            Log::warning('Portal AEME: no se pudieron leer los productos: ' . $e->getMessage());
+            return null;
+        }
+        Cache::put('portal_aeme.products', $list, now()->addMinutes(10));
+        return $list;
+    }
+
+    /**
+     * Productos del portal por su referencia: [ref => ['name', 'stock']]. Vacío si el
+     * portal no está o no responde (la garantía se guarda igual, sin el nombre).
+     */
+    public static function items(array $refs): array
+    {
+        $refs = array_values(array_unique(array_filter(array_map(fn ($r) => strtoupper(trim((string) $r)), $refs))));
+        if (! $refs || ! self::configured()) {
+            return [];
+        }
+        try {
+            return DB::connection('portal_aeme')->table('items')->whereIn('item_ref', $refs)
+                ->get(['item_ref', 'item_name', 'item_available_stock'])
+                ->mapWithKeys(fn ($i) => [strtoupper($i->item_ref) => [
+                    'name'  => trim((string) $i->item_name),
+                    'stock' => $i->item_available_stock !== null ? (int) $i->item_available_stock : null,
+                ]])->all();
+        } catch (Throwable $e) {
+            Log::warning('Portal AEME: no se pudieron leer los productos: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     /**
      * Un hotel o tienda por nombre (el proyecto más reciente si tiene varios pedidos),
      * ordenados por nombre.

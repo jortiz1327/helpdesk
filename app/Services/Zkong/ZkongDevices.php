@@ -149,8 +149,14 @@ class ZkongDevices
                 $etiquetas = [];
                 foreach ($codes as $code) {
                     if (self::kindOf($code) === DeviceSighting::AP) {
-                        $json = $c->post('/apStation/adminAp?page=0&size=10', ['storeIdList' => $todas, 'mac' => $this->mac($code), 'model' => [], 'softVersion' => []]);
-                        $row = $json['data']['rows'][0] ?? null;
+                        // APP02 guarda la MAC sin dos puntos; se prueban los dos formatos.
+                        $row = null;
+                        foreach ([$code, $this->mac($code)] as $mac) {
+                            $json = $c->post('/apStation/adminAp?page=0&size=10', ['storeIdList' => $todas, 'mac' => $mac, 'model' => [], 'softVersion' => []]);
+                            if ($row = $json['data']['rows'][0] ?? null) {
+                                break;
+                            }
+                        }
                         if ($row) {
                             $out[$code][] = ['kind' => DeviceSighting::AP] + $this->conTienda($row, $s, $tiendas);
                         }
@@ -176,6 +182,75 @@ class ZkongDevices
             $results[] = ['code' => $code, 'kind' => self::kindOf($code), 'rows' => $rows];
         }
         return ['results' => $results, 'failed' => $fallidos];
+    }
+
+    /**
+     * Muchas etiquetas o antenas a la vez (las de una garantía) en TODOS los servidores: en cada
+     * servidor, una consulta por código y todas en paralelo. De cada código devuelve las
+     * filas de cada servidor donde sale y cuál es la viva, y apunta su historial.
+     *
+     * @return array{labels: array<string, array{rows: array, live: ?array}>, failed: array<int, string>}
+     */
+    public function labels(array $codes, ?int $userId = null): array
+    {
+        $codes = array_values(array_unique(array_filter(array_map(fn ($c) => $this->codigo((string) $c), $codes))));
+        $filas = array_fill_keys($codes, []);
+        $fallidos = [];
+
+        foreach ($this->servers() as $s) {
+            if (! $codes) {
+                break;
+            }
+            try {
+                $tiendas = $this->stores($s);
+                $c = new ZkongClient($s);
+                // Etiqueta: por código de barras. Antena: por MAC, sin y con dos puntos
+                // (cada servidor la guarda a su manera).
+                $llamadas = [];
+                foreach ($codes as $code) {
+                    if (self::kindOf($code) === DeviceSighting::AP) {
+                        foreach (array_unique([$code, $this->mac($code)]) as $j => $mac) {
+                            $llamadas["{$code}|{$j}"] = ['/apStation/adminAp?page=0&size=10', ['storeIdList' => [], 'mac' => $mac, 'model' => [], 'softVersion' => []]];
+                        }
+                    } else {
+                        $llamadas["{$code}|0"] = ['/pricetag/adminEsl?page=0&size=10', ['barCode' => $code, 'storeIdList' => [], 'model' => [], 'softVersion' => [], 'hardVersion' => [], 'apMacList' => []]];
+                    }
+                }
+                // La primera, normal (renueva el token si caducó); el resto, en paralelo.
+                $primera = array_key_first($llamadas);
+                $res = [$primera => $c->post(...$llamadas[$primera])];
+                $res += $c->postMany(array_slice($llamadas, 1, null, true));
+                $vistos = [];
+                foreach ($res as $clave => $json) {
+                    $code = explode('|', (string) $clave)[0];
+                    if ($json === null) {
+                        throw new \RuntimeException("Sin respuesta de {$s->name} para {$code}");
+                    }
+                    $ap = self::kindOf($code) === DeviceSighting::AP;
+                    // La búsqueda es por «contiene»: solo vale la fila con el código exacto.
+                    foreach ($json['data']['rows'] ?? [] as $row) {
+                        if ($this->codigo((string) ($row[$ap ? 'mac' : 'barCode'] ?? '')) === (string) $code && empty($vistos[$code])) {
+                            $vistos[$code] = true;
+                            $filas[$code][] = ['kind' => $ap ? DeviceSighting::AP : DeviceSighting::ESL, 'server_url' => $s->base_url] + $this->conTienda($row, $s, $tiendas);
+                        }
+                    }
+                }
+            } catch (Throwable $e) {
+                report($e);
+                $fallidos[] = $s->name;
+            }
+        }
+
+        $out = [];
+        foreach ($filas as $code => $rows) {
+            $ap = self::kindOf((string) $code) === DeviceSighting::AP;
+            $vivo = $rows ? ($ap ? $this->antenaViva($rows) : $this->etiquetaViva($rows)) : null;
+            if ($vivo) {
+                DeviceSighting::record($ap ? DeviceSighting::AP : DeviceSighting::ESL, $vivo, $userId);
+            }
+            $out[$code] = ['rows' => $rows, 'live' => $vivo];
+        }
+        return ['labels' => $out, 'failed' => $fallidos];
     }
 
     /**

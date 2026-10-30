@@ -201,6 +201,89 @@ class WarrantiesTest extends TestCase
         $this->assertSame([12, 345], [$r['portal_client_id'], $r['portal_project_id']]);
     }
 
+    /** Servidores ZKONG de mentira: código => [servidor, tienda, modelo, conectada]. */
+    private function zkong(array $etiquetas): void
+    {
+        $this->app->instance(\App\Services\Zkong\ZkongDevices::class, new class($etiquetas) extends \App\Services\Zkong\ZkongDevices {
+            public function __construct(private array $e) {}
+            public function servers() { return collect([(object) ['name' => 'APP02']]); }
+            public function labels(array $codes, ?int $userId = null): array
+            {
+                $out = [];
+                foreach ($codes as $c) {
+                    $x = $this->e[$c] ?? null;
+                    $row = $x ? ['barCode' => $c, 'mac' => $c, 'online' => $x[3] ? 1 : 0, 'offLineTime' => $x[3] ? null : now()->subDays(3)->toDateTimeString(), 'server' => $x[0], 'server_url' => 'https://' . strtolower($x[0]) . '.zkong.com', 'storeName' => $x[1], 'merchantName' => null,
+                        'model' => $x[2], 'state' => $x[3] ? 1 : 0, 'lastCommuTime' => now()->subDays($x[4] ?? 0)->toDateTimeString()] : null;
+                    $out[$c] = ['rows' => $row ? [$row] : [], 'live' => $row];
+                }
+                return ['labels' => $out, 'failed' => []];
+            }
+        });
+        \Illuminate\Support\Facades\Cache::flush();
+    }
+
+    public function test_etiquetas_solo_con_el_codigo_sacan_modelo_producto_y_avisos(): void
+    {
+        config(['database.connections.portal_aeme.host' => '']);   // sin portal: los nombres de producto no hacen falta aquí
+        [, $h] = $this->agente();
+        $this->zkong([
+            '8E9749440' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
+            '854A49907' => ['APP02', 'Mis Chuches', 'ZKC99X-NE4', false, 60],
+        ]);
+
+        $r = $this->postJson('/api/warranties.php?action=labels_check', ['codes' => "8e9749440\n854A49907, ZZZZZZZZ9  malo", 'client_name' => 'Hoteles Sol', 'project_name' => 'Sol Centro'], $h)->assertOk()->json();
+        $this->assertSame(['MALO'], $r['invalid']);
+        $res = collect($r['results'])->keyBy('code');
+        $this->assertSame('AMC26V', $res['8E9749440']['aeme_ref']);           // del modelo del servidor sale el producto
+        $this->assertSame([], $res['8E9749440']['warnings']);
+        $this->assertNull($res['854A49907']['aeme_ref']);                     // modelo fuera del catálogo
+        $claves = collect($res['854A49907']['warnings'])->pluck('key')->all();
+        $this->assertContains('no_model', $claves);
+        $this->assertContains('other_client', $claves);
+        $this->assertContains('silent', $claves);
+        $this->assertSame('not_found', $res['ZZZZZZZZ9']['lookup_state']);
+        $this->assertSame('info', collect($res['854A49907']['warnings'])->firstWhere('key', 'no_model')['tone']);   // se queda el modelo de ZKONG
+
+        // Antenas: por su MAC, con o sin dos puntos.
+        $this->zkong(['A0A3B85B5F7F' => ['APP02', 'Sol Centro', null, false]]);
+        $ap = $this->postJson('/api/warranties.php?action=labels_check', ['codes' => 'a0:a3:b8:5b:5f:7f', 'project_name' => 'Sol Centro'], $h)->json('results.0');
+        $this->assertSame(['A0A3B85B5F7F', 'ap', 'found', false], [$ap['code'], $ap['kind'], $ap['lookup_state'], $ap['online']]);
+        $this->assertContains('ap_offline', collect($ap['warnings'])->pluck('key')->all());
+        $this->assertSame(['AMAP-C', false], [$ap['aeme_ref'], $ap['model_manual']]);    // la antena es AMAP-C en el portal
+        $this->assertNotContains('no_model', collect($ap['warnings'])->pluck('key')->all());
+        $this->zkong([
+            '8E9749440' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
+            '854A49907' => ['APP02', 'Mis Chuches', 'ZKC99X-NE4', false, 60],
+        ]);
+
+        // Alta con las etiquetas; la que no tiene modelo se elige a mano.
+        $w = $this->crear($h, ['labels' => "8E9749440\n854A49907", 'manual' => ['854A49907' => 'AMC42B-W']]);
+        $this->assertSame(['8E9749440', '854A49907'], $w['added']);
+        $items = collect($this->getJson("/api/warranties.php?action=get&id={$w['id']}", $h)->json('items'))->keyBy('code');
+        $this->assertSame(['AMC26V', false], [$items['8E9749440']['aeme_ref'], $items['8E9749440']['model_manual']]);
+        $this->assertSame(['AMC42B-W', true], [$items['854A49907']['aeme_ref'], $items['854A49907']['model_manual']]);
+
+        // En otra garantía abierta no puede entrar; cerrada la primera, sí (con aviso del historial).
+        $otra = $this->crear($h, ['labels' => '8E9749440']);
+        $this->assertSame([], $otra['added']);
+        $this->assertStringContainsString($w['code'], $otra['skipped'][0]['reason']);
+        Warranty::whereKey($w['id'])->update(['status' => 'cerrada', 'closed_at' => now()]);
+        $add = $this->postJson('/api/warranties.php?action=labels_add', ['id' => $otra['id'], 'codes' => '8E9749440'], $h)->assertOk()->json();
+        $this->assertSame(['8E9749440'], $add['added']);
+
+        // Cambiar el modelo y quitar una etiqueta queda en el historial.
+        $item = \App\Models\WarrantyItem::where('warranty_id', $otra['id'])->first();
+        $this->postJson('/api/warranties.php?action=label_model', ['item_id' => $item->id, 'aeme_ref' => 'NO-EXISTE'], $h)->assertStatus(400);
+        $this->postJson('/api/warranties.php?action=label_model', ['item_id' => $item->id, 'aeme_ref' => 'AMC42B-W'], $h)->assertOk();
+        $this->assertContains('model_changed', collect($item->fresh()->warnings)->pluck('key')->all());
+        $this->postJson('/api/warranties.php?action=label_delete', ['item_id' => $item->id], $h)->assertOk();
+        $campos = collect($this->getJson("/api/warranties.php?action=get&id={$otra['id']}", $h)->json('events'))->pluck('field')->all();
+        $this->assertSame(2, count(array_keys($campos, 'items')));
+        $this->assertContains('item_model', $campos);
+
+        $this->assertSame(2, collect($this->getJson('/api/warranties.php', $h)->json('rows'))->firstWhere('id', $w['id'])['labels_count']);
+    }
+
     public function test_solo_superadmin_borra(): void
     {
         [, $h] = $this->agente();

@@ -44,6 +44,8 @@ function timeoutDe(path, opts) {
   return esLectura && !SIN_TIMEOUT.test(path) ? 30000 : 0
 }
 
+const postJson = (path, payload) => req(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+
 async function req(path, opts = {}) {
   const headers = { ...(opts.headers || {}) }
   const tok = getToken()
@@ -394,6 +396,12 @@ export const api = {
   warrantyOptions: () => req('warranties.php?action=options'),
   warranty: (id) => req(`warranties.php?action=get&id=${id}`),
   warrantiesByTicket: (ticketId) => req(`warranties.php?action=by_ticket&ticket_id=${ticketId}`),
+  checkWarrantyLabels: (payload) => postJson('warranties.php?action=labels_check', payload),
+  addWarrantyLabels: (id, codes, manual = {}) => postJson('warranties.php?action=labels_add', { id, codes, manual }),
+  recheckWarrantyLabels: (id) => postJson('warranties.php?action=labels_recheck', { id }),
+  setWarrantyLabelModel: (item_id, aeme_ref) => postJson('warranties.php?action=label_model', { item_id, aeme_ref }),
+  deleteWarrantyLabel: (item_id) => postJson('warranties.php?action=label_delete', { item_id }),
+  warrantyCatalog: () => req('warranties.php?action=catalog'),
   portalClients: () => req('warranties.php?action=portal_clients'),
   portalProjects: (clientId) => req(`warranties.php?action=portal_projects&client_id=${clientId}`),
   saveWarranty: (payload) => req('warranties.php?action=save', {

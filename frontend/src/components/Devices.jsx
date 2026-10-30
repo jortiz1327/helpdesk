@@ -675,3 +675,6 @@ export default function Devices({ canServers = false, onGoServers }) {
     </>
   )
 }
+
+// La ficha (con su historial) se abre también desde las etiquetas de una garantía.
+export { Ficha as FichaDispositivo }

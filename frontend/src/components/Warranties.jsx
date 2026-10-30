@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
+import { FichaDispositivo } from './Devices.jsx'
 
 /* -------------------------------------------------------------------------
  * GARANTÍAS (Gestión de garantías). Expedientes G-AAAA-NNNN.
@@ -114,17 +115,24 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
   const valCliente = f.portal_client_id || (f.client_name ? '__txt' : '')
   const valProyecto = f.portal_project_id || (f.project_name ? '__txt' : '')
 
+  // En el alta, las etiquetas afectadas (solo sus códigos).
+  const [comp, setComp] = useState(COMP_VACIO)
+
   const guardar = async () => {
     if (!f.received_at) { toast('Indica la fecha de recepción', 'err'); return }
     setSaving(true)
-    const r = await api.saveWarranty(f)
+    const r = await api.saveWarranty(f.id ? f : { ...f, labels: comp.text, manual: comp.manual })
     setSaving(false)
-    if (r.ok) { toast(f.id ? 'Garantía guardada' : `Garantía ${r.code} creada`); onSaved(r.id) } else toast(r.error || 'Error', 'err')
+    if (!r.ok) { toast(r.error || 'Error', 'err'); return }
+    const n = r.added?.length || 0
+    toast(f.id ? 'Garantía guardada' : `Garantía ${r.code} creada${n ? ` con ${n} ${n === 1 ? 'etiqueta' : 'etiquetas'}` : ''}`)
+    if (r.skipped?.length) toast(`${r.skipped.length} ${r.skipped.length === 1 ? 'etiqueta no entró' : 'etiquetas no entraron'}: ${r.skipped.slice(0, 3).map((s) => `${s.code} (${s.reason})`).join('; ')}`, 'err')
+    onSaved(r.id)
   }
 
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className="modal" style={{ maxWidth: 640 }}>
+      <div className="modal" style={{ maxWidth: f.id ? 640 : 720 }}>
         <div className="modal-head">
           <h3>{f.id ? `Editar ${f.code}` : inicial.ticket_code ? `Nueva garantía desde ${inicial.ticket_code}` : 'Nueva garantía'}</h3>
           <button className="x" onClick={onClose}>×</button>
@@ -185,11 +193,15 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
               <input className="mono" value={f.ticket_code || ''} onChange={set('ticket_code')} placeholder="TK-2610-0001" /></label>
           </div>
           <label className="field"><span className="lbl">Descripción</span>
-            <textarea rows={4} value={f.description || ''} onChange={set('description')} placeholder="Qué le pasa al cliente, cuántas etiquetas, cómo llegó…" /></label>
+            <textarea rows={3} value={f.description || ''} onChange={set('description')} placeholder="Qué le pasa al cliente, cómo llegó…" /></label>
+          {!f.id && (
+            <div className="field"><span className="lbl">Etiquetas y antenas afectadas <span className="hint">(se buscan en los servidores ZKONG; también se pueden añadir después)</span></span>
+              <Comprobador contexto={{ client_name: f.client_name, project_name: f.project_name }} value={comp} onChange={setComp} /></div>
+          )}
         </div>
         <div className="modal-foot">
           <button className="btn ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn" disabled={saving} onClick={guardar}>{saving ? 'Guardando…' : (f.id ? 'Guardar' : 'Crear garantía')}</button>
+          <button className="btn" disabled={saving} onClick={guardar}>{saving ? (comp.text.trim() ? 'Creando y comprobando etiquetas…' : 'Guardando…') : (f.id ? 'Guardar' : 'Crear garantía')}</button>
         </div>
       </div>
     </div>
@@ -277,17 +289,18 @@ function Lista({ opts, onOpen, onNew, reload }) {
             <thead><tr>
               <th>Expediente</th>
               <th><button className="wr-sort" onClick={() => setSort(sort === 'received_asc' ? '' : 'received_asc')}>Recepción <Icon.chevron style={{ transform: sort === 'received_asc' ? 'rotate(180deg)' : 'none' }} /></button></th>
-              <th>Cliente</th><th>Proyecto</th><th>Categoría</th><th>Urgencia</th><th>Responsable</th><th>Estado</th>
+              <th>Cliente</th><th>Proyecto</th><th>Etiquetas</th><th>Categoría</th><th>Urgencia</th><th>Responsable</th><th>Estado</th>
             </tr></thead>
             <tbody>
               {data === null
-                ? Array.from({ length: 6 }, (_, i) => <tr key={i}>{Array.from({ length: 8 }, (_, j) => <td key={j}><span className="dev-skel" /></td>)}</tr>)
+                ? Array.from({ length: 6 }, (_, i) => <tr key={i}>{Array.from({ length: 9 }, (_, j) => <td key={j}><span className="dev-skel" /></td>)}</tr>)
                 : filas.map((w) => (
                   <tr key={w.id} className="wr-row" onClick={() => onOpen(w.id)}>
                     <td><span className="wr-code">{w.code}</span>{w.ticket_code ? <span className="wr-tk" title={`Ticket ${w.ticket_code}`}><Icon.ticket /></span> : null}</td>
                     <td>{fecha(w.received_at)}</td>
                     <td className="wr-ell">{w.client_name || <span className="dev-mute">—</span>}</td>
                     <td className="wr-ell">{w.project_name || <span className="dev-mute">—</span>}</td>
+                    <td>{w.labels_count ? <b>{num(w.labels_count)}</b> : <span className="dev-mute">—</span>}</td>
                     <td>{w.category || <span className="dev-mute">—</span>}</td>
                     <td><UrgPill u={w.urgency} opts={opts} /></td>
                     <td>{w.responsible_name || <span className="dev-mute">Sin asignar</span>}</td>
@@ -319,7 +332,236 @@ function Lista({ opts, onOpen, onNew, reload }) {
 
 /* --- Ficha --- */
 const HIST_FILTROS = [['', 'Todos'], ['status', 'Estado'], ['responsible_id', 'Responsable'], ['urgency', 'Urgencia'], ['otros', 'Otros']]
-const CAMPOS = { created: 'Garantía creada', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+/* --- Etiquetas (productos) ---------------------------------------------
+ * Solo se piden los códigos: cada uno se busca en todos los servidores ZKONG (dónde
+ * está, si está viva, qué modelo dice el servidor) y de ese modelo sale el producto
+ * del portal. Lo raro se avisa; estar ya en otra garantía abierta la deja fuera. */
+let catalogo = null   // referencias AEME para elegir el modelo a mano; se pide una vez
+const cargarCatalogo = () => (catalogo ||= api.warrantyCatalog().then((r) => (r.ok ? r.models : [])))
+
+const estadoEtiqueta = (r) => r.blocked || r.warnings?.some((a) => a.blocks) ? 'bad'
+  : r.lookup_state === 'not_found' ? 'bad'
+  : r.lookup_state !== 'found' || !(r.aeme_ref || r.server_model) || r.warnings?.some((a) => a.tone !== 'info') ? 'warn' : 'ok'
+// Lo que es: producto del portal o, si no está en el catálogo, el modelo de ZKONG.
+const productoDe = (r) => r.aeme_ref || r.server_model || 'Sin modelo'
+
+function Avisos({ list }) {
+  if (!list?.length) return null
+  return (
+    <ul className="wr-avisos">
+      {list.map((a, i) => <li key={i} className={`t-${a.tone}`}>{a.tone === 'info' ? <Icon.clock /> : <Icon.warn />}<span>{a.text}</span></li>)}
+    </ul>
+  )
+}
+
+function Donde({ r }) {
+  if (r.lookup_state === 'not_found') return <span className="wr-st bad">No aparece en los servidores</span>
+  if (r.lookup_state !== 'found') return <span className="wr-st warn">Sin comprobar</span>
+  const d = dias(r.last_commu_at)
+  return (
+    <div className="wr-donde">
+      <span><i className={`wr-dot ${r.online ? 'on' : ''}`} /><b>{r.server}</b> · {r.store_name || '—'}</span>
+      <small>{r.online ? 'Conectada' : 'Desconectada'}{r.last_commu_at ? ` · comunicó ${haceDias(d)}` : ''}</small>
+    </div>
+  )
+}
+
+/* El producto: referencia AEME y su nombre en el portal. Con onPick se puede elegir a mano. */
+function Modelo({ r, onPick }) {
+  const [editar, setEditar] = useState(false)
+  const [cat, setCat] = useState(null)
+  const elegir = onPick && (editar || (!r.aeme_ref && !r.server_model))
+  useEffect(() => { if (elegir && !cat) cargarCatalogo().then(setCat) }, [elegir, cat])
+  const abrir = () => setEditar(true)
+  if (elegir) {
+    if (!cat) return <span className="dev-mute">Cargando modelos…</span>
+    return (
+      <div className="wr-modelo-pick">
+        <Select sm block searchable value={r.aeme_ref || ''} placeholder={r.kind === 'ap' ? 'Elegir antena del portal…' : 'Elegir producto del portal…'}
+          options={[...cat].sort((a, b) => (a.kind === r.kind ? 0 : 1) - (b.kind === r.kind ? 0 : 1)).map((m) => ({ value: m.ref, label: m.ref, sub: [m.kind === 'ap' ? 'Antena' : null, m.product_name || m.description].filter(Boolean).join(' · ') }))}
+          onChange={(v) => { setEditar(false); onPick(v, cat.find((m) => m.ref === v)) }} />
+        {editar && r.aeme_ref ? <button className="icon-btn" title="Cancelar" onClick={() => setEditar(false)}>×</button> : null}
+      </div>
+    )
+  }
+  return (
+    <div className="wr-modelo">
+      <span><b>{r.aeme_ref || r.server_model || '—'}</b>{r.model_manual ? <em className="wr-mano-tag">a mano</em> : null}
+        {onPick ? <button className="icon-btn sm" title={r.aeme_ref ? 'Cambiar producto' : 'Elegir el producto del portal'} onClick={abrir}><Icon.pencil /></button> : null}</span>
+      <small>{r.aeme_ref ? r.product_name || '' : r.server_model ? 'Modelo de ZKONG · sin producto del portal' : ''}</small>
+    </div>
+  )
+}
+
+/* Caja para pegar códigos y comprobarlos. El estado (texto, resultados, modelos
+   elegidos a mano) lo guarda quien la usa: value / onChange. */
+function Comprobador({ contexto, value, onChange, autoFocus }) {
+  const toast = useToast()
+  const [cargando, setCargando] = useState(false)
+  const v = value
+  const set = (cambios) => onChange({ ...v, ...cambios })
+  const lineas = v.text.split(/[\s,;]+/).filter(Boolean).length
+  const comprobado = v.results && v.checked === v.text
+
+  const comprobar = async () => {
+    if (!v.text.trim()) return
+    setCargando(true)
+    const r = await api.checkWarrantyLabels({ ...contexto, codes: v.text })
+    setCargando(false)
+    if (r.ok) set({ results: r.results, invalid: r.invalid, checked: v.text }); else toast(r.error || 'No se pudo comprobar', 'err')
+  }
+  const elegir = (code, ref, m) => set({ manual: { ...v.manual, [code]: ref }, results: v.results.map((x) => (x.code === code ? { ...x, aeme_ref: ref, model_manual: true, product_name: m?.product_name || null, warnings: (x.warnings || []).filter((w) => w.key !== 'no_model') } : x)) })
+
+  const res = comprobado ? v.results : []
+  const cuenta = { ok: 0, warn: 0, bad: 0 }
+  res.forEach((r) => { cuenta[r.already ? 'bad' : estadoEtiqueta(r)]++ })
+
+  return (
+    <div className="wr-comp">
+      <textarea rows={4} className="mono" value={v.text} autoFocus={autoFocus}
+        onChange={(e) => set({ text: e.target.value })}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) comprobar() }}
+        placeholder={'Pega los códigos, uno por línea: etiquetas (9 caracteres) o MAC de antenas\n8E9749440\nA0A3B85B5F7F'} />
+      <div className="wr-comp-f">
+        <span className="dev-mute">{lineas ? `${lineas} ${lineas === 1 ? 'código' : 'códigos'}` : 'Etiquetas: código de 9 caracteres · Antenas: su MAC'}{comprobado ? '' : lineas ? ' · sin comprobar' : ''}</span>
+        <button type="button" className="dev-btn" disabled={cargando || !lineas || comprobado} onClick={comprobar}>
+          <Icon.search /> {cargando ? 'Buscando en los servidores…' : comprobado ? 'Comprobadas' : 'Comprobar'}
+        </button>
+      </div>
+      {comprobado && (
+        <>
+          <div className="wr-comp-sum">
+            {cuenta.ok ? <span className="ok"><Icon.check /> {cuenta.ok} {cuenta.ok === 1 ? "correcta" : "correctas"}</span> : null}
+            {cuenta.warn ? <span className="warn"><Icon.warn /> {cuenta.warn} con avisos</span> : null}
+            {cuenta.bad ? <span className="bad"><Icon.warn /> {cuenta.bad} no entrarán o no aparecen</span> : null}
+          </div>
+          {v.invalid?.length ? <p className="wr-comp-bad">No parecen etiquetas (9 letras o números) ni MAC de antena (12): <span className="mono">{v.invalid.join(', ')}</span></p> : null}
+          <ul className="wr-lbls">
+            {res.map((r) => {
+              const st = r.already ? 'bad' : estadoEtiqueta(r)
+              return (
+                <li key={r.code} className={`st-${st}`}>
+                  <span className="wr-lbl-code mono">{r.code}{r.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</span>
+                  <Donde r={r} />
+                  {r.already ? <span className="wr-st bad">Ya está en esta garantía</span> : <Modelo r={r} onPick={r.blocked ? null : (ref, m) => elegir(r.code, ref, m)} />}
+                  <div className="full"><Avisos list={r.warnings} /></div>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+const COMP_VACIO = { text: '', results: null, invalid: [], manual: {}, checked: null }
+
+function Productos({ w, items, onReload, onChanged }) {
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [panel, setPanel] = useState(!items.length)
+  const [comp, setComp] = useState(COMP_VACIO)
+  const [ocupado, setOcupado] = useState('')
+  const [ficha, setFicha] = useState(null)
+  const [filtro, setFiltro] = useState('')
+
+  const anadir = async () => {
+    setOcupado('add')
+    const r = await api.addWarrantyLabels(w.id, comp.text, comp.manual)
+    setOcupado('')
+    if (!r.ok) { toast(r.error || 'Error', 'err'); return }
+    if (r.added.length) toast(`${r.added.length} ${r.added.length === 1 ? 'etiqueta añadida' : 'etiquetas añadidas'}`)
+    if (r.skipped.length) toast(`${r.skipped.length} no ${r.skipped.length === 1 ? 'entró' : 'entraron'}: ${r.skipped.slice(0, 3).map((s) => `${s.code} (${s.reason})`).join('; ')}${r.skipped.length > 3 ? '…' : ''}`, 'err')
+    setComp(COMP_VACIO); setPanel(false); onReload(); onChanged()
+  }
+  const recomprobar = async () => {
+    setOcupado('recheck')
+    const r = await api.recheckWarrantyLabels(w.id)
+    setOcupado('')
+    if (r.ok) { toast('Etiquetas comprobadas de nuevo'); onReload() } else toast(r.error || 'Error', 'err')
+  }
+  const cambiarModelo = async (it, ref) => {
+    const r = await api.setWarrantyLabelModel(it.id, ref)
+    if (r.ok) { toast(`${it.code}: ${ref}`); onReload() } else toast(r.error || 'Error', 'err')
+  }
+  const quitar = async (it) => {
+    if (!(await confirm({ title: 'Quitar etiqueta', message: `¿Quitar ${it.code} de ${w.code}?`, danger: true, confirmText: 'Quitar' }))) return
+    const r = await api.deleteWarrantyLabel(it.id)
+    if (r.ok) { onReload(); onChanged() } else toast(r.error || 'Error', 'err')
+  }
+  const exportar = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const cab = ['Código', 'Tipo', 'Referencia AEME', 'Producto', 'Modelo en el servidor', 'Servidor', 'Tienda', 'Conectada', 'Última comunicación', 'Avisos']
+    const lineas = items.map((i) => [i.code, i.kind === 'ap' ? 'Antena' : 'Etiqueta', i.aeme_ref, i.product_name, i.server_model, i.server, i.store_name, i.online == null ? '' : i.online ? 'Sí' : 'No', fechaHora(i.last_commu_at), (i.warnings || []).map((a) => a.text).join(' | ')])
+    const blob = new Blob(['﻿' + [cab.map(esc).join(';'), ...lineas.map((l) => l.map(esc).join(';'))].join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = `${w.code}-etiquetas.csv`; a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
+
+  // Resumen por producto: «AMC26V ×12».
+  const porProducto = {}
+  items.forEach((i) => { const k = productoDe(i); porProducto[k] = (porProducto[k] || 0) + 1 })
+  const conectadas = items.filter((i) => i.online).length
+  const conAvisos = items.filter((i) => estadoEtiqueta(i) !== 'ok').length
+  const listado = items.filter((i) => !filtro || (filtro === 'avisos' ? estadoEtiqueta(i) !== 'ok' : productoDe(i) === filtro))
+  const nuevas = comp.results && comp.checked === comp.text ? comp.results.filter((r) => !r.blocked && !r.already).length : null
+
+  return (
+    <>
+      <div className="wr-prod-h">
+        <div>
+          <b>{items.length} {items.length === 1 ? 'etiqueta' : 'etiquetas'}</b>
+          {items.length ? <span className="dev-mute"> · {conectadas} conectadas{conAvisos ? ` · ${conAvisos} con avisos` : ''}</span> : null}
+        </div>
+        <div className="spacer" />
+        {items.length ? <button className="dev-btn" disabled={!!ocupado} onClick={recomprobar}><Icon.refresh /> {ocupado === 'recheck' ? 'Comprobando…' : 'Volver a comprobar'}</button> : null}
+        {items.length ? <button className="dev-btn" onClick={exportar}><Icon.download /> CSV</button> : null}
+        <button className="btn" onClick={() => setPanel((p) => !p)}><Icon.plus /> Añadir etiquetas</button>
+      </div>
+
+      {panel && (
+        <div className="wr-prod-add">
+          <Comprobador contexto={{ id: w.id }} value={comp} onChange={setComp} autoFocus />
+          <div className="wr-comp-acts">
+            <button className="btn ghost" onClick={() => { setPanel(false); setComp(COMP_VACIO) }}>Cancelar</button>
+            <button className="btn" disabled={!comp.text.trim() || ocupado === 'add' || nuevas === 0} onClick={anadir}>
+              {ocupado === 'add' ? 'Añadiendo…' : nuevas != null ? `Añadir ${nuevas} ${nuevas === 1 ? 'etiqueta' : 'etiquetas'}` : 'Comprobar y añadir'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <>
+          <div className="wr-chips sm">
+            <button className={!filtro ? 'on' : ''} onClick={() => setFiltro('')}>Todas ({items.length})</button>
+            {conAvisos ? <button className={filtro === 'avisos' ? 'on' : ''} onClick={() => setFiltro('avisos')}>Con avisos ({conAvisos})</button> : null}
+            {Object.entries(porProducto).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
+              <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(k)}>{k} ×{n}</button>
+            ))}
+          </div>
+          <ul className="wr-lbls big">
+            {listado.map((i) => (
+              <li key={i.id} className={`st-${estadoEtiqueta(i)}`}>
+                <span className="wr-lbl-code mono"><button className="link" title="Ver ficha e historial" onClick={() => setFicha(i.code)}>{i.code}</button>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</span>
+                <Donde r={i} />
+                <Modelo r={i} onPick={(ref) => cambiarModelo(i, ref)} />
+                <button className="icon-btn" title="Quitar de la garantía" onClick={() => quitar(i)}><Icon.trash /></button>
+                <div className="full"><Avisos list={i.warnings} /></div>
+              </li>
+            ))}
+          </ul>
+          {items[0]?.checked_at ? <p className="dev-mute wr-prod-foot">Comprobadas por última vez {fechaHora(items.reduce((a, i) => (i.checked_at > a ? i.checked_at : a), ''))}.</p> : null}
+        </>
+      )}
+      {!items.length && !panel ? <p className="dev-mute">Todavía no hay etiquetas. Añádelas con su código.</p> : null}
+      {ficha && <FichaDispositivo code={ficha} servers={[]} onClose={() => setFicha(null)} onOpen={setFicha} />}
+    </>
+  )
+}
+
+const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const toast = useToast()
@@ -403,10 +645,10 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
       </div>
 
       <div className="wr-tabs" role="tablist">
-        {[['resumen', 'Resumen', Icon.doc], ['seguimiento', `Seguimiento${d.notes.length ? ` (${d.notes.length})` : ''}`, Icon.chat], ['historial', 'Historial', Icon.clock]].map(([k, l, Ic]) => (
+        {[['resumen', 'Resumen', Icon.doc], ['productos', `Productos${d.items.length ? ` (${d.items.length})` : ''}`, Icon.tag], ['seguimiento', `Seguimiento${d.notes.length ? ` (${d.notes.length})` : ''}`, Icon.chat], ['historial', 'Historial', Icon.clock]].map(([k, l, Ic]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Ic /> {l}</button>
         ))}
-        {[['Productos', Icon.tag], ['ZKONG', Icon.server], ['Documentos', Icon.file]].map(([l, Ic]) => (
+        {[['Documentos', Icon.file]].map(([l, Ic]) => (
           <button key={l} disabled title="Próximamente"><Ic /> {l} <em>Pronto</em></button>
         ))}
       </div>
@@ -430,12 +672,15 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
           </dl>
         )}
 
+        {tab === 'productos' && <Productos w={w} items={d.items} onReload={cargar} onChanged={onChanged} />}
+
         {tab === 'seguimiento' && (
           <>
             <div className="wr-compose">
-              <select value={nota.type} onChange={(e) => setNota((s) => ({ ...s, type: e.target.value }))}>
-                {Object.entries(opts?.note_types || {}).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+              <div className="wr-compose-type">
+                <Select sm value={nota.type} onChange={(v) => setNota((s) => ({ ...s, type: v }))}
+                  options={Object.entries(opts?.note_types || {}).map(([k, v]) => ({ value: k, label: v }))} />
+              </div>
               <textarea ref={notaRef} rows={3} value={nota.body} onChange={(e) => setNota((s) => ({ ...s, body: e.target.value }))}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarNota() }}
                 placeholder="Qué se ha hecho, con quién se ha hablado, qué falta…" />
