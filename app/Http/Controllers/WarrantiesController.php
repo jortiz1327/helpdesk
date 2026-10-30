@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Warranty;
+use App\Services\AemePortal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -26,6 +27,8 @@ class WarrantiesController extends Controller
             'delete'  => $this->delete($request),
             'options' => $this->options(),
             'by_ticket' => $this->byTicket($request),
+            'portal_clients'  => $this->portalClients(),
+            'portal_projects' => $this->portalProjects($request),
             default   => $this->list($request),
         };
     }
@@ -86,9 +89,12 @@ class WarrantiesController extends Controller
         return [
             'id'               => $w->id,
             'code'             => $w->code,
+            'first_contact_at' => $w->first_contact_at?->toDateString(),
             'received_at'      => $w->received_at?->toDateString(),
-            'client_name'      => $w->client_name,
-            'project_name'     => $w->project_name,
+            'portal_client_id'  => $w->portal_client_id,
+            'client_name'       => $w->client_name,
+            'portal_project_id' => $w->portal_project_id,
+            'project_name'      => $w->project_name,
             'category'         => $w->category,
             'urgency'          => $w->urgency,
             'status'           => $w->status,
@@ -137,6 +143,20 @@ class WarrantiesController extends Controller
         return response()->json(['ok' => true, 'warranties' => $rows]);
     }
 
+    // Clientes del portal AEME. available=false si no está configurado o no responde:
+    // entonces el formulario deja escribir cliente y proyecto a mano.
+    private function portalClients()
+    {
+        $list = AemePortal::clients();
+        return response()->json(['ok' => true, 'available' => $list !== null, 'clients' => $list ?? []]);
+    }
+
+    private function portalProjects(Request $request)
+    {
+        $list = AemePortal::projects((int) $request->query('client_id'));
+        return response()->json(['ok' => true, 'available' => $list !== null, 'projects' => $list ?? []]);
+    }
+
     private function save(Request $request)
     {
         $me = $request->user();
@@ -144,8 +164,10 @@ class WarrantiesController extends Controller
 
         $datos = [
             'received_at'    => (string) $request->input('received_at', ''),
-            'client_name'    => $this->texto($request->input('client_name'), 160),
-            'project_name'   => $this->texto($request->input('project_name'), 160),
+            'portal_client_id'  => $request->input('portal_client_id') ? (int) $request->input('portal_client_id') : null,
+            'client_name'       => $this->texto($request->input('client_name'), 160),
+            'portal_project_id' => $request->input('portal_project_id') ? (int) $request->input('portal_project_id') : null,
+            'project_name'      => $this->texto($request->input('project_name'), 160),
             'category'       => $this->texto($request->input('category'), 60),
             'urgency'        => $request->input('urgency') ?: null,
             'status'         => (string) $request->input('status', 'no_iniciado'),
@@ -153,9 +175,18 @@ class WarrantiesController extends Controller
             'description'    => $this->texto($request->input('description'), 5000),
         ];
 
-        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['received_at']) || ! strtotime($datos['received_at'])) {
+        if (! $this->esFecha($datos['received_at'])) {
             return response()->json(['ok' => false, 'error' => 'Indica la fecha de recepción'], 400);
         }
+        // Fechas opcionales: vacías se quedan sin poner.
+        $contacto = (string) $request->input('first_contact_at', '');
+        $cierre = (string) $request->input('closed_at', '');
+        foreach ([[$contacto, 'primera fecha de contacto'], [$cierre, 'fecha de cierre']] as [$v, $nombre]) {
+            if ($v !== '' && ! $this->esFecha($v)) {
+                return response()->json(['ok' => false, 'error' => "La {$nombre} no es válida"], 400);
+            }
+        }
+        $datos['first_contact_at'] = $contacto ?: null;
         if (! isset(Warranty::STATUSES[$datos['status']])) {
             return response()->json(['ok' => false, 'error' => 'Estado no válido'], 400);
         }
@@ -176,12 +207,18 @@ class WarrantiesController extends Controller
             }
         }
 
-        $w = DB::transaction(function () use ($id, $datos, $me) {
+        // Cerrada: el día indicado (con la hora de ahora) o, si no se indica, hoy.
+        // Cualquier otro estado no tiene fecha de cierre.
+        $cerrarEl = fn ($w) => $datos['status'] !== 'cerrada' ? null
+            : ($cierre === '' ? ($w?->closed_at ?? now())
+                : ($w?->closed_at?->toDateString() === $cierre ? $w->closed_at : \Illuminate\Support\Carbon::parse($cierre)->setTimeFrom(now())));
+
+        $w = DB::transaction(function () use ($id, $datos, $me, $cerrarEl) {
             if (! $id) {
                 $w = Warranty::create($datos + [
                     'code'             => Warranty::nextCode(),
                     'created_by'       => $me->id,
-                    'closed_at'        => $datos['status'] === 'cerrada' ? now() : null,
+                    'closed_at'        => $cerrarEl(null),
                     'last_activity_at' => now(),
                 ]);
                 $this->evento($w->id, $me->id, 'created', null, $w->code);
@@ -189,18 +226,17 @@ class WarrantiesController extends Controller
             }
 
             $w = Warranty::lockForUpdate()->findOrFail($id);
-            $antes = $w->only(array_keys(Warranty::TRACKED));
-            $antes['received_at'] = $w->received_at?->toDateString();
-            $w->fill($datos);
-            if ($datos['status'] === 'cerrada' && $antes['status'] !== 'cerrada') {
-                $w->closed_at = now();
-            } elseif ($datos['status'] !== 'cerrada') {
-                $w->closed_at = null;
+            $valor = fn ($campo) => $w->{$campo} instanceof \DateTimeInterface ? $w->{$campo}->format('Y-m-d') : $w->{$campo};
+            $antes = [];
+            foreach (Warranty::TRACKED as $campo => $_) {
+                $antes[$campo] = $valor($campo);
             }
+            $w->fill($datos);
+            $w->closed_at = $cerrarEl($w);
 
             $cambios = 0;
             foreach (Warranty::TRACKED as $campo => $_) {
-                $nuevo = $campo === 'received_at' ? $datos['received_at'] : $w->{$campo};
+                $nuevo = $valor($campo);
                 if ((string) ($antes[$campo] ?? '') !== (string) ($nuevo ?? '')) {
                     $this->evento($w->id, $me->id, $campo, $this->legible($campo, $antes[$campo] ?? null), $this->legible($campo, $nuevo));
                     $cambios++;
@@ -290,9 +326,14 @@ class WarrantiesController extends Controller
             'urgency'        => Warranty::URGENCIES[$v] ?? $v,
             'responsible_id' => User::whereKey($v)->value('name') ?? "#{$v}",
             'ticket_id'      => DB::table('tickets')->where('id', $v)->value('code') ?? "#{$v}",
-            'received_at'    => date('d/m/Y', strtotime((string) $v)),
+            'received_at', 'first_contact_at', 'closed_at' => date('d/m/Y', strtotime((string) $v)),
             default          => mb_substr((string) $v, 0, 500),
         };
+    }
+
+    private function esFecha(string $v): bool
+    {
+        return (bool) preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
     }
 
     private function texto($v, int $max): ?string

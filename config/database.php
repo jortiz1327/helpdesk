@@ -64,6 +64,22 @@ return [
             ]) : [],
         ],
 
+        // Portal AEME (clientes y proyectos), solo lectura. Sin AEME_DB_HOST no se usa.
+        'portal_aeme' => [
+            'driver' => 'mysql',
+            'host' => env('AEME_DB_HOST'),
+            'port' => env('AEME_DB_PORT', '3306'),
+            'database' => env('AEME_DB_DATABASE'),
+            'username' => env('AEME_DB_USERNAME'),
+            'password' => env('AEME_DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? [PDO::ATTR_TIMEOUT => 5] : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

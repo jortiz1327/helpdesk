@@ -16,6 +16,7 @@ class Warranty extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
+        'first_contact_at' => 'date',
         'received_at'      => 'date',
         'closed_at'        => 'datetime',
         'last_activity_at' => 'datetime',
@@ -52,7 +53,9 @@ class Warranty extends Model
 
     // Los campos que guardan historial al cambiar, con su nombre para la pantalla.
     public const TRACKED = [
+        'first_contact_at' => 'Primera fecha de contacto',
         'received_at'    => 'Fecha de recepción',
+        'closed_at'      => 'Fecha de cierre',
         'client_name'    => 'Cliente',
         'project_name'   => 'Proyecto',
         'category'       => 'Categoría',

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
+import Select from './Select.jsx'
 
 /* -------------------------------------------------------------------------
  * GARANTÍAS (Gestión de garantías). Expedientes G-AAAA-NNNN.
@@ -14,6 +15,8 @@ import { useToast, useConfirm } from '../App.jsx'
 
 const ESTADO_CLS = { no_iniciado: 'gray', en_curso: 'blue', pte_cliente: 'amber', pte_zkong: 'purple', pte_envio: 'orange', enviada: 'indigo', cerrada: 'green' }
 const URG_CLS = { baja: 'gray', media: 'amber', alta: 'orange', muy_urgente: 'red' }
+// Punto de color de cada opción en los desplegables (mismos tonos que las píldoras).
+const COLOR = { gray: '#94a3b8', blue: '#3b82f6', amber: '#f59e0b', purple: '#8b5cf6', orange: '#f97316', indigo: '#6366f1', green: '#22c55e', red: '#ef4444', none: '#cbd5e1' }
 const CHIPS = [
   ['mine', 'Mis garantías'], ['open', 'Abiertas'], ['urgent', 'Urgentes'], ['pte_cliente', 'Pte. cliente'],
   ['pte_zkong', 'Pte. ZKONG'], ['pte_envio', 'Pte. envío'], ['stale', 'Sin actualizar'], ['no_owner', 'Sin responsable'],
@@ -21,7 +24,7 @@ const CHIPS = [
 ]
 const SIZE = 25
 const hoy = () => new Date().toISOString().slice(0, 10)
-const VACIA = { id: 0, received_at: '', client_name: '', project_name: '', category: '', urgency: '', status: 'no_iniciado', responsible_id: '', ticket_code: '', description: '' }
+const VACIA = { id: 0, first_contact_at: '', received_at: '', closed_at: '', portal_client_id: null, client_name: '', portal_project_id: null, project_name: '', category: '', urgency: '', status: 'no_iniciado', responsible_id: '', ticket_code: '', description: '' }
 
 const aFecha = (v) => (v ? new Date(String(v).replace(' ', 'T')) : null)
 const fecha = (v) => { const d = aFecha(v); return d && !isNaN(d) ? d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—' }
@@ -39,9 +42,77 @@ function UrgPill({ u, opts }) { return u ? <Pill cls={URG_CLS[u] || 'gray'}>{opt
 /* --- Alta y edición --- */
 function Formulario({ inicial, opts, onClose, onSaved }) {
   const toast = useToast()
-  const [f, setF] = useState(inicial)
+  const [f, setF] = useState(() => ({ ...inicial, closed_at: (inicial.closed_at || '').slice(0, 10) }))
   const [saving, setSaving] = useState(false)
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
+  const pon = (k) => (v) => setF((s) => ({ ...s, [k]: v }))
+  // Al pasar a «Cerrada» la fecha de cierre propone hoy (se puede cambiar).
+  const elegirEstado = (v) => setF((s) => ({ ...s, status: v, closed_at: v === 'cerrada' ? s.closed_at || hoy() : s.closed_at }))
+
+  // Cliente y proyecto salen del portal AEME; si no responde, se escriben a mano.
+  const [clientes, setClientes] = useState(null)       // null = cargando
+  const [proyectos, setProyectos] = useState(null)
+  const [aMano, setAMano] = useState(false)             // proyecto escrito a mano
+  const portal = clientes?.available !== false
+
+  useEffect(() => {
+    api.portalClients().then((r) => {
+      const lista = r.ok ? r : { available: false, clients: [] }
+      setClientes(lista)
+      // Desde un ticket llega el nombre del contacto: si coincide con un cliente del portal, se elige.
+      setF((s) => {
+        if (s.portal_client_id || !s.client_name) return s
+        const c = lista.clients.find((x) => x.name.toLowerCase() === s.client_name.trim().toLowerCase())
+        return c ? { ...s, portal_client_id: c.id, client_name: c.name } : s
+      })
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!f.portal_client_id) { setProyectos(null); return }
+    let vivo = true
+    setProyectos('cargando')
+    api.portalProjects(f.portal_client_id).then((r) => {
+      if (!vivo) return
+      const lista = r.ok && r.available ? r.projects : []
+      setProyectos(lista)
+      setF((s) => {
+        if (s.portal_project_id || s.project_name) return s
+        // Un solo hotel o tienda se elige solo; ninguno, el nombre del cliente.
+        if (lista.length === 1) return { ...s, portal_project_id: lista[0].id, project_name: lista[0].name }
+        return s
+      })
+      if (!lista.length) setAMano(true)
+    })
+    return () => { vivo = false }
+  }, [f.portal_client_id])
+
+  const elegirCliente = (id) => {
+    if (id === '__txt') return
+    const c = clientes.clients.find((x) => x.id === id)
+    setAMano(false)
+    setF((s) => ({ ...s, portal_client_id: id, client_name: c?.name || '', portal_project_id: null, project_name: '' }))
+  }
+  const elegirProyecto = (id) => {
+    if (id === '__otro') { setAMano(true); setF((s) => ({ ...s, portal_project_id: null })); return }
+    if (id === '__txt') return
+    const p = (proyectos || []).find((x) => x.id === id)
+    setF((s) => ({ ...s, portal_project_id: id, project_name: p?.name || '' }))
+  }
+
+  // Lo guardado a mano (o que vino del ticket) sigue visible aunque no esté en el portal.
+  const optsCliente = [
+    ...(f.client_name && !f.portal_client_id ? [{ value: '__txt', label: f.client_name, sub: 'No vinculado al portal' }] : []),
+    ...(clientes?.clients || []).map((c) => ({ value: c.id, label: c.name })),
+  ]
+  const listaProy = Array.isArray(proyectos) ? proyectos : []
+  const optsProyecto = [
+    ...(f.project_name && !f.portal_project_id ? [{ value: '__txt', label: f.project_name, sub: 'Escrito a mano' }] : []),
+    ...listaProy.map((p) => ({ value: p.id, label: p.name, sub: p.title })),
+    { value: '__otro', label: 'Otro… (escribir el nombre)' },
+  ]
+  const valCliente = f.portal_client_id || (f.client_name ? '__txt' : '')
+  const valProyecto = f.portal_project_id || (f.project_name ? '__txt' : '')
 
   const guardar = async () => {
     if (!f.received_at) { toast('Indica la fecha de recepción', 'err'); return }
@@ -58,37 +129,58 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
           <h3>{f.id ? `Editar ${f.code}` : inicial.ticket_code ? `Nueva garantía desde ${inicial.ticket_code}` : 'Nueva garantía'}</h3>
           <button className="x" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body">
+        <div className="modal-body wr-form">
+          {portal ? (
+            <div className="grid2">
+              <div className="field"><span className="lbl">Cliente <span className="hint">(portal AEME)</span></span>
+                <Select block searchable value={valCliente} onChange={elegirCliente} options={optsCliente}
+                  placeholder={clientes ? 'Busca el cliente…' : 'Cargando clientes…'} disabled={!clientes} /></div>
+              <div className="field"><span className="lbl">Hotel o tienda</span>
+                {aMano ? (
+                  <div className="wr-mano">
+                    <input value={f.project_name || ''} onChange={set('project_name')} autoFocus
+                      placeholder={listaProy.length ? 'Nombre del hotel o tienda' : 'Sin proyectos en el portal: escribe el nombre'} />
+                    {listaProy.length > 0 && <button type="button" className="btn ghost sm" onClick={() => setAMano(false)}>Lista</button>}
+                  </div>
+                ) : (
+                  <Select block searchable value={valProyecto} onChange={elegirProyecto} options={optsProyecto}
+                    disabled={!f.portal_client_id || proyectos === 'cargando'}
+                    placeholder={!f.portal_client_id ? 'Elige antes el cliente' : proyectos === 'cargando' ? 'Cargando proyectos…' : `Elige entre ${listaProy.length}`} />
+                )}</div>
+            </div>
+          ) : (
+            <div className="grid2">
+              <label className="field"><span className="lbl">Cliente <span className="hint">(portal sin conexión)</span></span>
+                <input value={f.client_name || ''} onChange={set('client_name')} placeholder="Empresa del cliente" /></label>
+              <label className="field"><span className="lbl">Hotel o tienda</span>
+                <input value={f.project_name || ''} onChange={set('project_name')} placeholder="Hotel, tienda…" /></label>
+            </div>
+          )}
           <div className="grid2">
-            <label className="field"><span className="lbl">Cliente</span>
-              <input value={f.client_name} onChange={set('client_name')} placeholder="Empresa del cliente" autoFocus /></label>
-            <label className="field"><span className="lbl">Proyecto</span>
-              <input value={f.project_name} onChange={set('project_name')} placeholder="Hotel, tienda…" /></label>
-          </div>
-          <div className="grid2">
+            <label className="field"><span className="lbl">Primera fecha de contacto</span>
+              <input type="date" value={f.first_contact_at || ''} onChange={set('first_contact_at')} /></label>
             <label className="field"><span className="lbl">Fecha de recepción <em>*</em></span>
               <input type="date" value={f.received_at} onChange={set('received_at')} /></label>
-            <label className="field"><span className="lbl">Categoría</span>
-              <input list="wr-cats" value={f.category} onChange={set('category')} placeholder="Elige o escribe" />
-              <datalist id="wr-cats">{(opts?.categories || []).map((c) => <option key={c} value={c} />)}</datalist></label>
           </div>
           <div className="grid2">
-            <label className="field"><span className="lbl">Estado</span>
-              <select value={f.status} onChange={set('status')}>
-                {Object.entries(opts?.statuses || {}).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select></label>
-            <label className="field"><span className="lbl">Urgencia</span>
-              <select value={f.urgency || ''} onChange={set('urgency')}>
-                <option value="">No disponible</option>
-                {Object.entries(opts?.urgencies || {}).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select></label>
+            <div className="field"><span className="lbl">Estado</span>
+              <Select block value={f.status} onChange={elegirEstado}
+                options={Object.entries(opts?.statuses || {}).map(([k, v]) => ({ value: k, label: v, color: COLOR[ESTADO_CLS[k]] }))} /></div>
+            <label className="field"><span className="lbl">Fecha de cierre {f.status !== 'cerrada' && <span className="hint">(al cerrarla)</span>}</span>
+              <input type="date" value={f.status === 'cerrada' ? f.closed_at || '' : ''} onChange={set('closed_at')} disabled={f.status !== 'cerrada'} /></label>
           </div>
           <div className="grid2">
-            <label className="field"><span className="lbl">Responsable</span>
-              <select value={f.responsible_id || ''} onChange={set('responsible_id')}>
-                <option value="">Sin responsable</option>
-                {(opts?.agents || []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select></label>
+            <div className="field"><span className="lbl">Urgencia</span>
+              <Select block value={f.urgency || ''} onChange={pon('urgency')}
+                options={[{ value: '', label: 'No disponible', color: COLOR.none }, ...Object.entries(opts?.urgencies || {}).map(([k, v]) => ({ value: k, label: v, color: COLOR[URG_CLS[k]] }))]} /></div>
+            <div className="field"><span className="lbl">Categoría</span>
+              <Select block value={f.category || ''} onChange={pon('category')} placeholder="Sin categoría"
+                options={[{ value: '', label: 'Sin categoría' }, ...[...new Set([...(opts?.categories || []), ...(f.category ? [f.category] : [])])].map((c) => ({ value: c, label: c }))]} /></div>
+          </div>
+          <div className="grid2">
+            <div className="field"><span className="lbl">Responsable</span>
+              <Select block value={f.responsible_id ? Number(f.responsible_id) : ''} onChange={pon('responsible_id')}
+                options={[{ value: '', label: 'Sin responsable' }, ...(opts?.agents || []).map((a) => ({ value: a.id, label: a.name }))]} /></div>
             <label className="field"><span className="lbl">Ticket de soporte <span className="hint">(opcional)</span></span>
               <input className="mono" value={f.ticket_code || ''} onChange={set('ticket_code')} placeholder="TK-2610-0001" /></label>
           </div>
@@ -227,7 +319,7 @@ function Lista({ opts, onOpen, onNew, reload }) {
 
 /* --- Ficha --- */
 const HIST_FILTROS = [['', 'Todos'], ['status', 'Estado'], ['responsible_id', 'Responsable'], ['urgency', 'Urgencia'], ['otros', 'Otros']]
-const CAMPOS = { created: 'Garantía creada', received_at: 'Fecha de recepción', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const toast = useToast()
@@ -252,7 +344,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const stale = abierta && diasSin != null && diasSin >= (opts?.stale_days || 15)
 
   const guardarCon = async (cambios, msg) => {
-    const r = await api.saveWarranty({ ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '', ...cambios })
+    const r = await api.saveWarranty({ ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '', first_contact_at: w.first_contact_at || '', closed_at: (w.closed_at || '').slice(0, 10), ...cambios })
     if (r.ok) { toast(msg); cargar(); onChanged() } else toast(r.error || 'Error', 'err')
   }
   const cerrar = async () => {
@@ -323,6 +415,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
         {tab === 'resumen' && (
           <dl className="wr-dl">
             <div><dt>Nº expediente</dt><dd><b>{w.code}</b></dd></div>
+            <div><dt>Primera fecha de contacto</dt><dd>{fecha(w.first_contact_at)}</dd></div>
             <div><dt>Fecha de recepción</dt><dd>{fecha(w.received_at)}</dd></div>
             <div><dt>Cliente</dt><dd>{w.client_name || '—'}</dd></div>
             <div><dt>Proyecto</dt><dd>{w.project_name || '—'}</dd></div>
@@ -332,7 +425,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
             <div><dt>Responsable</dt><dd>{w.responsible_name || '—'}</dd></div>
             <div><dt>Ticket de soporte</dt><dd>{w.ticket_code ? <>{ticket}{w.ticket_subject ? <span className="dev-mute"> · {w.ticket_subject}</span> : null}</> : '—'}</dd></div>
             <div><dt>Creada</dt><dd>{fechaHora(w.created_at)}{w.created_by_name ? <span className="dev-mute"> · {w.created_by_name}</span> : null}</dd></div>
-            {w.closed_at ? <div><dt>Cerrada</dt><dd>{fechaHora(w.closed_at)}</dd></div> : null}
+            {w.closed_at ? <div><dt>Fecha de cierre</dt><dd>{fecha(w.closed_at)}</dd></div> : null}
             <div className="full"><dt>Descripción</dt><dd className="wr-desc">{w.description || <span className="dev-mute">Sin descripción</span>}</dd></div>
           </dl>
         )}

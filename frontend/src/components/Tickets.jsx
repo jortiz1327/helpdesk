@@ -2548,8 +2548,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode, 
         <NuevaGarantia
           inicial={{
             ticket_code: t.code, client_name: t.contact_name || '', project_name: t.contact_sede_name || '', description: t.subject || '',
-            // La garantía se «recibe» cuando el cliente abrió el ticket.
-            ...(/^\d{4}-\d{2}-\d{2}/.test(t.opened_at || '') ? { received_at: t.opened_at.slice(0, 10) } : {}),
+            // El primer contacto es cuando el cliente abrió el ticket (la recepción propone hoy; ambas se pueden cambiar).
+            ...(/^\d{4}-\d{2}-\d{2}/.test(t.opened_at || '') ? { first_contact_at: t.opened_at.slice(0, 10) } : {}),
           }}
           onClose={() => setGarForm(false)}
           onSaved={() => { setGarForm(false); cargarGarantias() }} />

@@ -394,6 +394,8 @@ export const api = {
   warrantyOptions: () => req('warranties.php?action=options'),
   warranty: (id) => req(`warranties.php?action=get&id=${id}`),
   warrantiesByTicket: (ticketId) => req(`warranties.php?action=by_ticket&ticket_id=${ticketId}`),
+  portalClients: () => req('warranties.php?action=portal_clients'),
+  portalProjects: (clientId) => req(`warranties.php?action=portal_projects&client_id=${clientId}`),
   saveWarranty: (payload) => req('warranties.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),

@@ -4450,3 +4450,9 @@ button.dev-code:hover { text-decoration: underline; }
 .tkm-wr button small { color: var(--ink-3); font-weight: 500; }
 /* El alta de garantía se abre también encima de la ficha de un ticket */
 .modal-bg.wr-over { z-index: 130; }
+
+/* Garantías: hotel o tienda escrito a mano */
+.wr-mano { display: flex; gap: 8px; align-items: center; }
+.wr-mano input { flex: 1; min-width: 0; }
+/* Los desplegables del formulario, con el mismo aspecto que sus campos de texto */
+.wr-form .sel-trigger { background: var(--panel-2); padding: 11px 13px; }

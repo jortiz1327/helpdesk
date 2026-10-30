@@ -83,6 +83,26 @@ class WarrantiesTest extends TestCase
         $this->assertNull(Warranty::find($id)->closed_at);
     }
 
+    public function test_todas_las_fechas_se_pueden_cambiar_y_quedan_en_el_historial(): void
+    {
+        [, $h] = $this->agente();
+        $id = $this->crear($h, ['first_contact_at' => '2026-10-10', 'status' => 'cerrada', 'closed_at' => '2026-10-25'])['id'];
+        $w = Warranty::find($id);
+        $this->assertSame(['2026-10-10', '2026-10-25'], [$w->first_contact_at->toDateString(), $w->closed_at->toDateString()]);
+
+        $this->postJson('/api/warranties.php?action=save', [
+            'id' => $id, 'first_contact_at' => '2026-10-08', 'received_at' => '2026-10-21', 'status' => 'cerrada', 'closed_at' => '2026-10-27',
+            'client_name' => 'Hoteles Sol', 'project_name' => 'Sol Centro', 'category' => 'Hoteles', 'urgency' => 'media',
+        ], $h)->assertOk();
+        $ev = collect($this->getJson("/api/warranties.php?action=get&id={$id}", $h)->json('events'))->keyBy('field');
+        $this->assertSame(['10/10/2026', '08/10/2026'], [$ev['first_contact_at']['from_value'], $ev['first_contact_at']['to_value']]);
+        $this->assertSame(['20/10/2026', '21/10/2026'], [$ev['received_at']['from_value'], $ev['received_at']['to_value']]);
+        $this->assertSame(['25/10/2026', '27/10/2026'], [$ev['closed_at']['from_value'], $ev['closed_at']['to_value']]);
+        $this->assertSame(4, $ev->count());   // created + las tres fechas, nada más
+
+        $this->postJson('/api/warranties.php?action=save', ['id' => $id, 'received_at' => '2026-10-21', 'closed_at' => '2026-02-30'], $h)->assertStatus(400);
+    }
+
     public function test_responsable_debe_tener_acceso_y_ticket_debe_existir(): void
     {
         [, $h] = $this->agente();
@@ -150,6 +170,35 @@ class WarrantiesTest extends TestCase
         $w = $this->crear($h, ['ticket_code' => 'TK-GAR-1']);
         $r = $this->getJson("/api/warranties.php?action=by_ticket&ticket_id={$g}", $h)->assertOk()->json('warranties');
         $this->assertSame([$w['code']], array_column($r, 'code'));
+    }
+
+    public function test_hoteles_y_tiendas_del_portal(): void
+    {
+        $this->assertSame('Fergus Club Europa', \App\Services\AemePortal::baseName('Fergus Club Europa - Proyecto'));
+        $this->assertSame('Farmacia Carmen Castro', \App\Services\AemePortal::baseName('Farmacia  Carmen Castro - Comanda 981 - Expofarm'));
+        $this->assertNull(\App\Services\AemePortal::baseName('Soporte - Farmacia Remunta - Comanda 981'));
+        $this->assertNull(\App\Services\AemePortal::baseName('(Nulo) Hotel X - Proyecto'));
+        $this->assertNull(\App\Services\AemePortal::baseName('Stock Expofarm - Comanda 1011'));
+        $this->assertNull(\App\Services\AemePortal::baseName('Proyecto temporal'));
+
+        // Varios pedidos de la misma tienda: una sola entrada, la más reciente.
+        $bases = \App\Services\AemePortal::bases([
+            (object) ['project_id' => 5, 'project_title' => 'Farmacia Sol - Comanda 10'],
+            (object) ['project_id' => 9, 'project_title' => 'Farmacia Sol - Comanda 22'],
+            (object) ['project_id' => 7, 'project_title' => 'Amanecer - Proyecto'],
+        ]);
+        $this->assertSame([[7, 'Amanecer'], [9, 'Farmacia Sol']], array_map(fn ($b) => [$b['id'], $b['name']], $bases));
+    }
+
+    public function test_sin_portal_se_escribe_a_mano_y_guarda_los_ids(): void
+    {
+        config(['database.connections.portal_aeme.host' => '']);
+        [, $h] = $this->agente();
+        $this->getJson('/api/warranties.php?action=portal_clients', $h)->assertOk()->assertJson(['available' => false, 'clients' => []]);
+
+        $w = $this->crear($h, ['portal_client_id' => 12, 'portal_project_id' => 345]);
+        $r = $this->getJson("/api/warranties.php?action=get&id={$w['id']}", $h)->json('warranty');
+        $this->assertSame([12, 345], [$r['portal_client_id'], $r['portal_project_id']]);
     }
 
     public function test_solo_superadmin_borra(): void
