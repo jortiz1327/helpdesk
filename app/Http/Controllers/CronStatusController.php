@@ -47,6 +47,8 @@ class CronStatusController extends Controller
                  'last' => null, 'off' => (string) Setting::get('sla_alerts_active', '1') !== '1'],
                 ['name' => 'Cierre por falta de respuesta del cliente', 'schedule' => 'Cada 15 minutos',
                  'last' => null, 'off' => !\App\Models\EmailTemplate::where('key', 'ticket_followup')->value('active')],
+                ['name' => 'Aviso al agente 24 h antes de ese cierre', 'schedule' => 'Cada 15 minutos',
+                 'last' => null, 'off' => !\App\Models\EmailTemplate::where('key', 'ticket_followup')->value('active')],
                 ['name' => 'Aviso al turno de tickets sin contestar', 'schedule' => 'Días laborables a las ' . \App\Console\Commands\TicketsStaleDigest::hora(),
                  'last' => null, 'off' => (string) Setting::get('stale_alert_active', '1') !== '1'],
             ],
