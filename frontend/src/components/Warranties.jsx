@@ -22,7 +22,7 @@ const COLOR = { gray: '#94a3b8', blue: '#3b82f6', amber: '#f59e0b', purple: '#8b
 const CHIPS = [
   ['mine', 'Mis garantías'], ['open', 'Abiertas'], ['alerts', 'Con alertas'], ['critical', 'Críticas'], ['urgent', 'Urgentes'], ['pte_cliente', 'Pte. cliente'],
   ['pte_zkong', 'Pte. ZKONG'], ['pte_envio', 'Pte. envío'], ['stale', 'Sin actualizar'], ['no_owner', 'Sin responsable'],
-  ['no_client', 'Sin cliente'], ['no_project', 'Sin proyecto'], ['no_category', 'Sin categoría'], ['closed', 'Cerradas'],
+  ['unreviewed', 'Con dispositivos sin revisar'], ['no_client', 'Sin cliente'], ['no_project', 'Sin proyecto'], ['no_category', 'Sin categoría'], ['closed', 'Cerradas'],
 ]
 const SIZE = 25
 const hoy = () => new Date().toISOString().slice(0, 10)
@@ -229,8 +229,11 @@ export function NuevaGarantia({ inicial, onClose, onSaved }) {
 }
 
 /* --- Lista --- */
-function Lista({ opts, onOpen, onNew, reload }) {
-  const [chip, setChip] = useState('')
+function Lista({ opts, onOpen, onNew, reload, filtro }) {
+  const [chip, setChip] = useState(filtro?.chip || '')
+  // Responsable concreto (al llegar desde Equipo): { id, name }; id «none» = sin responsable.
+  const [resp, setResp] = useState(filtro?.responsible ? { id: filtro.responsible, name: filtro.name } : null)
+  useEffect(() => { if (filtro) { setChip(filtro.chip || ''); setResp(filtro.responsible ? { id: filtro.responsible, name: filtro.name } : null); setPage(0) } }, [filtro])
   const [qLive, setQLive] = useState('')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('')
@@ -244,12 +247,12 @@ function Lista({ opts, onOpen, onNew, reload }) {
   useEffect(() => {
     const n = ++pedida.current
     setLoading(true)
-    api.warranties({ chip, q, sort, page, size: SIZE }).then((r) => {
+    api.warranties({ chip, q, sort, page, size: SIZE, ...(resp ? { responsible: resp.id } : {}) }).then((r) => {
       if (n !== pedida.current) return
       setLoading(false)
       setData(r.ok ? r : { rows: [], total: 0, all: 0, error: r.error })
     })
-  }, [chip, q, sort, page, reload])
+  }, [chip, q, sort, page, reload, resp])
 
   const total = data?.total || 0
   const paginas = Math.ceil(total / SIZE)
@@ -293,7 +296,8 @@ function Lista({ opts, onOpen, onNew, reload }) {
             <input value={qLive} onChange={(e) => setQLive(e.target.value)} placeholder="Buscar por expediente, cliente, proyecto o ticket…" />
             {qLive ? <button className="dev-x" onClick={() => setQLive('')} title="Borrar">×</button> : null}
           </div>
-          {chip ? <button className="dev-clear" onClick={() => setChip('')}><Icon.x /> Quitar filtro</button> : null}
+          {resp ? <button className="wr-resp-f" title="Quitar" onClick={() => { setResp(null); setPage(0) }}><Icon.user /> {resp.id === 'none' ? 'Sin responsable' : resp.name} <Icon.x /></button> : null}
+          {chip || resp ? <button className="dev-clear" onClick={() => { setChip(''); setResp(null); setPage(0) }}><Icon.x /> Quitar filtro</button> : null}
         </div>
         <div className="dev-table-wrap keep">
           <table className="dev-table wr-table">
@@ -1083,11 +1087,13 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   )
 }
 
-export default function Warranties({ isSuper = false, openId = null, onOpened, onOpenTicket }) {
+export default function Warranties({ isSuper = false, openId = null, onOpened, onOpenTicket, filtro = null }) {
   const [opts, setOpts] = useState(null)
   const [sel, setSel] = useState(openId)
-  // Llegar con una garantía concreta (desde la ficha de un ticket).
+  // Llegar con una garantía concreta (desde la ficha de un ticket o ZKONG).
   useEffect(() => { if (openId) { setSel(openId); onOpened?.() } }, [openId])
+  // Llegar con la lista filtrada (desde Equipo).
+  useEffect(() => { if (filtro) setSel(null) }, [filtro])
   const [form, setForm] = useState(null)
   const [reload, setReload] = useState(0)
   const refrescar = () => setReload((n) => n + 1)
@@ -1107,7 +1113,7 @@ export default function Warranties({ isSuper = false, openId = null, onOpened, o
           ? <Ficha key={`${sel}-${reload}`} id={sel} opts={opts} isSuper={isSuper} onBack={() => setSel(null)}
               onEdit={(w) => setForm({ ...VACIA, ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '' })}
               onChanged={() => {}} onOpenTicket={onOpenTicket} />
-          : <Lista opts={opts} reload={reload} onOpen={setSel} onNew={() => setForm({ ...VACIA, received_at: hoy() })} />}
+          : <Lista opts={opts} reload={reload} filtro={filtro} onOpen={setSel} onNew={() => setForm({ ...VACIA, received_at: hoy() })} />}
       </div></div>
 
       {form && <Formulario inicial={form} opts={opts} onClose={() => setForm(null)} onSaved={(id) => { setForm(null); refrescar(); setSel(id) }} />}

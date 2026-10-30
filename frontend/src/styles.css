@@ -4774,3 +4774,36 @@ button.dev-code:hover { text-decoration: underline; }
 .ws-tpl-tx b { font-size: 13.5px; margin-right: 8px; }
 .ws-tpl-tx p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
 @media (max-width: 980px) { .ws-grid { grid-template-columns: 1fr; } .ws-foot { flex-direction: column; align-items: flex-end; } }
+
+/* Garantías · Equipo e Informes */
+.wr-resp-f { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px 5px 10px; margin: 0 0 12px; border-radius: 20px; font-size: 12.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent); }
+.wr-resp-f svg { width: 13px; height: 13px; fill: currentColor; }
+.wr-resp-f:hover { border-color: var(--primary); }
+.wt-help { margin: 0 0 12px; font-size: 12.5px; }
+.dev-table-wrap.wt-wrap { min-height: 0; max-height: none; }
+.wt-table th.c, .wt-table td.c { text-align: center; }
+.wt-table tfoot td { font-weight: 700; border-top: 1px solid var(--line-2); font-variant-numeric: tabular-nums; }
+.wt-table tr.wt-none td:first-child b { color: var(--danger); }
+.wt-n { min-width: 34px; padding: 3px 9px; border-radius: 8px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); background: transparent; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; }
+.wt-n:hover { background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 30%, transparent); color: var(--primary); }
+.wt-n.crit { color: var(--danger); }
+.wt-n.warn { color: #b45309; }
+.wt-0 { color: var(--ink-3); opacity: 0.6; font-variant-numeric: tabular-nums; }
+.wt-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.wt-filtros .wr-chips { margin: 0; }
+.wt-filtros label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.wt-filtros input[type=date] { height: 32px; padding: 0 8px; }
+.wt-filtros .spacer { flex: 1; }
+.wt-kpis .dev-kpi { cursor: default; }
+.wt-kpis .dev-kpi:hover { transform: none; box-shadow: none; border-color: var(--line); }
+.wt-agr { font-size: 12.5px; font-weight: 600; }
+.wt-tot { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wt-bar { display: inline-block; width: 120px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 6%, transparent); overflow: hidden; flex-shrink: 0; }
+.wt-bar i { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--primary); }
+.wt-rep { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.wt-rep li { display: grid; grid-template-columns: minmax(0, 1fr) 120px 40px 42px; align-items: center; gap: 10px; font-size: 13px; }
+.wt-rep li b { text-align: right; font-variant-numeric: tabular-nums; }
+.wt-rep li .dev-mute { text-align: right; font-size: 12px; }
+.wt-rep-l { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wt-rep-l i { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+@media (max-width: 980px) { .wt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .wt-rep li { grid-template-columns: minmax(0, 1fr) 70px 34px 40px; } }

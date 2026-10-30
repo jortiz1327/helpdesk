@@ -49,6 +49,8 @@ class WarrantiesController extends Controller
             'photo_from_ticket' => $this->photoFromTicket($request),
             'photo_delete'      => $this->photoDelete($request),
             'ticket_images'     => $this->ticketImages($request),
+            'team'              => $this->team(),
+            'report'            => $this->report($request),
             default   => $this->list($request),
         };
     }
@@ -71,6 +73,11 @@ class WarrantiesController extends Controller
 
         $cerrados = Warranty::closedStatuses();
         $abierta = fn ($w) => $w->whereNotIn('warranties.status', $cerrados);
+
+        // De un responsable concreto (desde Equipo); «none» = sin responsable.
+        $resp = (string) $request->query('responsible', '');
+        if ($resp === 'none') $q->whereNull('warranties.responsible_id');
+        elseif ($resp !== '') $q->where('warranties.responsible_id', (int) $resp);
         $vacio = fn (string $col) => fn ($w) => $w->whereNull($col)->orWhere($col, '');
         match ((string) $request->query('chip', '')) {
             'mine'        => $q->where('warranties.responsible_id', $me->id),
@@ -79,6 +86,8 @@ class WarrantiesController extends Controller
             'pte_cliente', 'pte_zkong', 'pte_envio' => $q->where('warranties.status', $request->query('chip')),
             'alerts'      => $this->alertas()->scope($q, 'warn'),
             'critical'    => $this->alertas()->scope($q, 'crit'),
+            'unreviewed'  => $q->where($abierta)->whereExists(fn ($e) => $e->selectRaw('1')->from('warranty_items as ui')
+                ->whereColumn('ui.warranty_id', 'warranties.id')->where('ui.resolution', 'pendiente')),
             'stale'       => $q->where($abierta)->where(fn ($w) => $w->whereNull('warranties.last_activity_at')
                 ->orWhere('warranties.last_activity_at', '<', now()->subDays($this->diasSinActividad()))),
             'no_owner'    => $q->where($abierta)->whereNull('warranties.responsible_id'),
@@ -602,6 +611,121 @@ class WarrantiesController extends Controller
                 'batch_statuses' => ZkongBatch::STATUSES,
                 'zkong_results'  => ZkongBatch::RESULTS,
             ],
+        ]);
+    }
+
+    /* --- Equipo e informes --- */
+
+    /**
+     * Carga de cada responsable (y «sin responsable») sobre las garantías abiertas:
+     * abiertas, con alertas, críticas, urgentes, sin actividad, pendientes de cliente y
+     * de ZKONG, y dispositivos sin revisar. Salen también los que no tienen ninguna.
+     */
+    private function team()
+    {
+        $abiertas = Warranty::whereNotIn('status', Warranty::closedStatuses())
+            ->get(['id', 'status', 'urgency', 'responsible_id', 'last_activity_at', 'status_changed_at', 'created_at']);
+        $alertas = $this->alertas()->alerts($abiertas);
+        $sinRevisar = WarrantyItem::whereIn('warranty_id', $abiertas->pluck('id'))->where('resolution', 'pendiente')
+            ->groupBy('warranty_id')->selectRaw('warranty_id, count(*) as n')->pluck('n', 'warranty_id');
+        $limite = now()->subDays($this->diasSinActividad());
+
+        $vacia = fn ($id, $name) => ['id' => $id, 'name' => $name, 'open' => 0, 'alerts' => 0, 'critical' => 0, 'urgent' => 0,
+            'stale' => 0, 'pte_cliente' => 0, 'pte_zkong' => 0, 'unreviewed' => 0];
+        $filas = [];
+        foreach ($this->agentes() as $id => $name) $filas[$id] = $vacia($id, $name);
+        foreach ($abiertas as $w) {
+            $k = $w->responsible_id ?: 'none';
+            $filas[$k] ??= $vacia($k, $k === 'none' ? null : (User::whereKey($k)->value('name') ?? "#{$k}"));
+            $f = &$filas[$k];
+            $f['open']++;
+            $a = $alertas[$w->id] ?? [];
+            if ($a) $f['alerts']++;
+            if (collect($a)->contains('level', 'crit')) $f['critical']++;
+            if (in_array($w->urgency, ['alta', 'muy_urgente'], true)) $f['urgent']++;
+            if (($w->last_activity_at ?? $w->created_at) < $limite) $f['stale']++;
+            if ($w->status === 'pte_cliente') $f['pte_cliente']++;
+            if ($w->status === 'pte_zkong') $f['pte_zkong']++;
+            $f['unreviewed'] += (int) ($sinRevisar[$w->id] ?? 0);
+            unset($f);
+        }
+        $filas = array_values($filas);
+        usort($filas, fn ($a, $b) => [$b['critical'], $b['open']] <=> [$a['critical'], $a['open']]);
+        return response()->json(['ok' => true, 'rows' => $filas, 'stale_days' => $this->diasSinActividad()]);
+    }
+
+    private const REPORT_GROUPS = ['status', 'urgency', 'category', 'responsible', 'client', 'month'];
+
+    /**
+     * Informe de las garantías recibidas en un rango: totales, tiempo medio hasta el
+     * cierre, dispositivos y su revisión, agrupado por estado, urgencia, categoría,
+     * responsable, cliente o mes; con el reparto de soluciones y las respuestas de ZKONG.
+     */
+    private function report(Request $request)
+    {
+        $desde = (string) $request->query('from', '');
+        $hasta = (string) $request->query('to', '');
+        $grupo = in_array($request->query('group'), self::REPORT_GROUPS, true) ? $request->query('group') : 'status';
+
+        $q = Warranty::query()->leftJoin('users as u', 'u.id', '=', 'warranties.responsible_id');
+        if ($this->esFecha($desde)) $q->where('warranties.received_at', '>=', $desde);
+        if ($this->esFecha($hasta)) $q->where('warranties.received_at', '<=', $hasta);
+        $ws = $q->get(['warranties.id', 'warranties.status', 'warranties.urgency', 'warranties.category', 'warranties.client_name',
+            'warranties.received_at', 'warranties.closed_at', 'u.name as responsible_name']);
+
+        $items = WarrantyItem::whereIn('warranty_id', $ws->pluck('id'))->get(['warranty_id', 'resolution', 'zkong_result']);
+        $porW = $items->groupBy('warranty_id');
+        $cerrados = Warranty::closedStatuses();
+        $estados = Warranty::statuses();
+
+        $etiqueta = fn ($w) => match ($grupo) {
+            'status'      => [$w->status, $estados[$w->status] ?? $w->status],
+            'urgency'     => [$w->urgency ?: '', Warranty::URGENCIES[$w->urgency] ?? 'No disponible'],
+            'category'    => [$w->category ?: '', $w->category ?: 'Sin categoría'],
+            'responsible' => [$w->responsible_name ?: '', $w->responsible_name ?: 'Sin responsable'],
+            'client'      => [$w->client_name ?: '', $w->client_name ?: 'Sin cliente'],
+            'month'       => [$w->received_at?->format('Y-m') ?? '', $w->received_at ? ucfirst($w->received_at->locale('es')->isoFormat('MMMM YYYY')) : '—'],
+        };
+        $acum = fn () => ['total' => 0, 'open' => 0, 'closed' => 0, 'days_sum' => 0, 'days_n' => 0, 'devices' => 0, 'reviewed' => 0];
+        $suma = function (array &$g, $w) use ($cerrados, $porW) {
+            $g['total']++;
+            if (in_array($w->status, $cerrados, true)) {
+                $g['closed']++;
+                if ($w->closed_at && $w->received_at) {
+                    $g['days_sum'] += max(0, $w->received_at->startOfDay()->diffInDays($w->closed_at->copy()->startOfDay()));
+                    $g['days_n']++;
+                }
+            } else {
+                $g['open']++;
+            }
+            $its = $porW[$w->id] ?? collect();
+            $g['devices'] += $its->count();
+            $g['reviewed'] += $its->where('resolution', '!=', 'pendiente')->count();
+        };
+
+        $grupos = [];
+        $total = $acum();
+        foreach ($ws as $w) {
+            [$k, $nombre] = $etiqueta($w);
+            $grupos[$k] ??= ['key' => $k, 'label' => $nombre] + $acum();
+            $suma($grupos[$k], $w);
+            $suma($total, $w);
+        }
+        $fin = fn (array $g) => array_diff_key($g, ['days_sum' => 1, 'days_n' => 1]) + ['avg_days' => $g['days_n'] ? round($g['days_sum'] / $g['days_n'], 1) : null];
+        $grupos = array_map($fin, array_values($grupos));
+        if ($grupo === 'status') {
+            $orden = array_flip(array_keys($estados));
+            usort($grupos, fn ($a, $b) => ($orden[$a['key']] ?? 999) <=> ($orden[$b['key']] ?? 999));
+        } elseif ($grupo === 'month') {
+            usort($grupos, fn ($a, $b) => strcmp($b['key'], $a['key']));
+        } else {
+            usort($grupos, fn ($a, $b) => $b['total'] <=> $a['total']);
+        }
+
+        return response()->json([
+            'ok' => true, 'group' => $grupo, 'rows' => $grupos, 'total' => $fin($total),
+            'resolutions' => $items->countBy('resolution'),
+            'zkong_results' => $items->whereNotNull('zkong_result')->countBy('zkong_result'),
         ]);
     }
 

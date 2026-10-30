@@ -423,6 +423,8 @@ export const api = {
   deleteWarranty: (id) => req('warranties.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
+  warrantyTeam: () => req('warranties.php?action=team'),
+  warrantyReport: (params) => req('warranties.php?action=report&' + new URLSearchParams(params).toString()),
   // Configuración de garantías: warrantySettingsDo('status_save', {...}) y demás acciones.
   warrantySettings: () => req('warranty_settings.php'),
   warrantySettingsDo: (action, payload) => postJson(`warranty_settings.php?action=${action}`, payload),

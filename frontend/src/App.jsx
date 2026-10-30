@@ -39,6 +39,7 @@ import AreaChooser from "./components/AreaChooser.jsx";
 import Devices from "./components/Devices.jsx";
 import Zkong from "./components/Zkong.jsx";
 import WarrantySettings from "./components/WarrantySettings.jsx";
+import { WarrantyTeam, WarrantyReports } from "./components/WarrantyTeam.jsx";
 import ZkongServers from "./components/ZkongServers.jsx";
 import Warranties from "./components/Warranties.jsx";
 import Users from "./components/Users.jsx";
@@ -653,6 +654,20 @@ const AREAS = [
                         color: "#2563eb",
                     },
                     {
+                        key: "garantias_equipo",
+                        label: "Equipo",
+                        icon: Icon.user,
+                        perm: "warranties.access",
+                        color: "#0891b2",
+                    },
+                    {
+                        key: "garantias_informes",
+                        label: "Informes",
+                        icon: Icon.chart,
+                        perm: "warranties.access",
+                        color: "#12925a",
+                    },
+                    {
                         // Bandeja de lo que va a ZKONG y remesas de RMA.
                         key: "zkong",
                         label: "ZKONG",
@@ -884,6 +899,7 @@ export default function App() {
     const [ticketAbierto, setTicketAbierto] = useState(null);
     // Gestión de garantías: saltar de un ticket a su garantía y al revés.
     const [garantiaAbierta, setGarantiaAbierta] = useState(null);
+    const [garantiaFiltro, setGarantiaFiltro] = useState(null);   // desde Equipo: { responsible, name, chip }
     const [ticketGarantia, setTicketGarantia] = useState(null);
     useEffect(() => { if (view !== "garantias_tickets") setTicketGarantia(null); }, [view]);
     // Código del ticket abierto REFLEJADO en la URL (para compartir el enlace).
@@ -1601,10 +1617,14 @@ export default function App() {
                         )}
                         {view === "zkong_servers" && can("warranties.servers") && <ZkongServers />}
                         {view === "garantias" && can("warranties.access") && (
-                            <Warranties isSuper={!!auth.user?.is_super} openId={garantiaAbierta} onOpened={() => setGarantiaAbierta(null)}
+                            <Warranties isSuper={!!auth.user?.is_super} openId={garantiaAbierta} onOpened={() => setGarantiaAbierta(null)} filtro={garantiaFiltro}
                                 onOpenTicket={can("helpdesk.access") ? (id) => { setTicketGarantia(id); setView("garantias_tickets"); } : null} />
                         )}
                         {view === "warranty_settings" && can("warranties.config") && <WarrantySettings />}
+                        {view === "garantias_equipo" && can("warranties.access") && (
+                            <WarrantyTeam onFilter={(f) => { setGarantiaFiltro({ ...f }); setView("garantias"); }} />
+                        )}
+                        {view === "garantias_informes" && can("warranties.access") && <WarrantyReports />}
                         {view === "zkong" && can("warranties.access") && (
                             <Zkong onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
                         )}
