@@ -68,6 +68,8 @@ export const Icon = {
   hash: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M9 3 8 8H4v2h3.6l-.8 4H3v2h3.4L5.5 21h2l.9-5h4l-.9 5h2l.9-5H18v-2h-3.6l.8-4H20V8h-3.4l.9-5h-2l-.9 5h-4l.9-5H9zm.2 7h4l-.8 4h-4l.8-4z" /></svg>,
   calendar: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z" /></svg>,
   list: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z" /></svg>,
+  antenna: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 11a2 2 0 0 0-1 3.73V22h2v-7.27A2 2 0 0 0 12 11zm-4.95-2.95-1.41-1.41a9 9 0 0 0 0 12.72l1.41-1.41a7 7 0 0 1 0-9.9zm9.9 0a7 7 0 0 1 0 9.9l1.41 1.41a9 9 0 0 0 0-12.72l-1.41 1.41zM9.88 10.88 8.46 9.46a5 5 0 0 0 0 7.08l1.42-1.42a3 3 0 0 1 0-4.24zm4.24 0a3 3 0 0 1 0 4.24l1.42 1.42a5 5 0 0 0 0-7.08l-1.42 1.42z" /></svg>,
+  server: (p) => <svg viewBox="0 0 24 24" {...p}><path fillRule="evenodd" d="M4 3h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm0 10h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1zM7 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm0 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z" /></svg>,
   radio: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 16a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" /></svg>,
   checkSquare: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-9 14-5-5 1.4-1.4L10 14.2l7.6-7.6L19 8l-9 9z" /></svg>,
   alignLeft: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M3 5h18v2H3V5zm0 4h12v2H3V9zm0 4h18v2H3v-2zm0 4h12v2H3v-2z" /></svg>,

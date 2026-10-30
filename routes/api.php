@@ -226,6 +226,17 @@ Route::middleware('token')->group(function () {
     Route::match(['get', 'post', 'delete'], 'forms.php', [FormsController::class, 'handle'])
         ->middleware('can:forms.manage');
 
+    // --- Gestión de garantías ---
+    // Expedientes de garantía (lista, ficha, seguimiento e historial).
+    Route::match(['get', 'post'], 'warranties.php', [\App\Http\Controllers\WarrantiesController::class, 'handle'])
+        ->middleware('can:warranties.access');
+    // Centro de dispositivos (solo consulta a los servidores ZKONG).
+    Route::match(['get', 'post'], 'devices.php', [\App\Http\Controllers\DevicesController::class, 'handle'])
+        ->middleware('can:warranties.access');
+    // Cuentas de los servidores ZKONG. Solo superadmin (warranties.servers no va en ningún rol).
+    Route::match(['get', 'post'], 'zkong_servers.php', [\App\Http\Controllers\ZkongServersController::class, 'handle'])
+        ->middleware('can:warranties.servers');
+
     // --- Automatizaciones / bots ---
     Route::match(['get', 'post', 'delete'], 'flows.php', [FlowsController::class, 'handle'])
         ->middleware('can:automations.manage');

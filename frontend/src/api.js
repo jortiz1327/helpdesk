@@ -367,6 +367,43 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Correos bloqueados (banlist)
+  // Gestión de garantías: Centro de dispositivos (solo consulta) y servidores ZKONG.
+  deviceServers: () => req('devices.php?action=servers'),
+  deviceFilters: (server, kind) => req(`devices.php?action=filters&server=${server}&kind=${kind}`, { timeout: 60000 }),
+  deviceList: (server, kind, f, page, size) => req(`devices.php?action=list&server=${server}&kind=${kind}&page=${page}&size=${size}&f=${encodeURIComponent(JSON.stringify(f))}`, { timeout: 60000 }),
+  deviceItems: (server, items) => req(`devices.php?action=items&server=${server}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }), timeout: 60000,
+  }),
+  deviceStats: (server, kind) => req(`devices.php?action=stats&server=${server}&kind=${kind}`, { timeout: 60000 }),
+  deviceSearch: (codes) => req('devices.php?action=search', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codes }), timeout: 120000,
+  }),
+  deviceSheet: (code) => req(`devices.php?action=sheet&code=${encodeURIComponent(code)}`, { timeout: 90000 }),
+  zkongServers: () => req('zkong_servers.php'),
+  saveZkongServer: (payload) => req('zkong_servers.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
+  deleteZkongServer: (id) => req('zkong_servers.php?action=delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+  testZkongServer: (id) => req('zkong_servers.php?action=test', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }), timeout: 60000,
+  }),
+  // Expedientes de garantía.
+  warranties: (params) => req('warranties.php?' + new URLSearchParams(params).toString()),
+  warrantyOptions: () => req('warranties.php?action=options'),
+  warranty: (id) => req(`warranties.php?action=get&id=${id}`),
+  warrantiesByTicket: (ticketId) => req(`warranties.php?action=by_ticket&ticket_id=${ticketId}`),
+  saveWarranty: (payload) => req('warranties.php?action=save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }),
+  addWarrantyNote: (id, type, body) => req('warranties.php?action=note', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, type, body }),
+  }),
+  deleteWarranty: (id) => req('warranties.php?action=delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
+
   listEmailBans: () => req('email_bans.php'),
   saveEmailBan: (payload) => req('email_bans.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),

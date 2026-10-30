@@ -425,7 +425,12 @@ class TicketsController extends Controller
         // y muestra SIEMPRE también los «sin categoría» (los nuevos sin gestionar), para que
         // no se le escapen a nadie al filtrar por su área.
         $cat = (string) $request->query('category', '');
-        if ($cat !== '' && $cat !== 'all') {
+        if ($request->boolean('category_strict')) {
+            // Bandeja limitada a una categoría (Tickets de garantías): SOLO esa, sin los
+            // «sin categoría». Sin categoría válida no sale nada (nunca «todo»).
+            $ids = array_values(array_filter(array_map('intval', explode(',', $cat))));
+            $ids ? $q->whereIn('t.category_id', $ids) : $q->whereRaw('1 = 0');
+        } elseif ($cat !== '' && $cat !== 'all') {
             $ids = array_values(array_filter(array_map('intval', explode(',', $cat))));
             if ($ids) $q->where(fn($w) => $w->whereIn('t.category_id', $ids)->orWhereNull('t.category_id'));
         }

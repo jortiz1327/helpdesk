@@ -36,6 +36,8 @@ import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
 import MorningBriefing from "./components/MorningBriefing.jsx";
 import AreaChooser from "./components/AreaChooser.jsx";
+import Devices from "./components/Devices.jsx";
+import ZkongServers from "./components/ZkongServers.jsx";
 import Warranties from "./components/Warranties.jsx";
 import Users from "./components/Users.jsx";
 import Analytics from "./components/Analytics.jsx";
@@ -621,24 +623,57 @@ const AREAS = [
         ],
     },
     {
-        // Tercera área. De momento sin contenido: solo su portada (oculta en el menú,
-        // que así muestra únicamente Ayuda y Administración).
+        // Tercera área. Se va llenando por partes, empezando por el Centro de dispositivos.
         key: "warranties",
         label: "Gestión de garantías",
         icon: Icon.shield,
         perm: "warranties.access",
-        home: "warranties",
+        home: "devices",
         groups: [
             {
+                // Expedientes y la bandeja de tickets de categoría Garantías (de donde el
+                // agente crea la garantía a mano). La bandeja exige también soporte.
                 title: "Garantías",
                 items: [
                     {
-                        key: "warranties",
-                        label: "Gestión de garantías",
+                        key: "garantias_tickets",
+                        label: "Tickets de garantías",
+                        icon: Icon.ticket,
+                        perm: "warranties.access",
+                        perms: ["warranties.access", "helpdesk.access"],
+                        color: "#2563eb",
+                    },
+                    {
+                        key: "garantias",
+                        label: "Garantías",
+                        icon: Icon.shield,
+                        perm: "warranties.access",
+                        color: "#2563eb",
+                    },
+                ],
+            },
+            {
+                title: "Dispositivos",
+                items: [
+                    {
+                        key: "devices",
+                        label: "Centro de dispositivos",
                         icon: Icon.shield,
                         perm: "warranties.access",
                         color: "#f59e0b",
-                        hidden: true,
+                    },
+                ],
+            },
+            {
+                // Cuentas de los servidores ZKONG: solo superadmin.
+                title: "Ajustes",
+                items: [
+                    {
+                        key: "zkong_servers",
+                        label: "Servidores ZKONG",
+                        icon: Icon.settings,
+                        perm: "warranties.servers",
+                        color: "#8696a0",
                     },
                 ],
             },
@@ -734,7 +769,9 @@ const codigoDeUrl = () => {
 
 // ¿Puede el usuario ver esta entrada del menú?
 const allows = (user, item) =>
-    !item.perm || (user?.permissions || []).includes(item.perm);
+    (!item.perm || (user?.permissions || []).includes(item.perm)) &&
+    // `perms`: hacen falta TODOS (p. ej. Tickets de garantías: garantías + soporte).
+    (!item.perms || item.perms.every((p) => (user?.permissions || []).includes(p)));
 // Áreas a las que el usuario tiene acceso
 const areasFor = (user) => AREAS.filter((a) => allows(user, a));
 // ¿A qué área pertenece una vista? (account/usuarios no pertenecen a ninguna)
@@ -828,6 +865,10 @@ export default function App() {
     const [ticketsTab, setTicketsTab] = useState("tickets");
     // Ticket que hay que abrir nada más llegar (al pinchar uno de los recientes).
     const [ticketAbierto, setTicketAbierto] = useState(null);
+    // Gestión de garantías: saltar de un ticket a su garantía y al revés.
+    const [garantiaAbierta, setGarantiaAbierta] = useState(null);
+    const [ticketGarantia, setTicketGarantia] = useState(null);
+    useEffect(() => { if (view !== "garantias_tickets") setTicketGarantia(null); }, [view]);
     // Código del ticket abierto REFLEJADO en la URL (para compartir el enlace).
     const [ticketCode, setTicketCode] = useState(codigoDeUrl);
     // Enlace directo por código al cargar: se resuelve UNA vez y abre el ticket.
@@ -1538,7 +1579,18 @@ export default function App() {
                         {view === "wa_config" && <Settings />}
                         {view === "campaign_email_cfg" && <CampaignEmailSettings />}
                         {view === "help" && <Manuals />}
-                        {view === "warranties" && <Warranties />}
+                        {view === "devices" && (
+                            <Devices canServers={can("warranties.servers")} onGoServers={() => setView("zkong_servers")} />
+                        )}
+                        {view === "zkong_servers" && can("warranties.servers") && <ZkongServers />}
+                        {view === "garantias" && can("warranties.access") && (
+                            <Warranties isSuper={!!auth.user?.is_super} openId={garantiaAbierta} onOpened={() => setGarantiaAbierta(null)}
+                                onOpenTicket={can("helpdesk.access") ? (id) => { setTicketGarantia(id); setView("garantias_tickets"); } : null} />
+                        )}
+                        {view === "garantias_tickets" && can("warranties.access") && can("helpdesk.access") && (
+                            <Tickets user={auth.user} onGo={setView} scope="garantias" initialTicket={ticketGarantia}
+                                onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
+                        )}
                         {view === "tickets" && (
                             <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} onTicketCode={setTicketCode} />
                         )}

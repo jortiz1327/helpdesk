@@ -18,6 +18,7 @@ const SECT = {
   'Organización':  { icon: Icon.building, color: '#7c5cff' },
   'Campañas':      { icon: Icon.send,     color: '#f59e0b' },
   Turnos:          { icon: Icon.calendar, color: '#db2777' },
+  'Garantías':     { icon: Icon.shield,   color: '#f59e0b' },
   'Configuración': { icon: Icon.settings, color: '#64748b' },
   'Administración':{ icon: Icon.lock,     color: '#dc2626' },
   'Sesión':        { icon: Icon.logout,   color: '#0ea5e9' },

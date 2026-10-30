@@ -302,6 +302,13 @@ class LogActivity
         'flows.php'        => ['section' => 'Campañas', 'noun' => 'un flujo'],
         'upload_media.php' => ['section' => 'Campañas', 'noun' => 'un archivo'],
 
+        // --- Gestión de garantías ---
+        // devices.php no se apunta: solo consulta (la búsqueda va por POST pero no cambia nada).
+        'zkong_servers.php' => ['section' => 'Garantías', 'noun' => 'un servidor ZKONG'],
+        'warranties.php'    => ['section' => 'Garantías', 'noun' => 'una garantía', 'actions' => [
+            'note' => 'Añadió un seguimiento a una garantía',
+        ]],
+
         // --- Administración ---
         'users.php' => ['section' => 'Administración', 'noun' => 'un usuario'],
         'roles.php' => ['section' => 'Administración', 'noun' => 'un rol'],

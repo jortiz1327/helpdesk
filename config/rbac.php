@@ -58,8 +58,10 @@ return [
         'templates.manage'   => ['Gestionar plantillas de WhatsApp',           'campaigns'],
         'forms.manage'       => ['Gestionar formularios',                      'campaigns'],
 
-        // --- Gestión de garantías (área propia, de momento sin pantallas) ---
-        'warranties.access'  => ['Acceder a Gestión de garantías',             'warranties'],
+        // --- Gestión de garantías ---
+        'warranties.access'  => ['Acceder a Gestión de garantías (expedientes y Centro de dispositivos)', 'warranties'],
+        // Usuario y contraseña de los servidores ZKONG. NO se asigna a ningún rol: solo superadmin.
+        'warranties.servers' => ['Gestionar los servidores ZKONG',             'warranties'],
 
         // --- Automatizaciones / bots ---
         'automations.access' => ['Acceder a automatizaciones',                 'automations'],

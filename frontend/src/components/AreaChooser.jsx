@@ -23,7 +23,7 @@ const META = {
   warranties: {
     tagline: 'Garantías de los productos',
     c1: '#f59e0b', c2: '#d97706', glow: 'rgba(245,158,11,0.40)',
-    points: [],
+    points: ['Centro de dispositivos', 'Etiquetas y antenas de los servidores ZKONG'],
     art: 'bars',
   },
 }

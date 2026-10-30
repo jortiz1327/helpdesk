@@ -13,6 +13,7 @@ import Composer from './Composer.jsx'
 import Agents from './Agents.jsx'
 import CronAlerts from './CronAlerts.jsx'
 import LoadError from './LoadError.jsx'
+import { NuevaGarantia } from './Warranties.jsx'
 import { onTicketActivity } from '../realtime.js'
 
 /* Enter/Espacio activan una fila clicable con el teclado (Espacio sin hacer scroll
@@ -668,7 +669,13 @@ function ModalReasignarArea({ data, onClose, onDone }) {
  * «tickets recientes» del Centro de Soporte) se abre ESE ticket directamente, en
  * vez de dejar al usuario delante de la lista buscándolo otra vez.
  */
-export default function Tickets({ user, onGo, initialTab = 'tickets', initialTicket = null, initialOrg = null, onTicketCode = null }) {
+/*
+ * `scope`: la misma bandeja, limitada a UNA categoría (por su key). La usa Gestión de
+ * garantías («Tickets de garantías» = categoría `garantias`): ahí solo salen los de esa
+ * categoría (sin los «sin categoría»), sin las pestañas de Agentes/Crones, y la ficha
+ * del ticket ofrece «Crear garantía». Sin `scope`, Soporte sigue exactamente igual.
+ */
+export default function Tickets({ user, onGo, initialTab = 'tickets', initialTicket = null, initialOrg = null, onTicketCode = null, scope = null, onOpenWarranty = null }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [tab, setTab] = useState(initialTab)   // tickets | agents | cron
@@ -722,9 +729,14 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
 
   const can = (p) => (user?.permissions || []).includes(p)
 
+  // Con `scope`, la categoría va fija (y estricta). Hasta saber su id no se pide nada.
+  const scopeCat = scope ? (meta?.categories || []).find((c) => c.key === scope)?.id ?? null : null
+  const conScope = (x) => (scope ? { ...x, category: scopeCat ?? 0, category_strict: 1 } : x)
+
   const load = useCallback(() => {
+    if (scope && !meta) return
     setErr(false)
-    api.listTickets({ ...f, page, per_page: perPage }).then((d) => {
+    api.listTickets(conScope({ ...f, page, per_page: perPage })).then((d) => {
       if (!d || !Array.isArray(d.tickets)) { setErr(true); return }   // 500/no-JSON → error, no lista vacía falsa
       setRows(d.tickets)
       setCanTimes(!!d.can_times)
@@ -733,7 +745,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
       // El servidor recorta si pides una página que ya no existe (p. ej. tras filtrar).
       if (d.page && d.page !== page) setPage(d.page)
     }).catch(() => setErr(true))
-  }, [f, page, perPage])
+  }, [f, page, perPage, scope, meta, scopeCat])
 
   // Al cambiar de filtro o de tamaño, se vuelve a la primera página: quedarse en la
   // 7 de un resultado que ahora tiene 2 es la forma más tonta de ver la lista vacía.
@@ -855,7 +867,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
   // Exportar a Excel lo que se ve (mismos filtros). Descarga binaria vía blob.
   const exportar = async () => {
     setExporting(true)
-    const r = await api.exportTickets({ ...f })
+    const r = await api.exportTickets(conScope({ ...f }))
     setExporting(false)
     if (!r.ok) { toast(r.error || 'No se pudo exportar', 'err'); return }
     const url = URL.createObjectURL(r.blob)
@@ -879,15 +891,17 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
     <>
       <header className="page-head">
         <span className="sc-ic"><Icon.ticket style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Gestión de tickets</h1></div>
-        {tab === 'tickets'
+        <div><h1>{scope ? 'Tickets de garantías' : 'Gestión de tickets'}</h1></div>
+        {scope
+          ? <span className="sub">· Conversaciones de la categoría Garantías, por cualquier canal</span>
+          : tab === 'tickets'
           ? <WaUsageMeter />
           : <span className="sub">
               · {tab === 'agents' ? 'Carga de trabajo y disponibilidad del equipo' : 'Tareas programadas que fallan, agrupadas por cron'}
             </span>}
         <div className="spacer" />
 
-        <div className="seg">
+        {!scope && <div className="seg">
           <button className={tab === 'tickets' ? 'on' : ''} onClick={() => setTab('tickets')}><Icon.ticket /> Tickets</button>
           {/* Solo un encargado ve la carga de trabajo del equipo */}
           {can('agents.view') && (
@@ -901,7 +915,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             <Icon.bolt /> Crones
             {crones > 0 && <span className="seg-n">{crones}</span>}
           </button>
-        </div>
+        </div>}
         {tab === 'tickets' && (
           <button className="btn ghost" onClick={toggleDensity}
             title={density === 'compacta' ? 'Vista cómoda (filas más altas)' : 'Vista compacta (más filas en pantalla)'}>
@@ -1017,12 +1031,12 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
             {/* Multiselect: útil a quien lleva varias áreas (elige varias categorías a la
                 vez). Filtrar por categoría muestra SIEMPRE también los «sin categoría»
                 (los nuevos sin gestionar) — lo aplica el backend. */}
-            <div className="field"><span className="lbl">Categoría</span>
+            {!scope && <div className="field"><span className="lbl">Categoría</span>
               <Select block multiple placeholder="Todas"
                 value={!f.category || f.category === 'all' ? [] : String(f.category).split(',')}
                 onChange={(vals) => setF((s) => ({ ...s, category: vals.length ? vals.join(',') : 'all' }))}
                 options={(meta?.categories || []).map((c) => ({ value: String(c.id), label: c.name }))} />
-            </div>
+            </div>}
             {/* Filtro por etiqueta. Solo si hay catálogo de etiquetas. */}
             {meta?.labels?.length > 0 && (
               <div className="field"><span className="lbl">Etiqueta</span>
@@ -1291,7 +1305,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
       </div>
 
       {open && <TicketModal id={open} meta={meta} user={user} onClose={() => { setOpen(null); load(); onTicketCode?.(null) }} onChange={load}
-        onOpenTicket={(tid) => setOpen(tid)} onCode={onTicketCode} />}
+        onOpenTicket={(tid) => setOpen(tid)} onCode={onTicketCode} scope={scope} onOpenWarranty={onOpenWarranty} />}
 
       {/* Coherencia área↔asignado al asignar/categorizar desde la propia lista. */}
       {coh.modales}
@@ -1570,7 +1584,7 @@ function ModalFusion({ id, preselect = null, meta, onClose, onDone }) {
   )
 }
 
-function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }) {
+function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode, scope = null, onOpenWarranty = null }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)
@@ -1843,6 +1857,16 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
 
   const t = d?.ticket
 
+  // Garantías creadas a partir de este ticket. Solo desde «Tickets de garantías» (scope)
+  // y siempre a mano: un ticket nunca genera una garantía solo.
+  const conGarantias = scope === 'garantias' && can('warranties.access')
+  const [garantias, setGarantias] = useState([])
+  const [garForm, setGarForm] = useState(false)
+  const cargarGarantias = useCallback(() => {
+    if (conGarantias) api.warrantiesByTicket(id).then((r) => setGarantias(r.ok ? r.warranties : []))
+  }, [id, conGarantias])
+  useEffect(() => { setGarantias([]); cargarGarantias() }, [cargarGarantias])
+
   // ¿Este ticket está dormido (pospuesto)? y ¿NO es mío? (para el panel de acciones).
   const dormido = t?.snoozed_at && (Number(t.snooze_wake_on_reply)
     || (t.snoozed_until && parseDate(t.snoozed_until) > new Date()))
@@ -1933,6 +1957,11 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   <button className="tkm-q" onClick={() => setPdfOpts({ notes: true, images: true, anon: false, busy: false })} title="Generar PDF">
                     <Icon.file /><small>PDF</small>
                   </button>
+                  {conGarantias && (
+                    <button className="tkm-q" onClick={() => setGarForm(true)} title="Crear una garantía a partir de este ticket">
+                      <Icon.shield /><small>Garantía</small>
+                    </button>
+                  )}
                   {(masMio || can('tickets.delete')) && (
                     <div className="tkm-q-wrap" ref={masRef}>
                       <button className="tkm-q" onClick={() => setMasOpen((o) => !o)} title="Más acciones">
@@ -1955,6 +1984,17 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                     </div>
                   )}
                 </div>
+
+                {conGarantias && garantias.length > 0 && (
+                  <div className="tkm-wr">
+                    <span>Garantías:</span>
+                    {garantias.map((g) => (
+                      <button key={g.id} onClick={() => onOpenWarranty?.(g.id)} title="Abrir la garantía">
+                        <Icon.shield />{g.code} <small>{g.status_label}</small>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Si está pospuesto, una línea con hasta cuándo + reactivar. */}
                 {dormido && (
@@ -2502,6 +2542,17 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
             <div className="modal-foot"><button className="btn ghost" onClick={() => setNotaEstado(false)}>Dejar como está</button></div>
           </div>
         </div>
+      )}
+
+      {garForm && t && (
+        <NuevaGarantia
+          inicial={{
+            ticket_code: t.code, client_name: t.contact_name || '', project_name: t.contact_sede_name || '', description: t.subject || '',
+            // La garantía se «recibe» cuando el cliente abrió el ticket.
+            ...(/^\d{4}-\d{2}-\d{2}/.test(t.opened_at || '') ? { received_at: t.opened_at.slice(0, 10) } : {}),
+          }}
+          onClose={() => setGarForm(false)}
+          onSaved={() => { setGarForm(false); cargarGarantias() }} />
       )}
 
       {/* Fusionar. El diálogo vive fuera (ModalFusion): se abre igual desde aquí,
