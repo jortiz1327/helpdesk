@@ -62,6 +62,8 @@ return [
         'warranties.access'  => ['Acceder a Gestión de garantías (expedientes y Centro de dispositivos)', 'warranties'],
         // Usuario y contraseña de los servidores ZKONG. NO se asigna a ningún rol: solo superadmin.
         'warranties.servers' => ['Gestionar los servidores ZKONG',             'warranties'],
+        // Estados, categorías, alertas y plantillas de diagnóstico. Sin rol: se da a mano.
+        'warranties.config'  => ['Configurar garantías (estados, categorías, alertas y plantillas)', 'warranties'],
 
         // --- Automatizaciones / bots ---
         'automations.access' => ['Acceder a automatizaciones',                 'automations'],

@@ -20,18 +20,41 @@ class Warranty extends Model
         'received_at'      => 'date',
         'closed_at'        => 'datetime',
         'last_activity_at' => 'datetime',
+        'status_changed_at' => 'datetime',
     ];
 
-    // Estados en el orden en que avanza un expediente.
-    public const STATUSES = [
-        'no_iniciado' => 'No iniciado',
-        'en_curso'    => 'En curso',
-        'pte_cliente' => 'Pte. cliente',
-        'pte_zkong'   => 'Pte. ZKONG',
-        'pte_envio'   => 'Pte. envío',
-        'enviada'     => 'Enviada',
-        'cerrada'     => 'Cerrada',
-    ];
+    // Estados: se configuran (warranty_statuses). Estos dos no se pueden desactivar:
+    // el alta empieza en no_iniciado y «Cerrar garantía» pasa a cerrada.
+    public const STATUS_NEW = 'no_iniciado';
+    public const STATUS_CLOSED = 'cerrada';
+    public const STATUS_REOPEN = 'en_curso';
+
+    private static ?array $estados = null;
+
+    /** Todos los estados, en orden: [key => {label, color, closed, active, system}]. */
+    public static function statusRows(): array
+    {
+        return self::$estados ??= DB::table('warranty_statuses')->orderBy('sort')->orderBy('label')->get()
+            ->mapWithKeys(fn ($s) => [$s->key => ['label' => $s->label, 'color' => $s->color, 'closed' => (bool) $s->closed,
+                'active' => (bool) $s->active, 'system' => (bool) $s->system]])->all();
+    }
+
+    /** [key => nombre] de todos los estados (también los inactivos, para leer los antiguos). */
+    public static function statuses(): array
+    {
+        return array_map(fn ($s) => $s['label'], self::statusRows());
+    }
+
+    /** Estados que cuentan como cerrada. */
+    public static function closedStatuses(): array
+    {
+        return array_keys(array_filter(self::statusRows(), fn ($s) => $s['closed']));
+    }
+
+    public static function forgetStatuses(): void
+    {
+        self::$estados = null;
+    }
 
     public const URGENCIES = [
         'baja'        => 'Baja',
@@ -81,6 +104,6 @@ class Warranty extends Model
 
     public function isOpen(): bool
     {
-        return $this->status !== 'cerrada';
+        return ! in_array($this->status, self::closedStatuses(), true);
     }
 }

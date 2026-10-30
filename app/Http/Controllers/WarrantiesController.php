@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Warranty;
 use App\Models\WarrantyItem;
+use App\Models\ZkongBatch;
 use App\Services\AemePortal;
+use App\Services\WarrantyAlerts;
 use App\Services\WarrantyLabels;
 use App\Services\WarrantyPhotos;
 use Illuminate\Http\Request;
@@ -18,8 +20,7 @@ use Illuminate\Support\Facades\DB;
  */
 class WarrantiesController extends Controller
 {
-    private const STALE_DAYS = 15;   // «Sin actualizar»: abiertas sin movimiento en estos días
-    private const DEFAULT_CATEGORIES = ['Hoteles', 'Retail', 'Farmacia', 'Otros'];
+    private const STALE_DAYS = 15;   // «Sin actualizar» si la regla de inactividad está apagada
 
     private function labels(): WarrantyLabels
     {
@@ -68,20 +69,23 @@ class WarrantiesController extends Controller
                 ->orWhere('t.code', 'like', $like));
         }
 
-        $abierta = fn ($w) => $w->where('warranties.status', '!=', 'cerrada');
+        $cerrados = Warranty::closedStatuses();
+        $abierta = fn ($w) => $w->whereNotIn('warranties.status', $cerrados);
         $vacio = fn (string $col) => fn ($w) => $w->whereNull($col)->orWhere($col, '');
         match ((string) $request->query('chip', '')) {
             'mine'        => $q->where('warranties.responsible_id', $me->id),
             'open'        => $q->where($abierta),
             'urgent'      => $q->where($abierta)->whereIn('warranties.urgency', ['alta', 'muy_urgente']),
             'pte_cliente', 'pte_zkong', 'pte_envio' => $q->where('warranties.status', $request->query('chip')),
+            'alerts'      => $this->alertas()->scope($q, 'warn'),
+            'critical'    => $this->alertas()->scope($q, 'crit'),
             'stale'       => $q->where($abierta)->where(fn ($w) => $w->whereNull('warranties.last_activity_at')
-                ->orWhere('warranties.last_activity_at', '<', now()->subDays(self::STALE_DAYS))),
+                ->orWhere('warranties.last_activity_at', '<', now()->subDays($this->diasSinActividad()))),
             'no_owner'    => $q->where($abierta)->whereNull('warranties.responsible_id'),
             'no_client'   => $q->where($vacio('warranties.client_name')),
             'no_project'  => $q->where($vacio('warranties.project_name')),
             'no_category' => $q->where($vacio('warranties.category')),
-            'closed'      => $q->where('warranties.status', 'cerrada'),
+            'closed'      => $q->whereIn('warranties.status', $cerrados),
             default       => null,
         };
 
@@ -99,8 +103,9 @@ class WarrantiesController extends Controller
             ->offset($page * $size)->limit($size)
             ->select(['warranties.*', 'u.name as responsible_name', 't.code as ticket_code'])
             ->addSelect(['labels_count' => WarrantyItem::selectRaw('count(*)')->whereColumn('warranty_id', 'warranties.id')])
-            ->get()
-            ->map(fn ($w) => $this->row($w));
+            ->get();
+        $alertas = $this->alertas()->alerts($rows);
+        $rows = $rows->map(fn ($w) => $this->row($w) + ['alerts' => $alertas[$w->id] ?? []]);
 
         return response()->json(['ok' => true, 'rows' => $rows, 'total' => $total, 'all' => Warranty::count()]);
     }
@@ -150,6 +155,8 @@ class WarrantiesController extends Controller
             ->get(['e.id', 'e.field', 'e.from_value', 'e.to_value', 'e.created_at', 'u.name as user_name']);
 
         return response()->json(['ok' => true, 'warranty' => $this->row($w) + [
+            'alerts'          => $this->alertas()->alerts([$w])[$w->id] ?? [],
+            'status_changed_at' => $w->status_changed_at?->toDateTimeString(),
             'description'     => $w->description,
             'ticket_subject'  => $w->ticket_subject,
             'created_by_name' => $w->created_by_name,
@@ -161,7 +168,7 @@ class WarrantiesController extends Controller
     {
         $rows = Warranty::where('ticket_id', (int) $request->query('ticket_id'))->orderBy('id')
             ->get(['id', 'code', 'status'])
-            ->map(fn ($w) => ['id' => $w->id, 'code' => $w->code, 'status' => $w->status, 'status_label' => Warranty::STATUSES[$w->status] ?? $w->status]);
+            ->map(fn ($w) => ['id' => $w->id, 'code' => $w->code, 'status' => $w->status, 'status_label' => Warranty::statuses()[$w->status] ?? $w->status]);
         return response()->json(['ok' => true, 'warranties' => $rows]);
     }
 
@@ -252,8 +259,9 @@ class WarrantiesController extends Controller
     private function items(int $warrantyId): array
     {
         $items = WarrantyItem::query()->leftJoin('users as r', 'r.id', '=', 'warranty_items.reviewed_by')
+            ->leftJoin('zkong_batches as b', 'b.id', '=', 'warranty_items.zkong_batch_id')
             ->where('warranty_id', $warrantyId)->orderBy('warranty_items.id')
-            ->get(['warranty_items.*', 'r.name as reviewed_by_name']);
+            ->get(['warranty_items.*', 'r.name as reviewed_by_name', 'b.code as batch_code', 'b.status as batch_status']);
         $fotos = WarrantyPhotos::forItems($items->pluck('id')->all());
 
         return $items->map(fn ($i) => [
@@ -266,6 +274,8 @@ class WarrantiesController extends Controller
             'broken_cases' => $i->broken_cases ?? [], 'battery_changed' => $i->battery_changed,
             'zkong_decision' => $i->zkong_decision, 'zkong_issue' => $i->zkong_issue,
             'reviewed_at' => $i->reviewed_at?->toDateTimeString(), 'reviewed_by_name' => $i->reviewed_by_name,
+            'batch_code' => $i->batch_code, 'batch_status' => $i->batch_status,
+            'zkong_result' => $i->zkong_result, 'zkong_result_note' => $i->zkong_result_note,
             'photos' => $fotos[$i->id] ?? [],
         ])->all();
     }
@@ -307,6 +317,14 @@ class WarrantiesController extends Controller
             return response()->json(['ok' => false, 'error' => $error], 400);
         }
 
+        // Lo que ya se mandó a ZKONG no se toca desde aquí: su respuesta va en la remesa.
+        $enviadas = $items->filter(fn ($i) => $i->zkong_batch_id)->pluck('zkong_batch_id')->unique();
+        $remesa = $enviadas->isEmpty() ? null
+            : ZkongBatch::whereIn('id', $enviadas)->where('status', '!=', 'borrador')->first(['code']);
+        if ($remesa) {
+            return response()->json(['ok' => false, 'error' => "Hay dispositivos que ya van en la remesa {$remesa->code}, enviada a ZKONG"], 400);
+        }
+
         $pendiente = $res === 'pendiente';
         $datos = [
             'resolution'      => $res,
@@ -321,6 +339,13 @@ class WarrantiesController extends Controller
         WarrantyItem::whereIn('id', $items->pluck('id'))->update(
             array_merge($datos, ['broken_cases' => $datos['broken_cases'] ? json_encode($datos['broken_cases']) : null])
         );
+        // Bandeja de ZKONG: entran al decidir enviarlas (conservan su fecha de entrada si ya
+        // estaban); las que dejan de ir salen de la bandeja y del borrador de remesa.
+        if ($zk && $decision === 'enviar') {
+            WarrantyItem::whereIn('id', $items->pluck('id'))->whereNull('zkong_queued_at')->update(['zkong_queued_at' => now()]);
+        } else {
+            WarrantyItem::whereIn('id', $items->pluck('id'))->update(['zkong_queued_at' => null, 'zkong_batch_id' => null]);
+        }
 
         $this->evento($w->id, $request->user()->id, 'review', null,
             WarrantyItem::RESOLUTIONS[$res]['label'] . ' (' . $items->count() . '): ' . $this->lista($items->pluck('code')->all()));
@@ -441,9 +466,15 @@ class WarrantiesController extends Controller
             }
         }
         $datos['first_contact_at'] = $contacto ?: null;
-        if (! isset(Warranty::STATUSES[$datos['status']])) {
+        $estado = Warranty::statusRows()[$datos['status']] ?? null;
+        if (! $estado) {
             return response()->json(['ok' => false, 'error' => 'Estado no válido'], 400);
         }
+        // Un estado desactivado no se puede elegir, pero quien ya lo tiene lo conserva.
+        if (! $estado['active'] && (! $id || Warranty::whereKey($id)->value('status') !== $datos['status'])) {
+            return response()->json(['ok' => false, 'error' => "El estado «{$estado['label']}» está desactivado"], 400);
+        }
+        $cerrado = $estado['closed'];
         if ($datos['urgency'] !== null && ! isset(Warranty::URGENCIES[$datos['urgency']])) {
             return response()->json(['ok' => false, 'error' => 'Urgencia no válida'], 400);
         }
@@ -461,9 +492,9 @@ class WarrantiesController extends Controller
             }
         }
 
-        // Cerrada: el día indicado (con la hora de ahora) o, si no se indica, hoy.
-        // Cualquier otro estado no tiene fecha de cierre.
-        $cerrarEl = fn ($w) => $datos['status'] !== 'cerrada' ? null
+        // Estado que cuenta como cerrada: el día indicado (con la hora de ahora) o, si no
+        // se indica, hoy. Cualquier otro estado no tiene fecha de cierre.
+        $cerrarEl = fn ($w) => ! $cerrado ? null
             : ($cierre === '' ? ($w?->closed_at ?? now())
                 : ($w?->closed_at?->toDateString() === $cierre ? $w->closed_at : \Illuminate\Support\Carbon::parse($cierre)->setTimeFrom(now())));
 
@@ -474,6 +505,7 @@ class WarrantiesController extends Controller
                     'created_by'       => $me->id,
                     'closed_at'        => $cerrarEl(null),
                     'last_activity_at' => now(),
+                    'status_changed_at' => now(),
                 ]);
                 $this->evento($w->id, $me->id, 'created', null, $w->code);
                 return $w;
@@ -484,6 +516,9 @@ class WarrantiesController extends Controller
             $antes = [];
             foreach (Warranty::TRACKED as $campo => $_) {
                 $antes[$campo] = $valor($campo);
+            }
+            if ($w->status !== $datos['status']) {
+                $w->status_changed_at = now();
             }
             $w->fill($datos);
             $w->closed_at = $cerrarEl($w);
@@ -547,25 +582,39 @@ class WarrantiesController extends Controller
 
     private function options()
     {
-        $usadas = Warranty::whereNotNull('category')->where('category', '!=', '')->distinct()->pluck('category')->all();
-        $cats = array_values(array_unique(array_merge(self::DEFAULT_CATEGORIES, $usadas)));
-        sort($cats, SORT_NATURAL | SORT_FLAG_CASE);
-
         return response()->json([
             'ok'         => true,
-            'statuses'   => Warranty::STATUSES,
+            'statuses'   => Warranty::statuses(),
+            'status_meta' => Warranty::statusRows(),
+            'status_closed' => Warranty::STATUS_CLOSED,
+            'status_reopen' => Warranty::STATUS_REOPEN,
             'urgencies'  => Warranty::URGENCIES,
             'note_types' => Warranty::NOTE_TYPES,
-            'categories' => $cats,
+            'categories' => DB::table('warranty_categories')->where('active', true)->orderBy('sort')->orderBy('name')->pluck('name'),
             'agents'     => $this->agentes()->map(fn ($n, $id) => ['id' => $id, 'name' => $n])->values(),
-            'stale_days' => self::STALE_DAYS,
+            'stale_days' => $this->diasSinActividad(),
+            'diagnosis'  => DB::table('warranty_diagnosis_templates')->where('active', true)->orderBy('sort')->orderBy('id')->get(['id', 'title', 'body']),
             'review'     => [
                 'resolutions'  => WarrantyItem::RESOLUTIONS,
                 'zkong'        => WarrantyItem::ZKONG_DECISIONS,
                 'broken_cases' => WarrantyItem::BROKEN_CASES,
                 'photo_types'  => WarrantyItem::PHOTO_TYPES,
+                'batch_statuses' => ZkongBatch::STATUSES,
+                'zkong_results'  => ZkongBatch::RESULTS,
             ],
         ]);
+    }
+
+    private function alertas(): WarrantyAlerts
+    {
+        return app(WarrantyAlerts::class);
+    }
+
+    /** «Sin actualizar»: los días de aviso de la regla de inactividad (o los de siempre). */
+    private function diasSinActividad(): int
+    {
+        $r = $this->alertas()->rules()['inactividad'] ?? null;
+        return $r && $r['active'] && $r['warn_days'] ? $r['warn_days'] : self::STALE_DAYS;
     }
 
     /** Usuarios activos con acceso a garantías: [id => nombre]. */
@@ -591,7 +640,7 @@ class WarrantiesController extends Controller
             return null;
         }
         return match ($campo) {
-            'status'         => Warranty::STATUSES[$v] ?? $v,
+            'status'         => Warranty::statuses()[$v] ?? $v,
             'urgency'        => Warranty::URGENCIES[$v] ?? $v,
             'responsible_id' => User::whereKey($v)->value('name') ?? "#{$v}",
             'ticket_id'      => DB::table('tickets')->where('id', $v)->value('code') ?? "#{$v}",

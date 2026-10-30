@@ -233,6 +233,12 @@ Route::middleware('token')->group(function () {
     // Fotos de los dispositivos revisados e imágenes del ticket de la garantía (<img> con ?token=).
     Route::get('warranty_photo.php', [\App\Http\Controllers\WarrantiesController::class, 'photo'])
         ->middleware('can:warranties.access');
+    // ZKONG: bandeja de dispositivos para enviar y remesas de RMA (Excel y fotos).
+    Route::match(['get', 'post'], 'zkong_rma.php', [\App\Http\Controllers\ZkongRmaController::class, 'handle'])
+        ->middleware('can:warranties.access');
+    // Configuración de garantías: estados, categorías, alertas y plantillas de diagnóstico.
+    Route::match(['get', 'post'], 'warranty_settings.php', [\App\Http\Controllers\WarrantySettingsController::class, 'handle'])
+        ->middleware('can:warranties.config');
     // Centro de dispositivos (solo consulta a los servidores ZKONG).
     Route::match(['get', 'post'], 'devices.php', [\App\Http\Controllers\DevicesController::class, 'handle'])
         ->middleware('can:warranties.access');

@@ -14,12 +14,13 @@ import { FichaDispositivo } from './Devices.jsx'
  * Productos, ZKONG y Documentos.
  * ---------------------------------------------------------------------- */
 
-const ESTADO_CLS = { no_iniciado: 'gray', en_curso: 'blue', pte_cliente: 'amber', pte_zkong: 'purple', pte_envio: 'orange', enviada: 'indigo', cerrada: 'green' }
+// Los estados (nombre, color, si cuentan como cerrada) vienen de la configuración: opts.status_meta.
+const cerradaEn = (opts, s) => !!opts?.status_meta?.[s]?.closed
 const URG_CLS = { baja: 'gray', media: 'amber', alta: 'orange', muy_urgente: 'red' }
 // Punto de color de cada opción en los desplegables (mismos tonos que las píldoras).
 const COLOR = { gray: '#94a3b8', blue: '#3b82f6', amber: '#f59e0b', purple: '#8b5cf6', orange: '#f97316', indigo: '#6366f1', green: '#22c55e', red: '#ef4444', none: '#cbd5e1' }
 const CHIPS = [
-  ['mine', 'Mis garantías'], ['open', 'Abiertas'], ['urgent', 'Urgentes'], ['pte_cliente', 'Pte. cliente'],
+  ['mine', 'Mis garantías'], ['open', 'Abiertas'], ['alerts', 'Con alertas'], ['critical', 'Críticas'], ['urgent', 'Urgentes'], ['pte_cliente', 'Pte. cliente'],
   ['pte_zkong', 'Pte. ZKONG'], ['pte_envio', 'Pte. envío'], ['stale', 'Sin actualizar'], ['no_owner', 'Sin responsable'],
   ['no_client', 'Sin cliente'], ['no_project', 'Sin proyecto'], ['no_category', 'Sin categoría'], ['closed', 'Cerradas'],
 ]
@@ -37,7 +38,16 @@ const num = (n) => Number(n || 0).toLocaleString('es-ES')
 function Pill({ cls, children }) {
   return <span className={`wr-pill ${cls}`}><i />{children}</span>
 }
-function EstadoPill({ s, opts }) { return <Pill cls={ESTADO_CLS[s] || 'gray'}>{opts?.statuses?.[s] || s}</Pill> }
+function EstadoPill({ s, opts }) {
+  return <span className="wr-pill" style={{ '--pc': opts?.status_meta?.[s]?.color || '#64748b' }}><i />{opts?.statuses?.[s] || s}</span>
+}
+/* Alertas de una garantía (reglas de la configuración): punto rojo si hay alguna crítica. */
+function Alertas({ list, full }) {
+  if (!list?.length) return null
+  const crit = list.some((a) => a.level === 'crit')
+  if (!full) return <span className={`wr-alert ${crit ? 'crit' : 'warn'}`} title={list.map((a) => a.text).join(' · ')}><Icon.warn /> {list.length}</span>
+  return list.map((a) => <span key={a.key} className={`wr-flag ${a.level}`}><Icon.warn /> {a.text}</span>)
+}
 function UrgPill({ u, opts }) { return u ? <Pill cls={URG_CLS[u] || 'gray'}>{opts?.urgencies?.[u] || u}</Pill> : <Pill cls="none">No disponible</Pill> }
 
 /* --- Alta y edición --- */
@@ -48,7 +58,8 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
   const pon = (k) => (v) => setF((s) => ({ ...s, [k]: v }))
   // Al pasar a «Cerrada» la fecha de cierre propone hoy (se puede cambiar).
-  const elegirEstado = (v) => setF((s) => ({ ...s, status: v, closed_at: v === 'cerrada' ? s.closed_at || hoy() : s.closed_at }))
+  const elegirEstado = (v) => setF((s) => ({ ...s, status: v, closed_at: cerradaEn(opts, v) ? s.closed_at || hoy() : s.closed_at }))
+  const cerrado = cerradaEn(opts, f.status)
 
   // Cliente y proyecto salen del portal AEME; si no responde, se escriben a mano.
   const [clientes, setClientes] = useState(null)       // null = cargando
@@ -173,9 +184,9 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
           <div className="grid2">
             <div className="field"><span className="lbl">Estado</span>
               <Select block value={f.status} onChange={elegirEstado}
-                options={Object.entries(opts?.statuses || {}).map(([k, v]) => ({ value: k, label: v, color: COLOR[ESTADO_CLS[k]] }))} /></div>
-            <label className="field"><span className="lbl">Fecha de cierre {f.status !== 'cerrada' && <span className="hint">(al cerrarla)</span>}</span>
-              <input type="date" value={f.status === 'cerrada' ? f.closed_at || '' : ''} onChange={set('closed_at')} disabled={f.status !== 'cerrada'} /></label>
+                options={Object.entries(opts?.status_meta || {}).filter(([k, m]) => m.active || k === inicial.status).map(([k, m]) => ({ value: k, label: m.label, color: m.color }))} /></div>
+            <label className="field"><span className="lbl">Fecha de cierre {!cerrado && <span className="hint">(al cerrarla)</span>}</span>
+              <input type="date" value={cerrado ? f.closed_at || '' : ''} onChange={set('closed_at')} disabled={!cerrado} /></label>
           </div>
           <div className="grid2">
             <div className="field"><span className="lbl">Urgencia</span>
@@ -296,7 +307,7 @@ function Lista({ opts, onOpen, onNew, reload }) {
                 ? Array.from({ length: 6 }, (_, i) => <tr key={i}>{Array.from({ length: 9 }, (_, j) => <td key={j}><span className="dev-skel" /></td>)}</tr>)
                 : filas.map((w) => (
                   <tr key={w.id} className="wr-row" onClick={() => onOpen(w.id)}>
-                    <td><span className="wr-code">{w.code}</span>{w.ticket_code ? <span className="wr-tk" title={`Ticket ${w.ticket_code}`}><Icon.ticket /></span> : null}</td>
+                    <td><span className="wr-code">{w.code}</span>{w.ticket_code ? <span className="wr-tk" title={`Ticket ${w.ticket_code}`}><Icon.ticket /></span> : null}<Alertas list={w.alerts} /></td>
                     <td>{fecha(w.received_at)}</td>
                     <td className="wr-ell">{w.client_name || <span className="dev-mute">—</span>}</td>
                     <td className="wr-ell">{w.project_name || <span className="dev-mute">—</span>}</td>
@@ -497,6 +508,7 @@ function ResDetalle({ rv, it }) {
   const partes = []
   if (it.resolution === 'bateria' && it.battery_changed) partes.push('Pilas cambiadas')
   if (it.zkong_decision) partes.push(`${rv?.zkong?.[it.zkong_decision] || it.zkong_decision}${it.zkong_issue ? `: ${it.zkong_issue}` : ''}`)
+  if (it.batch_code) partes.push(`Remesa ${it.batch_code} (${rv?.batch_statuses?.[it.batch_status] || it.batch_status})${it.zkong_result ? `: ${rv?.zkong_results?.[it.zkong_result] || it.zkong_result}${it.zkong_result_note ? ` — ${it.zkong_result_note}` : ''}` : ''}`)
   if (it.resolution === 'danada' && it.broken_cases?.length) partes.push(it.broken_cases.map((k) => rv?.broken_cases?.[k] || k).join(', '))
   if (it.resolution_note) partes.push(it.resolution_note)
   if (!partes.length && !it.reviewed_by_name) return null
@@ -538,7 +550,7 @@ function FotoSlot({ label, photo, active, busy, onActivate, onFile, onSrc, onDel
 
 // preset: la solución elegida en la barra de selección. Un dispositivo que ya pide fotos
 // abre directamente en las fotos.
-function Revisar({ w, rv, items: iniciales, preset, onClose, onSaved }) {
+function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
   const toast = useToast()
   const uno = iniciales.length === 1 ? iniciales[0] : null
   const [items, setItems] = useState(iniciales)
@@ -670,7 +682,15 @@ function Revisar({ w, rv, items: iniciales, preset, onClose, onSaved }) {
             )}
             {f.resolution && (
               <div className="wr-rev-sec">
-                <label>{f.resolution === 'desechada' ? <>Por qué se desecha <span className="req">*</span></> : 'Comentario'}</label>
+                <div className="wr-rev-lbl">
+                  <label>{f.resolution === 'desechada' ? <>Por qué se desecha <span className="req">*</span></> : 'Comentario'}</label>
+                  {diag?.length ? (
+                    <Select sm value="" placeholder="Usar plantilla de diagnóstico…" onChange={(id) => {
+                      const t = diag.find((x) => x.id === id)
+                      if (t) set({ note: f.note.trim() ? `${f.note.trim()}\n${t.body}` : t.body })
+                    }} options={diag.map((t) => ({ value: t.id, label: t.title }))} />
+                  ) : null}
+                </div>
                 <textarea rows={2} value={f.note} onChange={(e) => set({ note: e.target.value })} placeholder="Opcional: lo que se ha visto o hecho"
                   onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !faltaAlgo) guardar() }} />
               </div>
@@ -893,12 +913,12 @@ function Productos({ w, items, opts, onReload, onChanged }) {
       )}
       {!items.length && !panel ? <p className="dev-mute">Todavía no hay etiquetas. Añádelas con su código.</p> : null}
       {ficha && <FichaDispositivo code={ficha} servers={[]} onClose={() => setFicha(null)} onOpen={setFicha} />}
-      {revisar && <Revisar w={w} rv={rv} items={revisar.items} preset={revisar.preset} onClose={() => setRevisar(null)} onSaved={trasRevisar} />}
+      {revisar && <Revisar w={w} rv={rv} diag={opts?.diagnosis} items={revisar.items} preset={revisar.preset} onClose={() => setRevisar(null)} onSaved={trasRevisar} />}
     </>
   )
 }
 
-const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const toast = useToast()
@@ -917,7 +937,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   if (d.error) return <><button className="wr-back" onClick={onBack}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> Garantías</button><div className="dev-error"><Icon.warn /> {d.error}</div></>
 
   const w = d.warranty
-  const abierta = w.status !== 'cerrada'
+  const abierta = !cerradaEn(opts, w.status)
   const diasAbierta = dias(w.received_at, abierta ? null : w.closed_at)
   const diasSin = dias(w.last_activity_at)
   const stale = abierta && diasSin != null && diasSin >= (opts?.stale_days || 15)
@@ -928,7 +948,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   }
   const cerrar = async () => {
     if (!(await confirm({ title: 'Cerrar garantía', message: `¿Cerrar ${w.code}? Se podrá reabrir después.`, confirmText: 'Cerrar garantía' }))) return
-    guardarCon({ status: 'cerrada' }, 'Garantía cerrada')
+    guardarCon({ status: opts?.status_closed || 'cerrada' }, 'Garantía cerrada')
   }
   const borrar = async () => {
     if (!(await confirm({ title: 'Borrar garantía', message: `¿Borrar ${w.code} con todo su seguimiento e historial? No se puede deshacer.`, danger: true, confirmText: 'Borrar' }))) return
@@ -961,14 +981,14 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
             <p>{[w.client_name, w.project_name].filter(Boolean).join(' — ') || <span className="dev-mute">Sin cliente ni proyecto</span>}</p>
             <div className="wr-flags">
               {abierta && diasAbierta >= 30 ? <span className="wr-flag"><Icon.warn /> Abierta {diasAbierta} días</span> : null}
-              {stale ? <span className="wr-flag"><Icon.warn /> Sin actividad {diasSin} días</span> : null}
+              {w.alerts?.length ? <Alertas list={w.alerts} full /> : stale ? <span className="wr-flag"><Icon.warn /> Sin actividad {diasSin} días</span> : null}
             </div>
           </div>
           <div className="wr-acts">
             <button className="btn" onClick={irASeguimiento}><Icon.plus /> Añadir seguimiento</button>
             {abierta
               ? <button className="btn dark" onClick={cerrar}><Icon.lock /> Cerrar garantía</button>
-              : <button className="btn ghost" onClick={() => guardarCon({ status: 'en_curso' }, 'Garantía reabierta')}><Icon.refresh /> Reabrir</button>}
+              : <button className="btn ghost" onClick={() => guardarCon({ status: opts?.status_reopen || 'en_curso' }, 'Garantía reabierta')}><Icon.refresh /> Reabrir</button>}
             <button className="dev-btn" onClick={() => onEdit(w)}><Icon.pencil /> Editar</button>
             {isSuper ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
           </div>

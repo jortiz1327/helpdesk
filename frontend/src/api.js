@@ -423,6 +423,30 @@ export const api = {
   deleteWarranty: (id) => req('warranties.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
+  // Configuración de garantías: warrantySettingsDo('status_save', {...}) y demás acciones.
+  warrantySettings: () => req('warranty_settings.php'),
+  warrantySettingsDo: (action, payload) => postJson(`warranty_settings.php?action=${action}`, payload),
+  // ZKONG: bandeja y remesas de RMA. zkongRma('send', { id }) y demás acciones POST.
+  zkongInbox: () => req('zkong_rma.php?action=inbox'),
+  zkongBatches: () => req('zkong_rma.php?action=batches'),
+  zkongBatch: (id) => req(`zkong_rma.php?action=batch&id=${id}`),
+  zkongRma: (action, payload) => postJson(`zkong_rma.php?action=${action}`, payload),
+  // Excel o ZIP de fotos de una remesa: descarga binaria con el token en cabecera.
+  zkongDownload: async (kind, id) => {
+    try {
+      const r = await fetch(`${BASE}/zkong_rma.php?action=${kind}&id=${id}`, { headers: { 'X-App-Token': getToken() } })
+      if (!r.ok) {
+        let error = 'No se pudo descargar'
+        try { error = (await r.json()).error || error } catch { /* no-json */ }
+        return { ok: false, error }
+      }
+      const cd = r.headers.get('Content-Disposition') || ''
+      const filename = (cd.match(/filename="?([^"]+)"?/) || [])[1] || `rma.${kind}`
+      return { ok: true, blob: await r.blob(), filename }
+    } catch {
+      return { ok: false, error: 'Sin conexión al descargar' }
+    }
+  },
 
   listEmailBans: () => req('email_bans.php'),
   saveEmailBan: (payload) => req('email_bans.php?action=save', {

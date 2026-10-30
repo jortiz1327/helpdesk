@@ -302,8 +302,8 @@ class WarrantyLabels
             ->get(['g.id', 'g.code', 'g.status', 'g.received_at', 'g.closed_at']);
 
         // 1. Ya está en otra garantía abierta.
-        if ($abierta = $otras->firstWhere(fn ($g) => $g->status !== 'cerrada')) {
-            $aviso('open_warranty', 'bad', "Ya está en la garantía abierta {$abierta->code} (" . (Warranty::STATUSES[$abierta->status] ?? $abierta->status) . '): no puede entrar hasta que esa se cierre.', true);
+        if ($abierta = $otras->firstWhere(fn ($g) => ! in_array($g->status, Warranty::closedStatuses(), true))) {
+            $aviso('open_warranty', 'bad', "Ya está en la garantía abierta {$abierta->code} (" . (Warranty::statuses()[$abierta->status] ?? $abierta->status) . '): no puede entrar hasta que esa se cierre.', true);
         }
         // 2. Varias garantías en el último año.
         $recientes = $otras->filter(fn ($g) => $g->received_at && Carbon::parse($g->received_at)->gte(now()->subMonths(self::RECENT_MONTHS)));
