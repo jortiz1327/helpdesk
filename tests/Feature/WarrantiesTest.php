@@ -46,6 +46,16 @@ class WarrantiesTest extends TestCase
         $this->getJson('/api/warranties.php', $h)->assertForbidden();
     }
 
+    public function test_bandeja_de_tickets_pide_tambien_helpdesk(): void
+    {
+        [, $solo] = $this->agente();
+        $this->getJson('/api/warranties.php?action=inbox&tab=todos', $solo)->assertForbidden();
+        $this->getJson('/api/warranties.php?action=by_ticket&ticket_id=1', $solo)->assertForbidden();
+        [, $ambos] = $this->agente(['warranties.access', 'helpdesk.access'], 'Pepe');
+        $this->getJson('/api/warranties.php?action=inbox&tab=todos', $ambos)->assertOk();
+        $this->getJson('/api/warranties.php?action=by_ticket&ticket_id=1', $ambos)->assertOk();
+    }
+
     public function test_numeracion_por_anio(): void
     {
         [, $h] = $this->agente();

@@ -257,6 +257,7 @@ class WarrantiesController extends Controller
     // Garantías creadas a partir de un ticket (para enseñarlas en su ficha).
     private function byTicket(Request $request)
     {
+        abort_unless($request->user()->can('helpdesk.access'), 403);
         $rows = Warranty::where('ticket_id', (int) $request->query('ticket_id'))->orderBy('id')
             ->get(['id', 'code', 'status'])
             ->map(fn ($w) => ['id' => $w->id, 'code' => $w->code, 'status' => $w->status, 'status_label' => Warranty::statuses()[$w->status] ?? $w->status]);
@@ -271,6 +272,8 @@ class WarrantiesController extends Controller
     private function inbox(Request $request)
     {
         $me = $request->user();
+        // Son tickets del Helpdesk con datos de contacto: el menú ya lo pide, y aquí también.
+        abort_unless($me->can('helpdesk.access'), 403);
         $cat = DB::table('ticket_categories')->where('key', 'garantias')->value('id');
         $base = DB::table('tickets as t')->where('t.category_id', $cat ?? 0)->whereNull('t.merged_into_id');
         \App\Support\TicketVisibility::scope($base, $me);
