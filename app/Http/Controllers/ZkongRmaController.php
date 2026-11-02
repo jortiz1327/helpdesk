@@ -27,6 +27,9 @@ class ZkongRmaController extends Controller
             'add'     => $this->add($request),
             'remove'  => $this->remove($request),
             'send'    => $this->send($request),
+            'shipping' => $this->shipping($request),
+            'receive' => $this->receive($request),
+            'cancel'  => $this->cancel($request),
             'result'  => $this->result($request),
             'close'   => $this->close($request),
             'reopen'  => $this->reopen($request),
@@ -121,7 +124,49 @@ class ZkongRmaController extends Controller
             'id' => $b->id, 'code' => $b->code, 'status' => $b->status, 'note' => $b->note,
             'sent_at' => $b->sent_at?->toDateTimeString(), 'closed_at' => $b->closed_at?->toDateTimeString(),
             'created_at' => $b->created_at?->toDateTimeString(), 'created_by_name' => $b->created_by_name ?? null,
+            'units_sent' => $b->units_sent, 'carrier' => $b->carrier, 'tracking' => $b->tracking, 'shipping_ref' => $b->shipping_ref,
+            'received_at' => $b->received_at?->toDateTimeString(), 'units_received' => $b->units_received,
+            'cancelled_at' => $b->cancelled_at?->toDateTimeString(), 'cancel_reason' => $b->cancel_reason,
+            // Días esperando a que ZKONG confirme que le ha llegado.
+            'waiting_days' => $b->status === 'enviada' && $b->sent_at ? (int) $b->sent_at->copy()->startOfDay()->diffInDays(now()->startOfDay()) : null,
         ];
+    }
+
+    /** Línea de tiempo de la remesa, en el orden en que se apuntó cada paso (cada uno con su fecha). */
+    private function eventos(int $id): array
+    {
+        return DB::table('zkong_batch_events as e')->leftJoin('users as u', 'u.id', '=', 'e.user_id')
+            ->where('e.zkong_batch_id', $id)->orderBy('e.id')
+            ->get(['e.type', 'e.text', 'e.note', 'e.at', 'u.name as user_name'])
+            ->map(fn ($e) => (array) $e)->all();
+    }
+
+    /** Fecha «AAAA-MM-DD» del formulario con la hora de ahora (hoy) o a las 12:00 (otro día). */
+    private function dia($v, string $campo): \Illuminate\Support\Carbon
+    {
+        $v = trim((string) $v);
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) abort(response()->json(['ok' => false, 'error' => "Indica la {$campo}"], 400));
+        $d = \Illuminate\Support\Carbon::parse($v);
+        if ($d->isAfter(today())) abort(response()->json(['ok' => false, 'error' => "La {$campo} no puede ser futura"], 400));
+        return $d->isToday() ? now() : $d->setTime(12, 0);
+    }
+
+    /** Datos del transporte del formulario (todos opcionales). */
+    private function transporte(Request $request): array
+    {
+        return [
+            'carrier'      => $this->texto($request->input('carrier'), 80),
+            'tracking'     => $this->texto($request->input('tracking'), 120),
+            'shipping_ref' => $this->texto($request->input('shipping_ref'), 120),
+        ];
+    }
+
+    private function resumenEnvio(ZkongBatch $b): string
+    {
+        return implode(' · ', array_filter([
+            $b->units_sent ? "{$b->units_sent} unidades" : null,
+            $b->carrier, $b->tracking ? "tracking {$b->tracking}" : null, $b->shipping_ref ? "ref. {$b->shipping_ref}" : null,
+        ]));
     }
 
     private function batch(Request $request)
@@ -131,7 +176,7 @@ class ZkongRmaController extends Controller
         if (! $b) {
             return response()->json(['ok' => false, 'error' => 'La remesa no existe'], 404);
         }
-        return response()->json(['ok' => true, 'batch' => $this->remesa($b), 'items' => $this->itemsDe($b->id)]);
+        return response()->json(['ok' => true, 'batch' => $this->remesa($b), 'items' => $this->itemsDe($b->id), 'events' => $this->eventos($b->id)]);
     }
 
     private function itemsDe(int $batchId): array
@@ -159,6 +204,7 @@ class ZkongRmaController extends Controller
             $b = ZkongBatch::create(['code' => ZkongBatch::nextCode(), 'status' => 'borrador', 'created_by' => $request->user()->id,
                 'note' => $this->texto($request->input('note'), 2000)]);
             WarrantyItem::whereIn('id', $items->pluck('id'))->update(['zkong_batch_id' => $b->id]);
+            $b->evento('creada', 'Remesa creada con ' . $items->count() . ' ' . ($items->count() === 1 ? 'etiqueta' : 'etiquetas'), $request->user()->id);
             return $b;
         });
         $this->historial($items, $request->user()->id, "En la remesa {$b->code} (borrador)");
@@ -203,8 +249,71 @@ class ZkongRmaController extends Controller
         if ($items->isEmpty()) {
             return response()->json(['ok' => false, 'error' => 'La remesa no tiene etiquetas'], 400);
         }
-        $b->forceFill(['status' => 'enviada', 'sent_at' => now()])->save();
+        // A mano: fecha, unidades, transportista, tracking y albarán (no hay API del transportista).
+        $cuando = $this->dia($request->input('sent_on', today()->toDateString()), 'fecha de envío');
+        $uds = (int) $request->input('units_sent', $items->count());
+        if ($uds < 1 || $uds > 100000) {
+            return response()->json(['ok' => false, 'error' => 'Indica cuántas unidades se envían'], 400);
+        }
+        $b->forceFill(['status' => 'enviada', 'sent_at' => $cuando, 'units_sent' => $uds] + $this->transporte($request))->save();
+        $b->evento('enviada', 'Enviada a ZKONG' . (($r = $this->resumenEnvio($b)) ? ": {$r}" : ''), $request->user()->id, $request->input('note'), $cuando);
         $this->historial($items, $request->user()->id, "Enviada a ZKONG en la remesa {$b->code}");
+        return response()->json(['ok' => true]);
+    }
+
+    /** Corregir o completar el transporte (el tracking suele llegar después). */
+    private function shipping(Request $request)
+    {
+        $b = ZkongBatch::findOrFail((int) $request->input('id'));
+        if (! in_array($b->status, ZkongBatch::EN_ZKONG, true)) {
+            return response()->json(['ok' => false, 'error' => 'Solo se cambia el envío de una remesa enviada'], 400);
+        }
+        $datos = $this->transporte($request);
+        if ($request->has('sent_on')) $datos['sent_at'] = $this->dia($request->input('sent_on'), 'fecha de envío');
+        if ($request->filled('units_sent')) $datos['units_sent'] = max(1, (int) $request->input('units_sent'));
+        $b->forceFill($datos)->save();
+        $b->evento('envio', 'Datos del envío actualizados' . (($r = $this->resumenEnvio($b)) ? ": {$r}" : ''), $request->user()->id);
+        return response()->json(['ok' => true]);
+    }
+
+    /** ZKONG confirma que le ha llegado la remesa. */
+    private function receive(Request $request)
+    {
+        $b = ZkongBatch::findOrFail((int) $request->input('id'));
+        if ($b->status !== 'enviada') {
+            return response()->json(['ok' => false, 'error' => $b->received_at ? 'La recepción ya está apuntada' : 'Primero registra el envío'], 400);
+        }
+        $cuando = $this->dia($request->input('received_on'), 'fecha de recepción');
+        if ($b->sent_at && $cuando->copy()->startOfDay()->lt($b->sent_at->copy()->startOfDay())) {
+            return response()->json(['ok' => false, 'error' => 'La recepción no puede ser anterior al envío'], 400);
+        }
+        $uds = $request->filled('units_received') ? max(0, (int) $request->input('units_received')) : null;
+        $b->forceFill(['received_at' => $cuando, 'units_received' => $uds])->save();
+        $b->forceFill(['status' => $b->estadoAbierto()])->save();
+        $b->evento('recibida', 'Recibida por ZKONG' . ($uds !== null ? ": {$uds} unidades" : ''), $request->user()->id, $request->input('note'), $cuando);
+        $items = WarrantyItem::where('zkong_batch_id', $b->id)->get(['id', 'code', 'warranty_id']);
+        $this->historial($items, $request->user()->id, "ZKONG confirma que ha recibido la remesa {$b->code}");
+        return response()->json(['ok' => true]);
+    }
+
+    /** Anular una remesa enviada (con motivo): sus etiquetas vuelven a la bandeja. */
+    private function cancel(Request $request)
+    {
+        $b = ZkongBatch::findOrFail((int) $request->input('id'));
+        if (! in_array($b->status, ['enviada', 'recibida'], true)) {
+            return response()->json(['ok' => false, 'error' => $b->status === 'borrador' ? 'Una remesa en preparación se descarta, no se anula' : 'Solo se anula una remesa enviada sin respuestas'], 400);
+        }
+        $motivo = $this->texto($request->input('reason'), 500);
+        if (! $motivo) {
+            return response()->json(['ok' => false, 'error' => 'Indica el motivo de la anulación'], 400);
+        }
+        $items = WarrantyItem::where('zkong_batch_id', $b->id)->get(['id', 'code', 'warranty_id']);
+        DB::transaction(function () use ($b, $motivo, $request) {
+            WarrantyItem::where('zkong_batch_id', $b->id)->update(['zkong_batch_id' => null, 'zkong_result' => null, 'zkong_result_note' => null]);
+            $b->forceFill(['status' => 'anulada', 'cancelled_at' => now(), 'cancel_reason' => $motivo])->save();
+            $b->evento('anulada', 'Remesa anulada', $request->user()->id, $motivo);
+        });
+        $this->historial($items, $request->user()->id, "Remesa {$b->code} anulada: vuelve a la bandeja");
         return response()->json(['ok' => true]);
     }
 
@@ -212,8 +321,11 @@ class ZkongRmaController extends Controller
     private function result(Request $request)
     {
         $b = ZkongBatch::findOrFail((int) $request->input('id'));
-        if (! in_array($b->status, ['enviada', 'respondida'], true)) {
-            return response()->json(['ok' => false, 'error' => $b->status === 'borrador' ? 'Primero envía la remesa a ZKONG' : 'La remesa está cerrada: reábrela para cambiar respuestas'], 400);
+        if (! in_array($b->status, ZkongBatch::EN_ZKONG, true)) {
+            return response()->json(['ok' => false, 'error' => match ($b->status) {
+                'borrador' => 'Primero envía la remesa a ZKONG', 'anulada' => 'La remesa está anulada',
+                default => 'La remesa está cerrada: reábrela para cambiar respuestas',
+            }], 400);
         }
         $res = (string) $request->input('result', '');
         if ($res !== '' && ! isset(ZkongBatch::RESULTS[$res])) {
@@ -229,10 +341,11 @@ class ZkongRmaController extends Controller
             'zkong_result_note' => $res ? $this->texto($request->input('note'), 500) : null,
         ]);
 
-        // Respondida cuando todas tienen respuesta; si se quita alguna, vuelve a Enviada.
-        $faltan = WarrantyItem::where('zkong_batch_id', $b->id)->whereNull('zkong_result')->exists();
-        $b->forceFill(['status' => $faltan ? 'enviada' : 'respondida'])->save();
+        // Respondida cuando todas tienen respuesta; si se quita alguna, vuelve a Recibida/Enviada.
+        $b->forceFill(['status' => $b->estadoAbierto()])->save();
 
+        $texto = 'Respuesta de ZKONG: ' . ($res ? ZkongBatch::RESULTS[$res] : 'sin respuesta') . ' (' . $items->count() . ' ' . ($items->count() === 1 ? 'etiqueta' : 'etiquetas') . ')';
+        $b->evento('respuesta', $texto, $request->user()->id, $res ? $request->input('note') : null);
         $this->historial($items, $request->user()->id, 'Respuesta de ZKONG (' . $b->code . '): ' . ($res ? ZkongBatch::RESULTS[$res] : 'sin respuesta'));
         return response()->json(['ok' => true, 'status' => $b->status, 'items' => $this->itemsDe($b->id)]);
     }
@@ -240,10 +353,11 @@ class ZkongRmaController extends Controller
     private function close(Request $request)
     {
         $b = ZkongBatch::findOrFail((int) $request->input('id'));
-        if (! in_array($b->status, ['enviada', 'respondida'], true)) {
+        if (! in_array($b->status, ZkongBatch::EN_ZKONG, true)) {
             return response()->json(['ok' => false, 'error' => 'Solo se cierra una remesa enviada'], 400);
         }
         $b->forceFill(['status' => 'cerrada', 'closed_at' => now()])->save();
+        $b->evento('cerrada', 'Remesa cerrada', $request->user()->id);
         return response()->json(['ok' => true]);
     }
 
@@ -253,8 +367,9 @@ class ZkongRmaController extends Controller
         if ($b->status !== 'cerrada') {
             return response()->json(['ok' => false, 'error' => 'La remesa no está cerrada'], 400);
         }
-        $faltan = WarrantyItem::where('zkong_batch_id', $b->id)->whereNull('zkong_result')->exists();
-        $b->forceFill(['status' => $faltan ? 'enviada' : 'respondida', 'closed_at' => null])->save();
+        $b->forceFill(['closed_at' => null])->save();
+        $b->forceFill(['status' => $b->estadoAbierto()])->save();
+        $b->evento('reabierta', 'Remesa reabierta', $request->user()->id);
         return response()->json(['ok' => true]);
     }
 

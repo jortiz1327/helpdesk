@@ -71,17 +71,25 @@ class DeviceCatalogController extends Controller
         ]);
     }
 
-    /** Referencias de un modelo como parejas [zkong, aeme]; las sueltas, con el otro lado vacío. */
+    /**
+     * Referencias de un modelo como parejas [zkong, aeme]; las sueltas, con el otro lado
+     * vacío. Una ZKONG puede tener varias AEME (AME42B-W y AME42B-W-X son la misma
+     * ZKC42B-NE4): sale una pareja por cada AEME que apunta a ella.
+     */
     private function filas($refs): array
     {
         $porId = $refs->keyBy('id');
         $usadas = [];
         $filas = [];
         foreach ($refs->where('provider', 'zkong') as $z) {
-            $a = $z->pair_id ? $porId[$z->pair_id] ?? null : null;
-            $a = $a && $a->provider === 'aeme' ? $a : null;
-            if ($a) $usadas[$a->id] = true;
-            $filas[] = ['zkong' => $z->name, 'aeme' => $a?->name ?? ''];
+            $aemes = $refs->where('provider', 'aeme')->filter(fn ($a) => (int) $a->pair_id === (int) $z->id)->values();
+            $suya = $z->pair_id ? $porId[$z->pair_id] ?? null : null;
+            if ($suya && $suya->provider === 'aeme' && ! $aemes->contains('id', $suya->id)) $aemes->push($suya);
+            foreach ($aemes->sortBy('id') as $a) {
+                $usadas[$a->id] = true;
+                $filas[] = ['zkong' => $z->name, 'aeme' => $a->name];
+            }
+            if ($aemes->isEmpty()) $filas[] = ['zkong' => $z->name, 'aeme' => ''];
         }
         foreach ($refs->where('provider', 'aeme') as $a) {
             if (! isset($usadas[$a->id])) $filas[] = ['zkong' => '', 'aeme' => $a->name];
@@ -111,7 +119,8 @@ class DeviceCatalogController extends Controller
         if ($pilas && ($tipo === '' || mb_strlen($tipo) > 30)) return $this->error('Indica el tipo de pila (p. ej. CR2450)');
         if ($pilas && ($cant < 1 || $cant > 9)) return $this->error('Indica cuántas pilas lleva (de 1 a 9)');
 
-        // Referencias: parejas sin repetir, ni aquí ni en otro modelo.
+        // Referencias: parejas sin repetir, ni aquí ni en otro modelo. La misma ZKONG sí puede
+        // ir en varias parejas del modelo (una ZKONG con varias AEME).
         $filas = [];
         $vistas = ['zkong' => [], 'aeme' => []];
         foreach ((array) $request->input('refs', []) as $f) {
@@ -121,7 +130,10 @@ class DeviceCatalogController extends Controller
             foreach (['zkong' => $z, 'aeme' => $a] as $p => $n) {
                 if ($n === '') continue;
                 $k = mb_strtoupper($n);
-                if (isset($vistas[$p][$k])) return $this->error("La referencia {$n} está repetida");
+                if (isset($vistas[$p][$k])) {
+                    if ($p === 'zkong' && $a !== '') continue;
+                    return $this->error("La referencia {$n} está repetida");
+                }
                 $vistas[$p][$k] = true;
                 $otro = DB::table('device_model_references as r')->where('r.provider', $p)->whereRaw('upper(r.name) = ?', [$k])
                     ->when($id, fn ($q) => $q->where('r.device_model_id', '!=', $id))->value('r.device_model_id');
@@ -144,10 +156,15 @@ class DeviceCatalogController extends Controller
 
             DB::table('device_model_references')->where('device_model_id', $id)->delete();
             $ahora = now();
+            $zks = [];   // una sola fila por ZKONG aunque tenga varias AEME
             foreach ($filas as [$z, $a]) {
-                $zid = $z !== '' ? DB::table('device_model_references')->insertGetId(['device_model_id' => $id, 'provider' => 'zkong', 'name' => $z, 'created_at' => $ahora, 'updated_at' => $ahora]) : null;
+                $zk = mb_strtoupper($z);
+                $nueva = $z !== '' && ! isset($zks[$zk]);
+                if ($nueva) $zks[$zk] = DB::table('device_model_references')->insertGetId(['device_model_id' => $id, 'provider' => 'zkong', 'name' => $z, 'created_at' => $ahora, 'updated_at' => $ahora]);
+                $zid = $z !== '' ? $zks[$zk] : null;
                 $aid = $a !== '' ? DB::table('device_model_references')->insertGetId(['device_model_id' => $id, 'provider' => 'aeme', 'name' => $a, 'pair_id' => $zid, 'created_at' => $ahora, 'updated_at' => $ahora]) : null;
-                if ($zid && $aid) DB::table('device_model_references')->where('id', $zid)->update(['pair_id' => $aid]);
+                // La ZKONG apunta a su primera AEME (la que da la ficha al casar con el servidor).
+                if ($nueva && $aid) DB::table('device_model_references')->where('id', $zid)->update(['pair_id' => $aid]);
             }
 
             // Las etiquetas de las garantías siguen a su referencia AEME.

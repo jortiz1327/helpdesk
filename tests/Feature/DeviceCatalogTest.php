@@ -68,6 +68,24 @@ class DeviceCatalogTest extends TestCase
         $this->assertSame(0, DB::table('device_model_references')->where('device_model_id', $id)->count());
     }
 
+    public function test_una_zkong_con_varias_aeme(): void
+    {
+        $h = $this->agente(['warranties.access', 'warranties.config']);
+        $id = $this->postJson('/api/device_catalog.php?action=save', [
+            'size' => '4,2', 'eink_colors' => 'BWRY', 'color' => 'white', 'has_batteries' => false,
+            'refs' => [['zkong' => 'ZKX77B-NE4 (White)', 'aeme' => 'AMX77B-W'], ['zkong' => 'ZKX77B-NE4 (White)', 'aeme' => 'AMX77B-W-X']],
+        ], $h)->assertOk()->json('id');
+
+        // Una sola ZKONG guardada; las dos AEME apuntan a ella y salen como dos parejas.
+        $this->assertSame(1, DB::table('device_model_references')->where('device_model_id', $id)->where('provider', 'zkong')->count());
+        $m = collect($this->getJson('/api/device_catalog.php', $h)->json('models'))->firstWhere('id', $id);
+        $this->assertSame([['zkong' => 'ZKX77B-NE4 (White)', 'aeme' => 'AMX77B-W'], ['zkong' => 'ZKX77B-NE4 (White)', 'aeme' => 'AMX77B-W-X']], $m['refs']);
+
+        // La misma AEME dos veces sigue sin valer.
+        $this->postJson('/api/device_catalog.php?action=save', ['id' => $id, 'size' => '4,2', 'eink_colors' => 'BWRY', 'color' => 'white',
+            'refs' => [['zkong' => 'ZKX77B-NE4', 'aeme' => 'AMX77B-W'], ['zkong' => '', 'aeme' => 'AMX77B-W']]], $h)->assertStatus(400);
+    }
+
     public function test_consultar_si_cambiar_no_sin_configuracion(): void
     {
         $h = $this->agente(['warranties.access']);

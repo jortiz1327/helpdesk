@@ -7,24 +7,48 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Remesa a ZKONG (R-AAAA-NNN): etiquetas de varias garantías que se mandan juntas en un
- * RMA. Borrador (se le quitan y ponen etiquetas) → Enviada → Respondida (cuando todas
- * tienen respuesta de ZKONG) → Cerrada.
+ * RMA. En preparación (se le quitan y ponen etiquetas) → Enviada (con transportista y
+ * tracking, apuntado a mano) → Recibida (ZKONG confirma que le ha llegado) → Respondida
+ * (todas con respuesta) → Cerrada. Una enviada se puede anular con motivo.
  */
 class ZkongBatch extends Model
 {
     protected $guarded = ['id'];
 
     protected $casts = [
-        'sent_at'   => 'datetime',
-        'closed_at' => 'datetime',
+        'sent_at'      => 'datetime',
+        'received_at'  => 'datetime',
+        'closed_at'    => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     public const STATUSES = [
-        'borrador'   => 'Borrador',
+        'borrador'   => 'En preparación',
         'enviada'    => 'Enviada',
+        'recibida'   => 'Recibida por ZKONG',
         'respondida' => 'Respondida',
         'cerrada'    => 'Cerrada',
+        'anulada'    => 'Anulada',
     ];
+
+    /** Estados en los que ZKONG ya la tiene o está en camino (se pueden apuntar respuestas). */
+    public const EN_ZKONG = ['enviada', 'recibida', 'respondida'];
+
+    /** Apunta un paso en la línea de tiempo de la remesa. */
+    public function evento(string $type, string $text, ?int $userId, ?string $note = null, $at = null): void
+    {
+        DB::table('zkong_batch_events')->insert([
+            'zkong_batch_id' => $this->id, 'user_id' => $userId, 'type' => $type, 'text' => mb_substr($text, 0, 300),
+            'note' => $note !== null && trim($note) !== '' ? trim($note) : null, 'at' => $at ?? now(), 'created_at' => now(),
+        ]);
+    }
+
+    /** Estado que le toca tras una respuesta o al reabrir: según tenga respuestas y recepción. */
+    public function estadoAbierto(): string
+    {
+        $faltan = DB::table('warranty_items')->where('zkong_batch_id', $this->id)->whereNull('zkong_result')->exists();
+        return ! $faltan ? 'respondida' : ($this->received_at ? 'recibida' : 'enviada');
+    }
 
     // Lo que contesta ZKONG por cada etiqueta.
     public const RESULTS = [

@@ -45,7 +45,7 @@ class WarrantyAlerts
     {
         if (! $ids) return [];
         return DB::table('warranty_items as i')->join('zkong_batches as b', 'b.id', '=', 'i.zkong_batch_id')
-            ->whereIn('i.warranty_id', $ids)->where('b.status', 'enviada')->whereNull('i.zkong_result')
+            ->whereIn('i.warranty_id', $ids)->whereIn('b.status', ['enviada', 'recibida'])->whereNull('i.zkong_result')
             ->groupBy('i.warranty_id')->selectRaw('i.warranty_id, min(b.sent_at) as desde')->pluck('desde', 'warranty_id')->all();
     }
 
@@ -104,7 +104,7 @@ class WarrantyAlerts
                     $k === 'inactividad'     => $o->orWhereRaw('coalesce(warranties.last_activity_at, warranties.created_at) <= ?', [$hasta]),
                     $k === 'rma'             => $o->orWhereExists(fn ($e) => $e->selectRaw('1')->from('warranty_items as ai')
                         ->join('zkong_batches as ab', 'ab.id', '=', 'ai.zkong_batch_id')
-                        ->whereColumn('ai.warranty_id', 'warranties.id')->where('ab.status', 'enviada')
+                        ->whereColumn('ai.warranty_id', 'warranties.id')->whereIn('ab.status', ['enviada', 'recibida'])
                         ->whereNull('ai.zkong_result')->where('ab.sent_at', '<=', $hasta)),
                 };
             }

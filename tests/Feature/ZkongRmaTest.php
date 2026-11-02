@@ -158,4 +158,38 @@ class ZkongRmaTest extends TestCase
         // El número no se reutiliza mal: la siguiente vuelve a ser la 001 al no quedar ninguna.
         $this->assertSame('R-' . now()->year . '-001', $this->rma('create', ['item_ids' => [$a['8E9749440']]], $h)->json('code'));
     }
+
+    public function test_envio_a_mano_recepcion_de_zkong_y_anulacion(): void
+    {
+        [, $h] = $this->agente();
+        [$w, $a] = $this->garantia('G-2026-0004', ['8E9749440' => 'esl', '8E9749441' => 'esl']);
+        $this->postJson('/api/warranties.php?action=review', ['id' => $w->id, 'item_ids' => array_values($a), 'resolution' => 'defectuosa', 'zkong_decision' => 'enviar', 'zkong_issue' => 'X'], $h)->assertOk();
+        $id = $this->rma('create', ['item_ids' => array_values($a)], $h)->json('id');
+
+        // Envío: la fecha no puede ser futura; el resto del transporte se apunta a mano.
+        $this->rma('send', ['id' => $id, 'sent_on' => now()->addDay()->toDateString()], $h)->assertStatus(400);
+        $this->rma('send', ['id' => $id, 'sent_on' => now()->subDays(3)->toDateString(), 'units_sent' => 2, 'carrier' => 'DHL', 'tracking' => 'JD0001', 'shipping_ref' => 'A-77', 'note' => 'Caja 1'], $h)->assertOk();
+        $b = $this->getJson("/api/zkong_rma.php?action=batch&id={$id}", $h)->json('batch');
+        $this->assertSame(['enviada', 'DHL', 'JD0001', 'A-77', 2, 3], [$b['status'], $b['carrier'], $b['tracking'], $b['shipping_ref'], $b['units_sent'], $b['waiting_days']]);
+
+        // El tracking se puede completar después; la recepción no puede ser anterior al envío.
+        $this->rma('shipping', ['id' => $id, 'tracking' => 'JD0002', 'carrier' => 'DHL'], $h)->assertOk();
+        $this->rma('receive', ['id' => $id, 'received_on' => now()->subDays(5)->toDateString()], $h)->assertStatus(400);
+        $this->rma('receive', ['id' => $id, 'received_on' => now()->toDateString(), 'units_received' => 2], $h)->assertOk();
+        $this->rma('receive', ['id' => $id, 'received_on' => now()->toDateString()], $h)->assertStatus(400);   // ya apuntada
+
+        $d = $this->getJson("/api/zkong_rma.php?action=batch&id={$id}", $h)->json();
+        $this->assertSame(['recibida', 'JD0002', 2, null], [$d['batch']['status'], $d['batch']['tracking'], $d['batch']['units_received'], $d['batch']['waiting_days']]);
+        $this->assertSame(['creada', 'enviada', 'envio', 'recibida'], array_column($d['events'], 'type'));
+        $this->assertSame('Caja 1', $d['events'][1]['note']);
+
+        // Una respuesta parcial la deja en Recibida; anular pide motivo y devuelve las etiquetas a la bandeja.
+        $this->rma('result', ['id' => $id, 'item_ids' => [$a['8E9749440']], 'result' => 'abono'], $h)->assertOk()->assertJsonPath('status', 'recibida');
+        $this->rma('cancel', ['id' => $id], $h)->assertStatus(400);
+        $this->rma('cancel', ['id' => $id, 'reason' => 'Paquete perdido'], $h)->assertOk();
+        $this->assertSame(['anulada', 'Paquete perdido'], [DB::table('zkong_batches')->where('id', $id)->value('status'), DB::table('zkong_batches')->where('id', $id)->value('cancel_reason')]);
+        $this->assertSame(0, WarrantyItem::whereNotNull('zkong_batch_id')->orWhereNotNull('zkong_result')->count());
+        $this->assertSame(2, count($this->getJson('/api/zkong_rma.php', $h)->json('groups.0.items')));
+        $this->rma('result', ['id' => $id, 'item_ids' => [$a['8E9749440']], 'result' => 'abono'], $h)->assertStatus(400);
+    }
 }

@@ -5006,3 +5006,35 @@ button.dev-code:hover { text-decoration: underline; }
 .dc-ae-b.out .dc-ae { color: #b45309; }
 .dc-ae-b > svg { width: 12px; height: 12px; fill: #d97706; }
 .dc-list .dc-pname { max-width: none; font-size: 11.5px; }
+/* Remesas ZKONG: envío y recepción apuntados a mano, línea de tiempo. */
+.zk-espera { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 20px; font-size: 11px; font-weight: 700; font-style: normal; color: #2563eb; background: rgba(37, 99, 235, .1); white-space: nowrap; }
+.zk-espera.warn { color: #b45309; background: rgba(217, 119, 6, .12); }
+.zk-espera.bad { color: var(--danger); background: rgba(220, 38, 38, .1); }
+.zk-envio { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 18px; margin: 14px 0 4px; padding: 12px 14px; border-radius: 11px; background: var(--panel-2); border: 1px solid var(--line); }
+.zk-envio div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.zk-envio span { font-size: 11.5px; color: var(--ink-3); }
+.zk-envio b { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.zk-envio .zk-espera { margin: 2px 0 0; align-self: flex-start; }
+.zk-anulada { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: rgba(220, 38, 38, .07); color: #b91c1c; font-size: 13px; font-weight: 600; }
+.zk-anulada svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+.btn.ghost.zk-anular { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+.zk-ventana { max-width: 560px; }
+.zk-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.zk-form .field { margin: 0; }
+.zk-form .field.ancho { grid-column: 1 / -1; }
+.zk-form input, .zk-form textarea { width: 100%; padding: 8px 11px; font-size: 13px; border: 1.5px solid var(--line-2); border-radius: 9px; background: var(--panel); color: var(--ink); font-family: inherit; }
+.zk-form input:focus, .zk-form textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.zk-req { color: var(--danger); }
+.zk-tl ol { list-style: none; margin: 0; padding: 0 0 0 4px; }
+.zk-tl li { position: relative; padding: 0 0 14px 20px; border-left: 2px solid var(--line); margin-left: 4px; display: flex; flex-direction: column; gap: 2px; }
+.zk-tl li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.zk-tl li::before { content: ''; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--ink-3); box-shadow: 0 0 0 3px var(--panel); }
+.zk-tl li.t-enviada::before { background: #2563eb; }
+.zk-tl li.t-recibida::before { background: #4f46e5; }
+.zk-tl li.t-respuesta::before { background: #7c3aed; }
+.zk-tl li.t-cerrada::before { background: #12925a; }
+.zk-tl li.t-anulada::before { background: #dc2626; }
+.zk-tl li b { font-size: 13px; color: var(--ink); }
+.zk-tl li span { font-size: 12px; }
+.zk-tl li p { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-2); white-space: pre-wrap; }
+@media (max-width: 640px) { .zk-form { grid-template-columns: 1fr; } }
