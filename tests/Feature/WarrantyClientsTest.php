@@ -71,6 +71,9 @@ class WarrantyClientsTest extends TestCase
         $this->assertSame(2, $d['kpis']['items']);
 
         $this->getJson('/api/warranty_clients.php?action=get&key=x', $h)->assertStatus(400);
+        // Un cliente del portal sin garantías (ni aquí ni en el portal) no se puede consultar.
+        $this->getJson('/api/warranty_clients.php?action=get&key=p:999', $h)->assertNotFound();
+        $this->getJson('/api/warranty_clients.php?action=get&key=' . urlencode('n:nadie'), $h)->assertNotFound();
     }
 
     public function test_requiere_acceso_a_garantias(): void

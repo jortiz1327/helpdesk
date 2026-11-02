@@ -133,6 +133,12 @@ class WarrantyClientsController extends Controller
             ->get(['warranties.id', 'warranties.code', 'warranties.status', 'warranties.received_at', 'warranties.closed_at',
                 'warranties.client_name', 'warranties.project_name', 'warranties.portal_project_id', 'u.name as responsible_name']);
 
+        // Solo clientes de esta lista: con garantías aquí o con proyectos de garantía en el
+        // portal. Cualquier otro id del portal no enseña sus datos de contacto.
+        if ($ws->isEmpty() && ! ($portalId && in_array($portalId, array_column($this->portalClients() ?? [], 'id'), true))) {
+            return response()->json(['ok' => false, 'error' => 'Ese cliente no tiene garantías'], 404);
+        }
+
         $estados = Warranty::statuses();
         $cerrados = Warranty::closedStatuses();
         $items = DB::table('warranty_items')->whereIn('warranty_id', $ws->pluck('id'))->groupBy('warranty_id')
