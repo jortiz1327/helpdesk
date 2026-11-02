@@ -248,6 +248,9 @@ Route::middleware('token')->group(function () {
     // Centro de dispositivos (solo consulta a los servidores ZKONG).
     Route::match(['get', 'post'], 'devices.php', [\App\Http\Controllers\DevicesController::class, 'handle'])
         ->middleware('can:warranties.access');
+    // Clientes y proyectos: solo consulta (garantías de aquí y documentos del portal).
+    Route::get('warranty_clients.php', [\App\Http\Controllers\WarrantyClientsController::class, 'handle'])
+        ->middleware('can:warranties.access');
     // Cuentas de los servidores ZKONG. Solo superadmin (warranties.servers no va en ningún rol).
     Route::match(['get', 'post'], 'zkong_servers.php', [\App\Http\Controllers\ZkongServersController::class, 'handle'])
         ->middleware('can:warranties.servers');

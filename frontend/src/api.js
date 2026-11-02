@@ -427,6 +427,9 @@ export const api = {
   }),
   warrantyTeam: (p = {}) => req(`warranties.php?action=team&from=${p.from || ''}&to=${p.to || ''}`),
   warrantyReport: (params) => req('warranties.php?action=report&' + new URLSearchParams(params).toString()),
+  // Clientes y proyectos (solo consulta). key = «p:<cliente del portal>» o «n:<nombre>».
+  warrantyClients: () => req('warranty_clients.php'),
+  warrantyClient: (key, fresh = false) => req(`warranty_clients.php?action=get&key=${encodeURIComponent(key)}${fresh ? '&fresh=1' : ''}`),
   // Catálogo de modelos: deviceCatalogDo('save' | 'delete', {...}).
   deviceCatalog: () => req('device_catalog.php'),
   deviceCatalogDo: (action, payload) => postJson(`device_catalog.php?action=${action}`, payload),

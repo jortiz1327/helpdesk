@@ -41,6 +41,7 @@ import Zkong from "./components/Zkong.jsx";
 import WarrantyInbox from "./components/WarrantyInbox.jsx";
 import WarrantySettings from "./components/WarrantySettings.jsx";
 import { WarrantyTeam, WarrantyReports } from "./components/WarrantyTeam.jsx";
+import WarrantyClients from "./components/WarrantyClients.jsx";
 import DeviceCatalog from "./components/DeviceCatalog.jsx";
 import ZkongServers from "./components/ZkongServers.jsx";
 import Warranties from "./components/Warranties.jsx";
@@ -668,6 +669,14 @@ const AREAS = [
                         icon: Icon.chart,
                         perm: "warranties.access",
                         color: "#12925a",
+                    },
+                    {
+                        // Solo consulta: garantías de aquí y documentos del portal AEME.
+                        key: "garantias_clientes",
+                        label: "Clientes y proyectos",
+                        icon: Icon.building,
+                        perm: "warranties.access",
+                        color: "#475569",
                     },
                     {
                         // Bandeja de lo que va a ZKONG y remesas de RMA.
@@ -1637,6 +1646,9 @@ export default function App() {
                             <WarrantyTeam onFilter={(f) => { setGarantiaFiltro({ ...f }); setView("garantias"); }} />
                         )}
                         {view === "garantias_informes" && can("warranties.access") && <WarrantyReports />}
+                        {view === "garantias_clientes" && can("warranties.access") && (
+                            <WarrantyClients onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
+                        )}
                         {view === "zkong" && can("warranties.access") && (
                             <Zkong onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
                         )}
