@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Warranty;
 use App\Models\WarrantyDocument;
 use App\Models\WarrantyItem;
+use App\Services\PortalDocCheck;
 use App\Services\WarrantyDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class WarrantyDocumentsController extends Controller
             'download'   => $this->download($request),
             'report'     => $this->report($request),
             'email'      => $this->email($request),
+            'portal_check' => $this->portalCheck($request),
             default      => $this->list($request),
         };
     }
@@ -184,6 +186,12 @@ class WarrantyDocumentsController extends Controller
         return is_string($r)
             ? response()->json(['ok' => false, 'error' => $r], 400)
             : response()->json(['ok' => true, 'id' => $r->id]);
+    }
+
+    // Validación previa para crear el documento en el portal: solo lee, crear aún no está activado.
+    private function portalCheck(Request $request)
+    {
+        return response()->json(['ok' => true, 'enabled' => false] + PortalDocCheck::check($this->doc($request)));
     }
 
     // El correo de resolución ya rellenado, para copiarlo (no se envía desde aquí).

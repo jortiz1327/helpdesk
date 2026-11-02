@@ -19,6 +19,8 @@ const fecha = (s) => (s ? new Date(s.replace(' ', 'T')).toLocaleDateString('es-E
 const peso = (b) => (!b ? '' : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB`)
 const SUBIBLES = ['presupuesto', 'albaran', 'factura', 'otro']
 const COV_ORDEN = ['cliente', 'pilas', 'garantia']
+const PORTAL = ['presupuesto', 'albaran']   // los que se podrán crear en el portal
+const PLURAL = { presupuesto: 'Presupuestos', albaran: 'Albaranes', factura: 'Facturas', informe: 'Informes', otro: 'Otros' }
 
 async function descargar(doc, toast) {
   const r = await api.warrantyDocDownload(doc.id)
@@ -89,14 +91,25 @@ function Generar({ w, kind, opts, summary, docs, onClose, onDone }) {
   )
 }
 
-/* --- Editar un presupuesto o albarán generado --- */
+/* --- Editar un presupuesto o albarán generado: debajo de la lista, sin tapar la ficha --- */
 function Editor({ id, opts, services, onClose, onSaved }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [d, setD] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [abiertos, setAbiertos] = useState(() => new Set())
-  useEffect(() => { api.warrantyDoc(id).then((r) => (r.ok ? setD(r.document) : (toast(r.error, 'err'), onClose()))) }, [id])
-  if (!d) return <Modal title="Documento" onClose={onClose}><div className="center-load"><div className="spinner" /></div></Modal>
+  const original = useRef('')
+  const caja = useRef(null)
+  useEffect(() => {
+    setD(null)
+    api.warrantyDoc(id).then((r) => {
+      if (!r.ok) { toast(r.error, 'err'); onClose(); return }
+      original.current = JSON.stringify(r.document)
+      setD(r.document)
+    })
+  }, [id])
+  useEffect(() => { if (d) caja.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [!!d])
+  if (!d) return <section className="wd-ed"><div className="center-load"><div className="spinner" /></div></section>
 
   const kind = opts.documents.kinds[d.kind]
   const cobra = d.coverage !== 'garantia'
@@ -106,6 +119,8 @@ function Editor({ id, opts, services, onClose, onSaved }) {
   const anadir = (l) => set({ lines: [...d.lines, { ref: '', description: '', qty: 1, price: 0, codes: [], ...l }] })
   const base = cobra ? d.lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.price) || 0), 0) : 0
   const iva = Math.round(base * (Number(d.vat) || 0)) / 100
+  // Los de garantía salen a 0 €, pero se ve cuánto vale lo que cubre (precio de la tarifa).
+  const valorado = d.lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.price) || 0), 0)
   const guardar = async () => {
     setGuardando(true)
     const r = await api.warrantyDocsDo('save', { id: d.id, vat: d.vat, note: d.note || '', status: d.status, lines: d.lines })
@@ -113,16 +128,26 @@ function Editor({ id, opts, services, onClose, onSaved }) {
     if (!r.ok) { toast(r.error, 'err'); return }
     toast(`${d.number} guardado`); onSaved()
   }
+  const cerrar = async () => {
+    if (JSON.stringify(d) !== original.current && !(await confirm({ title: 'Cambios sin guardar', message: `¿Cerrar ${d.number} sin guardar los cambios?`, confirmText: 'Cerrar sin guardar', danger: true }))) return
+    onClose()
+  }
   return (
-    <Modal wide title={<>{kind.label} <span className="mono">{d.number}</span> <CovPill c={d.coverage} opts={opts} /></>} onClose={onClose} foot={<>
-      <span className="wd-tot-foot">{cobra ? <>Total <b>{eur(base + iva)}</b> <span className="dev-mute">({eur(base)} + IVA)</span></> : <span className="dev-mute">Garantía: sin cargo para el cliente</span>}</span>
-      <button className="btn ghost" onClick={onClose}>Cancelar</button>
-      <button className="btn" disabled={guardando} onClick={guardar}>{guardando ? 'Guardando…' : 'Guardar'}</button>
-    </>}>
-      <div className="wd-ed-top">
+    <section className="wd-ed" ref={caja}>
+      <header className="wd-ed-h">
+        <div>
+          <h3>{kind.label} <span className="mono">{d.number}</span> <CovPill c={d.coverage} opts={opts} /></h3>
+          <p className="dev-mute">{cobra ? 'Las líneas que paga el cliente, con el precio de la tarifa.' : 'Lo que cubre la garantía: sale a 0 € para el cliente, con lo que vale a tarifa como referencia.'}{d.from_number ? ` Sale del presupuesto ${d.from_number}.` : ''}</p>
+        </div>
         <label>Estado <Select sm value={d.status} onChange={(v) => set({ status: v })} options={kind.statuses.map((s) => ({ value: s, label: opts.documents.statuses[s] }))} /></label>
-        {cobra ? <label>IVA % <input type="number" min="0" max="100" step="0.01" value={d.vat} onChange={(e) => set({ vat: e.target.value })} /></label> : null}
-        {d.from_number ? <span className="dev-mute">Desde el presupuesto {d.from_number}</span> : null}
+        <button className="icon-btn" title="Cerrar el editor" onClick={cerrar}>✕</button>
+      </header>
+      <div className="wd-add">
+        {services.length ? <Select sm value="" placeholder="Añadir concepto de la tarifa…" onChange={(ref) => { const s = services.find((x) => x.ref === ref); if (s) anadir({ ref: s.ref, description: s.label, price: s.price }) }}
+          options={services.map((s) => ({ value: s.ref, label: `${s.label} · ${eur(s.price)}` }))} /> : null}
+        <button className="dev-btn" onClick={() => anadir({})}><Icon.plus /> Línea manual</button>
+        <span className="spacer" />
+        <span className="dev-mute">{d.lines.length} {d.lines.length === 1 ? 'línea' : 'líneas'}</span>
       </div>
       <div className="dev-table-wrap keep wt-wrap">
         <table className="dev-table wd-lines">
@@ -141,7 +166,9 @@ function Editor({ id, opts, services, onClose, onSaved }) {
                 </td>
                 <td><input type="number" min="0" step="1" className="r" value={l.qty} onChange={(e) => setLinea(i, { qty: e.target.value })} /></td>
                 <td><input type="number" min="0" step="0.01" className="r" value={l.price} onChange={(e) => setLinea(i, { price: e.target.value })} /></td>
-                <td className="r">{cobra ? eur((Number(l.qty) || 0) * (Number(l.price) || 0)) : <span className="wd-free">Sin cargo</span>}</td>
+                <td className="r">{cobra ? eur((Number(l.qty) || 0) * (Number(l.price) || 0)) : (
+                  <span className="wd-cub"><span className="wd-free">0,00 €</span>{Number(l.price) ? <s>{eur((Number(l.qty) || 0) * Number(l.price))}</s> : null}</span>
+                )}</td>
                 <td><button className="icon-btn" title="Quitar línea" onClick={() => quitar(i)}><Icon.trash /></button></td>
               </tr>
             ))}
@@ -149,18 +176,32 @@ function Editor({ id, opts, services, onClose, onSaved }) {
         </table>
         {!d.lines.length ? <p className="dev-mute" style={{ padding: 12 }}>Sin líneas.</p> : null}
       </div>
-      <div className="wd-add">
-        <button className="dev-btn" onClick={() => anadir({})}><Icon.plus /> Añadir línea</button>
-        {services.length ? <Select sm value="" placeholder="Añadir concepto de la tarifa…" onChange={(ref) => { const s = services.find((x) => x.ref === ref); if (s) anadir({ description: s.label, price: s.price }) }}
-          options={services.map((s) => ({ value: s.ref, label: `${s.label} · ${eur(s.price)}` }))} /> : null}
-        <span className="spacer" />
-        {cobra ? <span className="wd-sum">Base {eur(base)} · IVA {eur(iva)} · <b>Total {eur(base + iva)}</b></span> : null}
+      <div className="wd-ed-f">
+        <div className="field">
+          <span className="lbl">Nota del documento <span className="hint">— sale al pie (condiciones, plazos…)</span></span>
+          <textarea rows={4} value={d.note || ''} maxLength={5000} onChange={(e) => set({ note: e.target.value })} />
+        </div>
+        <div className="wd-tot">
+          {cobra ? (
+            <>
+              <div><span>Base imponible</span><b>{eur(base)}</b></div>
+              <div><span>IVA <input type="number" min="0" max="100" step="0.01" value={d.vat} onChange={(e) => set({ vat: e.target.value })} /> %</span><b>{eur(iva)}</b></div>
+              <div className="big"><span>Total cliente</span><b>{eur(base + iva)}</b></div>
+            </>
+          ) : (
+            <>
+              <div><span>Valorado a tarifa</span><b>{eur(valorado)}</b></div>
+              <div className="wd-cubre"><span>Cubierto por la garantía</span><b>−{eur(valorado)}</b></div>
+              <div className="big"><span>Total cliente</span><b className="wd-free">0,00 €</b></div>
+            </>
+          )}
+          <div className="wd-tot-acts">
+            <button className="btn ghost" onClick={cerrar}>Cancelar</button>
+            <button className="btn" disabled={guardando} onClick={guardar}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+          </div>
+        </div>
       </div>
-      <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
-        <span className="lbl">Nota del documento <span className="hint">— sale al pie (condiciones, plazos…)</span></span>
-        <textarea rows={3} value={d.note || ''} maxLength={5000} onChange={(e) => set({ note: e.target.value })} />
-      </div>
-    </Modal>
+    </section>
   )
 }
 
@@ -239,6 +280,73 @@ function Informe({ w, summary, actual, onClose, onDone }) {
   )
 }
 
+/* --- Validar para el portal: lo que el portal pide para darlo de alta y cómo quedaría.
+ *     Solo comprueba; crear el documento en el portal aún no está activado. --- */
+function Portal({ doc, opts, onClose, onEditWarranty }) {
+  const toast = useToast()
+  const [r, setR] = useState(null)
+  const validar = useCallback(() => { setR(null); api.warrantyDocsDo('portal_check', { id: doc.id }).then((x) => (x.ok ? setR(x) : (toast(x.error, 'err'), onClose()))) }, [doc.id])
+  useEffect(() => { validar() }, [validar])
+  const p = r?.preview
+  const malos = r ? r.checks.filter((c) => c.tone === 'bad').length : 0
+  return (
+    <Modal wide title={<>Validar para el portal <span className="mono">{doc.number}</span> <CovPill c={doc.coverage} opts={opts} /></>} onClose={onClose} foot={<>
+      <button className="dev-btn" onClick={validar} disabled={!r}><Icon.refresh /> Volver a validar</button>
+      <span className="spacer" />
+      <button className="btn ghost" onClick={onClose}>Cerrar</button>
+      <button className="btn" disabled title={r?.enabled ? '' : 'La creación en el portal todavía no está activada'}><Icon.send /> Crear en el portal</button>
+    </>}>
+      {!r ? <div className="center-load"><div className="spinner" /></div> : (
+        <>
+          <div className={`wd-pv-st ${r.ready ? 'ok' : 'bad'}`}>
+            {r.ready ? <Icon.check /> : <Icon.warn />}
+            <span>{r.ready ? 'Listo para crearlo en el portal.' : `Hay ${malos} ${malos === 1 ? 'cosa' : 'cosas'} que ${malos === 1 ? 'impide' : 'impiden'} crearlo en el portal.`}
+              <small>La creación en el portal todavía no está activada: esto solo comprueba.</small></span>
+          </div>
+          <ul className="wd-pv-checks">
+            {r.checks.map((c, i) => <li key={i} className={`t-${c.tone}`}>{c.tone === 'ok' ? <Icon.check /> : <Icon.warn />}<span>{c.text}</span></li>)}
+          </ul>
+          {r.checks.some((c) => c.tone === 'bad' && /cliente del portal|proyecto/.test(c.text)) && onEditWarranty
+            ? <button className="dev-btn wd-pv-fix" onClick={onEditWarranty}><Icon.pencil /> Editar la garantía para enlazar cliente y proyecto</button> : null}
+          {p ? (
+            <div className="wd-pv">
+              <div className="wd-pv-h">
+                <div><small>Se creará como</small><b>{p.type}</b><span className="dev-mute">{p.prefix}-…… (lo numera el portal) · borrador</span></div>
+                <div><small>Cliente</small><b>{p.client || <span className="wf-warn">Sin enlazar</span>}</b><span className="dev-mute">{p.project || 'Sin proyecto'}</span></div>
+                <div><small>Fecha</small><b>{fecha(p.date)}</b></div>
+              </div>
+              <div className="dev-table-wrap keep wt-wrap">
+                <table className="dev-table wd-pv-t">
+                  <thead><tr><th>Ref.</th><th>Nombre / descripción</th><th className="r">Cant.</th><th>Unidad</th>{p.prices ? <><th className="r">Precio</th><th className="r">Total</th></> : null}</tr></thead>
+                  <tbody>
+                    {p.lines.map((l, i) => (
+                      <tr key={i} className={l.found ? '' : 'libre'}>
+                        <td className="mono">{l.ref || <span className="dev-mute">Libre</span>}</td>
+                        <td><b>{l.name || l.description}</b>{l.name && l.name !== l.description ? <small>{l.description}</small> : null}</td>
+                        <td className="r">{String(l.qty).replace('.', ',')}</td>
+                        <td>{l.unit}</td>
+                        {p.prices ? <><td className="r">{eur(l.rate)}</td><td className="r">{eur(l.total)}</td></> : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {p.prices ? (
+                <div className="wd-pv-tot">
+                  <span>Subtotal <b>{eur(p.base)}</b></span>
+                  {p.tax ? <span>{p.tax} <b>{eur(p.tax_amount)}</b></span> : null}
+                  <span className="big">Total <b>{eur(p.total)}</b></span>
+                </div>
+              ) : null}
+              {p.terms ? <p className="wd-pv-obs"><small>Observaciones</small>{p.terms}</p> : null}
+            </div>
+          ) : null}
+        </>
+      )}
+    </Modal>
+  )
+}
+
 /* --- Correo de resolución: la plantilla rellenada, para copiar --- */
 function Correo({ w, docs, onClose }) {
   const toast = useToast()
@@ -266,11 +374,12 @@ function Correo({ w, docs, onClose }) {
   )
 }
 
-export default function WarrantyDocuments({ w, opts, onGoReview }) {
+export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)
   const [modal, setModal] = useState(null)   // {t: 'gen'|'edit'|'up'|'report'|'mail', ...}
+  const [filtro, setFiltro] = useState('')
   const cargar = useCallback(() => api.warrantyDocs(w.id).then((r) => setD(r.ok ? r : { error: r.error })), [w.id])
   useEffect(() => { cargar() }, [cargar])
 
@@ -298,35 +407,43 @@ export default function WarrantyDocuments({ w, opts, onGoReview }) {
     if (r.ok) { toast('Documento borrado'); cargar() } else toast(r.error, 'err')
   }
   const revisados = summary.total - summary.pending
+  const porTipo = docs.reduce((m, x) => ({ ...m, [x.kind]: (m[x.kind] || 0) + 1 }), {})
+  const tipos = Object.keys(kinds).filter((k) => porTipo[k])
+  const lista = filtro && porTipo[filtro] ? docs.filter((x) => x.kind === filtro) : docs
 
   return (
     <>
-      <div className="wd-covbar">
+      <div className="wd-resumen">
         {COV_ORDEN.map((c) => {
           const x = summary.coverage[c]
           return (
-            <div key={c} className={`wd-covtile cov-${c}`}>
-              <span className="k"><i />{opts.review.coverages[c]}</span>
-              <b>{x.items}</b>
-              <small>{x.items === 1 ? 'dispositivo' : 'dispositivos'}{x.no_price ? <em title="Sin precio en la tarifa (Configuración)"> · {x.no_price} sin precio</em> : null}</small>
-            </div>
+            <span key={c} className={`wd-rs cov-${c}${!x.items ? ' cero' : ''}`}>
+              <i />{opts.review.coverages[c]} <b>{x.items}</b>
+              {x.no_price ? <em title="Sin precio en la tarifa (Configuración)">{x.no_price} sin precio</em> : null}
+            </span>
           )
         })}
-        <div className={`wd-covtile rev${summary.pending ? ' pend' : ''}`}>
-          <span className="k">Revisión</span>
-          <b>{revisados}<small> / {summary.total}</small></b>
-          {summary.pending ? <button className="link" onClick={onGoReview}>Quedan {summary.pending} sin revisar</button> : <small>{summary.total ? 'Todo revisado' : 'Sin dispositivos'}</small>}
-        </div>
+        <span className={`wd-rs rev${summary.pending ? ' pend' : ''}`}>
+          Revisión <b>{revisados}/{summary.total}</b>
+          {summary.pending ? <button className="wf-link" onClick={onGoReview}>Quedan {summary.pending} sin revisar</button> : null}
+        </span>
       </div>
 
       <div className="wd-acts">
-        <button className="btn" disabled={!revisados} onClick={() => setModal({ t: 'gen', kind: 'presupuesto' })}><Icon.doc /> Generar presupuestos</button>
+        <button className="btn sm" disabled={!revisados} onClick={() => setModal({ t: 'gen', kind: 'presupuesto' })}><Icon.doc /> Generar presupuestos</button>
         <button className="dev-btn" disabled={!revisados} onClick={() => setModal({ t: 'gen', kind: 'albaran' })}><Icon.list /> Generar albaranes</button>
         <button className="dev-btn" onClick={() => setModal({ t: 'up' })}><Icon.upload /> Subir documento</button>
         <span className="spacer" />
         <button className="dev-btn" disabled={!summary.total} title={summary.pending ? 'Se genera con todo revisado' : ''} onClick={() => setModal({ t: 'report' })}><Icon.file /> Informe de resolución</button>
         <button className="dev-btn" onClick={() => setModal({ t: 'mail' })}><Icon.mail /> Correo de resolución</button>
       </div>
+
+      {tipos.length > 1 ? (
+        <div className="dc-seg wd-filtro">
+          <button className={!filtro || !porTipo[filtro] ? 'on' : ''} onClick={() => setFiltro('')}>Todos <small>{docs.length}</small></button>
+          {tipos.map((k) => <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(k)}>{PLURAL[k] || kinds[k].label} <small>{porTipo[k]}</small></button>)}
+        </div>
+      ) : null}
 
       {!docs.length ? (
         <div className="act-empty wd-empty"><Icon.file style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
@@ -335,31 +452,32 @@ export default function WarrantyDocuments({ w, opts, onGoReview }) {
         <div className="dev-card">
           <div className="dev-table-wrap keep wt-wrap">
             <table className="dev-table wd-table">
-              <thead><tr><th>Documento</th><th>Quién paga</th><th>Estado</th><th className="r">Importe</th><th>Fecha</th><th /></tr></thead>
+              <thead><tr><th>Documento</th><th>Estado</th><th className="r">Importe</th><th>Fecha</th><th /></tr></thead>
               <tbody>
-                {docs.map((x) => {
+                {lista.map((x) => {
                   const k = kinds[x.kind]
                   const generado = x.source === 'generado' && k.generated
+                  const editando = modal?.t === 'edit' && modal.id === x.id
                   return (
-                    <tr key={x.id} className={x.status === 'anulado' ? 'off' : ''}>
+                    <tr key={x.id} className={`${x.status === 'anulado' ? 'off' : ''}${editando ? ' wd-on' : ''}`}>
                       <td>
                         <div className="wd-doc">
                           <span className={`wd-ic k-${x.kind}`}>{x.kind === 'informe' ? <Icon.file /> : x.kind === 'albaran' ? <Icon.list /> : <Icon.doc />}</span>
                           <div>
-                            <b>{k.label}{x.number ? <> <span className="mono">{x.number}</span></> : null}</b>
+                            <b>{k.label}{x.number ? <> <span className="mono">{x.number}</span></> : null}{x.coverage ? <> <CovPill c={x.coverage} opts={opts} /></> : null}</b>
                             <small className="dev-mute">
                               {x.source === 'subido' ? <>Subido · {x.file_name} {peso(x.size)}</> : x.kind === 'informe' ? <>Generado{x.note ? ` · ${x.note.toLowerCase()}` : ''}</> : <>{x.lines_count} {x.lines_count === 1 ? 'línea' : 'líneas'}{x.from_number ? ` · desde ${x.from_number}` : ''}</>}
                             </small>
                           </div>
                         </div>
                       </td>
-                      <td><CovPill c={x.coverage} opts={opts} /></td>
                       <td>{k.statuses.length ? <Select sm value={x.status} onChange={(s) => estado(x, s)} options={k.statuses.map((s) => ({ value: s, label: opts.documents.statuses[s] }))} /> : <span className="dev-mute">—</span>}</td>
                       <td className="r"><b>{x.coverage === 'garantia' && generado ? <span className="wd-free">Sin cargo</span> : eur(x.total)}</b></td>
                       <td><span title={x.created_by_name || ''}>{fecha(x.kind === 'informe' ? x.updated_at : x.created_at)}</span></td>
                       <td className="wd-row-acts">
-                        {generado ? <button className="icon-btn" title="Editar líneas" onClick={() => setModal({ t: 'edit', id: x.id })}><Icon.pencil /></button> : null}
+                        {generado ? <button className={`icon-btn${editando ? ' wd-editing' : ''}`} title={editando ? 'Editando: las líneas están debajo' : 'Editar líneas'} onClick={() => setModal({ t: 'edit', id: x.id })}><Icon.pencil /></button> : null}
                         {x.source === 'subido' ? <button className="icon-btn" title="Editar datos" onClick={() => setModal({ t: 'up', doc: x })}><Icon.pencil /></button> : null}
+                        {generado && PORTAL.includes(x.kind) ? <button className="icon-btn" title="Validar para el portal" onClick={() => setModal({ t: 'portal', doc: x })}><Icon.globe /></button> : null}
                         <button className="icon-btn" title="Descargar" onClick={() => descargar(x, toast)}><Icon.download /></button>
                         {generado && x.kind === 'presupuesto' && !['rechazado', 'anulado'].includes(x.status) ? <button className="icon-btn" title="Hacer albarán" onClick={() => albaran(x)}><Icon.arrowRight /></button> : null}
                         <button className="icon-btn" title={generado && !['borrador', 'anulado'].includes(x.status) ? 'Anúlalo para poder borrarlo' : 'Borrar'} disabled={generado && !['borrador', 'anulado'].includes(x.status)} onClick={() => borrar(x)}><Icon.trash /></button>
@@ -375,10 +493,11 @@ export default function WarrantyDocuments({ w, opts, onGoReview }) {
 
       {modal?.t === 'gen' && <Generar w={w} kind={modal.kind} opts={opts} summary={summary} docs={docs} onClose={cerrar}
         onDone={(ids) => { cargar(); setModal(ids.length === 1 ? { t: 'edit', id: ids[0] } : null) }} />}
-      {modal?.t === 'edit' && <Editor id={modal.id} opts={opts} services={d.services || []} onClose={() => { cerrar(); cargar() }} onSaved={tras} />}
+      {modal?.t === 'edit' && <Editor key={modal.id} id={modal.id} opts={opts} services={d.services || []} onClose={() => { cerrar(); cargar() }} onSaved={tras} />}
       {modal?.t === 'up' && <Subir w={w} opts={opts} doc={modal.doc} onClose={cerrar} onDone={tras} />}
       {modal?.t === 'report' && <Informe w={w} summary={summary} actual={informe} onClose={cerrar} onDone={tras} />}
       {modal?.t === 'mail' && <Correo w={w} docs={docs} onClose={cerrar} />}
+      {modal?.t === 'portal' && <Portal doc={modal.doc} opts={opts} onClose={cerrar} onEditWarranty={onEditWarranty ? () => { cerrar(); onEditWarranty() } : null} />}
     </>
   )
 }

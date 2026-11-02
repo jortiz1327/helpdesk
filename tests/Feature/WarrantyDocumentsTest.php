@@ -165,4 +165,15 @@ class WarrantyDocumentsTest extends TestCase
         $this->assertSame(10.0, (float) WarrantyDocument::setting('documents')['vat']);
         $this->assertSame('AEME Group', WarrantyDocument::setting('company')['name']);
     }
+
+    public function test_validar_para_el_portal_no_crea_nada(): void
+    {
+        $this->item('8E9749440', ['resolution' => 'danada', 'coverage' => 'cliente']);
+        $id = $this->postJson('/api/warranty_docs.php?action=generate', ['id' => $this->w->id, 'kind' => 'presupuesto', 'coverages' => ['cliente']], $this->h)->json('ids.0');
+        $r = $this->postJson('/api/warranty_docs.php?action=portal_check', ['id' => $id], $this->h)->assertOk()->json();
+        // Sin cliente del portal enlazado (o sin portal) no está listo, y crear sigue desactivado.
+        $this->assertFalse($r['ready']);
+        $this->assertFalse($r['enabled']);
+        $this->assertTrue(collect($r['checks'])->contains('tone', 'bad'));
+    }
 }
