@@ -5135,3 +5135,28 @@ button.dev-code:hover { text-decoration: underline; }
 .wr-cs-grupos li b { white-space: nowrap; }
 .wr-cs-grupos li.t-info { color: var(--ink-2); }
 .wr-cs-grupos li.t-info svg { fill: var(--ink-3); }
+/* Garantías · lista: barra de filtros en una línea, selección con acciones en lote y
+ * columnas a dos líneas (cliente/proyecto), responsable con iniciales y quién paga. */
+.wl-search { flex: 0 1 260px; min-width: 180px; }
+.wl-head-acts { display: flex; align-items: center; gap: 10px; }
+.wl-search { flex: 1 1 220px !important; min-width: 160px !important; max-width: 340px; }
+.wl-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 9px 16px; border-bottom: 1px solid var(--line); background: var(--primary-soft); font-size: 13px; }
+.wl-bulk b { color: var(--primary); }
+.wl-bulk .sep { width: 1px; height: 20px; background: color-mix(in srgb, var(--primary) 25%, transparent); }
+.wl-bulk .spacer { flex: 1; }
+.wl-bulk .sel-trigger { background: var(--panel); }
+.wl-table .wl-ck { width: 34px; padding-right: 0; }
+.wl-table .wl-ck input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.wl-table tr.wl-on td { background: color-mix(in srgb, var(--primary) 5%, transparent); }
+.wl-table .r { text-align: right; }
+.wl-cli { max-width: 300px; }
+.wl-cli b, .wl-cli > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-cli b { font-size: 13px; font-weight: 600; color: var(--ink); }
+.wl-cli > span { font-size: 12px; color: var(--ink-3); }
+.wl-tk { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.wl-resp { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 13px; }
+.wl-resp i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line-2); }
+.wl-cob { display: inline-flex; gap: 4px; }
+.wl-cob em { font-style: normal; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line); white-space: nowrap; }
+.wl-cob em.c-cliente { background: color-mix(in srgb, #ea580c 10%, transparent); color: #c2410c; border-color: color-mix(in srgb, #ea580c 25%, transparent); }
+.wl-act { white-space: nowrap; font-size: 12.5px; color: var(--ink-2); }

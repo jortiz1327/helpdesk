@@ -140,6 +140,40 @@ class WarrantiesTest extends TestCase
         $this->assertSame(3, $r['all']);
     }
 
+    public function test_contadores_categoria_y_cambios_en_lote(): void
+    {
+        [$ana, $h] = $this->agente();
+        [$luis] = $this->agente(['warranties.access'], 'Luis');
+        [$pepe] = $this->agente(['helpdesk.access'], 'Pepe');
+        $a = $this->crear($h, ['responsible_id' => $ana->id]);
+        $b = $this->crear($h, ['category' => 'Tiendas']);
+        $c = $this->crear($h, ['status' => 'cerrada']);
+
+        $r = $this->getJson('/api/warranties.php', $h)->json();
+        $this->assertSame(['open' => 2, 'mine' => 1, 'pte_zkong' => 0, 'closed' => 1, 'all' => 3], $r['counts']);
+        $this->assertSame([$b['id']], collect($this->getJson('/api/warranties.php?category=Tiendas', $h)->json('rows'))->pluck('id')->all());
+
+        // Estado y responsable de varias a la vez; cada cambio queda en su historial.
+        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id'], $b['id']], 'status' => 'cerrada', 'responsible_id' => $luis->id], $h)
+            ->assertOk()->assertJson(['changed' => 2]);
+        $this->assertNotNull(Warranty::find($a['id'])->closed_at);
+        $this->assertSame($luis->id, Warranty::find($b['id'])->responsible_id);
+        $ev = collect($this->getJson("/api/warranties.php?action=get&id={$b['id']}", $h)->json('events'))->keyBy('field');
+        $this->assertSame(['No iniciado', 'Cerrada'], [$ev['status']['from_value'], $ev['status']['to_value']]);
+        $this->assertSame('Luis', $ev['responsible_id']['to_value']);
+
+        // Reabrir en lote quita la fecha de cierre; lo que no cambia no cuenta.
+        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id'], $c['id']], 'status' => 'en_curso'], $h)->assertJson(['changed' => 2]);
+        $this->assertNull(Warranty::find($c['id'])->closed_at);
+        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id']], 'status' => 'en_curso'], $h)->assertJson(['changed' => 0]);
+
+        // Sin acceso a garantías no puede ser responsable; sin nada que cambiar, error.
+        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id']], 'responsible_id' => $pepe->id], $h)->assertStatus(400);
+        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id']]], $h)->assertStatus(400);
+        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id']], 'responsible_id' => 'none'], $h)->assertJson(['changed' => 1]);
+        $this->assertNull(Warranty::find($a['id'])->responsible_id);
+    }
+
     public function test_bandeja_de_garantias_solo_su_categoria_y_garantia_enlazada_al_ticket(): void
     {
         $catGar = DB::table('ticket_categories')->insertGetId(['key' => 'garantias_t', 'name' => 'Garantías', 'color' => '#888', 'position' => 1, 'active' => 1]);

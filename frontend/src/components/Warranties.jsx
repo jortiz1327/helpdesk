@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
@@ -253,39 +254,71 @@ export function NuevaGarantia({ inicial, onClose, onSaved }) {
 }
 
 /* --- Lista --- */
+// Pestañas (con contador) y el resto de filtros rápidos, que van en «Más filtros».
+const PESTANAS = [['open', 'Abiertas'], ['mine', 'Mías'], ['pte_zkong', 'Pte. ZKONG'], ['closed', 'Cerradas'], ['', 'Todas']]
+const MAS_FILTROS = CHIPS.filter(([k]) => !PESTANAS.some(([p]) => p === k))
+const COB_CORTO = { garantia: 'Garantía', cliente: 'Cliente', pilas: 'Pilas' }
+const iniciales = (n) => String(n || '').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
+// «hace 20 min», «hace 3 h», «ayer», «hace 4 días», y la fecha a partir de un mes.
+const relativo = (v) => {
+  const d = aFecha(v)
+  if (!d || isNaN(d)) return '—'
+  const min = Math.floor((Date.now() - d) / 60000)
+  if (min < 1) return 'ahora'
+  if (min < 60) return `hace ${min} min`
+  if (min < 1440) return `hace ${Math.floor(min / 60)} h`
+  const n = Math.floor(min / 1440)
+  return n === 1 ? 'ayer' : n < 30 ? `hace ${n} días` : fecha(v)
+}
+
 function Lista({ opts, onOpen, onNew, reload, filtro }) {
-  const [chip, setChip] = useState(filtro?.chip || '')
-  // Responsable concreto (al llegar desde Equipo): { id, name }; id «none» = sin responsable.
-  const [resp, setResp] = useState(filtro?.responsible ? { id: filtro.responsible, name: filtro.name } : null)
-  useEffect(() => { if (filtro) { setChip(filtro.chip || ''); setResp(filtro.responsible ? { id: filtro.responsible, name: filtro.name } : null); setPage(0) } }, [filtro])
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [chip, setChip] = useState(filtro ? filtro.chip || '' : 'open')
+  // Responsable (al llegar desde Equipo viene puesto): '' todos, 'none' sin responsable o su id.
+  const [resp, setResp] = useState(filtro?.responsible ? String(filtro.responsible) : '')
+  useEffect(() => { if (filtro) { setChip(filtro.chip || ''); setResp(filtro.responsible ? String(filtro.responsible) : ''); setPage(0) } }, [filtro])
+  const [cat, setCat] = useState('')
   const [qLive, setQLive] = useState('')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('')
   const [page, setPage] = useState(0)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [sel, setSel] = useState(() => new Set())
+  const [otra, setOtra] = useState(0)   // recarga tras un cambio en lote
+  const [hueco, setHueco] = useState(null)   // acciones en la cabecera de la página
+  useEffect(() => { setHueco(document.getElementById('wr-head-acts')) }, [])
   const pedida = useRef(0)
 
   useEffect(() => { const t = setTimeout(() => { setQ(qLive.trim()); setPage(0) }, 300); return () => clearTimeout(t) }, [qLive])
+  useEffect(() => { setSel(new Set()) }, [chip, q, resp, cat])
 
   useEffect(() => {
     const n = ++pedida.current
     setLoading(true)
-    api.warranties({ chip, q, sort, page, size: SIZE, ...(resp ? { responsible: resp.id } : {}) }).then((r) => {
+    api.warranties({ chip, q, sort, page, size: SIZE, ...(resp ? { responsible: resp } : {}), ...(cat ? { category: cat } : {}) }).then((r) => {
       if (n !== pedida.current) return
       setLoading(false)
-      setData(r.ok ? r : { rows: [], total: 0, all: 0, error: r.error })
+      setData(r.ok ? r : { rows: [], total: 0, all: 0, counts: {}, error: r.error })
     })
-  }, [chip, q, sort, page, reload, resp])
+  }, [chip, q, sort, page, reload, resp, cat, otra])
 
   const total = data?.total || 0
   const paginas = Math.ceil(total / SIZE)
   const filas = data?.rows || []
+  const counts = data?.counts || {}
+  const filtrando = !!(q || resp || cat || MAS_FILTROS.some(([k]) => k === chip))
+  const todasMarcadas = filas.length > 0 && filas.every((w) => sel.has(w.id))
+  const marcar = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const marcarTodas = () => setSel(todasMarcadas ? new Set() : new Set(filas.map((w) => w.id)))
+  const elegidas = filas.filter((w) => sel.has(w.id))
 
-  const exportar = () => {
+  const exportar = (lista) => {
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const cab = ['Expediente', 'Recepción', 'Cliente', 'Proyecto', 'Categoría', 'Urgencia', 'Responsable', 'Estado', 'Ticket']
-    const lineas = filas.map((w) => [w.code, fecha(w.received_at), w.client_name, w.project_name, w.category, opts?.urgencies?.[w.urgency] || 'No disponible', w.responsible_name, opts?.statuses?.[w.status], w.ticket_code])
+    const cab = ['Expediente', 'Recepción', 'Cliente', 'Proyecto', 'Etiquetas', 'Categoría', 'Urgencia', 'Responsable', 'Estado', 'Quién paga', 'Ticket', 'Última actividad']
+    const lineas = lista.map((w) => [w.code, fecha(w.received_at), w.client_name, w.project_name, w.labels_count, w.category, opts?.urgencies?.[w.urgency] || 'No disponible',
+      w.responsible_name, opts?.statuses?.[w.status], (w.coverages || []).map((c) => COB_CORTO[c] || c).join(' + '), w.ticket_code, fechaHora(w.last_activity_at)])
     const blob = new Blob(['﻿' + [cab.map(esc).join(';'), ...lineas.map((l) => l.map(esc).join(';'))].join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -294,78 +327,120 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   }
 
+  const enLote = async (cambios, texto) => {
+    const n = sel.size
+    if (!(await confirm({ title: `${texto} en ${n} ${n === 1 ? 'garantía' : 'garantías'}`, message: 'Cada cambio queda en el historial de su garantía.', confirmText: 'Aplicar' }))) return
+    const r = await api.bulkWarranties([...sel], cambios)
+    if (!r.ok) { toast(r.error || 'No se pudo cambiar', 'err'); return }
+    toast(r.changed ? `${r.changed} ${r.changed === 1 ? 'garantía cambiada' : 'garantías cambiadas'}` : 'Ya estaban así: no ha cambiado nada')
+    setSel(new Set())
+    setOtra((x) => x + 1)
+  }
+
+  const estadosActivos = Object.entries(opts?.status_meta || {}).filter(([, m]) => m.active).map(([k, m]) => ({ value: k, label: m.label, color: m.color }))
+  const agentes = (opts?.agents || []).map((a) => ({ value: String(a.id), label: a.name }))
+
   return (
-    <>
-      <div className="wr-head">
-        <div>
-          <h2>Garantías</h2>
-          <p className="dev-mute">{data ? <><b>{num(total)}</b> de {num(data.all)} expedientes</> : 'Cargando…'}</p>
+    <div className={`dev-card wl-card ${loading ? 'busy' : ''}`}>
+      {loading && <div className="dev-progress" />}
+      <div className="wi-bar">
+        <div className="dev-search wl-search">
+          <Icon.search />
+          <input value={qLive} onChange={(e) => setQLive(e.target.value)} placeholder="Buscar expediente, cliente, proyecto o ticket…" />
+          {qLive ? <button className="dev-x" onClick={() => setQLive('')} title="Borrar">×</button> : null}
         </div>
-        <span className="spacer" />
-        <button className="dev-btn" disabled={!filas.length} onClick={exportar}><Icon.download /> Exportar</button>
+        <div className="dc-seg wi-tabs">
+          {PESTANAS.map(([k, l]) => (
+            <button key={k || 'all'} className={chip === k ? 'on' : ''} onClick={() => { setChip(k); setPage(0) }}>
+              {l}<span className="wi-n">{counts[k || 'all'] ?? '·'}</span>
+            </button>
+          ))}
+        </div>
+        <Select value={resp} onChange={(v) => { setResp(v); setPage(0) }} searchable
+          options={[{ value: '', label: 'Responsable: todos' }, { value: 'none', label: 'Sin responsable' }, ...agentes]} />
+        <Select value={cat} onChange={(v) => { setCat(v); setPage(0) }}
+          options={[{ value: '', label: 'Categoría: todas' }, { value: 'none', label: 'Sin categoría' }, ...(opts?.categories || []).map((c) => ({ value: c, label: c }))]} />
+        <Select value={MAS_FILTROS.some(([k]) => k === chip) ? chip : ''} onChange={(v) => { setChip(v || 'open'); setPage(0) }}
+          options={[{ value: '', label: 'Más filtros' }, ...MAS_FILTROS.map(([k, l]) => ({ value: k, label: l }))]} />
+        {filtrando ? <button className="dev-clear" onClick={() => { setQLive(''); setResp(''); setCat(''); setChip('open'); setPage(0) }}><Icon.x /> Limpiar</button> : null}
+      </div>
+      {hueco && createPortal(<>
+        <button className="dev-btn" disabled={!filas.length} onClick={() => exportar(filas)} title="Exportar a CSV lo que se ve"><Icon.download /> Exportar</button>
         <button className="btn" onClick={onNew}><Icon.plus /> Nueva garantía</button>
-      </div>
+      </>, hueco)}
 
-      <div className="wr-chips">
-        {CHIPS.map(([k, l]) => (
-          <button key={k} className={chip === k ? 'on' : ''} onClick={() => { setChip(chip === k ? '' : k); setPage(0) }}>{l}</button>
-        ))}
-      </div>
+      {sel.size > 0 && (
+        <div className="wl-bulk">
+          <b>{sel.size} {sel.size === 1 ? 'seleccionada' : 'seleccionadas'}</b>
+          <span className="sep" />
+          <Select sm value="" onChange={(v) => enLote({ status: v }, `Poner «${opts?.statuses?.[v] || v}»`)} options={[{ value: '', label: 'Cambiar estado…' }, ...estadosActivos]} />
+          <Select sm searchable value="" onChange={(v) => enLote({ responsible_id: v }, v === 'none' ? 'Quitar el responsable' : `Asignar a ${agentes.find((a) => a.value === v)?.label}`)}
+            options={[{ value: '', label: 'Asignar a…' }, { value: 'none', label: 'Sin responsable' }, ...agentes]} />
+          <button className="dev-btn" onClick={() => exportar(elegidas)}><Icon.download /> Exportar selección</button>
+          <span className="spacer" />
+          <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}><Icon.x /></button>
+        </div>
+      )}
 
-      <div className={`dev-card ${loading ? 'busy' : ''}`}>
-        {loading && <div className="dev-progress" />}
-        <div className="dev-tools">
-          <div className="dev-search" style={{ flexBasis: 420 }}>
-            <Icon.search />
-            <input value={qLive} onChange={(e) => setQLive(e.target.value)} placeholder="Buscar por expediente, cliente, proyecto o ticket…" />
-            {qLive ? <button className="dev-x" onClick={() => setQLive('')} title="Borrar">×</button> : null}
-          </div>
-          {resp ? <button className="wr-resp-f" title="Quitar" onClick={() => { setResp(null); setPage(0) }}><Icon.user /> {resp.id === 'none' ? 'Sin responsable' : resp.name} <Icon.x /></button> : null}
-          {chip || resp ? <button className="dev-clear" onClick={() => { setChip(''); setResp(null); setPage(0) }}><Icon.x /> Quitar filtro</button> : null}
-        </div>
-        <div className="dev-table-wrap keep">
-          <table className="dev-table wr-table">
-            <thead><tr>
-              <th>Expediente</th>
-              <th><button className="wr-sort" onClick={() => setSort(sort === 'received_asc' ? '' : 'received_asc')}>Recepción <Icon.chevron style={{ transform: sort === 'received_asc' ? 'rotate(180deg)' : 'none' }} /></button></th>
-              <th>Cliente</th><th>Proyecto</th><th>Etiquetas</th><th>Categoría</th><th>Urgencia</th><th>Responsable</th><th>Estado</th>
-            </tr></thead>
-            <tbody>
-              {data === null
-                ? Array.from({ length: 6 }, (_, i) => <tr key={i}>{Array.from({ length: 9 }, (_, j) => <td key={j}><span className="dev-skel" /></td>)}</tr>)
-                : filas.map((w) => (
-                  <tr key={w.id} className="wr-row" onClick={() => onOpen(w.id)}>
-                    <td><span className="wr-code">{w.code}</span>{w.ticket_code ? <span className="wr-tk" title={`Ticket ${w.ticket_code}`}><Icon.ticket /></span> : null}<Alertas list={w.alerts} /></td>
-                    <td>{fecha(w.received_at)}</td>
-                    <td className="wr-ell">{w.client_name || <span className="dev-mute">—</span>}</td>
-                    <td className="wr-ell">{w.project_name || <span className="dev-mute">—</span>}</td>
-                    <td>{w.labels_count ? <b>{num(w.labels_count)}</b> : <span className="dev-mute">—</span>}</td>
-                    <td>{w.category || <span className="dev-mute">—</span>}</td>
-                    <td><UrgPill u={w.urgency} opts={opts} /></td>
-                    <td>{w.responsible_name || <span className="dev-mute">Sin asignar</span>}</td>
-                    <td><EstadoPill s={w.status} opts={opts} /></td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-          {data && !filas.length && (
-            <div className="act-empty"><Icon.shield style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
-              <p>{chip || q ? 'Ninguna garantía coincide con el filtro.' : 'Aún no hay garantías. Crea la primera con «Nueva garantía».'}</p></div>
-          )}
-        </div>
-        {paginas > 1 && (
-          <div className="dev-foot">
-            <span className="dev-mute">Mostrando <b>{num(page * SIZE + 1)}–{num(Math.min(total, (page + 1) * SIZE))}</b> de <b>{num(total)}</b></span>
-            <span className="spacer" />
+      <div className="dev-table-wrap keep">
+        <table className="dev-table wr-table wl-table">
+          <thead><tr>
+            <th className="wl-ck"><input type="checkbox" checked={todasMarcadas} onChange={marcarTodas} title="Seleccionar las de esta página" /></th>
+            <th>Expediente</th>
+            <th>Cliente y proyecto</th>
+            <th>Ticket</th>
+            <th className="r">Etiquetas</th>
+            <th>Responsable</th>
+            <th>Estado</th>
+            <th>Urgencia</th>
+            <th>Quién paga</th>
+            <th><button className="wr-sort" onClick={() => setSort(sort === 'activity' ? '' : 'activity')}>Última actividad <Icon.chevron style={{ transform: sort === 'activity' ? 'none' : 'rotate(-90deg)', opacity: sort === 'activity' ? 1 : 0.4 }} /></button></th>
+          </tr></thead>
+          <tbody>
+            {data === null
+              ? Array.from({ length: 6 }, (_, i) => <tr key={i}>{Array.from({ length: 10 }, (_, j) => <td key={j}><span className="dev-skel" /></td>)}</tr>)
+              : filas.map((w) => (
+                <tr key={w.id} className={`wr-row ${sel.has(w.id) ? 'wl-on' : ''}`} onClick={() => onOpen(w.id)}>
+                  <td className="wl-ck" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(w.id)} onChange={() => marcar(w.id)} /></td>
+                  <td><span className="wr-code">{w.code}</span><Alertas list={w.alerts} /></td>
+                  <td className="wl-cli">
+                    <b>{w.client_name || <span className="dev-mute">Sin cliente</span>}</b>
+                    <span>{[w.project_name, w.category].filter(Boolean).join(' · ') || '—'}</span>
+                  </td>
+                  <td>{w.ticket_code ? <span className="wl-tk">{w.ticket_code}</span> : <span className="dev-mute">—</span>}</td>
+                  <td className="r">{w.labels_count ? <b>{num(w.labels_count)}</b> : <span className="dev-mute">—</span>}</td>
+                  <td>{w.responsible_name
+                    ? <span className="wl-resp"><i>{iniciales(w.responsible_name)}</i>{w.responsible_name}</span>
+                    : <span className="dev-mute">Sin asignar</span>}</td>
+                  <td><EstadoPill s={w.status} opts={opts} /></td>
+                  <td><UrgPill u={w.urgency} opts={opts} /></td>
+                  <td>{w.coverages?.length
+                    ? <span className="wl-cob">{w.coverages.map((c) => <em key={c} className={`c-${c}`}>{COB_CORTO[c] || c}</em>)}</span>
+                    : <span className="dev-mute" title="Se decide al revisar las etiquetas">—</span>}</td>
+                  <td className="wl-act" title={fechaHora(w.last_activity_at)}>{relativo(w.last_activity_at)}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+        {data && !filas.length && (
+          <div className="act-empty"><Icon.shield style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
+            <p>{data.all ? 'Ninguna garantía coincide con el filtro.' : 'Aún no hay garantías. Crea la primera con «Nueva garantía».'}</p></div>
+        )}
+      </div>
+      {total > 0 && (
+        <div className="dev-foot">
+          <span className="dev-mute">Mostrando <b>{num(page * SIZE + 1)}–{num(Math.min(total, (page + 1) * SIZE))}</b> de <b>{num(total)}</b>{data?.all !== total ? <> · {num(data.all)} en total</> : null}</span>
+          <span className="spacer" />
+          {paginas > 1 && (
             <div className="dev-pages">
               <button disabled={page === 0 || loading} onClick={() => setPage(page - 1)}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> <span>Anterior</span></button>
               <span className="dev-mute">{page + 1} / {paginas}</span>
               <button disabled={page + 1 >= paginas || loading} onClick={() => setPage(page + 1)}><span>Siguiente</span> <Icon.chevron style={{ transform: 'rotate(-90deg)' }} /></button>
             </div>
-          </div>
-        )}
-      </div>
-    </>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1254,6 +1329,9 @@ export default function Warranties({ isSuper = false, openId = null, onOpened, o
         <span className="sc-ic"><Icon.shield style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Garantías</h1></div>
         <span className="sub">· Expedientes de garantía</span>
+        <span className="spacer" />
+        {/* Aquí pone la lista sus acciones (exportar y nueva), como en el resto de pantallas. */}
+        {!sel && <div id="wr-head-acts" className="wl-head-acts" />}
       </header>
 
       <div className="page-scroll"><div className="page dev-page wr-page">

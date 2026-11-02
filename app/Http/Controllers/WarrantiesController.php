@@ -40,6 +40,7 @@ class WarrantiesController extends Controller
             'options' => $this->options(),
             'by_ticket' => $this->byTicket($request),
             'inbox'     => $this->inbox($request),
+            'bulk'      => $this->bulk($request),
             'labels_check'    => $this->labelsCheck($request),
             'labels_add'      => $this->labelsAdd($request),
             'labels_recheck'  => $this->labelsRecheck($request),
@@ -82,6 +83,19 @@ class WarrantiesController extends Controller
         $resp = (string) $request->query('responsible', '');
         if ($resp === 'none') $q->whereNull('warranties.responsible_id');
         elseif ($resp !== '') $q->where('warranties.responsible_id', (int) $resp);
+        $cat = trim((string) $request->query('category', ''));
+        if ($cat === 'none') $q->where(fn ($w) => $w->whereNull('warranties.category')->orWhere('warranties.category', ''));
+        elseif ($cat !== '') $q->where('warranties.category', $cat);
+
+        // Contadores de las pestañas, con la búsqueda y los desplegables ya aplicados.
+        $counts = [
+            'open'      => (clone $q)->where($abierta)->count(),
+            'mine'      => (clone $q)->where($abierta)->where('warranties.responsible_id', $me->id)->count(),
+            'pte_zkong' => (clone $q)->where('warranties.status', 'pte_zkong')->count(),
+            'closed'    => (clone $q)->whereIn('warranties.status', $cerrados)->count(),
+            'all'       => (clone $q)->count(),
+        ];
+
         $vacio = fn (string $col) => fn ($w) => $w->whereNull($col)->orWhere($col, '');
         match ((string) $request->query('chip', '')) {
             'mine'        => $q->where('warranties.responsible_id', $me->id),
@@ -116,11 +130,74 @@ class WarrantiesController extends Controller
             ->offset($page * $size)->limit($size)
             ->select(['warranties.*', 'u.name as responsible_name', 't.code as ticket_code'])
             ->addSelect(['labels_count' => WarrantyItem::selectRaw('count(*)')->whereColumn('warranty_id', 'warranties.id')])
+            // Quién paga: lo que se ha puesto en la revisión de sus etiquetas (garantía, cliente, pilas).
+            ->addSelect(['coverages' => WarrantyItem::selectRaw('group_concat(distinct coverage)')->whereColumn('warranty_id', 'warranties.id')->whereNotNull('coverage')])
             ->get();
         $alertas = $this->alertas()->alerts($rows);
-        $rows = $rows->map(fn ($w) => $this->row($w) + ['alerts' => $alertas[$w->id] ?? []]);
+        $rows = $rows->map(fn ($w) => $this->row($w) + [
+            'alerts'    => $alertas[$w->id] ?? [],
+            'coverages' => $w->coverages ? array_values(array_intersect(array_keys(WarrantyItem::COVERAGES), explode(',', $w->coverages))) : [],
+        ]);
 
-        return response()->json(['ok' => true, 'rows' => $rows, 'total' => $total, 'all' => Warranty::count()]);
+        return response()->json(['ok' => true, 'rows' => $rows, 'total' => $total, 'all' => Warranty::count(), 'counts' => $counts]);
+    }
+
+    /**
+     * Cambios en lote desde la lista: estado y/o responsable de varias garantías. Cada
+     * cambio queda en el historial de su garantía, igual que al editarla una a una.
+     */
+    private function bulk(Request $request)
+    {
+        $me = $request->user();
+        $ids = collect((array) $request->input('ids', []))->map(fn ($v) => (int) $v)->filter()->unique()->take(500)->values();
+        if ($ids->isEmpty()) {
+            return response()->json(['ok' => false, 'error' => 'No hay garantías elegidas'], 400);
+        }
+        $cambios = [];
+        if ($request->filled('status')) {
+            $estado = Warranty::statusRows()[(string) $request->input('status')] ?? null;
+            if (! $estado || ! $estado['active']) {
+                return response()->json(['ok' => false, 'error' => 'Estado no válido'], 400);
+            }
+            $cambios['status'] = (string) $request->input('status');
+        }
+        if ($request->has('responsible_id')) {
+            $r = $request->input('responsible_id');
+            $r = $r === null || $r === '' || $r === 'none' ? null : (int) $r;
+            if ($r && ! $this->agentes()->has($r)) {
+                return response()->json(['ok' => false, 'error' => 'Ese responsable no tiene acceso a garantías'], 400);
+            }
+            $cambios['responsible_id'] = $r;
+        }
+        if (! $cambios) {
+            return response()->json(['ok' => false, 'error' => 'Nada que cambiar'], 400);
+        }
+
+        $tocadas = 0;
+        DB::transaction(function () use ($ids, $cambios, $me, &$tocadas) {
+            foreach (Warranty::whereIn('id', $ids)->lockForUpdate()->get() as $w) {
+                $hubo = false;
+                foreach ($cambios as $campo => $nuevo) {
+                    if ((string) $w->{$campo} === (string) $nuevo) {
+                        continue;
+                    }
+                    $this->evento($w->id, $me->id, $campo, $this->legible($campo, $w->{$campo}), $this->legible($campo, $nuevo));
+                    if ($campo === 'status') {
+                        $w->status_changed_at = now();
+                        $cerrada = Warranty::statusRows()[$nuevo]['closed'] ?? false;
+                        $w->closed_at = $cerrada ? ($w->closed_at ?? now()) : null;
+                    }
+                    $w->{$campo} = $nuevo;
+                    $hubo = true;
+                }
+                if ($hubo) {
+                    $w->last_activity_at = now();
+                    $w->save();
+                    $tocadas++;
+                }
+            }
+        });
+        return response()->json(['ok' => true, 'changed' => $tocadas]);
     }
 
     private function row($w): array
