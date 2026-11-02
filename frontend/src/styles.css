@@ -4911,6 +4911,14 @@ button.dev-code:hover { text-decoration: underline; }
 .zk-pag { display: inline-flex; align-items: center; gap: 10px; }
 .zk-rt .wt-ver .wf-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; }
 .zk-rt .wt-ver svg { width: 14px; height: 14px; fill: currentColor; }
+/* Centro de dispositivos: garantías en las que ha estado un código (ficha y búsqueda). */
+.dev-h4-n { margin-left: 6px; font-size: 11.5px; font-weight: 700; }
+.dev-gar { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.dev-gar li { display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+.dev-gar li > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+.dev-gar .wr-code, .dev-two .link.wr-code { font-weight: 800; color: var(--primary); }
+.dev-gar small { font-size: 12px; }
+.dev-chip.warn { color: #b45309; background: color-mix(in srgb, #f59e0b 14%, transparent); }
 /* Selector de rango de fechas (DateRange.jsx): botón con el rango y calendario de dos meses. */
 .dr { position: relative; }
 .dr-btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }

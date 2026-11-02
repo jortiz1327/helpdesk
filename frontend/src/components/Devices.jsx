@@ -342,8 +342,20 @@ function Lista({ kind, server, stats, onOpen }) {
   )
 }
 
+/* Garantías en las que ha estado un código: la más reciente y cuántas más. */
+function Garantias({ ws, onOpenWarranty }) {
+  if (!ws?.length) return <span className="dev-mute">—</span>
+  const w = ws[0]
+  return (
+    <div className="dev-two" title={ws.map((x) => `${x.code} · ${x.status}`).join('\n')}>
+      <span>{onOpenWarranty ? <button className="link wr-code" onClick={() => onOpenWarranty(w.id)}>{w.code}</button> : <b>{w.code}</b>}{ws.length > 1 ? <span className="dev-mute"> +{ws.length - 1}</span> : null}</span>
+      <small>{w.status}</small>
+    </div>
+  )
+}
+
 /* --- Búsqueda de varios códigos en todos los servidores --- */
-function Buscar({ servers, onOpen }) {
+function Buscar({ servers, onOpen, onOpenWarranty }) {
   const [txt, setTxt] = useState('')
   const [res, setRes] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -362,15 +374,16 @@ function Buscar({ servers, onOpen }) {
   const results = res?.results || []
   const encontrados = results.filter((x) => x.rows.length)
   const noEstan = results.filter((x) => !x.rows.length)
+  const conGarantia = results.filter((x) => x.warranties?.length)
   const porServidor = (name) => results.reduce((n, x) => n + x.rows.filter((r) => r.server === name).length, 0)
   const maxSrv = Math.max(1, ...servers.map((s) => porServidor(s.name)))
-  const visibles = ver === 'found' ? encontrados : ver === 'missing' ? noEstan : results
+  const visibles = ver === 'found' ? encontrados : ver === 'missing' ? noEstan : ver === 'warranty' ? conGarantia : results
 
   const exportarBusqueda = () => {
-    const cab = ['Código', 'Tipo', 'Servidor', 'Estado', 'Tienda', 'Empresa', 'Modelo', 'Firmware']
+    const cab = ['Código', 'Tipo', 'Servidor', 'Estado', 'Tienda', 'Empresa', 'Modelo', 'Firmware', 'Garantías']
     const lineas = results.flatMap((x) => (x.rows.length
-      ? x.rows.map((r) => [x.code, r.kind === 'ap' ? 'Antena' : 'Etiqueta', r.server, estadoDe(r.kind, r)[0], r.storeName, r.merchantName, r.model, r.softVersion])
-      : [[x.code, '', '', 'No encontrado']]))
+      ? x.rows.map((r) => [x.code, r.kind === 'ap' ? 'Antena' : 'Etiqueta', r.server, estadoDe(r.kind, r)[0], r.storeName, r.merchantName, r.model, r.softVersion, (x.warranties || []).map((w) => w.code).join(', ')])
+      : [[x.code, '', '', 'No encontrado', '', '', '', '', (x.warranties || []).map((w) => w.code).join(', ')]]))
     descargar('busqueda', [cab.map(esc).join(';'), ...lineas.map((l) => l.map(esc).join(';'))])
   }
 
@@ -424,6 +437,7 @@ function Buscar({ servers, onOpen }) {
               <button className={ver === 'all' ? 'on' : ''} onClick={() => setVer('all')}>Todos</button>
               <button className={ver === 'found' ? 'on' : ''} onClick={() => setVer('found')}>Encontrados</button>
               <button className={`${ver === 'missing' ? 'on' : ''} bad`} onClick={() => setVer('missing')}>No localizados ({noEstan.length})</button>
+              {conGarantia.length ? <button className={ver === 'warranty' ? 'on' : ''} onClick={() => setVer('warranty')}>Con garantía ({conGarantia.length})</button> : null}
             </div>
             <span className="spacer" />
             <button className="dev-btn" onClick={exportarBusqueda}><Icon.download /> Exportar CSV</button>
@@ -431,7 +445,7 @@ function Buscar({ servers, onOpen }) {
           </div>
           <div className="dev-table-wrap keep">
             <table className="dev-table">
-              <thead><tr><th>#</th><th>Código buscado</th><th>Tipo</th><th>Servidor</th><th>Tienda</th><th>Estado</th><th>Modelo · firmware</th><th /></tr></thead>
+              <thead><tr><th>#</th><th>Código buscado</th><th>Tipo</th><th>Servidor</th><th>Tienda</th><th>Estado</th><th>Modelo · firmware</th><th>Garantías</th><th /></tr></thead>
               <tbody>
                 {visibles.flatMap((x) => {
                   const idx = results.indexOf(x) + 1
@@ -442,6 +456,7 @@ function Buscar({ servers, onOpen }) {
                         <td><span className="dev-code bad">{x.code}</span></td>
                         <td className="dev-mute">Desconocido</td>
                         <td colSpan={4}><span className="dev-pill off"><i />No encontrado en ningún servidor</span></td>
+                        <td><Garantias ws={x.warranties} onOpenWarranty={onOpenWarranty} /></td>
                         <td />
                       </tr>
                     )]
@@ -455,6 +470,7 @@ function Buscar({ servers, onOpen }) {
                       <td className="c-storeName"><Tienda r={r} /></td>
                       <td><Estado kind={r.kind} row={r} /></td>
                       <td><div className="dev-two">{r.model ? <span className="dev-mono">{r.model}</span> : <span className="dev-mute">—</span>}{r.softVersion ? <small>{r.softVersion}</small> : null}</div></td>
+                      <td>{i === 0 ? <Garantias ws={x.warranties} onOpenWarranty={onOpenWarranty} /> : null}</td>
                       <td>{i === 0 ? <button className="dev-open" onClick={() => onOpen(x.code)}>Abrir ficha <Icon.arrowRight /></button> : null}</td>
                     </tr>
                   ))
@@ -476,7 +492,7 @@ function Buscar({ servers, onOpen }) {
 const CAMPO = { server: 'Servidor', store: 'Tienda', model: 'Modelo', firmware: 'Firmware', ap_mac: 'Antena' }
 
 /* --- Ficha de un dispositivo: panel lateral --- */
-function Ficha({ code, servers, onClose, onOpen }) {
+function Ficha({ code, servers, onClose, onOpen, onOpenWarranty }) {
   const [d, setD] = useState(null)
   const [copiado, setCopiado] = useState(false)
   useEffect(() => {
@@ -555,6 +571,24 @@ function Ficha({ code, servers, onClose, onOpen }) {
                 )}
 
                 <section className="dev-box">
+                  <h4><Icon.shield /> Garantías{d.warranties?.length ? <span className="dev-mute dev-h4-n">{d.warranties.length}</span> : null}</h4>
+                  {!d.warranties?.length ? <p className="dev-mute" style={{ margin: 0 }}>No ha estado en ninguna garantía.</p> : (
+                    <ul className="dev-gar">
+                      {d.warranties.map((w) => (
+                        <li key={w.id}>
+                          <div>
+                            {onOpenWarranty ? <button className="link wr-code" onClick={() => onOpenWarranty(w.id)}>{w.code}</button> : <b>{w.code}</b>}
+                            <span className={`dev-chip ${w.closed ? '' : 'warn'}`}>{w.status}</span>
+                            <span className="dev-mute">{w.received_at ? `Recibida el ${fmtFecha(w.received_at)}` : ''}</span>
+                          </div>
+                          <small className="dev-mute">{[w.client_name, w.resolution ? `Revisión: ${w.resolution}` : 'Sin revisar', w.zkong_result ? `ZKONG: ${w.zkong_result}` : null].filter(Boolean).join(' · ')}</small>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+
+                <section className="dev-box">
                   <h4><Icon.clock /> Historial</h4>
                   {!d.history?.length ? <p className="dev-mute" style={{ margin: 0 }}>Sin historial todavía: se empieza a guardar desde la primera vez que se consulta aquí.</p> : (
                     <ul className="dev-hist">
@@ -617,7 +651,7 @@ function Cabecera({ tab, setTab, servers, server, elegir, stats }) {
   )
 }
 
-export default function Devices({ canServers = false, onGoServers }) {
+export default function Devices({ canServers = false, onGoServers, onOpenWarranty }) {
   const [tab, setTab] = useState('esl')
   const [servers, setServers] = useState(null)
   const [server, setServer] = useState(null)
@@ -665,13 +699,13 @@ export default function Devices({ canServers = false, onGoServers }) {
           ) : (
             <>
               <Cabecera tab={tab} setTab={setTab} servers={servers} server={server} elegir={elegir} stats={stats} />
-              {tab === 'search' ? <Buscar servers={servers} onOpen={setFicha} />
+              {tab === 'search' ? <Buscar servers={servers} onOpen={setFicha} onOpenWarranty={onOpenWarranty} />
                 : <Lista key={tab} kind={tab} server={server} stats={stats[tab] || null} onOpen={setFicha} />}
             </>
           )}
       </div></div>
 
-      {ficha && <Ficha code={ficha} servers={servers || []} onClose={cerrarFicha} onOpen={setFicha} />}
+      {ficha && <Ficha code={ficha} servers={servers || []} onClose={cerrarFicha} onOpen={setFicha} onOpenWarranty={onOpenWarranty ? (id) => { setFicha(null); onOpenWarranty(id) } : null} />}
     </>
   )
 }

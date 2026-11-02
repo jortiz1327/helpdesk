@@ -3,15 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\DeviceSighting;
+use App\Models\Warranty;
+use App\Models\WarrantyItem;
+use App\Models\ZkongBatch;
 use App\Models\ZkongServer;
 use App\Services\Zkong\ZkongDevices;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
  * Centro de dispositivos (Gestión de garantías). Solo consulta: listas de etiquetas y
- * antenas por servidor, búsqueda de códigos en todos los servidores y ficha con historial.
+ * antenas por servidor, búsqueda de códigos en todos los servidores y ficha con historial
+ * y con las garantías en las que ha estado cada código.
  * Requiere warranties.access (ruta).
  */
 class DevicesController extends Controller
@@ -74,7 +79,33 @@ class DevicesController extends Controller
         if (count($codes) > 50) {
             return response()->json(['ok' => false, 'error' => 'Como máximo 50 códigos por búsqueda'], 400);
         }
-        return response()->json(['ok' => true] + $this->devices->search($codes));
+        $r = $this->devices->search($codes);
+        $g = $this->garantias(array_column($r['results'], 'code'));
+        $r['results'] = array_map(fn ($x) => $x + ['warranties' => $g[$x['code']] ?? []], $r['results']);
+        return response()->json(['ok' => true] + $r);
+    }
+
+    /**
+     * Las garantías en las que ha estado cada código (más recientes primero), con su estado
+     * y lo que se decidió en la revisión y respondió ZKONG. Los códigos ya van normalizados.
+     */
+    private function garantias(array $codes): array
+    {
+        if (! $codes) return [];
+        $estados = Warranty::statuses();
+        $res = WarrantyItem::RESOLUTIONS;
+        return DB::table('warranty_items as i')->join('warranties as w', 'w.id', '=', 'i.warranty_id')
+            ->whereIn('i.code', $codes)->orderByDesc('w.received_at')->orderByDesc('w.id')
+            ->get(['i.code', 'w.id', 'w.code as warranty_code', 'w.status', 'w.received_at', 'w.client_name', 'i.resolution', 'i.zkong_result'])
+            ->groupBy('code')
+            ->map(fn ($xs) => $xs->map(fn ($x) => [
+                'id' => $x->id, 'code' => $x->warranty_code, 'status' => $estados[$x->status] ?? $x->status,
+                'closed' => in_array($x->status, Warranty::closedStatuses(), true),
+                'received_at' => $x->received_at, 'client_name' => $x->client_name,
+                'resolution' => $x->resolution && $x->resolution !== 'pendiente' ? ($res[$x->resolution]['label'] ?? $x->resolution) : null,
+                'zkong_result' => $x->zkong_result ? (ZkongBatch::RESULTS[$x->zkong_result] ?? $x->zkong_result) : null,
+            ])->values()->all())
+            ->all();
     }
 
     private function sheet(Request $request)
@@ -83,7 +114,8 @@ class DevicesController extends Controller
         if (trim($code) === '') {
             return response()->json(['ok' => false, 'error' => 'Falta el código'], 400);
         }
-        return response()->json(['ok' => true] + $this->devices->sheet($code, $request->user()?->id));
+        $r = $this->devices->sheet($code, $request->user()?->id);
+        return response()->json(['ok' => true] + $r + ['warranties' => $this->garantias([$r['code']])[$r['code']] ?? []]);
     }
 
     private function server(Request $request): ZkongServer

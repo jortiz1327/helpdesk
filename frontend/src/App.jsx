@@ -1623,7 +1623,8 @@ export default function App() {
                         {view === "campaign_email_cfg" && <CampaignEmailSettings />}
                         {view === "help" && <Manuals />}
                         {view === "devices" && (
-                            <Devices canServers={can("warranties.servers")} onGoServers={() => setView("zkong_servers")} />
+                            <Devices canServers={can("warranties.servers")} onGoServers={() => setView("zkong_servers")}
+                                onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
                         )}
                         {view === "zkong_servers" && can("warranties.servers") && <ZkongServers />}
                         {view === "garantias" && can("warranties.access") && (
