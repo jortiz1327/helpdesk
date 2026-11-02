@@ -165,6 +165,15 @@ class WarrantiesTest extends TestCase
         // Editarla sin cambiar el ticket sigue funcionando.
         $this->postJson('/api/warranties.php?action=save', $base + ['id' => $w->id, 'ticket_code' => 'TK-AJENA', 'client_name' => 'X'], $h)->assertOk();
 
+        // Fotos del cliente: otro ticket del mismo contacto en un área que no ve tampoco aparece.
+        $wMia = Warranty::where('ticket_id', DB::table('tickets')->where('code', 'TK-MIA')->value('id'))->first();
+        $cMia = DB::table('tickets')->where('code', 'TK-MIA')->value('contact_id');
+        $tOculto = DB::table('tickets')->insertGetId(['code' => 'TK-OCULTO', 'subject' => 'x', 'status' => 'abierto', 'priority' => 'media', 'channel' => 'email',
+            'contact_id' => $cMia, 'category_id' => $ajena, 'opened_at' => now(), 'last_message_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        $oculta = DB::table('attachments')->insertGetId(['ticket_id' => $tOculto, 'name' => 'o.jpg', 'path' => 'attachments/x/f.jpg', 'mime' => 'image/jpeg', 'size' => strlen($jpg)]);
+        $this->assertSame([1, []], array_values(array_intersect_key($this->getJson("/api/warranties.php?action=ticket_images&id={$wMia->id}&all=1", $h)->json(), ['tickets' => 1, 'images' => 1])));
+        $this->get("/api/warranty_photo.php?w={$wMia->id}&src=a:{$oculta}&token={$media}")->assertNotFound();
+
         // Quien sí ve el ticket, sí lo lee.
         DB::table('user_ticket_categories')->insert(['user_id' => $ana->id, 'category_id' => $ajena]);
         $this->assertSame('Asunto TK-AJENA', $this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->json('warranty.ticket_subject'));
@@ -404,8 +413,12 @@ class WarrantiesTest extends TestCase
         \Illuminate\Support\Facades\Storage::disk('local')->put('attachments/x/doc.pdf', '%PDF-1.4');
         $foto = DB::table('attachments')->insertGetId(['ticket_id' => $tid, 'name' => 'rota.jpg', 'path' => 'attachments/x/rota.jpg', 'mime' => 'image/jpeg', 'size' => strlen($jpg)]);
         DB::table('attachments')->insert(['ticket_id' => $tid, 'name' => 'doc.pdf', 'path' => 'attachments/x/doc.pdf', 'mime' => 'application/pdf', 'size' => 8]);
+        // Otro ticket del mismo cliente (sus fotos también valen) y uno de otro cliente (no).
+        $mismo = DB::table('tickets')->insertGetId(['code' => 'TK-3', 'subject' => 'Antes', 'status' => 'cerrado', 'priority' => 'media',
+            'channel' => 'whatsapp', 'contact_id' => $cid, 'opened_at' => now(), 'last_message_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        $antes = DB::table('attachments')->insertGetId(['ticket_id' => $mismo, 'name' => 'antes.jpg', 'path' => 'attachments/x/rota.jpg', 'mime' => 'image/jpeg', 'size' => strlen($jpg), 'created_at' => now()->subDay()]);
         $otroTicket = DB::table('tickets')->insertGetId(['code' => 'TK-2', 'subject' => 'Otro', 'status' => 'abierto', 'priority' => 'media',
-            'channel' => 'email', 'contact_id' => $cid, 'opened_at' => now(), 'last_message_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            'channel' => 'email', 'contact_id' => DB::table('contacts')->insertGetId(['name' => 'D', 'email' => 'd@x.com']), 'opened_at' => now(), 'last_message_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         $ajena = DB::table('attachments')->insertGetId(['ticket_id' => $otroTicket, 'name' => 'a.jpg', 'path' => 'attachments/x/rota.jpg', 'mime' => 'image/jpeg', 'size' => 1]);
 
         $w = $this->crear($h, ['ticket_code' => 'TK-1', 'labels' => "8E9749440\n854A49907\nA0A3B85B5F7F"]);
@@ -436,6 +449,10 @@ class WarrantiesTest extends TestCase
         $media = TokenService::mediaToken($u);
         $this->get("/api/warranty_photo.php?w={$w['id']}&src=a:{$foto}&token={$media}")->assertOk()->assertHeader('Content-Type', 'image/jpeg');
         $this->get("/api/warranty_photo.php?w={$w['id']}&src=a:{$ajena}&token={$media}")->assertNotFound();
+        // Fotos del cliente: también las de sus otros tickets, con ticket y canal; y se descargan.
+        $todas = $this->getJson("/api/warranties.php?action=ticket_images&id={$w['id']}&all=1", $h)->assertOk()->json();
+        $this->assertSame([2, ["a:{$foto}", "a:{$antes}"], ['TK-1', 'TK-3']], [$todas['tickets'], array_column($todas['images'], 'src'), array_column($todas['images'], 'ticket')]);
+        $this->get("/api/warranty_photo.php?w={$w['id']}&src=a:{$antes}&dl=1&token={$media}")->assertOk()->assertHeader('Content-Disposition', 'attachment; filename="antes.jpg"');
 
         // Fotos: subida, desde el ticket, tipo que no es de una antena, y sustituir.
         $foto1 = fn ($item, $type, $file) => $this->post('/api/warranties.php?action=photo_upload', ['item_id' => $item, 'type' => $type, 'file' => $file], $h);

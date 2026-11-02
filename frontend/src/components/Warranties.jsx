@@ -786,7 +786,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
   const conFotos = items.filter((it) => pideFotos(rv, it))
   const res = rv.resolutions[f.resolution]
 
-  useEffect(() => { if (paso === 'fotos' && galeria === null) api.warrantyTicketImages(w.id).then((r) => setGaleria(!r.ok ? [] : r.visible === false ? false : r.images)) }, [paso, galeria, w.id])
+  useEffect(() => { if (paso === 'fotos' && galeria === null) api.warrantyTicketImages(w.id, true).then((r) => setGaleria(!r.ok ? [] : r.visible === false ? false : r.images)) }, [paso, galeria, w.id])
 
   // Primer hueco vacío (para que pegar o elegir una imagen del ticket vaya solo a su sitio).
   const huecos = conFotos.flatMap((it) => tiposFoto(rv, it).map(([t]) => ({ key: `${it.id}|${t}`, it, t, lleno: (it.photos || []).some((p) => p.type === t) })))
@@ -927,7 +927,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
         ) : (
           <div className="modal-body wr-fotos">
             <div className="wr-fotos-l">
-              <p className="dev-mute wr-fotos-tip">{w.ticket_id ? 'Elige un hueco y haz clic en una imagen del ticket, arrástrala, pega con Ctrl+V o sube un fichero.' : 'Haz clic en un hueco para subir la foto, arrástrala o pégala con Ctrl+V.'}</p>
+              <p className="dev-mute wr-fotos-tip">{w.ticket_id ? 'Elige un hueco y haz clic en una imagen del cliente, arrástrala, pega con Ctrl+V o sube un fichero.' : 'Haz clic en un hueco para subir la foto, arrástrala o pégala con Ctrl+V.'}</p>
               {conFotos.map((it) => (
                 <div key={it.id} className="wr-fotos-it">
                   <div className="wr-fotos-ith"><b className="mono">{it.code}</b>{it.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}<span className="dev-mute">{productoDe(it)}</span>
@@ -945,15 +945,15 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
             </div>
             {w.ticket_id ? (
               <aside className="wr-gal">
-                <h4><Icon.ticket /> Imágenes del ticket {w.ticket_code ? <span className="mono">{w.ticket_code}</span> : null}</h4>
-                {galeria === null ? <div className="spinner sm" /> : galeria === false ? <p className="dev-mute">No puedes ver este ticket en el Helpdesk, así que tampoco sus imágenes.</p> : !galeria.length ? <p className="dev-mute">El cliente no ha mandado imágenes en el ticket.</p> : (
+                <h4><Icon.image /> Imágenes del cliente</h4>
+                {galeria === null ? <div className="spinner sm" /> : galeria === false ? <p className="dev-mute">No puedes ver este ticket en el Helpdesk, así que tampoco sus imágenes.</p> : !galeria.length ? <p className="dev-mute">El cliente no ha mandado imágenes en sus tickets.</p> : (
                   <div className="wr-gal-grid">
                     {galeria.map((g) => (
-                      <button key={g.src} type="button" draggable title={`${g.name} · ${g.from === 'cliente' ? 'del cliente' : 'del equipo'} · ${fechaHora(g.at)}`}
+                      <button key={g.src} type="button" draggable title={`${g.name} · ${g.from === 'cliente' ? 'del cliente' : 'del equipo'} · ${g.ticket} · ${fechaHora(g.at)}`}
                         onDragStart={(e) => e.dataTransfer.setData('text/x-wr-src', g.src)} onClick={() => elegirDelTicket(g.src)}>
                         <img src={api.warrantyTicketImageUrl(w.id, g.src)} alt={g.name} loading="lazy"
                           onError={(e) => { e.currentTarget.parentElement.hidden = true }} />
-                        {g.from !== 'cliente' ? <em>Equipo</em> : null}
+                        {g.ticket_id !== w.ticket_id ? <em>{g.ticket}</em> : g.from !== 'cliente' ? <em>Equipo</em> : null}
                       </button>
                     ))}
                   </div>
@@ -1146,6 +1146,99 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   )
 }
 
+const CANAL = { correo: ['Correo', Icon.mail], whatsapp: ['WhatsApp', Icon.whatsapp], adjunto: ['Adjunto', Icon.file] }
+
+/**
+ * Fotos del cliente: lo que ha mandado por correo, WhatsApp o adjunto en el ticket de la
+ * garantía y en sus otros tickets (solo los que el agente ve en el Helpdesk), por ticket.
+ * Visor a pantalla completa con flechas, descarga y enlace al ticket.
+ */
+function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
+  const delCliente = fotos.filter((g) => g.from === 'cliente')
+  const [filtro, setFiltro] = useState(delCliente.length || !fotos.length ? 'cliente' : 'todas')
+  const lista = filtro === 'cliente' ? delCliente : fotos
+  const [sel, setSel] = useState(inicio != null ? Math.max(0, lista.findIndex((g) => g.src === inicio)) : null)
+  const g = sel != null ? lista[sel] : null
+  const grupos = [...lista.reduce((m, x, i) => m.set(x.ticket_id, [...(m.get(x.ticket_id) || []), [x, i]]), new Map()).entries()]
+    .sort(([a], [b]) => (a === w.ticket_id ? -1 : b === w.ticket_id ? 1 : 0))
+  const tickets = new Set(fotos.map((x) => x.ticket_id)).size
+
+  useEffect(() => {
+    const k = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); sel != null ? setSel(null) : onClose() }
+      else if (sel != null && e.key === 'ArrowRight') setSel((i) => (i + 1) % lista.length)
+      else if (sel != null && e.key === 'ArrowLeft') setSel((i) => (i - 1 + lista.length) % lista.length)
+    }
+    document.addEventListener('keydown', k)
+    return () => document.removeEventListener('keydown', k)
+  }, [sel, lista.length, onClose])
+
+  const canal = (x) => { const [l, Ic] = CANAL[x.channel] || CANAL.adjunto; return <span className={`fc-canal c-${x.channel}`}><Ic /> {l}</span> }
+
+  return (
+    <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal fc-modal" role="dialog" aria-label="Fotos del cliente">
+        <div className="modal-h">
+          <div>
+            <h3>Fotos del cliente</h3>
+            <p className="dev-mute fc-sub">{fotos.length} {fotos.length === 1 ? 'imagen' : 'imágenes'} de {tickets} {tickets === 1 ? 'ticket' : 'tickets'} · {w.client_name || 'Sin cliente'}</p>
+          </div>
+          <div className="fc-h-acts">
+            <div className="dc-seg">
+              {[['cliente', `Del cliente (${delCliente.length})`], ['todas', `Todas (${fotos.length})`]].map(([k, l]) => (
+                <button key={k} className={filtro === k ? 'on' : ''} onClick={() => { setFiltro(k); setSel(null) }}>{l}</button>
+              ))}
+            </div>
+            <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
+          </div>
+        </div>
+        <div className="modal-body fc-body">
+          {!lista.length ? <p className="dev-mute fc-none">{filtro === 'cliente' ? 'El cliente no ha mandado imágenes. En «Todas» están también las del equipo.' : 'No hay imágenes en los tickets de este cliente.'}</p> : grupos.map(([tid, xs]) => (
+            <section key={tid} className="fc-grupo">
+              <header>
+                <Icon.ticket /> <span className="mono">{xs[0][0].ticket}</span>
+                {tid === w.ticket_id ? <small>ticket de esta garantía</small> : <small>otro ticket del cliente</small>}
+                {onOpenTicket ? <button className="wf-link" onClick={() => onOpenTicket(tid)}>Abrir ticket</button> : null}
+              </header>
+              <div className="fc-grid">
+                {xs.map(([x, i]) => (
+                  <button key={x.src} type="button" className="fc-item" onClick={() => setSel(i)} title={x.name}>
+                    <span className="fc-th"><img src={api.warrantyTicketImageUrl(w.id, x.src)} alt="" loading="lazy" onError={(e) => { e.currentTarget.closest('.fc-item').hidden = true }} />
+                      {x.from !== 'cliente' ? <em>Equipo</em> : null}</span>
+                    <span className="fc-meta">{canal(x)}<time>{fechaHora(x.at)}</time></span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+        <div className="modal-foot fc-foot">
+          <span className="dev-mute"><Icon.info /> Para ponerla como foto de un dispositivo: Etiquetas → Revisar → paso Fotos, donde salen estas mismas imágenes.</span>
+        </div>
+
+        {g ? (
+          <div className="fc-visor" onMouseDown={(e) => e.target === e.currentTarget && setSel(null)}>
+            <button className="fc-cerrar" onClick={() => setSel(null)} title="Volver (Esc)">✕</button>
+            {lista.length > 1 ? <button className="fc-nav prev" onClick={() => setSel((i) => (i - 1 + lista.length) % lista.length)} title="Anterior (←)"><Icon.chevron /></button> : null}
+            <img key={g.src} src={api.warrantyTicketImageUrl(w.id, g.src)} alt={g.name} />
+            {lista.length > 1 ? <button className="fc-nav next" onClick={() => setSel((i) => (i + 1) % lista.length)} title="Siguiente (→)"><Icon.chevron /></button> : null}
+            <div className="fc-barra">
+              <div className="fc-info">
+                <b>{g.name}</b>
+                <span>{canal(g)} · {g.from === 'cliente' ? 'del cliente' : 'del equipo'} · <span className="mono">{g.ticket}</span> · {fechaHora(g.at)}</span>
+              </div>
+              <span className="fc-pos">{sel + 1} / {lista.length}</span>
+              <a className="dev-btn" href={api.warrantyTicketImageUrl(w.id, g.src, true)} download><Icon.download /> Descargar</a>
+              <a className="dev-btn" href={api.warrantyTicketImageUrl(w.id, g.src)} target="_blank" rel="noreferrer"><Icon.link /> Tamaño real</a>
+              {onOpenTicket ? <button className="dev-btn" onClick={() => onOpenTicket(g.ticket_id)}><Icon.ticket /> Abrir ticket</button> : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
@@ -1157,9 +1250,17 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const [nota, setNota] = useState({ type: 'nota', body: '' })
   const [enviando, setEnviando] = useState(false)
   const notaRef = useRef(null)
+  const [fotos, setFotos] = useState(null)         // imágenes de los tickets del cliente; false si no ve el ticket
+  const [verFotos, setVerFotos] = useState(undefined)   // undefined cerrado; null rejilla; src abre el visor
 
   const cargar = useCallback(() => api.warranty(id).then((r) => setD(r.ok ? r : { error: r.error || 'No se pudo cargar' })), [id])
   useEffect(() => { setD(null); cargar() }, [cargar])
+  const wid = d?.warranty?.id
+  const tid = d?.warranty?.ticket_id
+  useEffect(() => {
+    setFotos(null)
+    if (wid && tid) api.warrantyTicketImages(wid, true).then((r) => setFotos(!r.ok ? [] : r.visible === false ? false : r.images))
+  }, [wid, tid])
 
   if (d === null) return <div className="center-load"><div className="spinner" /></div>
   if (d.error) return <><button className="wr-back" onClick={onBack}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> Garantías</button><div className="dev-error"><Icon.warn /> {d.error}</div></>
@@ -1230,6 +1331,11 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
           {abierta
             ? <button className="btn dark" onClick={cerrar}><Icon.lock /> Cerrar</button>
             : <button className="btn ghost" onClick={() => guardarCon({ status: opts?.status_reopen || 'en_curso' }, 'Garantía reabierta')}><Icon.refresh /> Reabrir</button>}
+          {w.ticket_id && fotos !== false ? (
+            <button className="dev-btn" onClick={() => setVerFotos(null)} disabled={!fotos?.length} title={fotos && !fotos.length ? 'El cliente no ha mandado imágenes en sus tickets' : 'Lo que ha mandado el cliente por correo, WhatsApp o adjunto'}>
+              <Icon.image /> Fotos del cliente{fotos === null ? null : <em className="fc-n">{fotos.filter((x) => x.from === 'cliente').length}</em>}
+            </button>
+          ) : null}
           <button className="dev-btn" onClick={() => onEdit(w)}><Icon.pencil /> Editar</button>
           {isSuper ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
         </div>
@@ -1242,6 +1348,16 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
               {ticket ? <span className="dev-mute wf-orig">Ticket {ticket}{w.ticket_subject ? ` · ${w.ticket_subject}` : ''}</span> : null}
             </header>
             {w.description ? <p className="wf-desc">{w.description}</p> : <p className="dev-mute wf-desc-none">Sin descripción. <button className="wf-link" onClick={() => onEdit(w)}>Añadirla</button></p>}
+            {fotos?.some((x) => x.from === 'cliente') ? (
+              <div className="fc-tira">
+                {fotos.filter((x) => x.from === 'cliente').slice(0, 6).map((x) => (
+                  <button key={x.src} type="button" onClick={() => setVerFotos(x.src)} title={`${x.name} · ${x.ticket} · ${fechaHora(x.at)}`}>
+                    <img src={api.warrantyTicketImageUrl(w.id, x.src)} alt={x.name} loading="lazy" onError={(e) => { e.currentTarget.parentElement.hidden = true }} />
+                  </button>
+                ))}
+                <button type="button" className="wf-link" onClick={() => setVerFotos(null)}>Ver las fotos del cliente</button>
+              </div>
+            ) : null}
           </section>
 
           <section className="wf-card wf-tabs-card">
@@ -1312,6 +1428,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
           </section>
         </aside>
       </div>
+      {verFotos !== undefined && fotos?.length ? <FotosCliente w={w} fotos={fotos} inicio={verFotos} onClose={() => setVerFotos(undefined)} onOpenTicket={onOpenTicket} /> : null}
     </>
   )
 }

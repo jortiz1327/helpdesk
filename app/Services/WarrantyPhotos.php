@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use App\Models\Warranty;
 use App\Models\WarrantyItem;
+use App\Support\TicketVisibility;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,8 +18,9 @@ use Illuminate\Support\Str;
  * ticket: así no depende de que el adjunto se borre o de que caduque el medio de
  * WhatsApp. source queda solo como procedencia.
  *
- * Las imágenes del ticket se identifican con «a:ID» (adjunto) o «m:ID» (mensaje de
- * WhatsApp con imagen) y solo se aceptan si son del ticket de la garantía.
+ * Las imágenes del cliente se identifican con «a:ID» (adjunto) o «m:ID» (mensaje de
+ * WhatsApp con imagen) y solo se aceptan si son de un ticket de clientTickets(): el de la
+ * garantía y los demás del mismo contacto que el usuario ve en el Helpdesk.
  */
 class WarrantyPhotos
 {
@@ -39,30 +42,55 @@ class WarrantyPhotos
         return $out;
     }
 
-    /** Imágenes del ticket de la garantía, la más reciente primero. */
-    public static function ticketImages(Warranty $w): array
+    /**
+     * Tickets de los que esta garantía puede enseñar imágenes a este usuario: el suyo y los
+     * demás del mismo contacto (los 30 últimos), siempre que los vea en el Helpdesk.
+     * [ticket_id => código]; vacío si no ve el ticket de la garantía.
+     */
+    public static function clientTickets(Warranty $w, ?User $u): array
     {
-        if (! $w->ticket_id) return [];
+        if (! $w->ticketVisibleTo($u)) return [];
+        $t = DB::table('tickets')->where('id', $w->ticket_id)->first(['code', 'contact_id']);
+        if (! $t) return [];
+        $otros = $t->contact_id
+            ? TicketVisibility::scope(DB::table('tickets as t')->where('t.contact_id', $t->contact_id), $u)
+                ->orderByDesc('t.id')->limit(30)->pluck('t.code', 't.id')->all()
+            : [];
+        return [$w->ticket_id => $t->code] + $otros;
+    }
+
+    /**
+     * Imágenes de esos tickets, la más reciente primero: {src, name, at, from (cliente |
+     * agente), channel (correo | whatsapp | adjunto), ticket_id, ticket}.
+     */
+    public static function ticketImages(array $tickets): array
+    {
+        if (! $tickets) return [];
         $out = [];
 
         $adjuntos = DB::table('attachments as a')->leftJoin('messages as m', 'm.id', '=', 'a.message_id')
-            ->where('a.ticket_id', $w->ticket_id)->orderByDesc('a.id')
-            ->get(['a.id', 'a.name', 'a.path', 'a.size', 'a.inline', 'a.created_at', 'm.direction']);
+            ->whereIn('a.ticket_id', array_keys($tickets))->orderByDesc('a.id')
+            ->get(['a.id', 'a.ticket_id', 'a.name', 'a.path', 'a.size', 'a.inline', 'a.created_at', 'm.direction', 'm.channel']);
         foreach ($adjuntos as $a) {
             $mime = AttachmentService::mimeDe((string) $a->path);
             if (! isset(self::EXT[$mime]) || ($a->inline && $a->size < self::LOGO_BYTES)) continue;
-            $out[] = ['src' => 'a:' . $a->id, 'name' => $a->name, 'at' => (string) $a->created_at, 'from' => $a->direction === 'out' ? 'agente' : 'cliente'];
+            $out[] = ['src' => 'a:' . $a->id, 'name' => $a->name, 'at' => (string) $a->created_at,
+                'from' => $a->direction === 'out' ? 'agente' : 'cliente',
+                'channel' => $a->channel === 'email' ? 'correo' : ($a->channel === 'whatsapp' ? 'whatsapp' : 'adjunto'),
+                'ticket_id' => (int) $a->ticket_id, 'ticket' => $tickets[$a->ticket_id]];
         }
 
-        // De WhatsApp: las que tienen copia en el servidor o aún se pueden bajar de Meta
-        // (sus medios caducan a los 30 días).
-        $wa = DB::table('messages')->where('ticket_id', $w->ticket_id)->where('funcion', 'soporte')
+        // De WhatsApp: las que tienen copia en el servidor (wa:media las guarda 6 meses) o
+        // aún se pueden bajar de Meta (sus medios caducan a los 30 días).
+        $wa = DB::table('messages')->whereIn('ticket_id', array_keys($tickets))->where('funcion', 'soporte')
             ->whereNotNull('media_url')->where('media_mime', 'like', 'image/%')->orderByDesc('id')
-            ->get(['id', 'direction', 'created_at', 'media_path']);
+            ->get(['id', 'ticket_id', 'direction', 'created_at', 'media_path']);
         foreach ($wa as $m) {
             $copia = $m->media_path && Storage::disk('local')->exists($m->media_path);
             if (! $copia && strtotime((string) $m->created_at) < now()->subDays(self::META_DAYS)->getTimestamp()) continue;
-            $out[] = ['src' => 'm:' . $m->id, 'name' => 'Foto de WhatsApp', 'at' => (string) $m->created_at, 'from' => $m->direction === 'out' ? 'agente' : 'cliente'];
+            $out[] = ['src' => 'm:' . $m->id, 'name' => 'Foto de WhatsApp', 'at' => (string) $m->created_at,
+                'from' => $m->direction === 'out' ? 'agente' : 'cliente', 'channel' => 'whatsapp',
+                'ticket_id' => (int) $m->ticket_id, 'ticket' => $tickets[$m->ticket_id]];
         }
 
         usort($out, fn ($x, $y) => strcmp($y['at'], $x['at']));
@@ -70,22 +98,22 @@ class WarrantyPhotos
     }
 
     /**
-     * Bytes y tipo de una imagen del ticket de la garantía, o null si no es de ese ticket,
-     * no es una imagen o ya no está. [binario, mime, nombre].
+     * Bytes y tipo de una imagen de uno de esos tickets, o null si no es de ellos, no es
+     * una imagen o ya no está. [binario, mime, nombre].
      */
-    public static function ticketImage(Warranty $w, string $src): ?array
+    public static function ticketImage(array $tickets, string $src): ?array
     {
-        if (! $w->ticket_id || ! preg_match('/^([am]):(\d+)$/', $src, $mm)) return null;
+        if (! $tickets || ! preg_match('/^([am]):(\d+)$/', $src, $mm)) return null;
         $id = (int) $mm[2];
 
         if ($mm[1] === 'a') {
-            $a = DB::table('attachments')->where('id', $id)->where('ticket_id', $w->ticket_id)->first(['id', 'name', 'path']);
+            $a = DB::table('attachments')->where('id', $id)->whereIn('ticket_id', array_keys($tickets))->first(['id', 'name', 'path']);
             $mime = $a ? AttachmentService::mimeDe((string) $a->path) : null;
             if (! $a || ! isset(self::EXT[$mime]) || ! Storage::disk('local')->exists($a->path)) return null;
             return [Storage::disk('local')->get($a->path), $mime, $a->name];
         }
 
-        $m = DB::table('messages')->where('id', $id)->where('ticket_id', $w->ticket_id)->where('funcion', 'soporte')
+        $m = DB::table('messages')->where('id', $id)->whereIn('ticket_id', array_keys($tickets))->where('funcion', 'soporte')
             ->first(['media_url', 'media_path', 'media_mime']);
         if (! $m || ! $m->media_url) return null;
         $disco = Storage::disk('local');
@@ -118,10 +146,10 @@ class WarrantyPhotos
         return [Storage::disk('local')->path($p->path), AttachmentService::mimeDe($p->path)];
     }
 
-    public static function fromTicket(Warranty $w, WarrantyItem $item, string $type, string $src, int $userId): ?string
+    public static function fromTicket(array $tickets, WarrantyItem $item, string $type, string $src, int $userId): ?string
     {
-        $img = self::ticketImage($w, $src);
-        if (! $img) return 'Esa imagen no es del ticket de esta garantía o ya no está';
+        $img = self::ticketImage($tickets, $src);
+        if (! $img) return 'Esa imagen no es de los tickets de este cliente o ya no está';
         [$bin, , $name] = $img;
         if (strlen($bin) > self::MAX_BYTES) return 'La foto supera los 15 MB';
         if ($error = self::problema($bin)) return $error;

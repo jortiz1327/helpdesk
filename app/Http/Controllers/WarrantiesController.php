@@ -564,7 +564,7 @@ class WarrantiesController extends Controller
         if (! $w->ticketVisibleTo($request->user())) {
             return response()->json(['ok' => false, 'error' => 'No puedes ver el ticket de esta garantía en el Helpdesk'], 403);
         }
-        $error = WarrantyPhotos::fromTicket($w, $item, $type, (string) $request->input('src'), $request->user()->id);
+        $error = WarrantyPhotos::fromTicket(WarrantyPhotos::clientTickets($w, $request->user()), $item, $type, (string) $request->input('src'), $request->user()->id);
         return $this->trasFoto($item, $error);
     }
 
@@ -588,13 +588,17 @@ class WarrantiesController extends Controller
     {
         $w = Warranty::findOrFail((int) $request->query('id'));
         // Las imágenes son del Helpdesk: si no puede ver el ticket, no las ve (sin error).
+        // Con ?all=1, también las de los otros tickets del mismo contacto que ve.
         $visible = $w->ticketVisibleTo($request->user());
-        return response()->json(['ok' => true, 'visible' => $visible, 'images' => $visible ? WarrantyPhotos::ticketImages($w) : []]);
+        $tickets = WarrantyPhotos::clientTickets($w, $request->user());
+        if (! $request->boolean('all')) $tickets = array_intersect_key($tickets, [$w->ticket_id => 1]);
+        return response()->json(['ok' => true, 'visible' => $visible, 'tickets' => count($tickets), 'images' => WarrantyPhotos::ticketImages($tickets)]);
     }
 
     /**
-     * warranty_photo.php — sirve una foto de un dispositivo (?id=) o una imagen del ticket
-     * de una garantía (?w=&src=). Va por ?token= de medios para poder usarse en <img>.
+     * warranty_photo.php — sirve una foto de un dispositivo (?id=) o una imagen que mandó el
+     * cliente de una garantía (?w=&src=, de su ticket o de otro del mismo contacto que el
+     * usuario ve). Va por ?token= de medios para poder usarse en <img>. Con ?dl=1, descarga.
      */
     public function photo(Request $request)
     {
@@ -605,9 +609,11 @@ class WarrantiesController extends Controller
                 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=31536000']);
         }
         $w = Warranty::find((int) $request->query('w'));
-        $img = $w && $w->ticketVisibleTo($request->user()) ? WarrantyPhotos::ticketImage($w, (string) $request->query('src')) : null;
+        $img = $w ? WarrantyPhotos::ticketImage(WarrantyPhotos::clientTickets($w, $request->user()), (string) $request->query('src')) : null;
         if (! $img) abort(404);
-        return response($img[0], 200, ['Content-Type' => $img[1], 'Content-Disposition' => 'inline',
+        $nombre = preg_replace('/[^\w.\- ]+/u', '_',(string) $img[2]) ?: 'foto';
+        return response($img[0], 200, ['Content-Type' => $img[1],
+            'Content-Disposition' => ($request->boolean('dl') ? 'attachment' : 'inline') . '; filename="' . $nombre . '"',
             'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=86400']);
     }
 

@@ -413,9 +413,10 @@ export const api = {
   },
   warrantyPhotoFromTicket: (item_id, type, src) => postJson('warranties.php?action=photo_from_ticket', { item_id, type, src }),
   deleteWarrantyPhoto: (photo_id) => postJson('warranties.php?action=photo_delete', { photo_id }),
-  warrantyTicketImages: (id) => req(`warranties.php?action=ticket_images&id=${id}`),
+  // all: también las de los otros tickets del mismo contacto que el usuario ve.
+  warrantyTicketImages: (id, all = false) => req(`warranties.php?action=ticket_images&id=${id}${all ? '&all=1' : ''}`),
   warrantyPhotoUrl: (id) => `${BASE}/warranty_photo.php?id=${id}&token=${encodeURIComponent(getMediaToken())}`,
-  warrantyTicketImageUrl: (w, src) => `${BASE}/warranty_photo.php?w=${w}&src=${encodeURIComponent(src)}&token=${encodeURIComponent(getMediaToken())}`,
+  warrantyTicketImageUrl: (w, src, dl = false) => `${BASE}/warranty_photo.php?w=${w}&src=${encodeURIComponent(src)}${dl ? '&dl=1' : ''}&token=${encodeURIComponent(getMediaToken())}`,
   saveWarranty: (payload) => req('warranties.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
