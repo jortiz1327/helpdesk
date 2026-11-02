@@ -47,7 +47,7 @@ class ZkongServersController extends Controller
             return response()->json(['ok' => false, 'error' => 'El nombre y el usuario son obligatorios'], 400);
         }
         // Los servidores ZKONG suelen ir por http y puerto propio (p. ej. :9999): se admiten
-        // los dos. La contraseña viaja cifrada con la clave del servidor igualmente.
+        // los dos. La contraseña viaja cifrada con la clave del servidor, que queda fijada.
         if (! preg_match('#^https?://[a-z0-9.-]+(:\d+)?(/[\w./-]*)?$#i', $url)) {
             return response()->json(['ok' => false, 'error' => 'Escribe la dirección completa, p. ej. http://app02.etiquetaselectronicas.com:9999'], 400);
         }
@@ -66,10 +66,12 @@ class ZkongServersController extends Controller
         if ($pass !== '') {
             $s->password = $pass;
         }
-        // Otra dirección, usuario o contraseña: el token guardado ya no vale.
+        // Otra dirección, usuario o contraseña: el token guardado ya no vale, y la clave
+        // pública del servidor se vuelve a apuntar en el siguiente acceso.
         if ($cambiaAcceso) {
             $s->token = null;
             $s->token_updated_at = null;
+            $s->public_key_sha256 = null;
         }
         $s->save();
 

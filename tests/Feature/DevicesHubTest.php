@@ -22,6 +22,7 @@ class DevicesHubTest extends TestCase
 
     private string $privada = '';
     private array $logins = [];
+    private ?string $otraClave = null;   // si se pone, el servidor da esta clave pública
 
     protected function setUp(): void
     {
@@ -43,7 +44,7 @@ class DevicesHubTest extends TestCase
                 return Http::response('<html>502 Bad Gateway</html>', 502);
             }
             if (str_contains($url, '/user/getErpPublicKey')) {
-                return Http::response(['success' => true, 'code' => 10000, 'data' => $base64]);
+                return Http::response(['success' => true, 'code' => 10000, 'data' => $this->otraClave ?? $base64]);
             }
             if (str_contains($url, '/user/login')) {
                 openssl_private_decrypt(base64_decode($request['password']), $plano, $this->privada);
@@ -127,6 +128,28 @@ class DevicesHubTest extends TestCase
         $test = $this->postJson('/api/zkong_servers.php?action=test', ['id' => $raw->id], ['X-App-Token' => $tok])->assertJson(['ok' => true]);
         $this->assertStringNotContainsString('tok-', $test->getContent());
         $this->assertSame([['app02.test', 'admin', 'secreta']], $this->logins);
+    }
+
+    public function test_si_cambia_la_clave_publica_no_se_envia_la_contrasena(): void
+    {
+        $tok = $this->token(['warranties.access', 'warranties.servers']);
+        $s = $this->servidor('app02.test');
+        $this->postJson('/api/zkong_servers.php?action=test', ['id' => $s->id], ['X-App-Token' => $tok])->assertJson(['ok' => true]);
+        $this->assertNotNull($s->fresh()->public_key_sha256);
+
+        // Alguien en medio da otra clave: no hay login y el aviso lo explica.
+        $this->otraClave = base64_encode(random_bytes(162));
+        $s->forceFill(['token' => null])->save();
+        $r = $this->postJson('/api/zkong_servers.php?action=test', ['id' => $s->id], ['X-App-Token' => $tok])->assertJson(['ok' => false]);
+        $this->assertStringContainsString('no es la de siempre', $r->json('error'));
+        $this->assertCount(1, $this->logins);
+
+        // Volver a escribir la contraseña acepta la clave que tenga entonces.
+        $this->otraClave = null;
+        $this->postJson('/api/zkong_servers.php?action=save', ['id' => $s->id, 'name' => 'APP02', 'base_url' => 'https://app02.test/zk', 'username' => 'admin', 'password' => 'secreta'], ['X-App-Token' => $tok])->assertOk();
+        $this->assertNull($s->fresh()->public_key_sha256);
+        $this->postJson('/api/zkong_servers.php?action=test', ['id' => $s->id], ['X-App-Token' => $tok])->assertJson(['ok' => true]);
+        $this->assertCount(2, $this->logins);
     }
 
     public function test_lista_de_etiquetas_con_tienda_y_articulo(): void

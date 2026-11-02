@@ -83,6 +83,13 @@ class ZkongClient
         if (! is_string($key) || $key === '') {
             throw new RuntimeException('El servidor no devolvió su clave pública.');
         }
+        // Clave fijada: la primera vez se apunta su huella y, si luego cambia, no se manda la
+        // contraseña (por http alguien en medio podría haber puesto la suya).
+        $huella = hash('sha256', preg_replace('/\s+/', '', $key));
+        if ($this->server->public_key_sha256 && ! hash_equals($this->server->public_key_sha256, $huella)) {
+            throw new RuntimeException('La clave pública de ' . $this->server->name . ' no es la de siempre y no se le ha enviado la contraseña. '
+                . 'Si el servidor la ha cambiado de verdad, vuelve a escribir su contraseña en Servidores ZKONG para aceptar la nueva.');
+        }
         $pem = "-----BEGIN PUBLIC KEY-----\n" . trim($key) . "\n-----END PUBLIC KEY-----\n";
         if (! openssl_public_encrypt((string) $this->server->password, $cifrada, $pem)) {
             throw new RuntimeException('No se pudo cifrar la contraseña con la clave del servidor.');
@@ -106,6 +113,7 @@ class ZkongClient
             'merchant_id'      => $json['data']['currentUser']['merchantId'] ?? null,
             'agency_id'        => $json['data']['currentUser']['agencyId'] ?? null,
             'token_updated_at' => now(),
+            'public_key_sha256' => $huella,
         ])->save();
         $this->server->timestamps = true;
 
