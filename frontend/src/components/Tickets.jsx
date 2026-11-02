@@ -127,7 +127,7 @@ function slaPeor(sla) {
 /* Etiqueta de PRIORIDAD. El color ya no está en el CSS: viene de la BD, porque las
    prioridades se configuran. Si no hay color (prioridad borrada), cae a la clase de
    siempre para no quedarse sin estilo. */
-function prChip(v, meta, small = false) {
+export function prChip(v, meta, small = false) {
   // «Sin asignar»: el ticket aún no se ha triado (nace así). Chip gris.
   if (!v || v === 'sin_asignar') return <span className={`chip ${small ? 'sm' : ''}`.trim()} style={{ background: '#e5e7eb', color: '#6b7280' }}>Sin asignar</span>
   const p = meta?.priority_meta?.[v]
@@ -1338,7 +1338,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
  * PAGINADOR de la lista. Además de mover entre páginas, su trabajo es decir CUÁNTOS
  * tickets hay: antes la lista se cortaba en 200 sin avisar y no había forma de saberlo.
  */
-function Paginador({ page, pages, total, perPage, mostrados, onPage, onPerPage }) {
+export function Paginador({ page, pages, total, perPage, mostrados, onPage, onPerPage }) {
   const desde = (page - 1) * perPage + 1
   const hasta = desde + mostrados - 1
 
@@ -1584,7 +1584,7 @@ function ModalFusion({ id, preselect = null, meta, onClose, onDone }) {
   )
 }
 
-function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode, scope = null, onOpenWarranty = null }) {
+export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode, scope = null, onOpenWarranty = null }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)

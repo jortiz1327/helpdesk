@@ -187,10 +187,23 @@ class WarrantyLabels
         $faltan = [];
         foreach ($codes as $code) {
             $hit = $fresh ? null : Cache::get("warranty_label:{$code}");
+            $hit = ($hit['lookup_state'] ?? null) === 'found' ? $hit : null;
             $hit ? $out[$code] = $hit : $faltan[] = $code;
         }
         if ($faltan) {
             $res = $this->devices->labels($faltan, $userId);
+            // Un servidor a veces contesta «bien» pero sin filas: antes de dar una etiqueta por
+            // inexistente se pregunta otra vez solo por esas.
+            $vacias = array_values(array_filter($faltan, fn ($c) => empty($res['labels'][$c]['live'])));
+            if ($vacias && ! $res['failed']) {
+                $otra = $this->devices->labels($vacias, $userId);
+                foreach ($vacias as $c) {
+                    if (! empty($otra['labels'][$c]['live'])) {
+                        $res['labels'][$c] = $otra['labels'][$c];
+                    }
+                }
+                $res['failed'] = $otra['failed'];
+            }
             $sinServidores = $this->devices->servers()->isEmpty();
             foreach ($faltan as $code) {
                 $l = $res['labels'][$code] ?? ['rows' => [], 'live' => null];
@@ -216,7 +229,8 @@ class WarrantyLabels
                         'online' => $vivo($x), 'store' => $x['storeName'] ?? null,
                     ], $l['rows']),
                 ];
-                if ($state !== 'failed') {
+                // Solo se recuerda lo encontrado: un «no aparece» se vuelve a preguntar siempre.
+                if ($state === 'found') {
                     Cache::put("warranty_label:{$code}", $out[$code], now()->addMinutes(self::CACHE_MIN));
                 }
             }

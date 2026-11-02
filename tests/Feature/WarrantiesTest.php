@@ -264,9 +264,16 @@ class WarrantiesTest extends TestCase
         $this->assertSame(['AMC42B-W', true], [$items['854A49907']['aeme_ref'], $items['854A49907']['model_manual']]);
 
         // En otra garantía abierta no puede entrar; cerrada la primera, sí (con aviso del historial).
-        $otra = $this->crear($h, ['labels' => '8E9749440']);
-        $this->assertSame([], $otra['added']);
-        $this->assertStringContainsString($w['code'], $otra['skipped'][0]['reason']);
+        // El alta con una etiqueta que no puede entrar (o que no aparece) no se crea.
+        $base = ['received_at' => '2026-10-20', 'client_name' => 'Hoteles Sol', 'project_name' => 'Sol Centro', 'status' => 'no_iniciado'];
+        $antes = Warranty::count();
+        $this->postJson('/api/warranties.php?action=save', $base + ['labels' => '8E9749440'], $h)->assertStatus(400)->assertJsonFragment(['ok' => false]);
+        $this->postJson('/api/warranties.php?action=save', $base + ['labels' => 'ZZZZZZZZ9'], $h)->assertStatus(400);
+        $this->assertSame($antes, Warranty::count());
+        $otra = $this->crear($h);
+        $add = $this->postJson('/api/warranties.php?action=labels_add', ['id' => $otra['id'], 'codes' => '8E9749440'], $h)->assertOk()->json();
+        $this->assertSame([], $add['added']);
+        $this->assertStringContainsString($w['code'], $add['skipped'][0]['reason']);
         Warranty::whereKey($w['id'])->update(['status' => 'cerrada', 'closed_at' => now()]);
         $add = $this->postJson('/api/warranties.php?action=labels_add', ['id' => $otra['id'], 'codes' => '8E9749440'], $h)->assertOk()->json();
         $this->assertSame(['8E9749440'], $add['added']);

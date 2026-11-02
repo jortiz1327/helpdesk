@@ -9,6 +9,7 @@ use App\Models\WarrantyItem;
 use App\Services\WarrantyDocuments;
 use App\Models\ZkongBatch;
 use App\Services\AemePortal;
+use App\Services\TicketService;
 use App\Services\WarrantyAlerts;
 use App\Services\WarrantyLabels;
 use App\Services\WarrantyPhotos;
@@ -38,6 +39,7 @@ class WarrantiesController extends Controller
             'delete'  => $this->delete($request),
             'options' => $this->options(),
             'by_ticket' => $this->byTicket($request),
+            'inbox'     => $this->inbox($request),
             'labels_check'    => $this->labelsCheck($request),
             'labels_add'      => $this->labelsAdd($request),
             'labels_recheck'  => $this->labelsRecheck($request),
@@ -181,6 +183,77 @@ class WarrantiesController extends Controller
             ->get(['id', 'code', 'status'])
             ->map(fn ($w) => ['id' => $w->id, 'code' => $w->code, 'status' => $w->status, 'status_label' => Warranty::statuses()[$w->status] ?? $w->status]);
         return response()->json(['ok' => true, 'warranties' => $rows]);
+    }
+
+    /**
+     * Bandeja «Tickets de garantías»: los tickets de la categoría Garantías que ve este
+     * usuario, con la garantía que se haya creado de cada uno. Pendientes = vivos y aún
+     * sin garantía; con garantía = ya tienen al menos una; todos = cualquiera.
+     */
+    private function inbox(Request $request)
+    {
+        $me = $request->user();
+        $cat = DB::table('ticket_categories')->where('key', 'garantias')->value('id');
+        $base = DB::table('tickets as t')->where('t.category_id', $cat ?? 0)->whereNull('t.merged_into_id');
+        \App\Support\TicketVisibility::scope($base, $me);
+
+        $conGarantia = fn ($q) => $q->whereExists(fn ($e) => $e->from('warranties as w')->whereColumn('w.ticket_id', 't.id'));
+        $sinGarantia = fn ($q) => $q->whereNotExists(fn ($e) => $e->from('warranties as w')->whereColumn('w.ticket_id', 't.id'));
+        $pendientes  = fn ($q) => $sinGarantia($q)->whereIn('t.status', TicketService::OPEN_STATUSES);
+
+        $counts = [
+            'pendientes'   => $pendientes(clone $base)->count(),
+            'con_garantia' => $conGarantia(clone $base)->count(),
+            'todos'        => (clone $base)->count(),
+        ];
+        $resumen = [
+            'sin_asignar' => $pendientes(clone $base)->whereNull('t.assigned_to')->count(),
+            'mas_48h'     => $pendientes(clone $base)->where('t.created_at', '<', now()->subHours(48))->count(),
+            'creadas_mes' => Warranty::whereNotNull('ticket_id')->where('created_at', '>=', now()->startOfMonth())->count(),
+        ];
+
+        $q = clone $base;
+        $tab = (string) $request->query('tab', 'pendientes');
+        if ($tab === 'pendientes') $pendientes($q);
+        elseif ($tab === 'con_garantia') $conGarantia($q);
+
+        $texto = trim((string) $request->query('q', ''));
+        if ($texto !== '') {
+            $like = '%' . addcslashes($texto, '%_\\') . '%';
+            $q->leftJoin('contacts as cf', 'cf.id', '=', 't.contact_id')
+                ->where(fn ($w) => $w->where('t.code', 'like', $like)->orWhere('t.subject', 'like', $like)
+                    ->orWhere('cf.name', 'like', $like)->orWhere('cf.email', 'like', $like)->orWhere('cf.empresa', 'like', $like)
+                    ->orWhereExists(fn ($e) => $e->from('warranties as w')->whereColumn('w.ticket_id', 't.id')->where('w.code', 'like', $like)));
+        }
+        $prio = (string) $request->query('priority', '');
+        if ($prio !== '') $q->where('t.priority', $prio);
+
+        $total = (clone $q)->count();
+        $per = min(100, max(10, (int) $request->query('per_page', 25)));
+        $pages = max(1, (int) ceil($total / $per));
+        $page = min($pages, max(1, (int) $request->query('page', 1)));
+
+        // Pendientes: el que más lleva esperando, primero. En las demás, lo último arriba.
+        $q->orderBy('t.created_at', $tab === 'pendientes' && $request->query('order') !== 'recientes' ? 'asc' : 'desc');
+        $rows = $q->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+            ->leftJoin('users as u', 'u.id', '=', 't.assigned_to')
+            ->leftJoin('sedes as sede', 'sede.id', '=', 'c.sede_id')
+            ->forPage($page, $per)
+            ->get(['t.id', 't.code', 't.subject', 't.status', 't.priority', 't.channel', 't.created_at', 't.opened_at', 't.last_message_at',
+                'c.name as contact_name', 'c.email as contact_email', 'c.wa_id as contact_phone', 'c.empresa', 'c.tienda',
+                'sede.name as sede_name', 'u.name as assigned_name']);
+
+        $garantias = Warranty::whereIn('ticket_id', $rows->pluck('id'))->orderBy('id')->get(['id', 'code', 'status', 'ticket_id'])
+            ->groupBy('ticket_id');
+        $estados = Warranty::statuses();
+        $rows = $rows->map(fn ($t) => (array) $t + [
+            'warranties' => ($garantias[$t->id] ?? collect())->map(fn ($w) => [
+                'id' => $w->id, 'code' => $w->code, 'status' => $w->status, 'status_label' => $estados[$w->status] ?? $w->status,
+            ])->values(),
+        ]);
+
+        return response()->json(['ok' => true, 'tickets' => $rows, 'counts' => $counts, 'summary' => $resumen,
+            'total' => $total, 'page' => $page, 'pages' => $pages]);
     }
 
     /* --- Etiquetas (productos) --- */
@@ -507,6 +580,20 @@ class WarrantiesController extends Controller
             $datos['ticket_id'] = DB::table('tickets')->where('code', $ticketCode)->value('id');
             if (! $datos['ticket_id']) {
                 return response()->json(['ok' => false, 'error' => "No existe el ticket {$ticketCode}"], 400);
+            }
+        }
+
+        // En el alta, la garantía no se crea mientras alguna etiqueta no esté en ningún
+        // servidor, no se haya podido comprobar o no pueda entrar (otra garantía abierta…).
+        if (! $id && trim((string) $request->input('labels', '')) !== '') {
+            [$codes, $malos] = WarrantyLabels::parse((string) $request->input('labels'));
+            if ($malos) {
+                return response()->json(['ok' => false, 'error' => 'No parecen etiquetas ni antenas: ' . implode(', ', array_slice($malos, 0, 5))], 400);
+            }
+            $fallan = collect($this->labels()->check(array_slice($codes, 0, WarrantyLabels::MAX), ['client' => $datos['client_name'], 'project' => $datos['project_name']], $me->id))
+                ->filter(fn ($r) => $r['lookup_state'] !== 'found' || $r['blocked'])->pluck('code');
+            if ($fallan->isNotEmpty()) {
+                return response()->json(['ok' => false, 'error' => 'Antes de crear la garantía, revisa ' . ($fallan->count() === 1 ? 'esta etiqueta' : "estas {$fallan->count()} etiquetas") . ': ' . $fallan->take(5)->implode(', ') . ($fallan->count() > 5 ? '…' : '')], 400);
             }
         }
 

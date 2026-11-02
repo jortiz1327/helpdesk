@@ -395,6 +395,7 @@ export const api = {
   warranties: (params) => req('warranties.php?' + new URLSearchParams(params).toString()),
   warrantyOptions: () => req('warranties.php?action=options'),
   warranty: (id) => req(`warranties.php?action=get&id=${id}`),
+  warrantyInbox: (f = {}) => req('warranties.php?action=inbox&' + new URLSearchParams(f)),
   warrantiesByTicket: (ticketId) => req(`warranties.php?action=by_ticket&ticket_id=${ticketId}`),
   checkWarrantyLabels: (payload) => postJson('warranties.php?action=labels_check', payload),
   addWarrantyLabels: (id, codes, manual = {}) => postJson('warranties.php?action=labels_add', { id, codes, manual }),

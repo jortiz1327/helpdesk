@@ -38,6 +38,7 @@ import MorningBriefing from "./components/MorningBriefing.jsx";
 import AreaChooser from "./components/AreaChooser.jsx";
 import Devices from "./components/Devices.jsx";
 import Zkong from "./components/Zkong.jsx";
+import WarrantyInbox from "./components/WarrantyInbox.jsx";
 import WarrantySettings from "./components/WarrantySettings.jsx";
 import { WarrantyTeam, WarrantyReports } from "./components/WarrantyTeam.jsx";
 import DeviceCatalog from "./components/DeviceCatalog.jsx";
@@ -1639,7 +1640,7 @@ export default function App() {
                             <Zkong onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
                         )}
                         {view === "garantias_tickets" && can("warranties.access") && can("helpdesk.access") && (
-                            <Tickets user={auth.user} onGo={setView} scope="garantias" initialTicket={ticketGarantia}
+                            <WarrantyInbox user={auth.user} initialTicket={ticketGarantia}
                                 onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
                         )}
                         {view === "tickets" && (

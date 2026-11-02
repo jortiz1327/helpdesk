@@ -129,6 +129,16 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
 
   // En el alta, las etiquetas afectadas (solo sus códigos).
   const [comp, setComp] = useState(COMP_VACIO)
+  // Alta en dos pasos: primero los datos y después las etiquetas (pantalla propia, sin scroll).
+  const [paso, setPaso] = useState('datos')
+  const enEtiquetas = !f.id && paso === 'etiquetas'
+  const siguiente = () => { if (!f.received_at) { toast('Indica la fecha de recepción', 'err'); return } setPaso('etiquetas') }
+  const bloqueoEtiquetas = f.id || !comp.text.trim() ? null
+    : comp.checked !== comp.text || !comp.results ? 'Comprueba las etiquetas antes de crear la garantía'
+    : comp.invalid?.length ? 'Quita los códigos que no son etiquetas ni antenas'
+    : comp.results.some((r) => r.lookup_state !== 'found') ? 'Hay etiquetas que no aparecen en los servidores: corrígelas, quítalas o vuelve a comprobar'
+    : comp.results.some((r) => r.blocked) ? 'Hay etiquetas que no pueden entrar: quítalas de la lista'
+    : null
 
   const guardar = async () => {
     if (!f.received_at) { toast('Indica la fecha de recepción', 'err'); return }
@@ -144,11 +154,23 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
 
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className="modal" style={{ maxWidth: f.id ? 640 : 720 }}>
+      <div className={`modal ${enEtiquetas ? 'wr-alta-lbls' : ''}`} style={{ maxWidth: f.id ? 640 : enEtiquetas ? 1080 : 720 }}>
         <div className="modal-head">
           <h3>{f.id ? `Editar ${f.code}` : inicial.ticket_code ? `Nueva garantía desde ${inicial.ticket_code}` : 'Nueva garantía'}</h3>
+          {!f.id && (
+            <div className="wr-pasos">
+              <button className={paso === 'datos' ? 'on' : 'done'} onClick={() => setPaso('datos')}><b>{paso === 'datos' ? '1' : <Icon.check />}</b> Datos</button>
+              <i />
+              <button className={paso === 'etiquetas' ? 'on' : ''} onClick={siguiente}><b>2</b> Etiquetas</button>
+            </div>
+          )}
           <button className="x" onClick={onClose}>×</button>
         </div>
+        {enEtiquetas ? (
+          <div className="modal-body wr-alta-body">
+            <Comprobador split contexto={{ client_name: f.client_name, project_name: f.project_name }} value={comp} onChange={setComp} autoFocus />
+          </div>
+        ) : (
         <div className="modal-body wr-form">
           {portal ? (
             <div className="grid2">
@@ -206,14 +228,15 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
           </div>
           <label className="field"><span className="lbl">Descripción</span>
             <textarea rows={3} value={f.description || ''} onChange={set('description')} placeholder="Qué le pasa al cliente, cómo llegó…" /></label>
-          {!f.id && (
-            <div className="field"><span className="lbl">Etiquetas y antenas afectadas <span className="hint">(se buscan en los servidores ZKONG; también se pueden añadir después)</span></span>
-              <Comprobador contexto={{ client_name: f.client_name, project_name: f.project_name }} value={comp} onChange={setComp} /></div>
-          )}
         </div>
+        )}
         <div className="modal-foot">
-          <button className="btn ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn" disabled={saving} onClick={guardar}>{saving ? (comp.text.trim() ? 'Creando y comprobando etiquetas…' : 'Guardando…') : (f.id ? 'Guardar' : 'Crear garantía')}</button>
+          {enEtiquetas && bloqueoEtiquetas ? <span className="wr-foot-why"><Icon.warn /> {bloqueoEtiquetas}</span> : null}
+          {enEtiquetas && !comp.text.trim() ? <span className="wr-foot-why info">Puedes crearla sin etiquetas y añadirlas después.</span> : null}
+          {enEtiquetas ? <button className="btn ghost" onClick={() => setPaso('datos')}>Atrás</button> : <button className="btn ghost" onClick={onClose}>Cancelar</button>}
+          {!f.id && !enEtiquetas
+            ? <button className="btn" onClick={siguiente}>Siguiente <Icon.arrowRight /></button>
+            : <button className="btn" disabled={saving || !!bloqueoEtiquetas} onClick={guardar}>{saving ? (comp.text.trim() ? 'Creando y comprobando etiquetas…' : 'Guardando…') : (f.id ? 'Guardar' : 'Crear garantía')}</button>}
         </div>
       </div>
     </div>
@@ -409,15 +432,52 @@ function Modelo({ r, onPick }) {
   )
 }
 
+/*
+ * Avisos repetidos en varias etiquetas (misma tienda de otro cliente, sin comunicar…):
+ * se dicen una vez arriba con cuántas son y salen de sus filas. Se agrupa por texto
+ * idéntico; «sin comunicar» lleva la fecha de cada una, así que se junta por tipo.
+ */
+function agruparAvisos(res) {
+  const porTexto = new Map()
+  const silencio = []
+  res.forEach((r) => (r.warnings || []).forEach((a) => {
+    if (a.blocks) return   // lo que bloquea se queda en su fila, a la vista
+    if (a.key === 'silent') { silencio.push(r); return }
+    const k = `${a.key}|${a.text}`
+    porTexto.set(k, [...(porTexto.get(k) || []), r.code])
+  }))
+  const grupos = []
+  const dentro = new Set()
+  porTexto.forEach((codes, k) => {
+    if (codes.length < 2) return
+    const [key, text] = [k.slice(0, k.indexOf('|')), k.slice(k.indexOf('|') + 1)]
+    const tone = res.find((r) => r.code === codes[0]).warnings.find((a) => a.key === key && a.text === text).tone
+    grupos.push({ id: k, n: codes.length, tone, text: text.replace(/^En los servidores está/, 'Están') })
+    codes.forEach((c) => dentro.add(`${c}|${k}`))
+  })
+  if (silencio.length >= 2) {
+    const fechas = silencio.map((r) => r.last_commu_at).filter(Boolean).sort()
+    const vieja = fechas[0] ? fmtDiaCorto(fechas[0]) : null
+    grupos.push({ id: 'silent', n: silencio.length, tone: 'warn', text: `Sin comunicar hace más de 30 días${vieja ? ` (la más antigua, desde el ${vieja})` : ''}.` })
+    silencio.forEach((r) => dentro.add(`${r.code}|silent`))
+  }
+  grupos.sort((a, b) => b.n - a.n)
+  const agrupado = (code, a) => dentro.has(a.key === 'silent' ? `${code}|silent` : `${code}|${a.key}|${a.text}`)
+  return { grupos, agrupado }
+}
+const fmtDiaCorto = (s) => { const [y, m, d] = String(s).slice(0, 10).split('-'); return d && m && y ? `${d}/${m}/${y}` : s }
+
 /* Caja para pegar códigos y comprobarlos. El estado (texto, resultados, modelos
    elegidos a mano) lo guarda quien la usa: value / onChange. */
-function Comprobador({ contexto, value, onChange, autoFocus }) {
+function Comprobador({ contexto, value, onChange, autoFocus, split }) {
   const toast = useToast()
   const [cargando, setCargando] = useState(false)
+  const [filtro, setFiltro] = useState('')   // en dos columnas: todas | bad | warn | ok
   const v = value
   const set = (cambios) => onChange({ ...v, ...cambios })
   const lineas = v.text.split(/[\s,;]+/).filter(Boolean).length
   const comprobado = v.results && v.checked === v.text
+  const hayFallos = comprobado && v.results.some((r) => r.lookup_state !== 'found')
 
   const comprobar = async () => {
     if (!v.text.trim()) return
@@ -432,6 +492,77 @@ function Comprobador({ contexto, value, onChange, autoFocus }) {
   const cuenta = { ok: 0, warn: 0, bad: 0 }
   res.forEach((r) => { cuenta[r.already ? 'bad' : estadoEtiqueta(r)]++ })
 
+  // Quita códigos de la lista sin tener que volver a comprobar el resto.
+  const norm = (t) => t.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+  const quitar = (codes) => {
+    const fuera = new Set(codes)
+    const texto = v.text.split(/\r?\n/).map((l) => l.split(/[\s,;]+/).filter((t) => t && !fuera.has(norm(t))).join(' ')).filter((l) => l.trim()).join('\n')
+    set({ text: texto, checked: comprobado ? texto : v.checked, results: v.results ? v.results.filter((r) => !fuera.has(r.code)) : v.results, invalid: (v.invalid || []).filter((c) => !fuera.has(c)) })
+  }
+  const estado = (r) => (r.already ? 'bad' : estadoEtiqueta(r))
+  const ORDEN = { bad: 0, warn: 1, ok: 2 }
+  const malas = [...res.filter((r) => estado(r) === 'bad').map((r) => r.code), ...(comprobado ? v.invalid || [] : [])]
+
+  if (split) {
+    const vista = [...res].sort((a, b) => ORDEN[estado(a)] - ORDEN[estado(b)]).filter((r) => !filtro || estado(r) === filtro)
+    const cambiada = v.results && v.checked !== v.text
+    const { grupos, agrupado } = agruparAvisos(res)
+    return (
+      <div className="wr-cs">
+        <div className="wr-cs-in">
+          <span className="lbl">Códigos <span className="hint">— uno por línea: etiqueta (9) o MAC de antena (12)</span></span>
+          <textarea className="mono" value={v.text} autoFocus={autoFocus} onChange={(e) => set({ text: e.target.value })}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) comprobar() }}
+            placeholder={'806301480\n806301834\nA0A3B85B5F7F'} />
+          {comprobado && v.invalid?.length ? <p className="wr-comp-bad">No son etiquetas ni antenas: <span className="mono">{v.invalid.join(', ')}</span></p> : null}
+          <div className="wr-cs-f">
+            <span className="dev-mute">{lineas ? `${lineas} ${lineas === 1 ? 'código' : 'códigos'}` : 'Ctrl+Enter para comprobar'}</span>
+            <button type="button" className={comprobado && !hayFallos ? 'btn ghost' : 'btn'} disabled={cargando || !lineas || (comprobado && !hayFallos)} onClick={comprobar}>
+              {hayFallos && !cargando ? <Icon.refresh /> : <Icon.search />} {cargando ? 'Buscando…' : hayFallos ? 'Volver a comprobar' : comprobado ? 'Comprobadas' : 'Comprobar'}
+            </button>
+          </div>
+        </div>
+        <div className="wr-cs-out">
+          {!comprobado ? (
+            <div className="wr-cs-empty">{cargando ? <div className="spinner" /> : <Icon.search />}<span>{cargando ? 'Buscando en los servidores ZKONG…' : cambiada ? 'Has cambiado la lista: vuelve a comprobar.' : 'Pega los códigos y pulsa Comprobar. Aquí verás en qué servidor y tienda está cada uno.'}</span></div>
+          ) : (
+            <>
+              <div className="wr-cs-bar">
+                <div className="dc-seg wr-cs-tabs">
+                  {[['', 'Todas', res.length], ['bad', 'No entran', cuenta.bad], ['warn', 'Con avisos', cuenta.warn], ['ok', 'Correctas', cuenta.ok]].map(([k, l, n]) => (k === '' || n) ? (
+                    <button key={k} type="button" className={`${filtro === k ? 'on' : ''} t-${k || 'all'}`} onClick={() => setFiltro(k)}>{l}<span className="wi-n">{n}</span></button>
+                  ) : null)}
+                </div>
+                <span className="spacer" />
+                {malas.length ? <button type="button" className="btn ghost sm wr-cs-quitar" onClick={() => { quitar(malas); setFiltro('') }}><Icon.x /> Quitar las que no entran ({malas.length})</button> : null}
+              </div>
+              {grupos.length ? (
+                <ul className="wr-cs-grupos">
+                  {grupos.map((g) => <li key={g.id} className={`t-${g.tone}`}><Icon.warn /><b>{g.n} {g.n === 1 ? 'etiqueta' : 'etiquetas'}</b><span>{g.text}</span></li>)}
+                </ul>
+              ) : null}
+              <ul className="wr-cs-list">
+                {vista.map((r) => (
+                  <li key={r.code} className={`st-${estado(r)}`}>
+                    <span className="wr-lbl-code mono">{r.code}{r.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</span>
+                    <Donde r={r} />
+                    {r.already ? <span className="wr-st bad">Ya está en esta garantía</span> : <Modelo r={r} onPick={r.blocked ? null : (ref, m) => elegir(r.code, ref, m)} />}
+                    <button type="button" className="icon-btn sm" title="Quitar de la lista" onClick={() => quitar([r.code])}><Icon.x /></button>
+                    {(() => {
+                      const propios = (r.warnings || []).filter((a) => !agrupado(r.code, a))
+                      return propios.length ? <p className="wr-cs-av">{propios.map((a, i) => <span key={i} className={`t-${a.tone}`}>{a.text}</span>)}</p> : null
+                    })()}
+                  </li>
+                ))}
+                {!vista.length ? <li className="wr-cs-none">Ninguna en este filtro.</li> : null}
+              </ul>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="wr-comp">
       <textarea rows={4} className="mono" value={v.text} autoFocus={autoFocus}
@@ -440,8 +571,8 @@ function Comprobador({ contexto, value, onChange, autoFocus }) {
         placeholder={'Pega los códigos, uno por línea: etiquetas (9 caracteres) o MAC de antenas\n8E9749440\nA0A3B85B5F7F'} />
       <div className="wr-comp-f">
         <span className="dev-mute">{lineas ? `${lineas} ${lineas === 1 ? 'código' : 'códigos'}` : 'Etiquetas: código de 9 caracteres · Antenas: su MAC'}{comprobado ? '' : lineas ? ' · sin comprobar' : ''}</span>
-        <button type="button" className="dev-btn" disabled={cargando || !lineas || comprobado} onClick={comprobar}>
-          <Icon.search /> {cargando ? 'Buscando en los servidores…' : comprobado ? 'Comprobadas' : 'Comprobar'}
+        <button type="button" className="dev-btn" disabled={cargando || !lineas || (comprobado && !hayFallos)} onClick={comprobar}>
+          {hayFallos && !cargando ? <Icon.refresh /> : <Icon.search />} {cargando ? 'Buscando en los servidores…' : hayFallos ? 'Volver a comprobar' : comprobado ? 'Comprobadas' : 'Comprobar'}
         </button>
       </div>
       {comprobado && (
