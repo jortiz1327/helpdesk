@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Warranty;
-use App\Models\WarrantyDocument;
 use App\Models\WarrantyItem;
 use App\Services\WarrantyDocuments;
 use App\Models\ZkongBatch;
@@ -786,10 +785,6 @@ class WarrantiesController extends Controller
                 'zkong_results'  => ZkongBatch::RESULTS,
                 'coverages'        => WarrantyItem::COVERAGES,
                 'default_coverage' => WarrantyItem::DEFAULT_COVERAGE,
-            ],
-            'documents'  => [
-                'kinds'    => collect(WarrantyDocument::KINDS)->map(fn ($k, $key) => ['label' => $k['label'], 'statuses' => $k['statuses'], 'generated' => in_array($key, WarrantyDocument::GENERATED, true)])->all(),
-                'statuses' => WarrantyDocument::STATUSES,
             ],
         ]);
     }

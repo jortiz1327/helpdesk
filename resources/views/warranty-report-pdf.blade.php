@@ -92,15 +92,6 @@
                     @endif
                 @endforeach
             </table>
-            @if($docs->count())
-                <h2>Documentos</h2>
-                <table class="res">
-                    @foreach($docs as $d)
-                        <tr><td>{{ $kinds[$d->kind]['label'] }} {{ $d->number }}@if($d->coverage) <span class="cov {{ $d->coverage }}">{{ $cov[$d->coverage] }}</span>@endif</td>
-                            <td class="r" style="width:80px">{{ $d->total !== null ? $eur($d->total) : '' }}</td></tr>
-                    @endforeach
-                </table>
-            @endif
         </td>
     </tr></table>
 

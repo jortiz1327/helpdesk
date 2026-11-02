@@ -11,9 +11,8 @@ use Illuminate\Support\Str;
 
 /**
  * Configuración de Gestión de garantías (permiso warranties.config): estados,
- * categorías, reglas de alerta, plantillas de diagnóstico, tarifa de los documentos
- * (por referencia AEME, por tipo de pila y conceptos sueltos) y ajustes de los
- * documentos (empresa, IVA, condiciones y correo de resolución).
+ * categorías, reglas de alerta, plantillas de diagnóstico y ajustes de los documentos
+ * (empresa del informe y correo de resolución). Los precios viven en el portal AEME.
  *
  * Estados: los de serie no se borran (sí se renombran, se recolorean y se desactivan,
  * salvo los dos que usa la propia aplicación: no iniciado y cerrada). Uno propio se
@@ -35,8 +34,6 @@ class WarrantySettingsController extends Controller
             'alerts_save'     => $this->alertsSave($request),
             'template_save'   => $this->templateSave($request),
             'template_delete' => $this->templateDelete($request),
-            'price_save'      => $this->priceSave($request),
-            'price_delete'    => $this->priceDelete($request),
             'docs_save'       => $this->docsSave($request),
             default           => $this->get(),
         };
@@ -59,12 +56,8 @@ class WarrantySettingsController extends Controller
                 'active' => $reglas[$k]['active'] ?? false, 'warn_days' => $reglas[$k]['warn_days'] ?? 0, 'crit_days' => $reglas[$k]['crit_days'] ?? 0,
             ])->values(),
             'templates' => DB::table('warranty_diagnosis_templates')->orderBy('sort')->orderBy('id')->get(['id', 'title', 'body', 'active']),
-            'prices' => DB::table('warranty_prices')->orderBy('kind')->orderBy('ref')->get(['id', 'kind', 'ref', 'label', 'price'])
-                ->map(fn ($p) => (array) $p + ['price' => (float) $p->price]),
-            'price_hints' => $this->pistasTarifa(),
             'docs' => [
                 'company'          => WarrantyDocument::setting('company'),
-                'documents'        => WarrantyDocument::setting('documents'),
                 'resolution_email' => WarrantyDocument::setting('resolution_email'),
             ],
         ]);
@@ -236,54 +229,10 @@ class WarrantySettingsController extends Controller
 
     /* --- Tarifa y documentos --- */
 
-    /**
-     * Lo que se puede tarifar y aún no tiene precio: referencias que salen en las
-     * garantías (con cuántos dispositivos) y tipos de pila del catálogo.
-     */
-    private function pistasTarifa(): array
-    {
-        $con = DB::table('warranty_prices')->get(['kind', 'ref'])->map(fn ($p) => $p->kind . '|' . strtoupper($p->ref))->flip();
-        $productos = DB::table('warranty_items')->whereNotNull('aeme_ref')->where('aeme_ref', '!=', '')
-            ->groupBy('aeme_ref')->selectRaw('aeme_ref, max(product_name) as name, max(kind) as kind, count(*) as n')->orderByDesc('n')->get()
-            ->reject(fn ($r) => isset($con['product|' . strtoupper($r->aeme_ref)]))
-            ->map(fn ($r) => ['kind' => 'product', 'ref' => strtoupper($r->aeme_ref), 'label' => $r->name, 'used' => (int) $r->n])->values();
-        $pilas = DB::table('device_models')->whereNotNull('battery_type')->where('battery_type', '!=', '')->distinct()->pluck('battery_type')
-            ->map(fn ($t) => strtoupper($t))->unique()->reject(fn ($t) => isset($con["battery|{$t}"]))
-            ->map(fn ($t) => ['kind' => 'battery', 'ref' => $t, 'label' => "Pila {$t}", 'used' => null])->values();
-        return $productos->concat($pilas)->all();
-    }
-
-    private function priceSave(Request $request)
-    {
-        $kind = (string) $request->input('kind');
-        if (! in_array($kind, ['product', 'battery', 'service'], true)) return $this->error('Tipo no válido');
-        $ref = trim((string) $request->input('ref', ''));
-        $ref = $kind === 'service' ? Str::slug($ref ?: (string) $request->input('label', ''), '_') : strtoupper($ref);
-        if ($ref === '' || mb_strlen($ref) > 80) return $this->error($kind === 'service' ? 'Escribe el concepto' : 'Escribe la referencia');
-        $precio = str_replace(',', '.', trim((string) $request->input('price', '')));
-        if (! is_numeric($precio) || (float) $precio < 0 || (float) $precio > 999999) return $this->error('Escribe un precio válido (0 o más)');
-
-        $id = (int) $request->input('id');
-        $repe = DB::table('warranty_prices')->where('kind', $kind)->where('ref', $ref)->where('id', '!=', $id)->exists();
-        if ($repe) return $this->error('Esa referencia ya tiene precio');
-        $datos = ['kind' => $kind, 'ref' => $ref, 'label' => ($l = trim((string) $request->input('label', ''))) !== '' ? mb_substr($l, 0, 160) : null,
-            'price' => round((float) $precio, 2), 'updated_at' => now()];
-        $id ? DB::table('warranty_prices')->where('id', $id)->update($datos)
-            : DB::table('warranty_prices')->insert($datos + ['created_at' => now()]);
-        return response()->json(['ok' => true]);
-    }
-
-    private function priceDelete(Request $request)
-    {
-        DB::table('warranty_prices')->where('id', (int) $request->input('id'))->delete();
-        return response()->json(['ok' => true]);
-    }
-
     private function docsSave(Request $request)
     {
         $t = fn ($v, $max) => mb_substr(trim((string) $v), 0, $max);
         $c = (array) $request->input('company', []);
-        $d = (array) $request->input('documents', []);
         $e = (array) $request->input('resolution_email', []);
         if (trim((string) ($c['name'] ?? '')) === '') return $this->error('Escribe el nombre de la empresa');
         if (trim((string) ($e['subject'] ?? '')) === '' || trim((string) ($e['body'] ?? '')) === '') return $this->error('El correo de resolución necesita asunto y texto');
@@ -291,8 +240,6 @@ class WarrantySettingsController extends Controller
         $valores = [
             'company' => ['name' => $t($c['name'], 120), 'tax_id' => $t($c['tax_id'] ?? '', 30), 'address' => $t($c['address'] ?? '', 300),
                 'email' => $t($c['email'] ?? '', 120), 'phone' => $t($c['phone'] ?? '', 40)],
-            'documents' => ['vat' => round(max(0, min(100, (float) ($d['vat'] ?? 21))), 2),
-                'validity_days' => max(0, min(365, (int) ($d['validity_days'] ?? 30))), 'conditions' => $t($d['conditions'] ?? '', 3000)],
             'resolution_email' => ['subject' => $t($e['subject'], 200), 'body' => $t($e['body'], 5000)],
         ];
         foreach ($valores as $k => $v) {

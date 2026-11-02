@@ -8,13 +8,11 @@ use App\Models\WarrantyDocument;
 use App\Models\WarrantyItem;
 use App\Services\TokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
-/** Quién paga cada dispositivo, tarifa, presupuestos y albaranes, informe y correo de resolución. */
+/** Quién paga cada dispositivo, presupuestos para el portal, informe y correo de resolución. */
 class WarrantyDocumentsTest extends TestCase
 {
     use RefreshDatabase;
@@ -59,67 +57,6 @@ class WarrantyDocumentsTest extends TestCase
         $this->assertNull($b->fresh()->coverage);
     }
 
-    public function test_presupuestos_por_quien_paga_con_la_tarifa_y_albaran(): void
-    {
-        $modelo = DB::table('device_models')->insertGetId(['battery_type' => 'CR2450', 'battery_quantity' => 2, 'has_batteries' => 1, 'created_at' => now(), 'updated_at' => now()]);
-        $this->postJson('/api/warranty_settings.php?action=price_save', ['kind' => 'product', 'ref' => 'amc26v', 'price' => '12,50'], $this->h)->assertOk();
-        $this->postJson('/api/warranty_settings.php?action=price_save', ['kind' => 'battery', 'ref' => 'CR2450', 'price' => '0.80'], $this->h)->assertOk();
-        $d1 = $this->item('8E9749440', ['resolution' => 'danada', 'coverage' => 'cliente']);
-        $this->item('8E9749441', ['resolution' => 'danada', 'coverage' => 'cliente']);
-        $this->item('8E9749442', ['resolution' => 'bateria', 'coverage' => 'pilas', 'device_model_id' => $modelo]);
-        $this->item('8E9749443', ['resolution' => 'bateria', 'coverage' => 'pilas', 'device_model_id' => $modelo]);
-        $this->item('8E9749444', ['resolution' => 'defectuosa', 'coverage' => 'garantia']);
-        $this->item('8E9749445');                                                    // sin revisar: no entra
-
-        $s = $this->getJson("/api/warranty_docs.php?id={$this->w->id}", $this->h)->json('summary');
-        $this->assertSame([2, 2, 1, 1], [$s['coverage']['cliente']['items'], $s['coverage']['pilas']['items'], $s['coverage']['garantia']['items'], $s['pending']]);
-
-        $ids = $this->postJson('/api/warranty_docs.php?action=generate', ['id' => $this->w->id, 'kind' => 'presupuesto', 'coverages' => ['garantia', 'cliente', 'pilas']], $this->h)->assertOk()->json('ids');
-        $docs = WarrantyDocument::whereIn('id', $ids)->get()->keyBy('coverage');
-        $y = date('Y');
-        $this->assertSame(["P-{$y}-0001", "P-{$y}-0002", "P-{$y}-0003"], $docs->sortBy('id')->pluck('number')->values()->all());
-        $this->assertSame(30.25, $docs['cliente']->total);                           // 2 × 12,50 + 21 %
-        $this->assertSame(3.87, $docs['pilas']->total);                              // 4 pilas × 0,80 + 21 %
-        $this->assertSame(0.0, $docs['garantia']->total);                            // sin cargo
-        $l = $this->getJson("/api/warranty_docs.php?action=get&id={$docs['pilas']->id}", $this->h)->json('document.lines.0');
-        $this->assertSame(['CR2450', 4, ['8E9749442', '8E9749443']], [$l['ref'], (int) $l['qty'], $l['codes']]);
-
-        // Editar líneas recalcula; el estado cambia; un enviado no se borra.
-        $cli = $docs['cliente'];
-        $this->postJson('/api/warranty_docs.php?action=save', ['id' => $cli->id, 'vat' => 21, 'note' => '', 'status' => 'borrador', 'lines' => [
-            ['ref' => 'AMC26V', 'description' => 'Etiqueta', 'qty' => 2, 'price' => 12.5, 'codes' => [$d1->code]],
-            ['ref' => '', 'description' => 'Gastos de envío', 'qty' => 1, 'price' => 10],
-        ]], $this->h)->assertOk()->assertJsonPath('document.totals.total', 42.35);
-        $this->postJson('/api/warranty_docs.php?action=status', ['id' => $cli->id, 'status' => 'entregado'], $this->h)->assertStatus(400);
-        $this->postJson('/api/warranty_docs.php?action=status', ['id' => $cli->id, 'status' => 'aceptado'], $this->h)->assertOk();
-        $this->postJson('/api/warranty_docs.php?action=delete', ['id' => $cli->id], $this->h)->assertStatus(400);
-
-        $alb = $this->postJson('/api/warranty_docs.php?action=to_albaran', ['id' => $cli->id], $this->h)->assertOk()->json();
-        $this->assertSame("A-{$y}-0001", $alb['number']);
-        $this->assertSame(42.35, WarrantyDocument::find($alb['id'])->total);
-
-        $pdf = $this->get("/api/warranty_docs.php?action=download&id={$cli->id}", $this->h)->assertOk();
-        $this->assertStringStartsWith('%PDF', $pdf->getContent());
-        // Historial: 3 creados, modificado, aceptado y el albarán.
-        $this->assertSame(6, DB::table('warranty_events')->where('warranty_id', $this->w->id)->where('field', 'documents')->count());
-    }
-
-    public function test_documentos_subidos(): void
-    {
-        $r = $this->post('/api/warranty_docs.php?action=upload', ['id' => $this->w->id, 'kind' => 'albaran', 'coverage' => 'cliente', 'number' => 'ALB-889', 'total' => '120,40',
-            'file' => UploadedFile::fake()->create('albaran.pdf', 40, 'application/pdf')], $this->h)->assertOk();
-        $d = WarrantyDocument::find($r->json('id'));
-        $this->assertSame(['subido', 'ALB-889', 'cliente', 120.4, 'borrador'], [$d->source, $d->number, $d->coverage, $d->total, $d->status]);
-        Storage::disk('local')->assertExists($d->path);
-        $this->get("/api/warranty_docs.php?action=download&id={$d->id}", $this->h)->assertOk()->assertHeader('Content-Type', 'application/pdf');
-
-        $this->post('/api/warranty_docs.php?action=upload', ['id' => $this->w->id, 'kind' => 'otro',
-            'file' => UploadedFile::fake()->create('x.exe', 1)], $this->h)->assertStatus(400);
-
-        $this->postJson('/api/warranty_docs.php?action=delete', ['id' => $d->id], $this->h)->assertOk();   // los subidos se borran siempre
-        Storage::disk('local')->assertMissing($d->path);
-    }
-
     public function test_informe_de_resolucion_y_correo(): void
     {
         $a = $this->item('8E9749440', ['resolution' => 'defectuosa', 'coverage' => 'garantia', 'zkong_result' => 'reposicion']);
@@ -146,34 +83,35 @@ class WarrantyDocumentsTest extends TestCase
         $this->assertStringNotContainsString('{', $m['body']);
     }
 
-    public function test_tarifa_y_ajustes_solo_con_configuracion(): void
+    public function test_ajustes_solo_con_configuracion_y_sin_tarifa(): void
     {
         $u = User::create(['name' => 'Luis', 'email' => 'luis@x.com', 'password' => bcrypt('x'), 'active' => 1]);
         $u->givePermissionTo(['warranties.access']);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-        $this->postJson('/api/warranty_settings.php?action=price_save', ['kind' => 'product', 'ref' => 'X', 'price' => 1], ['X-App-Token' => TokenService::make($u)])->assertStatus(403);
+        $this->postJson('/api/warranty_settings.php?action=docs_save', [], ['X-App-Token' => TokenService::make($u)])->assertStatus(403);
 
-        $this->item('8E9749440');
-        $hints = collect($this->getJson('/api/warranty_settings.php', $this->h)->json('price_hints'));
-        $this->assertSame(1, $hints->firstWhere('ref', 'AMC26V')['used']);
-        $this->postJson('/api/warranty_settings.php?action=price_save', ['kind' => 'product', 'ref' => 'AMC26V', 'price' => -1], $this->h)->assertStatus(400);
-
+        // Los precios están en el portal: aquí ya no hay tarifa.
+        $this->assertArrayNotHasKey('prices', $this->getJson('/api/warranty_settings.php', $this->h)->json());
         $this->postJson('/api/warranty_settings.php?action=docs_save', [
-            'company' => ['name' => 'AEME Group', 'tax_id' => 'B123'], 'documents' => ['vat' => 10, 'validity_days' => 15, 'conditions' => 'X'],
+            'company' => ['name' => 'AEME Group', 'tax_id' => 'B123'],
             'resolution_email' => ['subject' => 'Garantía {codigo}', 'body' => 'Hola'],
         ], $this->h)->assertOk();
-        $this->assertSame(10.0, (float) WarrantyDocument::setting('documents')['vat']);
         $this->assertSame('AEME Group', WarrantyDocument::setting('company')['name']);
     }
 
-    public function test_validar_para_el_portal_no_crea_nada(): void
+    public function test_presupuestos_para_el_portal_solo_se_preparan(): void
     {
         $this->item('8E9749440', ['resolution' => 'danada', 'coverage' => 'cliente']);
-        $id = $this->postJson('/api/warranty_docs.php?action=generate', ['id' => $this->w->id, 'kind' => 'presupuesto', 'coverages' => ['cliente']], $this->h)->json('ids.0');
-        $r = $this->postJson('/api/warranty_docs.php?action=portal_check', ['id' => $id], $this->h)->assertOk()->json();
+        $this->item('8E9749441', ['resolution' => 'defectuosa', 'coverage' => 'garantia']);
+        $r = $this->postJson('/api/warranty_docs.php?action=portal_drafts', ['id' => $this->w->id], $this->h)->assertOk()->json();
         // Sin cliente del portal enlazado (o sin portal) no está listo, y crear sigue desactivado.
         $this->assertFalse($r['ready']);
         $this->assertFalse($r['enabled']);
         $this->assertTrue(collect($r['checks'])->contains('tone', 'bad'));
+
+        // Los documentos del portal piden el cliente enlazado; aquí no se crea ningún documento.
+        $this->getJson("/api/warranty_docs.php?action=portal&id={$this->w->id}", $this->h)->assertOk()->assertJsonPath('linked', false);
+        $this->postJson('/api/warranty_docs.php?action=generate', ['id' => $this->w->id, 'kind' => 'presupuesto', 'coverages' => ['cliente']], $this->h);
+        $this->assertSame(0, WarrantyDocument::count());
     }
 }

@@ -430,16 +430,10 @@ export const api = {
   // Catálogo de modelos: deviceCatalogDo('save' | 'delete', {...}).
   deviceCatalog: () => req('device_catalog.php'),
   deviceCatalogDo: (action, payload) => postJson(`device_catalog.php?action=${action}`, payload),
-  // Documentos de una garantía: warrantyDocsDo('generate', {...}) y demás acciones POST.
+  // Documentos de una garantía: los del portal (solo lectura), informe y correo de resolución.
   warrantyDocs: (id) => req(`warranty_docs.php?id=${id}`),
-  warrantyDoc: (id) => req(`warranty_docs.php?action=get&id=${id}`),
+  warrantyPortalDocs: (id, fresh) => req(`warranty_docs.php?action=portal&id=${id}${fresh ? '&fresh=1' : ''}`),
   warrantyDocsDo: (action, payload) => postJson(`warranty_docs.php?action=${action}`, payload),
-  uploadWarrantyDoc: (fields, file) => {
-    const fd = new FormData()
-    Object.entries(fields).forEach(([k, v]) => fd.append(k, v ?? ''))
-    fd.append('file', file)
-    return req('warranty_docs.php?action=upload', { method: 'POST', body: fd })
-  },
   warrantyResolutionEmail: (id) => req(`warranty_docs.php?action=email&id=${id}`),
   warrantyDocDownload: async (id) => {
     try {

@@ -4824,56 +4824,12 @@ button.dev-code:hover { text-decoration: underline; }
 .wr-seg button.on.cov-pilas { color: #a16207; }
 .wd-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
 .wd-acts .spacer { flex: 1; }
-.wd-empty { padding: 48px 20px; border: 1px dashed var(--line-2); border-radius: var(--radius); }
-.wd-table td { height: auto; padding-top: 10px; padding-bottom: 10px; }
-.wd-table th.r, .wd-table td.r { text-align: right; }
-.wd-table tr.off td { opacity: 0.55; }
-.wd-doc { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.wd-doc > div { display: flex; flex-direction: column; min-width: 0; }
-.wd-doc small { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
-.wd-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; background: var(--primary-soft); }
-.wd-ic svg { width: 16px; height: 16px; fill: var(--primary); }
-.wd-ic.k-albaran { background: color-mix(in srgb, #0891b2 12%, transparent); }
-.wd-ic.k-albaran svg { fill: #0891b2; }
-.wd-ic.k-informe { background: color-mix(in srgb, #16a34a 12%, transparent); }
-.wd-ic.k-informe svg { fill: #16a34a; }
-.wd-ic.k-factura, .wd-ic.k-otro { background: var(--panel-2); }
-.wd-ic.k-factura svg, .wd-ic.k-otro svg { fill: var(--ink-2); }
-.wd-row-acts { white-space: nowrap; text-align: right; }
-.wd-row-acts .icon-btn, .ws-tarifa .ws-acts .icon-btn { display: inline-grid; width: 32px; height: 32px; vertical-align: middle; }
-.wd-row-acts .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .wd-free { color: #15803d; font-weight: 700; font-size: 12.5px; }
 .modal.wd-modal { max-width: 560px; }
 .modal.wd-modal.wide { max-width: 940px; }
 .wd-tip { margin: 0 0 12px; font-size: 13px; line-height: 1.5; }
 .wd-warn { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: #b45309; background: color-mix(in srgb, #d97706 10%, transparent); }
 .wd-warn svg { width: 14px; height: 14px; fill: currentColor; flex-shrink: 0; }
-.wd-covs { display: flex; flex-direction: column; gap: 8px; }
-.wd-cov-opt { display: flex; align-items: flex-start; gap: 11px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 11px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
-.wd-cov-opt.on { border-color: var(--primary); background: var(--primary-soft); }
-.wd-cov-opt.off { opacity: 0.5; cursor: default; }
-.wd-cov-opt input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--primary); }
-.wd-cov-opt .tx { display: flex; flex-direction: column; gap: 3px; }
-.wd-cov-opt .t { font-size: 13.5px; }
-.wd-cov-opt small { font-size: 12px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 5px; }
-.wd-cov-opt small.bad { color: #b45309; font-weight: 600; }
-.wd-cov-opt small svg { width: 12px; height: 12px; fill: currentColor; }
-.wd-lines td { height: auto; padding: 6px 6px; vertical-align: top; }
-.wd-lines th.r, .wd-lines td.r { text-align: right; }
-.wd-lines td.r { padding-top: 13px; font-variant-numeric: tabular-nums; }
-.wd-lines input { width: 100%; height: 32px; padding: 0 8px; font-size: 13px; }
-.wd-lines input.r { text-align: right; }
-.wd-codes { display: block; margin-top: 4px; padding: 0; font: 11px/1.5 var(--mono, monospace); color: var(--ink-3); text-align: left; background: none; border: 0; cursor: pointer; white-space: normal; word-break: break-all; }
-.wd-codes:hover { color: var(--ink-2); }
-.wd-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
-.wd-add .spacer { flex: 1; }
-.wd-sum { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.wd-sum b { color: var(--ink); }
-.wd-drop { display: flex; align-items: center; gap: 12px; padding: 18px; margin-bottom: 16px; border: 1.5px dashed var(--line-2); border-radius: 12px; cursor: pointer; font-size: 13px; transition: border-color 0.15s, background 0.15s; }
-.wd-drop svg { width: 22px; height: 22px; fill: var(--ink-3); flex-shrink: 0; }
-.wd-drop small { display: block; margin-top: 2px; }
-.wd-drop.over, .wd-drop:hover { border-color: var(--primary); background: var(--primary-soft); }
-.wd-drop.has { border-style: solid; }
 .wd-mail-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
 .wd-mail-row > span { width: 52px; color: var(--ink-3); font-weight: 600; flex-shrink: 0; }
 .wd-mail-row input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; }
@@ -4882,16 +4838,6 @@ button.dev-code:hover { text-decoration: underline; }
 .wd-mail-f { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; }
 .wd-mail-f .spacer { flex: 1; }
 @media (max-width: 980px) { .wd-covbar { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.ws-tarifa td { height: auto; padding-top: 7px; padding-bottom: 7px; }
-.ws-tarifa th.r, .ws-tarifa td.r { text-align: right; }
-.ws-tarifa tr.hint td { background: color-mix(in srgb, #d97706 4%, transparent); }
-.ws-tarifa .ws-acts { text-align: right; white-space: nowrap; }
-.ws-precio { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-3); }
-.ws-precio input { width: 92px; height: 30px; padding: 0 8px; text-align: right; font-variant-numeric: tabular-nums; }
-.ws-precio-new .ws-add { flex-wrap: wrap; }
-.ws-precio-in { max-width: 110px; text-align: right; }
-.ws-hint-n { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; font-size: 12px; font-weight: 600; color: #b45309; }
-.ws-hint-n svg { width: 13px; height: 13px; fill: currentColor; }
 .ws-docs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
 .ws-docs .field { margin-bottom: 12px; }
 .ws-docs .field input, .ws-docs .field textarea { padding: 8px 11px; font-size: 13px; }
@@ -5210,45 +5156,11 @@ button.dev-code:hover { text-decoration: underline; }
 .wd-rs i { width: 8px; height: 8px; border-radius: 50%; background: var(--wdc, var(--ink-3)); }
 .wd-rs b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .wd-rs.cero { opacity: 0.55; }
-.wd-rs em { font-style: normal; font-size: 12px; font-weight: 600; color: #b45309; }
 .wd-rs.cov-garantia { --wdc: #16a34a; }
 .wd-rs.cov-cliente { --wdc: #ea580c; }
 .wd-rs.cov-pilas { --wdc: #d97706; }
 .wd-rs.rev { margin-left: auto; padding-left: 18px; border-left: 1px solid var(--line); }
 .wd-rs.rev.pend b { color: #b45309; }
-.wd-filtro { display: inline-flex; margin-bottom: 10px; }
-.wd-filtro small { margin-left: 4px; font-weight: 600; color: var(--ink-3); }
-.wd-table tr.wd-on td { background: var(--primary-soft); }
-.wd-table tr.wd-on td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
-.wd-ed { margin-top: 16px; padding: 16px 18px 18px; border: 1.5px solid color-mix(in srgb, var(--primary) 35%, var(--line)); border-radius: 14px; background: var(--panel); scroll-margin: 16px; }
-.wd-ed-h { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
-.wd-ed-h > div { flex: 1; min-width: 0; }
-.wd-ed-h h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 700; }
-.wd-ed-h h3 .mono { color: var(--primary); }
-.wd-ed-h p { margin: 3px 0 0; font-size: 12.5px; }
-.wd-ed-h label { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
-.wd-ed .wd-add { margin: 0 0 10px; }
-.wd-ed-f { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; margin-top: 14px; align-items: start; }
-.wd-ed-f .field { margin: 0; }
-.wd-tot { padding: 12px 14px; border-radius: 12px; background: var(--panel-2); font-size: 13px; font-variant-numeric: tabular-nums; }
-.wd-tot > div:not(.wd-tot-acts) { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; color: var(--ink-2); }
-.wd-tot > div > span { display: inline-flex; align-items: center; gap: 6px; }
-.wd-tot input { width: 64px; height: 28px; padding: 0 6px; text-align: right; font-size: 12.5px; }
-.wd-tot b { color: var(--ink); }
-.wd-tot .big { margin-top: 4px; padding-top: 10px !important; border-top: 1px solid var(--line); }
-.wd-tot .big span { font-weight: 700; color: var(--ink); }
-.wd-tot .big b { font-size: 20px; font-weight: 800; color: var(--primary); }
-.wd-tot .big b.wd-free { font-size: 15px; color: #15803d; }
-.wd-tot-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-@media (max-width: 900px) { .wd-ed-f { grid-template-columns: 1fr; } .wd-rs.rev { margin-left: 0; padding-left: 0; border-left: 0; } }
-.wd-row-acts .icon-btn.wd-editing { color: #fff; background: var(--primary); }
-.wd-row-acts .icon-btn.wd-editing svg { fill: #fff; }
-.wd-filtro button { padding: 0 12px; }
-.wd-table .wd-doc small { max-width: 240px; }
-.wd-table td:first-child, .wd-table th:first-child { padding-right: 6px; }
-.wd-cub { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
-.wd-cub s { font-size: 11.5px; color: var(--ink-3); }
-.wd-tot .wd-cubre, .wd-tot .wd-cubre b { color: #15803d; }
 /* Validar para el portal */
 .wd-pv-st { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; margin-bottom: 12px; border-radius: 11px; font-size: 13.5px; font-weight: 700; }
 .wd-pv-st svg { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; margin-top: 1px; }
@@ -5276,7 +5188,43 @@ button.dev-code:hover { text-decoration: underline; }
 .wd-pv-tot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px 22px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .wd-pv-tot b { margin-left: 6px; color: var(--ink); }
 .wd-pv-tot .big b { font-size: 16px; color: var(--primary); }
-.wd-pv-obs { margin: 0; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 12.5px; line-height: 1.5; color: var(--ink-2); white-space: pre-wrap; }
-.wd-pv-obs small { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
 .modal-foot .spacer { flex: 1; }
-.wd-doc b .wr-cov { margin-left: 4px; vertical-align: 1px; }
+.wd-pv + .wd-pv { margin-top: 12px; }
+.wd-pv-av { padding: 10px 14px 0; }
+.wd-pv-av .wd-pv-checks { margin-bottom: 10px; }
+.wr-cov.cov-mano_obra { color: #4338ca; background: color-mix(in srgb, #4f46e5 10%, transparent); border-color: transparent; }
+.wr-cov.cov-otro { color: var(--ink-2); background: var(--panel-2); border-color: transparent; }
+/* Documentos del portal: proyectos de garantía del cliente y sus presupuestos */
+.wd-sec { margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--line); }
+.wd-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.wd-sec-h h4 { display: inline-flex; align-items: center; gap: 7px; margin: 0; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.wd-sec-h h4 svg { width: 15px; height: 15px; fill: var(--primary); }
+.wd-sec-h h4 .dev-mute { font-weight: 500; }
+.wd-sec-sub { margin: 2px 0 10px; font-size: 12.5px; }
+.wd-empty-p { margin: 10px 0 4px; font-size: 13px; color: var(--ink-2); }
+.wd-proys { display: flex; flex-direction: column; gap: 10px; }
+.wd-proy { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.wd-proy-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 9px 12px; background: var(--panel-2); font-size: 13px; }
+.wd-proy-h b { color: var(--ink); }
+.wd-proy-h .end { margin-left: auto; }
+.wd-gcode { font-size: 12px; font-weight: 700; color: var(--primary); }
+.wd-proy-none { margin: 0; padding: 10px 12px; font-size: 12.5px; }
+.wd-est td { height: auto; padding-top: 8px; padding-bottom: 8px; vertical-align: top; font-size: 12.5px; }
+.wd-est tr:first-child td { border-top: 0; }
+.wd-est td small { display: block; font-size: 11.5px; color: var(--ink-3); }
+.wd-est td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.wd-est td.nw { white-space: nowrap; }
+.wd-prods span { display: inline-block; margin-right: 10px; white-space: nowrap; }
+.wd-prods b { font-weight: 600; }
+.wd-cadena { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 10px; }
+.wd-cadena .wd-link small { display: block; }
+.wd-etapa { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.wd-etapa.t-off { color: var(--ink-3); background: var(--panel-2); }
+.wd-etapa.t-mid { color: #b45309; background: color-mix(in srgb, #d97706 11%, transparent); }
+.wd-etapa.t-ok { color: #15803d; background: color-mix(in srgb, #16a34a 11%, transparent); }
+.wd-link { display: inline-flex; flex-direction: column; color: var(--primary); text-decoration: none; font-weight: 600; }
+.wd-link:hover { text-decoration: underline; }
+.wd-proy-h .wd-link { flex-direction: row; align-items: center; gap: 4px; font-size: 12px; }
+.wd-proy-h .wd-link svg { width: 12px; height: 12px; fill: currentColor; }
+.wd-mas { margin-top: 10px; font-size: 12.5px; }
+@media (max-width: 900px) { .wd-rs.rev { margin-left: 0; padding-left: 0; border-left: 0; } .wd-pv-h { grid-template-columns: 1fr; } }
