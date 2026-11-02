@@ -120,10 +120,23 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.14";
+const APP_VERSION = "1.5.15";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.15",
+        date: "2 nov 2026",
+        resumen: "Aviso antes de cerrar un ticket sin respuesta y más cuidado con los correos internos.",
+        mejoras: [
+            "El agente asignado recibe un aviso 24 horas antes de que un ticket se cierre por falta de respuesta del cliente.",
+            "Si quien escribe es de @aemegroup.com, el ticket se resalta y se pide confirmación antes de responder.",
+            "«Próximos envíos a clientes», en Tareas programadas, solo muestra lo que sale en los próximos 4 días.",
+        ],
+        arreglos: [
+            "Seguridad: actualizadas las librerías de Excel (importar contactos) y de correo.",
+        ],
+    },
     {
         version: "1.5.14",
         date: "28 oct 2026",

@@ -3,6 +3,23 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.15] — 2026-11-02
+
+### Mejoras
+
+- **Aviso de cierre al agente** (`tickets:closing-notice`): 24 h antes de que un ticket se cierre por
+  falta de respuesta del cliente, se avisa al agente asignado.
+- **Solicitante @aemegroup.com**: la fila se resalta con un triángulo junto al nombre y se pide
+  confirmación antes de responder.
+- Tareas programadas: «Próximos envíos a clientes» solo lista lo que sale en menos de 4 días.
+
+### Arreglos
+
+- Seguridad: `phpoffice/phpspreadsheet` 5.10.0 (XXE al leer el Excel de la importación de contactos,
+  CVE-2026-108357/108358/108359) y `symfony/mime` 7.4.22 (inyección de cabeceras, CVE-2026-45070).
+- Tests al día con la app: sin estados «en progreso» ni «esperando respuesta», reabrir pasa a
+  «Abierto», campañas solo ve su manual y crear una incidencia en el portal no pide código.
+
 ## [1.5.14] — 2026-10-28
 
 ### Mejoras
