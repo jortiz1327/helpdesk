@@ -445,7 +445,6 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
 }
 
 /* --- Ficha --- */
-const HIST_FILTROS = [['', 'Todos'], ['status', 'Estado'], ['responsible_id', 'Responsable'], ['urgency', 'Urgencia'], ['otros', 'Otros']]
 /* --- Etiquetas (productos) ---------------------------------------------
  * Solo se piden los códigos: cada uno se busca en todos los servidores ZKONG (dónde
  * está, si está viva, qué modelo dice el servidor) y de ese modelo sale el producto
@@ -1152,7 +1151,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)
-  const [tab, setTab] = useState('resumen')
+  const [tab, setTab] = useState('productos')   // etiquetas | documentos
   const [hist, setHist] = useState('')
   const [nota, setNota] = useState({ type: 'nota', body: '' })
   const [enviando, setEnviando] = useState(false)
@@ -1190,121 +1189,127 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
     setEnviando(false)
     if (r.ok) { setNota({ type: nota.type, body: '' }); cargar(); onChanged() } else toast(r.error || 'Error', 'err')
   }
-  const irASeguimiento = () => { setTab('seguimiento'); setTimeout(() => notaRef.current?.focus(), 50) }
 
   const ticket = w.ticket_code
     ? (onOpenTicket ? <button className="wr-tklink mono" title={w.ticket_subject || 'Abrir ticket'} onClick={() => onOpenTicket(w.ticket_id)}>{w.ticket_code}</button> : <span className="mono">{w.ticket_code}</span>)
     : null
-  const eventos = d.events.filter((e) => !hist || (hist === 'otros' ? !['status', 'responsible_id', 'urgency'].includes(e.field) : e.field === hist))
+  // Seguimiento (notas del equipo) e historial (cambios automáticos) en una sola línea de tiempo.
+  const linea = [
+    ...(hist !== 'cambios' ? d.notes.map((n) => ({ k: `n${n.id}`, nota: n, at: n.created_at })) : []),
+    ...(hist !== 'notas' ? d.events.map((e) => ({ k: `e${e.id}`, ev: e, at: e.created_at })) : []),
+  ].sort((a, b) => String(b.at).localeCompare(String(a.at)))
+  const coberturas = [...new Set(d.items.map((i) => i.coverage).filter(Boolean))]
+  const remesas = [...new Map(d.items.filter((i) => i.batch_code).map((i) => [i.batch_code, i.batch_status])).entries()]
+  const revisadas = d.items.filter((i) => i.resolution && i.resolution !== 'pendiente').length
+  const estados = Object.entries(opts?.status_meta || {}).filter(([k, m]) => m.active || k === w.status).map(([k, m]) => ({ value: k, label: m.label, color: m.color }))
 
   return (
     <>
       <button className="wr-back" onClick={onBack}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> Garantías</button>
 
-      <div className="wr-hero">
-        <div className="wr-hero-top">
-          <div className="wr-hero-id">
-            <h2>{w.code}</h2>
-            <div className="wr-hero-pills"><EstadoPill s={w.status} opts={opts} /><UrgPill u={w.urgency} opts={opts} /></div>
-            <p>{[w.client_name, w.project_name].filter(Boolean).join(' — ') || <span className="dev-mute">Sin cliente ni proyecto</span>}</p>
-            <div className="wr-flags">
-              {abierta && diasAbierta >= 30 ? <span className="wr-flag"><Icon.warn /> Abierta {diasAbierta} días</span> : null}
-              {w.alerts?.length ? <Alertas list={w.alerts} full /> : stale ? <span className="wr-flag"><Icon.warn /> Sin actividad {diasSin} días</span> : null}
+      <div className="wf-head">
+        <div className="wf-id">
+          <div className="wf-t">
+            <span className="wf-code">{w.code}</span>
+            <h2>{w.client_name || <span className="dev-mute">Sin cliente</span>}</h2>
+            <EstadoPill s={w.status} opts={opts} />
+            <UrgPill u={w.urgency} opts={opts} />
+            {w.alerts?.length ? <Alertas list={w.alerts} full /> : stale ? <span className="wr-flag"><Icon.warn /> Sin actividad {diasSin} días</span> : null}
+          </div>
+          <div className="wf-meta">
+            <span>{w.project_name || <span className="dev-mute">Sin proyecto</span>}</span>
+            <span className="wl-resp">{w.responsible_name ? <><i>{iniciales(w.responsible_name)}</i>{w.responsible_name}</> : <span className="wf-warn">Sin responsable</span>}</span>
+            {ticket ? <span>Ticket {ticket}</span> : null}
+            <span className={abierta && diasAbierta >= 30 ? 'wf-warn' : ''}>{abierta ? `Abierta ${diasAbierta ?? 0} ${diasAbierta === 1 ? 'día' : 'días'}` : `Cerrada en ${diasAbierta ?? 0} días`}</span>
+            <span className={stale ? 'wf-warn' : ''}>Última actividad {haceDias(diasSin)}</span>
+          </div>
+        </div>
+        <div className="wf-acts">
+          <Select value={w.status} onChange={(v) => v !== w.status && guardarCon({ status: v }, `Estado: ${opts?.statuses?.[v] || v}`)} options={estados} />
+          {abierta
+            ? <button className="btn dark" onClick={cerrar}><Icon.lock /> Cerrar</button>
+            : <button className="btn ghost" onClick={() => guardarCon({ status: opts?.status_reopen || 'en_curso' }, 'Garantía reabierta')}><Icon.refresh /> Reabrir</button>}
+          <button className="dev-btn" onClick={() => onEdit(w)}><Icon.pencil /> Editar</button>
+          {isSuper ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
+        </div>
+      </div>
+
+      <div className="wf-grid">
+        <div className="wf-main">
+          <section className="wf-card">
+            <header><h3><Icon.doc /> Qué le pasa al cliente</h3>
+              {ticket ? <span className="dev-mute wf-orig">Ticket {ticket}{w.ticket_subject ? ` · ${w.ticket_subject}` : ''}</span> : null}
+            </header>
+            {w.description ? <p className="wf-desc">{w.description}</p> : <p className="dev-mute wf-desc-none">Sin descripción. <button className="wf-link" onClick={() => onEdit(w)}>Añadirla</button></p>}
+          </section>
+
+          <section className="wf-card wf-tabs-card">
+            <div className="wr-tabs" role="tablist">
+              {[['productos', `Etiquetas${d.items.length ? ` (${d.items.length})` : ''}`, Icon.tag], ['documentos', 'Documentos', Icon.file]].map(([k, l, Ic]) => (
+                <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Ic /> {l}</button>
+              ))}
+              {tab === 'productos' && d.items.length ? <span className="wf-tab-sum dev-mute">{revisadas} de {d.items.length} revisadas</span> : null}
             </div>
-          </div>
-          <div className="wr-acts">
-            <button className="btn" onClick={irASeguimiento}><Icon.plus /> Añadir seguimiento</button>
-            {abierta
-              ? <button className="btn dark" onClick={cerrar}><Icon.lock /> Cerrar garantía</button>
-              : <button className="btn ghost" onClick={() => guardarCon({ status: opts?.status_reopen || 'en_curso' }, 'Garantía reabierta')}><Icon.refresh /> Reabrir</button>}
-            <button className="dev-btn" onClick={() => onEdit(w)}><Icon.pencil /> Editar</button>
-            {isSuper ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
-          </div>
+            <div className="wf-tab-body">
+              {tab === 'productos' && <Productos w={w} items={d.items} opts={opts} onReload={cargar} onChanged={onChanged} />}
+              {tab === 'documentos' && <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} />}
+            </div>
+          </section>
         </div>
-        <div className="wr-kpis">
-          <div><span className="ic"><Icon.user /></span><div><small>Responsable</small><b>{w.responsible_name || 'Sin asignar'}</b></div></div>
-          <div className={abierta && diasAbierta >= 30 ? 'bad' : ''}><span className="ic"><Icon.calendar /></span><div><small>{abierta ? 'Días abierta' : 'Días hasta el cierre'}</small><b>{diasAbierta ?? '—'} días</b></div></div>
-          <div className={stale ? 'bad' : ''}><span className="ic"><Icon.clock /></span><div><small>Última actividad</small><b>{haceDias(diasSin)}</b></div></div>
-          <div><span className="ic"><Icon.ticket /></span><div><small>Ticket de soporte</small><b>{ticket || 'Sin ticket'}</b></div></div>
-        </div>
-      </div>
 
-      <div className="wr-tabs" role="tablist">
-        {[['resumen', 'Resumen', Icon.doc], ['productos', `Productos${d.items.length ? ` (${d.items.length})` : ''}`, Icon.tag], ['documentos', 'Documentos', Icon.file], ['seguimiento', `Seguimiento${d.notes.length ? ` (${d.notes.length})` : ''}`, Icon.chat], ['historial', 'Historial', Icon.clock]].map(([k, l, Ic]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Ic /> {l}</button>
-        ))}
-      </div>
+        <aside className="wf-side">
+          <section className="wf-card">
+            <header><h3>Datos del expediente</h3></header>
+            <dl className="wf-dl">
+              <div><dt>Cliente</dt><dd>{w.client_name || '—'}</dd></div>
+              <div><dt>Proyecto</dt><dd>{w.project_name || '—'}</dd></div>
+              <div><dt>Categoría</dt><dd>{w.category || '—'}</dd></div>
+              <div><dt>Quién paga</dt><dd>{coberturas.length
+                ? <span className="wl-cob">{coberturas.map((c) => <em key={c} className={`c-${c}`}>{COB_CORTO[c] || c}</em>)}</span>
+                : <span className="dev-mute">Al revisar las etiquetas</span>}</dd></div>
+              <div><dt>Remesa ZKONG</dt><dd>{remesas.length
+                ? remesas.map(([code, st]) => <span key={code} className="wf-rem"><b className="mono">{code}</b> <small>{opts?.review?.batch_statuses?.[st] || st}</small></span>)
+                : '—'}</dd></div>
+              <div><dt>Primer contacto</dt><dd>{fecha(w.first_contact_at)}</dd></div>
+              <div><dt>Recepción</dt><dd>{fecha(w.received_at)}</dd></div>
+              {w.closed_at ? <div><dt>Cierre</dt><dd>{fecha(w.closed_at)}</dd></div> : null}
+              <div><dt>Creada</dt><dd>{fechaHora(w.created_at)}{w.created_by_name ? <small> · {w.created_by_name}</small> : null}</dd></div>
+            </dl>
+          </section>
 
-      <div className="wr-panel">
-        {tab === 'resumen' && (
-          <dl className="wr-dl">
-            <div><dt>Nº expediente</dt><dd><b>{w.code}</b></dd></div>
-            <div><dt>Primera fecha de contacto</dt><dd>{fecha(w.first_contact_at)}</dd></div>
-            <div><dt>Fecha de recepción</dt><dd>{fecha(w.received_at)}</dd></div>
-            <div><dt>Cliente</dt><dd>{w.client_name || '—'}</dd></div>
-            <div><dt>Proyecto</dt><dd>{w.project_name || '—'}</dd></div>
-            <div><dt>Categoría</dt><dd>{w.category || '—'}</dd></div>
-            <div><dt>Urgencia</dt><dd><UrgPill u={w.urgency} opts={opts} /></dd></div>
-            <div><dt>Estado</dt><dd><EstadoPill s={w.status} opts={opts} /></dd></div>
-            <div><dt>Responsable</dt><dd>{w.responsible_name || '—'}</dd></div>
-            <div><dt>Ticket de soporte</dt><dd>{w.ticket_code ? <>{ticket}{w.ticket_subject ? <span className="dev-mute"> · {w.ticket_subject}</span> : null}</> : '—'}</dd></div>
-            <div><dt>Creada</dt><dd>{fechaHora(w.created_at)}{w.created_by_name ? <span className="dev-mute"> · {w.created_by_name}</span> : null}</dd></div>
-            {w.closed_at ? <div><dt>Fecha de cierre</dt><dd>{fecha(w.closed_at)}</dd></div> : null}
-            <div className="full"><dt>Descripción</dt><dd className="wr-desc">{w.description || <span className="dev-mute">Sin descripción</span>}</dd></div>
-          </dl>
-        )}
-
-        {tab === 'productos' && <Productos w={w} items={d.items} opts={opts} onReload={cargar} onChanged={onChanged} />}
-
-        {tab === 'documentos' && <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} />}
-
-        {tab === 'seguimiento' && (
-          <>
-            <div className="wr-compose">
-              <div className="wr-compose-type">
-                <Select sm value={nota.type} onChange={(v) => setNota((s) => ({ ...s, type: v }))}
-                  options={Object.entries(opts?.note_types || {}).map(([k, v]) => ({ value: k, label: v }))} />
-              </div>
-              <textarea ref={notaRef} rows={3} value={nota.body} onChange={(e) => setNota((s) => ({ ...s, body: e.target.value }))}
+          <section className="wf-card">
+            <header><h3><Icon.clock /> Seguimiento e historial</h3></header>
+            <div className="wf-compose">
+              <textarea ref={notaRef} rows={2} value={nota.body} onChange={(e) => setNota((s) => ({ ...s, body: e.target.value }))}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarNota() }}
                 placeholder="Qué se ha hecho, con quién se ha hablado, qué falta…" />
-              <div className="wr-compose-f">
-                <span className="dev-mute">Ctrl + Enter para añadir</span>
-                <button className="btn" disabled={enviando || !nota.body.trim()} onClick={enviarNota}><Icon.plus /> {enviando ? 'Añadiendo…' : 'Añadir seguimiento'}</button>
+              <div className="wf-compose-f">
+                <Select sm value={nota.type} onChange={(v) => setNota((s) => ({ ...s, type: v }))}
+                  options={Object.entries(opts?.note_types || {}).map(([k, v]) => ({ value: k, label: v }))} />
+                <button className="btn sm" disabled={enviando || !nota.body.trim()} onClick={enviarNota}><Icon.plus /> {enviando ? 'Añadiendo…' : 'Añadir'}</button>
               </div>
             </div>
-            {!d.notes.length ? <p className="dev-mute">Todavía no hay seguimiento.</p> : (
-              <ul className="wr-timeline">
-                {d.notes.map((n) => (
-                  <li key={n.id}>
-                    <div className="wr-tl-h"><b>{n.user_name || 'Sistema'}</b><span className="dev-mute">{fechaHora(n.created_at)}</span></div>
-                    <span className={`wr-type t-${n.type}`}>{opts?.note_types?.[n.type] || n.type}</span>
+            <div className="dc-seg wf-filtro">
+              {[['', 'Todo'], ['notas', `Notas (${d.notes.length})`], ['cambios', 'Cambios']].map(([k, l]) => <button key={k} className={hist === k ? 'on' : ''} onClick={() => setHist(k)}>{l}</button>)}
+            </div>
+            {!linea.length ? <p className="dev-mute wf-none">{hist === 'notas' ? 'Todavía no hay seguimiento.' : 'Sin movimientos.'}</p> : (
+              <ol className="wf-tl">
+                {linea.map(({ k, nota: n, ev: e }) => n ? (
+                  <li key={k} className="nota">
+                    <div className="wf-tl-h"><b>{n.user_name || 'Sistema'}</b><span className={`wr-type t-${n.type}`}>{opts?.note_types?.[n.type] || n.type}</span><time>{fechaHora(n.created_at)}</time></div>
                     <p>{n.body}</p>
                   </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-
-        {tab === 'historial' && (
-          <>
-            <div className="wr-chips sm">
-              {HIST_FILTROS.map(([k, l]) => <button key={k} className={hist === k ? 'on' : ''} onClick={() => setHist(k)}>{l}</button>)}
-            </div>
-            {!eventos.length ? <p className="dev-mute">Sin cambios {hist ? 'de este tipo' : 'todavía'}.</p> : (
-              <ul className="wr-hist">
-                {eventos.map((e) => (
-                  <li key={e.id}>
-                    <div className="wr-tl-h"><b>{e.user_name || 'Sistema'}</b><span className="dev-mute">{fechaHora(e.created_at)}</span><span className="wr-type">{e.field === 'created' ? 'Alta' : 'Modificación'}</span></div>
-                    <div className="wr-hist-f">{CAMPOS[e.field] || e.field}</div>
-                    {e.field === 'created' ? null : <div className="wr-hist-v"><s>{e.from_value || '—'}</s> → <b>{e.to_value || '—'}</b></div>}
+                ) : (
+                  <li key={k} className={`ev f-${e.field}`}>
+                    <div className="wf-tl-h"><b>{e.field === 'created' ? 'Garantía creada' : CAMPOS[e.field] || e.field}</b><time>{fechaHora(e.created_at)}</time></div>
+                    {e.field === 'created' ? null : <div className="wf-ev">{e.from_value ? <><s>{e.from_value}</s> → </> : null}<b>{e.to_value || '—'}</b></div>}
+                    <small>{e.user_name || 'Sistema'}</small>
                   </li>
                 ))}
-              </ul>
+              </ol>
             )}
-          </>
-        )}
+          </section>
+        </aside>
       </div>
     </>
   )

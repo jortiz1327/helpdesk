@@ -5160,3 +5160,63 @@ button.dev-code:hover { text-decoration: underline; }
 .wl-cob em { font-style: normal; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line); white-space: nowrap; }
 .wl-cob em.c-cliente { background: color-mix(in srgb, #ea580c 10%, transparent); color: #c2410c; border-color: color-mix(in srgb, #ea580c 25%, transparent); }
 .wl-act { white-space: nowrap; font-size: 12.5px; color: var(--ink-2); }
+/* Ficha de una garantía: cabecera compacta y dos columnas (etiquetas y documentos a la
+ * izquierda; datos del expediente y la línea de tiempo con notas y cambios a la derecha). */
+.wf-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 20px; padding: 18px 22px; margin-bottom: 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.wf-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.wf-t { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.wf-code { font-family: var(--mono, ui-monospace, monospace); font-size: 18px; font-weight: 700; color: var(--primary); }
+.wf-t h2 { margin: 0; font-size: 19px; font-weight: 700; color: var(--ink); }
+.wf-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; font-size: 13px; color: var(--ink-2); }
+.wf-meta > span { display: inline-flex; align-items: center; gap: 5px; }
+.wf-meta > span + span::before { content: ''; width: 4px; height: 4px; margin: 0 12px; border-radius: 50%; background: var(--line-2); }
+.wf-meta .wl-resp i { width: 22px; height: 22px; font-size: 9.5px; }
+.wf-warn { color: #b45309; font-weight: 600; }
+.wf-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wf-acts .sel-trigger { min-width: 170px; }
+.wf-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+.wf-main, .wf-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.wf-card { border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.wf-card > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 14px 18px 0; }
+.wf-card h3 { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); }
+.wf-card h3 svg { width: 16px; height: 16px; fill: var(--primary); }
+.wf-orig { font-size: 12px; }
+.wf-desc { margin: 10px 18px 16px; padding: 12px 14px; border-radius: 10px; background: var(--panel-2); font-size: 13.5px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; }
+.wf-desc-none { margin: 10px 18px 16px; font-size: 13px; }
+.wf-link { background: none; border: 0; padding: 0; color: var(--primary); font-weight: 600; cursor: pointer; }
+.wf-tabs-card .wr-tabs { margin: 0; padding: 4px 14px 0; border-bottom: 1px solid var(--line); }
+.wf-tab-sum { margin-left: auto; align-self: center; font-size: 12px; }
+.wf-tab-body { padding: 16px 18px 18px; }
+.wf-dl { margin: 6px 0 4px; padding: 0 18px; }
+.wf-dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.wf-dl > div:last-child { border-bottom: 0; }
+.wf-dl dt { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
+.wf-dl dd { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.wf-dl dd small { font-weight: 400; color: var(--ink-3); }
+.wf-rem { display: block; }
+.wf-rem small { font-weight: 500; color: var(--ink-3); }
+.wf-compose { margin: 12px 18px 10px; border: 1.5px solid var(--line-2); border-radius: 10px; background: var(--panel-2); }
+.wf-compose:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.wf-compose textarea { display: block; width: 100%; min-height: 54px; padding: 10px 12px 4px; border: 0; background: none; outline: none; resize: vertical; font-size: 13px; line-height: 1.5; color: var(--ink); }
+.wf-compose-f { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px 8px; }
+.wf-compose-f .sel-trigger { background: var(--panel); }
+.wf-compose-f .btn svg { width: 14px; height: 14px; fill: currentColor; }
+.wf-filtro { margin: 0 18px 6px; }
+.wf-filtro button { flex: 1; }
+.wf-none { margin: 12px 18px 18px; font-size: 13px; }
+.wf-tl { list-style: none; margin: 0; padding: 6px 18px 16px 34px; max-height: 560px; overflow: auto; }
+.wf-tl li { position: relative; padding: 0 0 14px; }
+.wf-tl li::before { content: ''; position: absolute; left: -16px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); box-shadow: 0 0 0 3px var(--panel); z-index: 1; }
+.wf-tl li::after { content: ''; position: absolute; left: -12px; top: 12px; bottom: -2px; width: 1.5px; background: var(--line); }
+.wf-tl li:last-child::after { display: none; }
+.wf-tl li.nota::before { background: var(--primary); }
+.wf-tl li.f-status::before { background: #7c3aed; }
+.wf-tl li.f-created::before { background: #12925a; }
+.wf-tl-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
+.wf-tl-h b { color: var(--ink); }
+.wf-tl-h time { margin-left: auto; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.wf-tl li p { margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); white-space: pre-wrap; }
+.wf-ev { margin-top: 2px; font-size: 12.5px; color: var(--ink-2); }
+.wf-ev s { color: var(--ink-3); }
+.wf-tl li small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--ink-3); }
+@media (max-width: 1100px) { .wf-grid { grid-template-columns: 1fr; } }
