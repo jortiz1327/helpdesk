@@ -4846,6 +4846,45 @@ button.dev-code:hover { text-decoration: underline; }
 .wt-ver { text-align: right; white-space: nowrap; }
 .wt-ver .wf-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; }
 .wt-ver svg { width: 14px; height: 14px; fill: currentColor; }
+/* ZKONG · bandeja: barra de acción y una tabla con cada garantía como cabecera de sus etiquetas. */
+.zk-kpis2 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 14px; }
+.zk-warn-t { color: #b45309; font-weight: 600; }
+.zk-bandeja { position: relative; }
+.zk-bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
+.zk-bar .wl-search { max-width: 420px !important; }
+.zk-bar .spacer { flex: 1; }
+.zk-ayuda { font-size: 12.5px; }
+.zk-elegidas { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 12px; border-radius: 10px; background: var(--primary-soft); font-size: 13px; color: var(--ink-2); }
+.zk-elegidas b { color: var(--primary); }
+.zk-elegidas .zk-falta { margin-left: 0; }
+.zk-elegidas .icon-btn { width: 24px; height: 24px; }
+.zk-t th.r, .zk-t td.r { text-align: right; }
+.zk-t .zk-ck { width: 40px; padding-right: 0; }
+.zk-t tbody.zk-g + tbody.zk-g tr.zk-gh td { border-top: 6px solid var(--panel-2); }
+.zk-t tr.zk-gh td { background: color-mix(in srgb, var(--primary) 5%, var(--panel)); border-bottom: 1px solid var(--line); }
+.zk-gh-in { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.zk-gh-in .wr-code { font-size: 14px; font-weight: 800; }
+.zk-cli { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.zk-chev { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; flex: none; }
+.zk-chev:hover { background: var(--panel-2); }
+.zk-chev svg { width: 18px; height: 18px; fill: var(--ink-2); transition: transform 0.15s; }
+.zk-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; color: var(--primary); background: var(--panel); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.zk-chip.dias { color: var(--ink-2); background: var(--panel-2); border-color: transparent; }
+.zk-chip.dias i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.zk-chip.dias.warn { color: #b45309; background: color-mix(in srgb, #f59e0b 14%, transparent); }
+.zk-chip.dias.bad { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.zk-t tr.zk-it { cursor: pointer; }
+.zk-t tr.zk-it.zk-on td { background: color-mix(in srgb, var(--primary) 6%, var(--panel)); }
+.zk-mod b { display: block; font-weight: 600; white-space: nowrap; }
+.zk-mod small, .zk-fallo small { display: block; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.zk-fallo { max-width: 420px; }
+.zk-fallo > span:first-child { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zk-t tr.zk-mas td { padding-top: 6px; padding-bottom: 10px; border-bottom: 0; }
+.zk-mas-in { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; font-style: italic; }
+.zk-t tr.zk-mas .wf-link { display: inline-flex; align-items: center; gap: 4px; font-style: normal; }
+.zk-t tr.zk-mas svg { width: 14px; height: 14px; fill: currentColor; }
+.zk-pie { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 16px; border-top: 1px solid var(--line); background: var(--panel-2); font-size: 12.5px; border-radius: 0 0 14px 14px; }
+.zk-pie .zk-chip { margin-left: 4px; }
 /* Selector de rango de fechas (DateRange.jsx): botón con el rango y calendario de dos meses. */
 .dr { position: relative; }
 .dr-btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }

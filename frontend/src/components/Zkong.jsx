@@ -22,6 +22,7 @@ const aFecha = (v) => (v ? new Date(String(v).replace(' ', 'T')) : null)
 const fecha = (v) => { const d = aFecha(v); return d && !isNaN(d) ? d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—' }
 const dias = (v) => { const d = aFecha(v); return d ? Math.max(0, Math.floor((Date.now() - d) / 86400000)) : null }
 const tono = (n) => (n == null ? '' : n >= 30 ? 'bad' : n >= 15 ? 'warn' : '')
+const num = (n) => Number(n || 0).toLocaleString('es-ES')
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
 const sinFotos = (i) => i.photos.length < i.photos_total
 
@@ -61,12 +62,19 @@ function Dispositivo({ it, sel, onPick, rv, extra }) {
 }
 
 /* --- Bandeja --- */
+// Una sola tabla: cada garantía es una cabecera con sus etiquetas debajo (las 5 primeras;
+// «Ver las N restantes» despliega el resto). Elegir, buscar y crear la remesa en una barra.
+const VISIBLES = 5
+const ORDENES = [{ value: 'old', label: 'Más antigua primero' }, { value: 'new', label: 'Más reciente primero' }, { value: 'n', label: 'Más etiquetas primero' }]
+
 function Bandeja({ rv, onOpenWarranty, onBatch }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)
   const [orden, setOrden] = useState('old')
-  const [abiertos, setAbiertos] = useState(() => new Set())
+  const [q, setQ] = useState('')
+  const [plegados, setPlegados] = useState(() => new Set())
+  const [enteros, setEnteros] = useState(() => new Set())
   const [sel, setSel] = useState(() => new Set())
   const [ocupado, setOcupado] = useState(false)
 
@@ -75,20 +83,28 @@ function Bandeja({ rv, onOpenWarranty, onBatch }) {
 
   if (!d) return <div className="center-load"><div className="spinner" /></div>
 
-  const grupos = [...d.groups].sort((a, b) => orden === 'n' ? b.items.length - a.items.length
-    : orden === 'new' ? String(b.queued_at).localeCompare(String(a.queued_at)) : String(a.queued_at).localeCompare(String(b.queued_at)))
-  const etiquetas = d.groups.reduce((n, g) => n + g.items.length, 0)
+  const busca = q.trim().toLowerCase()
+  const coincide = (g, i) => !busca || [g.code, g.client_name, g.project_name, i.code, i.model, i.product_name, i.issue].some((v) => String(v || '').toLowerCase().includes(busca))
+  const grupos = d.groups
+    .map((g) => ({ ...g, vistos: g.items.filter((i) => coincide(g, i)) }))
+    .filter((g) => g.vistos.length)
+    .sort((a, b) => orden === 'n' ? b.items.length - a.items.length
+      : orden === 'new' ? String(b.queued_at).localeCompare(String(a.queued_at)) : String(a.queued_at).localeCompare(String(b.queued_at)))
+  const todos = d.groups.flatMap((g) => g.items)
+  const etiquetas = todos.length
   const maxDias = d.groups.reduce((m, g) => Math.max(m, dias(g.queued_at) ?? 0), 0)
-  const elegidas = d.groups.flatMap((g) => g.items).filter((i) => sel.has(i.id))
+  const sinFotosTot = todos.filter(sinFotos).length
+  const elegidas = todos.filter((i) => sel.has(i.id))
   const sinFotosSel = elegidas.filter(sinFotos).length
+  const gruposSel = new Set(elegidas.map((i) => i.warranty_id)).size
+  const vistas = grupos.flatMap((g) => g.vistos)
+  const todasSel = vistas.length > 0 && vistas.every((i) => sel.has(i.id))
 
   const toggle = (set, id) => set((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const marcarGrupo = (g) => setSel((s) => {
-    const n = new Set(s); const todas = g.items.every((i) => n.has(i.id))
-    g.items.forEach((i) => (todas ? n.delete(i.id) : n.add(i.id))); return n
+  const marcar = (items) => setSel((s) => {
+    const n = new Set(s); const todas = items.every((i) => n.has(i.id))
+    items.forEach((i) => (todas ? n.delete(i.id) : n.add(i.id))); return n
   })
-  const todasSel = etiquetas > 0 && elegidas.length === etiquetas
-  const marcarTodas = () => setSel(todasSel ? new Set() : new Set(d.groups.flatMap((g) => g.items.map((i) => i.id))))
 
   const meter = async (batchId) => {
     if (sinFotosSel && !(await confirm({ title: 'Faltan fotos', message: `${plural(sinFotosSel, 'etiqueta no tiene', 'etiquetas no tienen')} todas las fotos y ZKONG las pide. ¿Seguir igualmente? Se pueden subir después, antes de enviar la remesa.`, confirmText: 'Seguir' }))) return
@@ -100,82 +116,138 @@ function Bandeja({ rv, onOpenWarranty, onBatch }) {
     setSel(new Set()); onBatch(r.id)
   }
 
+  const exportar = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const filas = [['Garantía', 'Cliente', 'Proyecto', 'Nº de serie', 'Tipo', 'Modelo', 'Producto', 'Fallo', 'Fotos', 'En la bandeja desde', 'Días']]
+    d.groups.forEach((g) => g.items.forEach((i) => filas.push([g.code, g.client_name, g.project_name, i.code, i.kind === 'ap' ? 'Antena' : 'Etiqueta', i.model, i.product_name, i.issue,
+      `${i.photos.length}/${i.photos_total}`, fecha(i.queued_at || g.queued_at), dias(i.queued_at || g.queued_at) ?? ''])))
+    const blob = new Blob(['﻿' + filas.map((l) => l.map(esc).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = `bandeja-zkong-${hoyISO()}.csv`; a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
+
   return (
     <>
-      <div className="dev-kpis n3 zk-kpis">
-        <button className="dev-kpi k-total" disabled><span className="k"><Icon.shield /> Garantías pendientes</span><span className="v">{d.groups.length}</span><span className="h">con algo para enviar</span></button>
-        <button className="dev-kpi k-total" disabled><span className="k"><Icon.tag /> Etiquetas pendientes</span><span className="v">{etiquetas}</span><span className="h">{d.drafts.length ? `${plural(d.drafts.length, 'borrador', 'borradores')} de remesa abiertos` : 'sin remesa todavía'}</span></button>
-        <button className={`dev-kpi ${maxDias >= 30 ? 'k-offline' : maxDias >= 15 ? 'k-low_battery' : 'k-online'}`} disabled><span className="k"><Icon.clock /> Antigüedad más alta</span><span className={`v zk-age ${tono(etiquetas ? maxDias : null)}`}>{etiquetas ? plural(maxDias, 'día', 'días') : '—'}</span><span className="h">{maxDias >= 30 ? 'Conviene mandar ya una remesa' : 'desde que entró en la bandeja'}</span></button>
+      <div className="wi-kpis zk-kpis2">
+        <div className="wi-kpi">
+          <div className="v">{num(d.groups.length)}<span className="wi-de">{d.groups.length === 1 ? 'garantía' : 'garantías'}</span></div>
+          <div className="k">Con algo para enviar a ZKONG</div>
+          <div className="h">{d.drafts.length ? `${plural(d.drafts.length, 'remesa en borrador abierta', 'remesas en borrador abiertas')}` : 'Ninguna remesa en borrador'}</div>
+        </div>
+        <div className="wi-kpi">
+          <div className="v">{num(etiquetas)}<span className="wi-de">{etiquetas === 1 ? 'dispositivo' : 'dispositivos'}</span></div>
+          <div className="k">Esperando a ir en una remesa</div>
+          <div className="h">{sinFotosTot ? <span className="zk-warn-t">{plural(sinFotosTot, 'sin todas las fotos', 'sin todas las fotos')}</span> : etiquetas ? 'Todos con sus fotos' : '—'}</div>
+        </div>
+        <div className="wi-kpi">
+          <div className={`v zk-age ${tono(etiquetas ? maxDias : null)}`}>{etiquetas ? num(maxDias) : '—'}{etiquetas ? <span className="wi-de">{maxDias === 1 ? 'día' : 'días'}</span> : null}</div>
+          <div className="k">Lo que más lleva esperando</div>
+          <div className="h">{maxDias >= 30 ? 'Conviene mandar ya una remesa' : 'Desde que se marcó «Enviar a ZKONG»'}</div>
+        </div>
       </div>
 
       {d.undecided.length > 0 && (
         <div className="zk-aviso">
           <Icon.warn />
           <div>
-            <b>{plural(d.undecided.reduce((n, u) => n + Number(u.n), 0), 'dispositivo pendiente', 'dispositivos pendientes')} de decidir si va a ZKONG</b>
-            <p>No entran en la bandeja hasta que alguien marque «Enviar a ZKONG» en su revisión.</p>
-            <div className="zk-links">{d.undecided.map((u) => <button key={u.warranty_id} className="link" onClick={() => onOpenWarranty(u.warranty_id)}>{u.code} ({u.n})</button>)}</div>
+            <b>{plural(d.undecided.reduce((n, u) => n + Number(u.n), 0), 'dispositivo espera', 'dispositivos esperan')} a que se decida si va a ZKONG</b>
+            <p>No entran en la bandeja hasta que se marque «Enviar a ZKONG» en su revisión: {d.undecided.map((u, k) => <span key={u.warranty_id}>{k ? ', ' : ''}<button className="link" onClick={() => onOpenWarranty(u.warranty_id)}>{u.code} ({u.n})</button></span>)}</p>
           </div>
         </div>
       )}
 
-      <div className="zk-orden">
-        <span className="dev-mute">Ordenar:</span>
-        <div className="wr-chips sm">
-          {[['old', 'Más antigua'], ['new', 'Más reciente'], ['n', 'Nº etiquetas']].map(([k, l]) => <button key={k} className={orden === k ? 'on' : ''} onClick={() => setOrden(k)}>{l}</button>)}
-        </div>
-      </div>
-
-      <div className="dev-card">
-        <div className="dev-table-wrap keep">
-          <table className="dev-table zk-table">
-            <thead><tr>
-              <th className="zk-ck"><input type="checkbox" checked={todasSel} disabled={!etiquetas} onChange={marcarTodas} aria-label="Seleccionar todas" /></th>
-              <th>Expediente</th><th>Cliente</th><th>Etiquetas</th><th>Entrada en bandeja</th><th>Días pendiente</th><th className="r">Acción</th>
-            </tr></thead>
-            <tbody>
-              {grupos.map((g) => {
-                const n = dias(g.queued_at)
-                const marcadas = g.items.filter((i) => sel.has(i.id)).length
-                const abierto = abiertos.has(g.warranty_id)
-                const faltan = g.items.filter(sinFotos).length
-                return [
-                  <tr key={g.warranty_id} className={abierto ? 'zk-open' : ''}>
-                    <td className="zk-ck"><input type="checkbox" checked={marcadas === g.items.length} ref={(el) => { if (el) el.indeterminate = marcadas > 0 && marcadas < g.items.length }} onChange={() => marcarGrupo(g)} aria-label={`Seleccionar ${g.code}`} /></td>
-                    <td><button className="link wr-code" onClick={() => onOpenWarranty(g.warranty_id)}>{g.code}</button></td>
-                    <td className="wr-ell">{g.client_name || <span className="dev-mute">—</span>}{g.project_name ? <span className="dev-mute"> · {g.project_name}</span> : null}</td>
-                    <td><span className="zk-count"><Icon.tag /> {g.items.length}</span>{faltan ? <span className="zk-falta" title="Sin todas las fotos"><Icon.image /> {faltan}</span> : null}</td>
-                    <td>{fecha(g.queued_at)}</td>
-                    <td><b className={`zk-days ${tono(n)}`}>{n ?? '—'}d</b></td>
-                    <td className="r"><button className="dev-btn" onClick={() => toggle(setAbiertos, g.warranty_id)}><Icon.eye /> {abierto ? 'Ocultar' : 'Ver etiquetas'}</button></td>
-                  </tr>,
-                  abierto && (
-                    <tr key={`${g.warranty_id}-d`} className="zk-det"><td colSpan={7}>
-                      {g.items.map((i) => <Dispositivo key={i.id} it={i} rv={rv} sel={sel.has(i.id)} onPick={() => toggle(setSel, i.id)} />)}
-                    </td></tr>
-                  ),
-                ]
-              })}
-            </tbody>
-          </table>
-          {!grupos.length && (
-            <div className="act-empty"><Icon.zkong style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
-              <p>La bandeja está vacía. Aquí llegan las etiquetas revisadas como «No reproduce el fallo» o «Defectuosa» con «Enviar a ZKONG».</p></div>
-          )}
-        </div>
-      </div>
-
-      {elegidas.length > 0 && (
-        <div className="wr-selbar">
-          <b>{plural(elegidas.length, 'etiqueta', 'etiquetas')}{sinFotosSel ? <span className="zk-falta"><Icon.image /> {sinFotosSel} sin fotos</span> : null}</b>
-          <button className="btn" disabled={ocupado} onClick={() => meter(null)}><Icon.plus /> Crear remesa</button>
-          {d.drafts.length > 0 && (
+      <div className="dev-card zk-bandeja">
+        <div className="zk-bar">
+          <div className="dev-search wl-search">
+            <Icon.search />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar garantía, cliente, nº de serie, modelo o fallo…" />
+            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+          </div>
+          <Select sm value={orden} onChange={setOrden} options={ORDENES} />
+          <span className="spacer" />
+          <button className="dev-btn" disabled={!etiquetas} onClick={exportar} title="Descargar la bandeja en CSV"><Icon.download /> Exportar</button>
+          {elegidas.length ? (
+            <span className="zk-elegidas">
+              <b>{plural(elegidas.length, 'elegida', 'elegidas')}</b> de {plural(gruposSel, 'garantía', 'garantías')}
+              {sinFotosSel ? <span className="zk-falta" title="Sin todas las fotos"><Icon.image /> {sinFotosSel}</span> : null}
+              <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button>
+            </span>
+          ) : <span className="dev-mute zk-ayuda">Marca las etiquetas que van juntas</span>}
+          {d.drafts.length > 0 && elegidas.length > 0 && (
             <Select sm value="" placeholder="Añadir a un borrador…" onChange={(v) => v && meter(v)}
               options={d.drafts.map((b) => ({ value: b.id, label: `Añadir a ${b.code}` }))} />
           )}
-          <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button>
+          <button className="btn" disabled={ocupado || !elegidas.length} onClick={() => meter(null)}><Icon.send /> Crear remesa{elegidas.length ? ` con ${elegidas.length}` : ''}</button>
         </div>
-      )}
+
+        <div className="dev-table-wrap keep">
+          <table className="dev-table zk-t">
+            <thead><tr>
+              <th className="zk-ck"><input type="checkbox" checked={todasSel} disabled={!vistas.length} onChange={() => marcar(vistas)} aria-label="Elegir todas" /></th>
+              <th>Nº de serie</th><th>Modelo</th><th>Fallo que se envía a ZKONG</th><th>Fotos</th><th className="r">Días</th>
+            </tr></thead>
+            {grupos.map((g) => {
+              const n = dias(g.queued_at)
+              const plegado = plegados.has(g.warranty_id)
+              const marcadas = g.vistos.filter((i) => sel.has(i.id)).length
+              const lista = enteros.has(g.warranty_id) || busca ? g.vistos : g.vistos.slice(0, VISIBLES)
+              const resto = g.vistos.length - lista.length
+              return (
+                <tbody key={g.warranty_id} className="zk-g">
+                  <tr className="zk-gh">
+                    <td className="zk-ck"><input type="checkbox" checked={marcadas === g.vistos.length} ref={(el) => { if (el) el.indeterminate = marcadas > 0 && marcadas < g.vistos.length }} onChange={() => marcar(g.vistos)} aria-label={`Elegir ${g.code}`} /></td>
+                    <td colSpan={5}>
+                      <div className="zk-gh-in">
+                        <button className="zk-chev" onClick={() => toggle(setPlegados, g.warranty_id)} aria-label={plegado ? 'Desplegar' : 'Plegar'}><Icon.chevron style={{ transform: plegado ? 'rotate(-90deg)' : 'none' }} /></button>
+                        <button className="link wr-code" onClick={() => onOpenWarranty(g.warranty_id)}>{g.code}</button>
+                        <span className="zk-cli">{g.client_name || 'Sin cliente'}{g.project_name ? <span className="dev-mute"> · {g.project_name}</span> : null}</span>
+                        <span className="spacer" />
+                        <span className="zk-chip">{plural(g.items.length, 'etiqueta', 'etiquetas')}</span>
+                        <span className={`zk-chip dias ${tono(n)}`}><i />{n == null ? '—' : `${plural(n, 'día', 'días')} en la bandeja`}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  {!plegado && lista.map((i) => {
+                    const ni = dias(i.queued_at || g.queued_at)
+                    return (
+                      <tr key={i.id} className={`zk-it ${sel.has(i.id) ? 'zk-on' : ''}`} onClick={(e) => { if (!e.target.closest('a,button,input')) toggle(setSel, i.id) }}>
+                        <td className="zk-ck"><input type="checkbox" checked={sel.has(i.id)} onChange={() => toggle(setSel, i.id)} aria-label={`Elegir ${i.code}`} /></td>
+                        <td><span className="mono zk-sn">{i.code}</span>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</td>
+                        <td className="zk-mod"><b>{i.model || <span className="dev-mute">Sin modelo</span>}</b>{i.product_name ? <small>{i.product_name}</small> : null}</td>
+                        <td className="zk-fallo">
+                          {i.issue ? <span title={i.issue}>{i.issue}</span> : <span className="zk-warn-t">Sin fallo descrito</span>}
+                          {rv && i.resolution !== 'defectuosa' ? <small>{rv.resolutions?.[i.resolution]?.label}</small> : null}
+                        </td>
+                        <td><Fotos it={i} /></td>
+                        <td className="r"><span className={`zk-chip dias ${tono(ni)}`}>{ni == null ? '—' : `${ni} d`}</span></td>
+                      </tr>
+                    )
+                  })}
+                  {!plegado && (resto > 0 || (enteros.has(g.warranty_id) && g.vistos.length > VISIBLES && !busca)) ? (
+                    <tr className="zk-mas"><td />
+                      <td colSpan={5}><div className="zk-mas-in">
+                        <span className="dev-mute">Se ven {lista.length} de {g.vistos.length} etiquetas de {g.code}</span>
+                        <button className="wf-link" onClick={() => toggle(setEnteros, g.warranty_id)}>{resto > 0 ? <>Ver las {resto} restantes <Icon.arrowRight /></> : 'Ver menos'}</button>
+                      </div></td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              )
+            })}
+          </table>
+          {!grupos.length && (
+            <div className="act-empty"><Icon.zkong style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
+              <p>{etiquetas ? `Nada coincide con «${q}».` : 'La bandeja está vacía. Aquí llegan los dispositivos revisados como «No reproduce el fallo» o «Defectuosa» con «Enviar a ZKONG».'}</p></div>
+          )}
+        </div>
+        {etiquetas ? (
+          <div className="zk-pie">
+            <span>En la bandeja: <b>{plural(etiquetas, 'dispositivo', 'dispositivos')}</b> de <b>{plural(d.groups.length, 'garantía', 'garantías')}</b></span>
+            <span className="dev-mute">Días: <span className="zk-chip dias">menos de 15</span> <span className="zk-chip dias warn">15 o más</span> <span className="zk-chip dias bad">30 o más</span></span>
+          </div>
+        ) : null}
+      </div>
     </>
   )
 }
