@@ -5567,3 +5567,9 @@ button.dev-code:hover { text-decoration: underline; }
 .fc-meta time { white-space: nowrap; }
 .fc-barra a.dev-btn { text-decoration: none; }
 .fc-visor { background: rgba(8, 12, 22, 0.97); }
+
+/* Garantías · mensajes del cliente en la línea de tiempo */
+.wr-type.t-msg-correo { --tc: #2563eb; }
+.wr-type.t-msg-whatsapp { --tc: #128c4a; }
+.wf-tl li.msg::before { background: #128c4a; }
+.wf-tl li.msg p { margin: 4px 0 0; padding: 7px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }

@@ -139,6 +139,10 @@ class ZkongRmaTest extends TestCase
         $this->rma('result', ['id' => $c['id'], 'item_ids' => [$a['8E9749440']], 'result' => 'rechazada'], $h)->assertStatus(400);
         $this->rma('reopen', ['id' => $c['id']], $h)->assertOk();
         $this->assertSame('respondida', DB::table('zkong_batches')->where('id', $c['id'])->value('status'));
+        // Cerrar queda en el historial de la garantía; reabrir, solo en el de la remesa.
+        $hist = DB::table('warranty_events')->where('warranty_id', $w1->id)->where('field', 'zkong')->pluck('to_value')->implode(' | ');
+        $this->assertStringContainsString("Remesa {$c['code']} cerrada", $hist);
+        $this->assertStringNotContainsString('reabierta', $hist);
 
         // La ficha de la garantía lo ve, y queda en su historial.
         $g = $this->getJson("/api/warranties.php?action=get&id={$w1->id}", $h)->json();
@@ -177,6 +181,7 @@ class ZkongRmaTest extends TestCase
 
         // El tracking se puede completar después; la recepción no puede ser anterior al envío.
         $this->rma('shipping', ['id' => $id, 'tracking' => 'JD0002', 'carrier' => 'DHL'], $h)->assertOk();
+        $this->assertSame(1, DB::table('warranty_events')->where('field', 'zkong')->where('to_value', 'like', 'Envío de la remesa % actualizado (%tracking JD0002%')->distinct('warranty_id')->count('warranty_id'));
         $this->rma('receive', ['id' => $id, 'received_on' => now()->subDays(5)->toDateString()], $h)->assertStatus(400);
         $this->rma('receive', ['id' => $id, 'received_on' => now()->toDateString(), 'units_received' => 2], $h)->assertOk();
         $this->rma('receive', ['id' => $id, 'received_on' => now()->toDateString()], $h)->assertStatus(400);   // ya apuntada

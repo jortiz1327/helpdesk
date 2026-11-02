@@ -243,6 +243,16 @@ class WarrantiesController extends Controller
             ->where('e.warranty_id', $w->id)->orderByDesc('e.created_at')->orderByDesc('e.id')
             ->get(['e.id', 'e.field', 'e.from_value', 'e.to_value', 'e.created_at', 'u.name as user_name']);
 
+        // Lo que ha escrito el cliente en el ticket, para la línea de tiempo. Solo si ve el
+        // ticket en el Helpdesk, y de WhatsApp solo el de soporte (nunca Campañas).
+        $mensajes = ! $w->ticketVisibleTo($request->user()) ? collect() : DB::table('messages')
+            ->where('ticket_id', $w->ticket_id)->where('direction', 'in')->where('is_internal_note', 0)
+            ->where(fn ($q) => $q->where('channel', '!=', 'whatsapp')->orWhere('funcion', 'soporte'))
+            ->orderByDesc('id')->limit(200)
+            ->get(['id', 'channel', 'type', 'body', 'is_html', 'created_at'])
+            ->map(fn ($m) => ['id' => $m->id, 'channel' => $m->channel === 'whatsapp' ? 'whatsapp' : 'correo',
+                'text' => $this->extracto($m), 'created_at' => (string) $m->created_at]);
+
         return response()->json(['ok' => true, 'warranty' => $this->row($w) + [
             'alerts'          => $this->alertas()->alerts([$w])[$w->id] ?? [],
             'status_changed_at' => $w->status_changed_at?->toDateTimeString(),
@@ -251,7 +261,20 @@ class WarrantiesController extends Controller
             'ticket_subject'  => $w->ticketVisibleTo($request->user()) ? $w->ticket_subject : null,
             'ticket_visible'  => $w->ticketVisibleTo($request->user()),
             'created_by_name' => $w->created_by_name,
-        ], 'notes' => $notes, 'events' => $events, 'items' => $this->items($w->id)]);
+        ], 'notes' => $notes, 'events' => $events, 'messages' => $mensajes, 'items' => $this->items($w->id)]);
+    }
+
+    /** Un mensaje del cliente en una línea corta: el texto sin HTML o qué ha mandado. */
+    private function extracto(object $m): string
+    {
+        $txt = (string) $m->body;
+        if ($m->is_html) $txt = html_entity_decode(strip_tags(preg_replace('/<(br|\/p|\/div)[^>]*>/i', "\n", $txt)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $txt = trim(preg_replace('/\s+/u', ' ', $txt));
+        if ($txt === '') {
+            return ['image' => 'Ha mandado una foto', 'audio' => 'Ha mandado un audio', 'video' => 'Ha mandado un vídeo',
+                'document' => 'Ha mandado un documento', 'sticker' => 'Ha mandado un sticker'][$m->type] ?? 'Mensaje sin texto';
+        }
+        return mb_strlen($txt) > 280 ? mb_substr($txt, 0, 279) . '…' : $txt;
     }
 
     // Garantías creadas a partir de un ticket (para enseñarlas en su ficha).

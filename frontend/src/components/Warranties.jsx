@@ -1295,10 +1295,13 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const ticket = w.ticket_code
     ? (onOpenTicket ? <button className="wr-tklink mono" title={w.ticket_subject || 'Abrir ticket'} onClick={() => onOpenTicket(w.ticket_id)}>{w.ticket_code}</button> : <span className="mono">{w.ticket_code}</span>)
     : null
-  // Seguimiento (notas del equipo) e historial (cambios automáticos) en una sola línea de tiempo.
+  // Seguimiento (notas del equipo), historial (cambios automáticos) y lo que escribe el
+  // cliente en el ticket, en una sola línea de tiempo.
+  const mensajes = d.messages || []
   const linea = [
-    ...(hist !== 'cambios' ? d.notes.map((n) => ({ k: `n${n.id}`, nota: n, at: n.created_at })) : []),
-    ...(hist !== 'notas' ? d.events.map((e) => ({ k: `e${e.id}`, ev: e, at: e.created_at })) : []),
+    ...(!hist || hist === 'notas' ? d.notes.map((n) => ({ k: `n${n.id}`, nota: n, at: n.created_at })) : []),
+    ...(!hist || hist === 'cambios' ? d.events.map((e) => ({ k: `e${e.id}`, ev: e, at: e.created_at })) : []),
+    ...(!hist || hist === 'cliente' ? mensajes.map((m) => ({ k: `m${m.id}`, msg: m, at: m.created_at })) : []),
   ].sort((a, b) => String(b.at).localeCompare(String(a.at)))
   const coberturas = [...new Set(d.items.map((i) => i.coverage).filter(Boolean))]
   const remesas = [...new Map(d.items.filter((i) => i.batch_code).map((i) => [i.batch_code, i.batch_status])).entries()]
@@ -1407,11 +1410,16 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
               </div>
             </div>
             <div className="dc-seg wf-filtro">
-              {[['', 'Todo'], ['notas', `Notas (${d.notes.length})`], ['cambios', 'Cambios']].map(([k, l]) => <button key={k} className={hist === k ? 'on' : ''} onClick={() => setHist(k)}>{l}</button>)}
+              {[['', 'Todo'], ['notas', `Notas (${d.notes.length})`], ['cambios', 'Cambios'], ...(w.ticket_id && w.ticket_visible ? [['cliente', `Cliente (${mensajes.length})`]] : [])].map(([k, l]) => <button key={k} className={hist === k ? 'on' : ''} onClick={() => setHist(k)}>{l}</button>)}
             </div>
-            {!linea.length ? <p className="dev-mute wf-none">{hist === 'notas' ? 'Todavía no hay seguimiento.' : 'Sin movimientos.'}</p> : (
+            {!linea.length ? <p className="dev-mute wf-none">{hist === 'notas' ? 'Todavía no hay seguimiento.' : hist === 'cliente' ? 'El cliente no ha escrito en el ticket.' : 'Sin movimientos.'}</p> : (
               <ol className="wf-tl">
-                {linea.map(({ k, nota: n, ev: e }) => n ? (
+                {linea.map(({ k, nota: n, ev: e, msg: m }) => m ? (
+                  <li key={k} className="msg">
+                    <div className="wf-tl-h"><b>Cliente</b><span className={`wr-type t-msg-${m.channel}`}>{m.channel === 'whatsapp' ? 'WhatsApp' : 'Correo'}</span><time>{fechaHora(m.created_at)}</time></div>
+                    <p>{m.text}</p>
+                  </li>
+                ) : n ? (
                   <li key={k} className="nota">
                     <div className="wf-tl-h"><b>{n.user_name || 'Sistema'}</b><span className={`wr-type t-${n.type}`}>{opts?.note_types?.[n.type] || n.type}</span><time>{fechaHora(n.created_at)}</time></div>
                     <p>{n.body}</p>

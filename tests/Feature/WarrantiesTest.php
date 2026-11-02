@@ -174,9 +174,23 @@ class WarrantiesTest extends TestCase
         $this->assertSame([1, []], array_values(array_intersect_key($this->getJson("/api/warranties.php?action=ticket_images&id={$wMia->id}&all=1", $h)->json(), ['tickets' => 1, 'images' => 1])));
         $this->get("/api/warranty_photo.php?w={$wMia->id}&src=a:{$oculta}&token={$media}")->assertNotFound();
 
+        // Mensajes del cliente en la línea de tiempo: solo los suyos (no respuestas, notas
+        // internas ni WhatsApp de Campañas), y solo si ve el ticket.
+        $cAjena = DB::table('tickets')->where('id', $tAjena)->value('contact_id');
+        $msg = fn (array $d) => DB::table('messages')->insert($d + ['contact_id' => $cAjena, 'ticket_id' => $tAjena, 'direction' => 'in', 'channel' => 'email',
+            'funcion' => 'soporte', 'type' => 'text', 'is_html' => 0, 'is_internal_note' => 0, 'created_at' => now()]);
+        $msg(['body' => '<p>Llegaron <b>rotas</b></p><p>tres</p>', 'is_html' => 1]);
+        $msg(['body' => '', 'channel' => 'whatsapp', 'type' => 'image']);
+        $msg(['body' => 'respuesta nuestra', 'direction' => 'out']);
+        $msg(['body' => 'nota', 'is_internal_note' => 1]);
+        $msg(['body' => 'oferta', 'channel' => 'whatsapp', 'funcion' => 'campanas']);
+        $this->assertSame([], $this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->json('messages'));
+
         // Quien sí ve el ticket, sí lo lee.
         DB::table('user_ticket_categories')->insert(['user_id' => $ana->id, 'category_id' => $ajena]);
         $this->assertSame('Asunto TK-AJENA', $this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->json('warranty.ticket_subject'));
+        $m = $this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->json('messages');
+        $this->assertEqualsCanonicalizing([['correo', 'Llegaron rotas tres'], ['whatsapp', 'Ha mandado una foto']], array_map(fn ($x) => [$x['channel'], $x['text']], $m));
         $this->assertSame('TK-AJENA@cliente.com', $this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->json('to'));
     }
 

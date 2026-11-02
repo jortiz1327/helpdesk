@@ -278,6 +278,8 @@ class ZkongRmaController extends Controller
         if ($request->filled('units_sent')) $datos['units_sent'] = max(1, (int) $request->input('units_sent'));
         $b->forceFill($datos)->save();
         $b->evento('envio', 'Datos del envío actualizados' . (($r = $this->resumenEnvio($b)) ? ": {$r}" : ''), $request->user()->id);
+        $items = WarrantyItem::where('zkong_batch_id', $b->id)->get(['id', 'code', 'warranty_id']);
+        $this->historial($items, $request->user()->id, "Envío de la remesa {$b->code} actualizado" . ($r ? " ({$r})" : ''));
         return response()->json(['ok' => true]);
     }
 
@@ -363,6 +365,8 @@ class ZkongRmaController extends Controller
         }
         $b->forceFill(['status' => 'cerrada', 'closed_at' => now()])->save();
         $b->evento('cerrada', 'Remesa cerrada', $request->user()->id);
+        $items = WarrantyItem::where('zkong_batch_id', $b->id)->get(['id', 'code', 'warranty_id']);
+        $this->historial($items, $request->user()->id, "Remesa {$b->code} cerrada");
         return response()->json(['ok' => true]);
     }
 
