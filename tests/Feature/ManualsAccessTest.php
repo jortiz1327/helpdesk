@@ -64,15 +64,15 @@ class ManualsAccessTest extends TestCase
         $this->assertNotContains('potencialidad', $keys); // la hoja de ruta es solo del superadmin
     }
 
-    public function test_el_encargado_de_campanas_ve_campanas_y_roles_pero_no_soporte(): void
+    public function test_el_encargado_de_campanas_solo_ve_su_manual(): void
     {
         $u = $this->usuario('encargado_campanas');
         $r = $this->withHeader('X-App-Token', $this->token($u))->getJson('/api/manuals.php')->assertOk();
         $keys = $this->claves($r->json());
 
         $this->assertContains('usuario_campanas', $keys);
-        $this->assertContains('roles', $keys);          // tiene campaigns.delete
-        $this->assertContains('aplicacion', $keys);     // guía general ('*')
+        $this->assertNotContains('roles', $keys);       // solo encargado de soporte y superadmin
+        $this->assertNotContains('aplicacion', $keys);  // campañas solo ve su manual
         $this->assertNotContains('usuario_soporte', $keys);
     }
 

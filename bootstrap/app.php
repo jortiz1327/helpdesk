@@ -29,6 +29,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('email:fetch')->everyMinute()->withoutOverlapping();
         // Correo/web: a los 8 días sin respuesta del cliente, aviso de cierre y ticket cerrado
         $schedule->command('tickets:followup')->everyFifteenMinutes()->withoutOverlapping();
+        // 24 h antes de ese cierre, correo al agente asignado para que lo planifique o insista
+        $schedule->command('tickets:closing-notice')->everyFifteenMinutes()->withoutOverlapping();
         // Correo diario al turno con los tickets que esperan respuesta hace X días. Corre
         // cada 15 min y él decide: solo laborables, desde la hora fijada y una vez al día.
         $schedule->command('tickets:stale-digest')->everyFifteenMinutes()->withoutOverlapping();

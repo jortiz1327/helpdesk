@@ -1288,7 +1288,7 @@ function CronStatus() {
 const fmtFecha = (s) => fmtDate(s, { dateStyle: 'short', timeStyle: 'short' })
 
 /* --------------------------- Próximos envíos a clientes ---------------------------
- * Lo que va a salir SOLO hacia clientes en los próximos 7 días (cierre por falta de
+ * Lo que va a salir SOLO hacia clientes en los próximos 4 días (cierre por falta de
  * respuesta, respuestas programadas, cierre de resueltos con aviso). Solo consulta:
  * para frenar uno basta con contestar al cliente, planificarlo o posponerlo.
  * ------------------------------------------------------------------------- */
@@ -1343,13 +1343,13 @@ function ProximosEnvios() {
         <span className={`env-count ${pronto.length ? 'on' : ''}`}>{pronto.length} en las próximas 24 h</span>
       </h2>
       <p className="em-desc">
-        Correos que saldrán <b>solos</b> hacia clientes en los próximos 7 días. Para frenar un cierre por falta de
+        Correos que saldrán <b>solos</b> hacia clientes en los próximos 4 días. Para frenar un cierre por falta de
         respuesta basta con <b>contestar al cliente</b>, pasar el ticket a <b>Planificado</b> o <b>posponerlo</b>. Las
         respuestas programadas se cancelan desde el propio ticket. Las horas con «~» son aproximadas (la tarea pasa cada 15 minutos).
       </p>
-      {!items.length && <p className="ct-hint">No hay ningún envío automático previsto esta semana.</p>}
+      {!items.length && <p className="ct-hint">No hay ningún envío automático previsto en los próximos 4 días.</p>}
       {pronto.length > 0 && <><div className="env-grupo">Próximas 24 h</div>{tabla(pronto)}</>}
-      {luego.length > 0 && <><div className="env-grupo">Resto de la semana</div>{tabla(luego)}</>}
+      {luego.length > 0 && <><div className="env-grupo">Próximos 4 días</div>{tabla(luego)}</>}
     </div>
   )
 }
