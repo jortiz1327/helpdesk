@@ -12,6 +12,7 @@ use App\Services\TicketService;
 use App\Services\WarrantyAlerts;
 use App\Services\WarrantyLabels;
 use App\Services\WarrantyPhotos;
+use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -217,6 +218,7 @@ class WarrantiesController extends Controller
             'code'             => $w->code,
             'first_contact_at' => $w->first_contact_at?->toDateString(),
             'received_at'      => $w->received_at?->toDateString(),
+            'installed_at'     => $w->installed_at?->toDateString(),
             'portal_client_id'  => $w->portal_client_id,
             'client_name'       => $w->client_name,
             'portal_project_id' => $w->portal_project_id,
@@ -483,6 +485,8 @@ class WarrantiesController extends Controller
             ->whereIn('i.code', $items->pluck('code'))->where('i.warranty_id', '!=', $warrantyId)
             ->orderByDesc('w.received_at')->orderByDesc('w.id')
             ->get(['i.code', 'w.id', 'w.code as warranty_code', 'w.received_at', 'w.client_name', 'i.resolution'])->groupBy('code');
+        $w = Warranty::find($warrantyId);
+        $plazos = $w ? WarrantyTerms::forWarranty($w) : null;
 
         return $items->map(fn ($i) => [
             'id' => $i->id, 'code' => $i->code, 'kind' => $i->kind, 'lookup_state' => $i->lookup_state, 'server' => $i->server,
@@ -498,6 +502,8 @@ class WarrantiesController extends Controller
             'batch_code' => $i->batch_code, 'batch_status' => $i->batch_status,
             'zkong_result' => $i->zkong_result, 'zkong_result_note' => $i->zkong_result_note,
             'photos' => $fotos[$i->id] ?? [],
+            'installed_at' => $i->installed_at?->toDateString(),
+            'term' => $w ? WarrantyTerms::item($w, $i, $plazos) : null,
             'other_warranties' => ($otras[$i->code] ?? collect())->map(fn ($o) => ['id' => $o->id, 'code' => $o->warranty_code,
                 'received_at' => $o->received_at, 'client' => $o->client_name, 'resolution' => $o->resolution])->values()->all(),
         ])->all();
@@ -531,6 +537,11 @@ class WarrantiesController extends Controller
         // Quién paga: lo elegido o, si no, lo que se propone para la solución.
         $cov = (string) $request->input('coverage', '');
         $cov = isset(WarrantyItem::COVERAGES[$cov]) ? $cov : (WarrantyItem::DEFAULT_COVERAGE[$res] ?? null);
+        // Fuera del plazo de garantía (todos los elegidos): se propone que pague el cliente.
+        if ($cov === 'garantia' && ! isset(WarrantyItem::COVERAGES[(string) $request->input('coverage', '')]) && WarrantyTerms::settings()['out_of_term_to_client']) {
+            $t = WarrantyTerms::forWarranty($w);
+            if ($items->every(fn ($i) => (WarrantyTerms::item($w, $i, $t)['hardware_ok'] ?? true) === false)) $cov = 'cliente';
+        }
 
         $zk = WarrantyItem::RESOLUTIONS[$res]['zkong'];
         $error = match (true) {
@@ -696,12 +707,14 @@ class WarrantiesController extends Controller
         // Fechas opcionales: vacías se quedan sin poner.
         $contacto = (string) $request->input('first_contact_at', '');
         $cierre = (string) $request->input('closed_at', '');
-        foreach ([[$contacto, 'primera fecha de contacto'], [$cierre, 'fecha de cierre']] as [$v, $nombre]) {
+        $instalacion = (string) $request->input('installed_at', '');
+        foreach ([[$contacto, 'primera fecha de contacto'], [$cierre, 'fecha de cierre'], [$instalacion, 'fecha de instalación']] as [$v, $nombre]) {
             if ($v !== '' && ! $this->esFecha($v)) {
                 return response()->json(['ok' => false, 'error' => "La {$nombre} no es válida"], 400);
             }
         }
         $datos['first_contact_at'] = $contacto ?: null;
+        $datos['installed_at'] = $instalacion ?: null;
         $estado = Warranty::statusRows()[$datos['status']] ?? null;
         if (! $estado) {
             return response()->json(['ok' => false, 'error' => 'Estado no válido'], 400);
@@ -859,6 +872,7 @@ class WarrantiesController extends Controller
                 'zkong_results'  => ZkongBatch::RESULTS,
                 'coverages'        => WarrantyItem::COVERAGES,
                 'default_coverage' => WarrantyItem::DEFAULT_COVERAGE,
+                'out_of_term_to_client' => (bool) WarrantyTerms::settings()['out_of_term_to_client'],
             ],
         ]);
     }
@@ -1063,7 +1077,7 @@ class WarrantiesController extends Controller
             'urgency'        => Warranty::URGENCIES[$v] ?? $v,
             'responsible_id' => User::whereKey($v)->value('name') ?? "#{$v}",
             'ticket_id'      => DB::table('tickets')->where('id', $v)->value('code') ?? "#{$v}",
-            'received_at', 'first_contact_at', 'closed_at' => date('d/m/Y', strtotime((string) $v)),
+            'received_at', 'first_contact_at', 'closed_at', 'installed_at' => date('d/m/Y', strtotime((string) $v)),
             default          => mb_substr((string) $v, 0, 500),
         };
     }

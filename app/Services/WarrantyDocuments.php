@@ -103,11 +103,75 @@ class WarrantyDocuments
         return 'data:image/jpeg;base64,' . base64_encode($jpg);
     }
 
+    /*
+     * Grupos de dispositivos revisados, para el correo y para Finanzas (Configuración):
+     *  devueltas   — se devuelven las mismas (garantía o pilas): reacondicionadas
+     *  sustituidas — en garantía, pero se cambian por nuevas (cuentan stock)
+     *  danadas     — dañadas por el cliente (paga el cliente)
+     *  cliente     — paga el cliente por otra cosa (fuera de plazo…)
+     * En Finanzas, dañadas y cliente van en el mismo presupuesto, y las pilas cambiadas
+     * (pilas o «se le cambiaron las pilas») tienen el suyo.
+     */
+    public const BLOCK_GROUPS = [
+        'devueltas'   => 'Reacondicionadas (se devuelven las mismas)',
+        'sustituidas' => 'Sustituidas en garantía',
+        'danadas'     => 'Dañadas por el cliente',
+        'cliente'     => 'Fuera de garantía (paga el cliente)',
+    ];
+
+    public const FINANCE_GROUPS = [
+        'devueltas'   => 'Se devuelven las mismas',
+        'pilas'       => 'Pilas cambiadas',
+        'sustituidas' => 'Sustituidas en garantía',
+        'cliente'     => 'Paga el cliente',
+    ];
+
+    public const BODY_DEFAULT = "Hola {cliente}:\n\nEn relación con los dispositivos de la garantía {codigo} ({proyecto}) remitidos para su evaluación técnica, te informamos del resultado del análisis realizado por nuestro equipo:\n\n{detalle}\n\nTe adjuntamos el informe técnico con el detalle de cada dispositivo{documentos}. Una vez efectuado el pago, envíanos el justificante para preparar el envío: quedará pendiente hasta recibirlo.\n\nQuedamos a tu disposición para cualquier aclaración.\n\nUn saludo,\n{agente}";
+
+    public const BLOCK_DEFAULTS = [
+        'devueltas' => ['active' => true, 'text' => "• Reacondicionadas ({n}): únicamente presentaban incidencias de sincronización. Se han sustituido las baterías para asegurar su correcto funcionamiento y que las pruebas se hicieran correctamente. Figuran en el presupuesto con coste cero: no se factura la etiqueta, solo la sustitución de las baterías. Permanecerán en nuestras oficinas hasta recibir el justificante de pago."],
+        'sustituidas' => ['active' => true, 'text' => "• Sustituidas en garantía ({n}): presentan un defecto de fabricación cubierto por la garantía y se cambian por unidades nuevas sin coste."],
+        'danadas' => ['active' => true, 'text' => "• Con daños físicos ({n}): {motivos}. No se consideran defectos de fabricación y, por tanto, no están cubiertas por la garantía.\n\nDe acuerdo con nuestro protocolo, quedan excluidos de revisión los dispositivos con golpes, caídas o impactos en la carcasa o la pantalla, entrada de líquidos, humedad o corrosión, exposición a calor extremo, sobretensiones o daños por fuerza mayor. Estos daños, incluso si se producen al cambiar las pilas o al retirar el dispositivo del expositor, comprometen su funcionamiento interno e impiden una revisión fiable."],
+        'cliente' => ['active' => true, 'text' => "• Fuera de garantía ({n}): la cobertura es de {plazo_hardware} desde la instalación, por lo que únicamente sería posible su reposición por unidades nuevas.\n\nSi no aceptas la reposición de las unidades fuera de garantía, indícanoslo respondiendo a este correo: enviaremos solo las cubiertas o reacondicionadas, una vez recibido el pago. Si más adelante pidieras el envío de las excluidas, el transporte correría de tu cuenta."],
+    ];
+
+    public const FINANCE_DEFAULTS = [
+        'header'      => "{cliente} - {codigo} - Garantía material\n{enlace}",
+        'replaced'    => ['defectuosa', 'danada', 'desechada'],
+        'battery_ref' => 'AM-BZ{numero}',
+        'groups'      => [
+            'devueltas'   => ['active' => true, 'stock' => 'no cuenta stock', 'cost' => 'a coste 0', 'note' => 'etiquetas enviadas por el cliente que están en buen estado'],
+            'pilas'       => ['active' => true, 'stock' => 'cuenta stock', 'cost' => 'a coste cliente', 'note' => ''],
+            'sustituidas' => ['active' => true, 'stock' => 'cuenta stock', 'cost' => 'a coste 0', 'note' => 'fallo de fábrica, sustitución en garantía'],
+            'cliente'     => ['active' => true, 'stock' => 'cuenta stock', 'cost' => 'a coste cliente', 'note' => 'dispositivos dañados por el cliente o fuera de garantía'],
+        ],
+    ];
+
+    /** Un ajuste con sus valores de serie debajo (lo que falte sale de serie). */
+    public static function ajuste(string $key, array $defaults): array
+    {
+        $v = WarrantyDocument::setting($key);
+        foreach ($defaults as $k => $d) {
+            if (is_array($d) && ! array_is_list($d)) {
+                $v[$k] = array_replace_recursive($d, is_array($v[$k] ?? null) ? $v[$k] : []);
+            }
+        }
+        return array_replace($defaults, $v);
+    }
+
+    /** En qué grupo del correo va un dispositivo revisado (null: sin revisar). */
+    public static function grupoDe($i, array $sustituidas): ?string
+    {
+        if ($i->resolution === 'pendiente' || ! $i->coverage) return null;
+        if ($i->coverage === 'cliente') return $i->resolution === 'danada' ? 'danadas' : 'cliente';
+        return in_array($i->resolution, $sustituidas, true) ? 'sustituidas' : 'devueltas';
+    }
+
     /** Texto del correo de resolución con sus variables ya puestas. */
     public static function resolutionEmail(Warranty $w, string $agente): array
     {
         $tpl = WarrantyDocument::setting('resolution_email');
-        $items = WarrantyItem::where('warranty_id', $w->id)->get(['resolution', 'coverage']);
+        $items = WarrantyItem::where('warranty_id', $w->id)->orderBy('id')->get(['code', 'resolution', 'coverage', 'broken_cases']);
         $resumen = ['Dispositivos revisados: ' . $items->where('resolution', '!=', 'pendiente')->count() . ' de ' . $items->count()];
         foreach ($items->countBy('resolution')->sortDesc() as $k => $n) {
             if ($k !== 'pendiente') $resumen[] = '· ' . (WarrantyItem::RESOLUTIONS[$k]['label'] ?? $k) . ": {$n}";
@@ -115,12 +179,91 @@ class WarrantyDocuments
         $cov = collect(WarrantyItem::COVERAGES)->map(fn ($l, $k) => ($n = $items->where('coverage', $k)->count()) ? "{$l}: {$n}" : null)->filter()->implode(' · ');
         if ($cov) $resumen[] = $cov;
 
-        $vars = [
+        $t = WarrantyTerms::forWarranty($w);
+        $plazos = ['{plazo_hardware}' => WarrantyTerms::months($t['hardware_months']), '{plazo_pilas}' => WarrantyTerms::months($t['battery_months']),
+            '{ciclos}' => number_format($t['battery_cycles'], 0, ',', '.')];
+
+        // El detalle: un bloque por grupo con dispositivos, en el orden de Configuración.
+        $sustituidas = self::ajuste('finance', self::FINANCE_DEFAULTS)['replaced'];
+        $grupos = $items->groupBy(fn ($i) => self::grupoDe($i, $sustituidas) ?? '');
+        $bloques = [];
+        foreach (self::ajuste('resolution_blocks', self::BLOCK_DEFAULTS) as $g => $b) {
+            $suyos = $grupos->get($g);
+            if (! $suyos || empty($b['active']) || trim((string) ($b['text'] ?? '')) === '') continue;
+            $motivos = $suyos->flatMap(fn ($i) => $i->broken_cases ?? [])->unique()->map(fn ($k) => WarrantyItem::BROKEN_CASES[$k] ?? $k)->values();
+            $bloques[] = strtr(trim($b['text']), $plazos + ['{n}' => $suyos->count(), '{codigos}' => $suyos->pluck('code')->implode(', '),
+                '{motivos}' => mb_strtolower($motivos->implode(', ')) ?: 'daños visibles']);
+        }
+
+        $vars = $plazos + [
             '{codigo}' => $w->code, '{cliente}' => $w->client_name ?: 'cliente', '{proyecto}' => $w->project_name ?: $w->client_name ?: '',
-            '{resumen}' => implode("\n", $resumen), '{documentos}' => '',
+            '{resumen}' => implode("\n", $resumen), '{detalle}' => $bloques ? implode("\n\n", $bloques) : implode("\n", $resumen), '{documentos}' => '',
             '{agente}' => $agente, '{fecha}' => now()->format('d/m/Y'),
         ];
         return ['subject' => strtr((string) ($tpl['subject'] ?? ''), $vars), 'body' => strtr((string) ($tpl['body'] ?? ''), $vars)];
+    }
+
+    /**
+     * Aviso a Finanzas de los presupuestos que hay que crear, como lo piden los
+     * procedimientos: cabecera (cliente, garantía y enlace al proyecto del portal) y un
+     * PPTO por grupo con las unidades de cada modelo, si cuenta stock y a qué coste.
+     */
+    public static function financeText(Warranty $w): string
+    {
+        $cfg = self::ajuste('finance', self::FINANCE_DEFAULTS);
+        $items = WarrantyItem::where('warranty_id', $w->id)->orderBy('id')->get();
+        $modelos = DB::table('device_models')->whereIn('id', $items->pluck('device_model_id')->filter()->unique())->get(['id', 'battery_type', 'battery_quantity'])->keyBy('id');
+
+        $grupos = ['devueltas' => [], 'pilas' => [], 'sustituidas' => [], 'cliente' => []];
+        $sumar = function (string $g, string $nombre, int $n) use (&$grupos) { $grupos[$g][$nombre] = ($grupos[$g][$nombre] ?? 0) + $n; };
+        foreach ($items as $i) {
+            $g = self::grupoDe($i, $cfg['replaced']);
+            if (! $g) continue;
+            $sumar($g === 'danadas' ? 'cliente' : $g, ($i->kind === 'ap' ? 'antena|antenas' : 'etiqueta|etiquetas') . '|' . ($i->aeme_ref ?: $i->server_model ?: 'sin modelo'), 1);
+            if ($i->coverage === 'pilas' || $i->battery_changed) {
+                $m = $modelos->get($i->device_model_id);
+                $tipo = strtoupper(trim((string) ($m->battery_type ?? '')));
+                $ref = $tipo === '' ? '(tipo sin indicar)' : strtr($cfg['battery_ref'] ?: '{tipo}', ['{numero}' => preg_replace('/\D/', '', $tipo), '{tipo}' => $tipo]);
+                $sumar('pilas', "pila|pilas|{$ref}", max(1, (int) ($m->battery_quantity ?? 1)));
+            }
+        }
+
+        $cabecera = strtr((string) $cfg['header'], [
+            '{cliente}' => $w->project_name ?: $w->client_name ?: 'Cliente', '{empresa}' => $w->client_name ?: '', '{codigo}' => self::codigoCorto($w->code),
+            '{enlace}' => self::enlacePortal($w), '{fecha}' => now()->format('d/m/Y'),
+        ]);
+        $partes = [trim(preg_replace('/^\h*\R/m', '', $cabecera . "\n"))];   // sin las líneas que quedan vacías
+        $n = 0;
+        foreach ($grupos as $g => $lineas) {
+            $c = $cfg['groups'][$g] ?? [];
+            if (! $lineas || empty($c['active'])) continue;
+            ksort($lineas, SORT_NATURAL);
+            $txt = 'PPTO ' . (++$n) . (trim((string) ($c['stock'] ?? '')) !== '' ? ' (' . trim($c['stock']) . ')' : '') . ':';
+            foreach ($lineas as $k => $cant) {
+                [$uno, $varios, $ref] = explode('|', $k, 3);
+                $txt .= "\n{$cant} " . ($cant === 1 ? $uno : $varios) . " {$ref}" . (trim((string) ($c['cost'] ?? '')) !== '' ? ' ' . trim($c['cost']) : '');
+            }
+            if (trim((string) ($c['note'] ?? '')) !== '') $txt .= "\n(" . trim($c['note']) . ')';
+            $partes[] = $txt;
+        }
+        if ($n === 0) $partes[] = 'No hay dispositivos revisados todavía.';
+        return implode("\n\n", array_filter($partes, fn ($p) => $p !== ''));
+    }
+
+    /** G-2026-0032 → G-26-0032, como se nombran en el portal. */
+    public static function codigoCorto(string $code): string
+    {
+        return preg_replace('/^G-\d{2}(\d{2})-(\d+)$/', 'G-$1-$2', $code);
+    }
+
+    /** El proyecto de esta garantía en el portal (por su código), o vacío. */
+    private static function enlacePortal(Warranty $w): string
+    {
+        if (! $w->portal_client_id || ! preg_match('/^G-\d{2}(\d{2})-(\d+)$/', $w->code, $m)) return '';
+        foreach (PortalDocCheck::overview((int) $w->portal_client_id)['projects'] ?? [] as $p) {
+            if ($p['code'] && preg_match('/^G-(\d{2})-(\d+)$/', $p['code'], $x) && $x[1] === $m[1] && (int) $x[2] === (int) $m[2]) return $p['url'];
+        }
+        return '';
     }
 
     public static function purgeFiles(int $warrantyId): void

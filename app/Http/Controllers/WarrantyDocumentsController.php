@@ -31,8 +31,16 @@ class WarrantyDocumentsController extends Controller
             'report'        => $this->report($request),
             'email'         => $this->email($request),
             'send_email'    => $this->sendEmail($request),
+            'finance'       => $this->finance($request),
             default         => $this->list($request),
         };
+    }
+
+    // Aviso a Finanzas de los presupuestos a crear (para copiarlo; formato en Configuración).
+    private function finance(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->query('id'));
+        return response()->json(['ok' => true, 'text' => WarrantyDocuments::financeText($w)]);
     }
 
     private function list(Request $request)

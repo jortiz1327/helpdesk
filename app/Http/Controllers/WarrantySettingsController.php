@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Warranty;
 use App\Models\WarrantyDocument;
+use App\Models\WarrantyItem;
 use App\Services\WarrantyAlerts;
+use App\Services\WarrantyDocuments;
+use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -35,6 +38,8 @@ class WarrantySettingsController extends Controller
             'template_save'   => $this->templateSave($request),
             'template_delete' => $this->templateDelete($request),
             'docs_save'       => $this->docsSave($request),
+            'terms_save'      => $this->termsSave($request),
+            'finance_save'    => $this->financeSave($request),
             default           => $this->get(),
         };
     }
@@ -60,10 +65,70 @@ class WarrantySettingsController extends Controller
             'urgencies' => (fn ($uso) => collect(array_reverse(Warranty::URGENCIES, true))->map(fn ($l, $k) => ['key' => $k, 'label' => $l, 'open' => (int) ($uso[$k] ?? 0)])->values())(
                 DB::table('warranties')->whereNotIn('status', Warranty::closedStatuses())->groupBy('urgency')->selectRaw('urgency, count(*) as n')->pluck('n', 'urgency')),
             'docs' => [
-                'company'          => WarrantyDocument::setting('company'),
-                'resolution_email' => WarrantyDocument::setting('resolution_email'),
+                'company'           => WarrantyDocument::setting('company'),
+                'resolution_email'  => WarrantyDocument::setting('resolution_email'),
+                'resolution_blocks' => WarrantyDocuments::ajuste('resolution_blocks', WarrantyDocuments::BLOCK_DEFAULTS),
             ],
+            'block_groups' => WarrantyDocuments::BLOCK_GROUPS,
+            'terms' => WarrantyTerms::settings(),
+            'term_references' => WarrantyTerms::REFERENCES,
+            'finance' => WarrantyDocuments::ajuste('finance', WarrantyDocuments::FINANCE_DEFAULTS),
+            'finance_groups' => WarrantyDocuments::FINANCE_GROUPS,
+            'resolutions' => collect(WarrantyItem::RESOLUTIONS)->except('pendiente')->map(fn ($r) => $r['label']),
         ]);
+    }
+
+    /* --- Plazos de garantía --- */
+
+    private function termsSave(Request $request)
+    {
+        $meses = fn ($v) => (int) $v;
+        $hw = $meses($request->input('hardware_months'));
+        $bat = $meses($request->input('battery_months'));
+        if ($hw < 1 || $hw > 240 || $bat < 1 || $bat > 240) return $this->error('Los plazos van de 1 a 240 meses');
+        $ciclos = (int) $request->input('battery_cycles');
+        if ($ciclos < 0 || $ciclos > 1000000) return $this->error('Los refrescos de las pilas no son válidos');
+        $ref = (string) $request->input('reference');
+        if (! isset(WarrantyTerms::REFERENCES[$ref])) return $this->error('Elige con qué fecha se compara');
+
+        $existen = DB::table('warranty_categories')->pluck('name')->mapWithKeys(fn ($n) => [mb_strtolower($n) => $n]);
+        $cats = [];
+        foreach ((array) $request->input('categories', []) as $c) {
+            $nombre = $existen[mb_strtolower(trim((string) ($c['category'] ?? '')))] ?? null;
+            if (! $nombre) return $this->error('Esa categoría no existe');
+            if (isset($cats[$nombre])) return $this->error("La categoría «{$nombre}» está dos veces");
+            $h = $meses($c['hardware_months'] ?? 0);
+            $b = $meses($c['battery_months'] ?? 0);
+            if ($h < 1 || $h > 240 || $b < 1 || $b > 240) return $this->error("«{$nombre}»: los plazos van de 1 a 240 meses");
+            $cats[$nombre] = ['category' => $nombre, 'hardware_months' => $h, 'battery_months' => $b];
+        }
+        $this->guardar('terms', ['hardware_months' => $hw, 'battery_months' => $bat, 'battery_cycles' => $ciclos, 'reference' => $ref,
+            'out_of_term_to_client' => $request->boolean('out_of_term_to_client'), 'categories' => array_values($cats)]);
+        WarrantyTerms::forget();
+        return response()->json(['ok' => true]);
+    }
+
+    /* --- Texto para Finanzas --- */
+
+    private function financeSave(Request $request)
+    {
+        $t = fn ($v, $max) => mb_substr(trim((string) $v), 0, $max);
+        $cabecera = $t($request->input('header'), 500);
+        if ($cabecera === '') return $this->error('Escribe la cabecera');
+        $grupos = [];
+        foreach (WarrantyDocuments::FINANCE_GROUPS as $k => $_) {
+            $g = (array) $request->input("groups.{$k}", []);
+            $grupos[$k] = ['active' => ! empty($g['active']), 'stock' => $t($g['stock'] ?? '', 60), 'cost' => $t($g['cost'] ?? '', 60), 'note' => $t($g['note'] ?? '', 200)];
+        }
+        $this->guardar('finance', ['header' => $cabecera,
+            'replaced' => array_values(array_intersect(array_keys(WarrantyItem::RESOLUTIONS), (array) $request->input('replaced', []))),
+            'battery_ref' => $t($request->input('battery_ref'), 40), 'groups' => $grupos]);
+        return response()->json(['ok' => true]);
+    }
+
+    private function guardar(string $key, array $v): void
+    {
+        DB::table('warranty_settings')->updateOrInsert(['key' => $key], ['value' => json_encode($v), 'updated_at' => now()]);
     }
 
     private function error(string $msg)
@@ -147,6 +212,8 @@ class WarrantySettingsController extends Controller
             // Renombrar se lleva las garantías que la tenían.
             if ($antes !== $name) DB::table('warranties')->where('category', $antes)->update(['category' => $name]);
         });
+        // Y sus plazos propios, si tenía.
+        if ($antes !== $name) $this->plazosDeCategoria(fn ($c) => $c['category'] === $antes ? ['category' => $name] + $c : $c);
         return response()->json(['ok' => true, 'id' => $id]);
     }
 
@@ -157,7 +224,17 @@ class WarrantySettingsController extends Controller
         $n = DB::table('warranties')->where('category', $c->name)->count();
         if ($n) return $this->error("Hay {$n} " . ($n === 1 ? 'garantía' : 'garantías') . ' con esta categoría: desactívala en lugar de borrarla');
         DB::table('warranty_categories')->where('id', $c->id)->delete();
+        $this->plazosDeCategoria(fn ($x) => $x['category'] === $c->name ? null : $x);
         return response()->json(['ok' => true]);
+    }
+
+    /** Cambia (o quita, si devuelve null) los plazos propios de las categorías. */
+    private function plazosDeCategoria(callable $fn): void
+    {
+        $s = WarrantyTerms::settings();
+        $s['categories'] = array_values(array_filter(array_map($fn, $s['categories'])));
+        $this->guardar('terms', $s);
+        WarrantyTerms::forget();
     }
 
     /** Nuevo orden de estados, categorías o plantillas: ids (o claves) en el orden visto. */
@@ -245,6 +322,12 @@ class WarrantySettingsController extends Controller
                 'email' => $t($c['email'] ?? '', 120), 'phone' => $t($c['phone'] ?? '', 40)],
             'resolution_email' => ['subject' => $t($e['subject'], 200), 'body' => $t($e['body'], 5000)],
         ];
+        if ($request->has('resolution_blocks')) {
+            $b = (array) $request->input('resolution_blocks', []);
+            foreach (WarrantyDocuments::BLOCK_GROUPS as $k => $_) {
+                $valores['resolution_blocks'][$k] = ['active' => ! empty($b[$k]['active']), 'text' => $t($b[$k]['text'] ?? '', 3000)];
+            }
+        }
         foreach ($valores as $k => $v) {
             DB::table('warranty_settings')->updateOrInsert(['key' => $k], ['value' => json_encode($v), 'updated_at' => now()]);
         }

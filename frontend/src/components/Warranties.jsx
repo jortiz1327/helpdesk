@@ -29,7 +29,7 @@ const CHIPS = [
 ]
 const SIZE = 25
 const hoy = () => new Date().toISOString().slice(0, 10)
-const VACIA = { id: 0, first_contact_at: '', received_at: '', closed_at: '', portal_client_id: null, client_name: '', portal_project_id: null, project_name: '', category: '', urgency: '', status: 'no_iniciado', responsible_id: '', ticket_code: '', description: '' }
+const VACIA = { id: 0, first_contact_at: '', received_at: '', installed_at: '', closed_at: '', portal_client_id: null, client_name: '', portal_project_id: null, project_name: '', category: '', urgency: '', status: 'no_iniciado', responsible_id: '', ticket_code: '', description: '' }
 
 const aFecha = (v) => (v ? new Date(String(v).replace(' ', 'T')) : null)
 const fecha = (v) => { const d = aFecha(v); return d && !isNaN(d) ? d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—' }
@@ -206,6 +206,8 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
             <label className="field"><span className="lbl">Fecha de recepción <em>*</em></span>
               <input type="date" value={f.received_at} onChange={set('received_at')} /></label>
           </div>
+          <label className="field"><span className="lbl">Fecha de instalación <span className="hint">(opcional: si se indica, cuenta para todos los dispositivos en lugar de su alta en ZKONG)</span></span>
+            <input type="date" value={f.installed_at || ''} onChange={set('installed_at')} /></label>
           <div className="grid2">
             <div className="field"><span className="lbl">Estado</span>
               <Select block value={f.status} onChange={elegirEstado}
@@ -760,24 +762,37 @@ function FotoSlot({ label, photo, active, busy, onActivate, onFile, onSrc, onDel
   )
 }
 
+/* Plazo de garantía de un dispositivo: solo se marca si está fuera (y, en el título, hasta cuándo). */
+function Plazo({ t }) {
+  if (!t) return null
+  const desde = t.source === 'manual' ? 'instalada (fecha de la garantía)' : 'alta en ZKONG'
+  const tit = `${desde} el ${fecha(t.installed_at)} · hardware hasta el ${fecha(t.hardware_until)} · pilas hasta el ${fecha(t.battery_until)}`
+  if (t.hardware_ok) return t.battery_ok ? null : <em className="wr-term bat" title={tit}>Pilas fuera de plazo</em>
+  return <em className="wr-term out" title={tit}><Icon.clock /> Fuera de plazo</em>
+}
+
 // preset: la solución elegida en la barra de selección. Un dispositivo que ya pide fotos
 // abre directamente en las fotos.
 function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
   const toast = useToast()
   const uno = iniciales.length === 1 ? iniciales[0] : null
+  // Lo que se propone para una solución; si todos están fuera de plazo, lo que cubría la
+  // garantía pasa a «Paga el cliente» (Configuración → Plazos).
+  const fuera = iniciales.every((it) => it.term?.hardware_ok === false)
+  const propuesto = (k) => { const c = rv.default_coverage?.[k] || ''; return c === 'garantia' && fuera && rv.out_of_term_to_client ? 'cliente' : c }
   const [items, setItems] = useState(iniciales)
   const [paso, setPaso] = useState(!preset && uno && pideFotos(rv, uno) ? 'fotos' : 'solucion')
   const [f, setF] = useState(() => {
     const resolution = preset || (uno && uno.resolution !== 'pendiente' ? uno.resolution : '')
     return {
-      resolution, coverage: (!preset && uno?.coverage) || rv.default_coverage?.[resolution] || '',
+      resolution, coverage: (!preset && uno?.coverage) || propuesto(resolution),
       note: uno?.resolution_note || '', broken_cases: uno?.broken_cases || [], battery_changed: !!uno?.battery_changed,
       zkong_decision: uno?.zkong_decision || 'decidir', zkong_issue: uno?.zkong_issue || '',
     }
   })
   // Quién paga se propone según la solución hasta que el técnico lo cambia a mano.
-  const [covAMano, setCovAMano] = useState(!preset && !!uno?.coverage && uno.coverage !== rv.default_coverage?.[uno.resolution])
-  const elegirSolucion = (k) => set({ resolution: k, ...(covAMano ? {} : { coverage: rv.default_coverage?.[k] || '' }) })
+  const [covAMano, setCovAMano] = useState(!preset && !!uno?.coverage && uno.coverage !== propuesto(uno.resolution))
+  const elegirSolucion = (k) => set({ resolution: k, ...(covAMano ? {} : { coverage: propuesto(k) }) })
   const [guardando, setGuardando] = useState(false)
   const [cambios, setCambios] = useState(false)
   const [galeria, setGaleria] = useState(w.ticket_id ? null : [])
@@ -880,10 +895,10 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
             {f.resolution && (
               <div className="wr-rev-sec">
                 <label>¿Quién paga? <span className="req">*</span>
-                  <span className="dev-mute"> — {!f.coverage ? 'elígelo según el motivo' : f.coverage === rv.default_coverage?.[f.resolution] ? 'lo propuesto para esta solución' : 'elegido a mano'}</span></label>
+                  <span className="dev-mute"> — {!f.coverage ? 'elígelo según el motivo' : f.coverage === propuesto(f.resolution) ? (fuera && propuesto(f.resolution) !== rv.default_coverage?.[f.resolution] ? 'fuera del plazo de garantía' : 'lo propuesto para esta solución') : 'elegido a mano'}</span></label>
                 <div className="wr-seg">
                   {Object.entries(rv.coverages || {}).map(([k, l]) => (
-                    <button key={k} type="button" className={f.coverage === k ? `on cov-${k}` : ''} onClick={() => { setCovAMano(k !== rv.default_coverage?.[f.resolution]); set({ coverage: k }) }}>{l}</button>
+                    <button key={k} type="button" className={f.coverage === k ? `on cov-${k}` : ''} onClick={() => { setCovAMano(k !== propuesto(f.resolution)); set({ coverage: k }) }}>{l}</button>
                   ))}
                 </div>
               </div>
@@ -1023,11 +1038,11 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   }
   const exportar = () => {
     const esc = csvCell
-    const cab = ['Código', 'Tipo', 'Referencia AEME', 'Producto', 'Modelo en el servidor', 'Servidor', 'Tienda', 'Conectada', 'Última comunicación', 'Avisos', 'Revisión', 'Detalle de la revisión', 'Fotos', 'Otras garantías']
+    const cab = ['Código', 'Tipo', 'Referencia AEME', 'Producto', 'Modelo en el servidor', 'Servidor', 'Tienda', 'Conectada', 'Última comunicación', 'Avisos', 'Revisión', 'Detalle de la revisión', 'Fotos', 'Otras garantías', 'Instalación', 'Garantía hasta', 'En plazo']
     const lineas = items.map((i) => [i.code, i.kind === 'ap' ? 'Antena' : 'Etiqueta', i.aeme_ref, i.product_name, i.server_model, i.server, i.store_name, i.online == null ? '' : i.online ? 'Sí' : 'No', fechaHora(i.last_commu_at), (i.warnings || []).map((a) => a.text).join(' | '),
       rv?.resolutions?.[i.resolution]?.label || i.resolution,
       [i.battery_changed ? 'Pilas cambiadas' : '', i.zkong_decision ? rv?.zkong?.[i.zkong_decision] : '', i.zkong_issue, (i.broken_cases || []).map((k) => rv?.broken_cases?.[k] || k).join(', '), i.resolution_note].filter(Boolean).join(' · '),
-      pideFotos(rv, i) ? `${fotosDe(rv, i).hay}/${fotosDe(rv, i).total}` : '', (i.other_warranties || []).map((o) => o.code).join(', ')])
+      pideFotos(rv, i) ? `${fotosDe(rv, i).hay}/${fotosDe(rv, i).total}` : '', (i.other_warranties || []).map((o) => o.code).join(', '), i.term ? fecha(i.term.installed_at) : '', i.term ? fecha(i.term.hardware_until) : '', !i.term ? 'Sin fecha' : i.term.hardware_ok ? 'Sí' : 'No'])
     const blob = new Blob(['﻿' + [cab.map(esc).join(';'), ...lineas.map((l) => l.map(esc).join(';'))].join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob); a.download = `${w.code}-etiquetas.csv`; a.click()
@@ -1040,11 +1055,12 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   const conectadas = items.filter((i) => i.online).length
   const conAvisos = items.filter((i) => estadoEtiqueta(i) !== 'ok').length
   const repetidos = items.filter((i) => i.other_warranties?.length).length
+  const fueraPlazo = items.filter((i) => i.term?.hardware_ok === false).length
   const porRes = {}
   items.forEach((i) => { porRes[i.resolution] = (porRes[i.resolution] || 0) + 1 })
   const revisadas = items.length - (porRes.pendiente || 0)
   const sinFotos = items.filter((i) => faltanFotos(rv, i)).length
-  const listado = items.filter((i) => (!filtro || (filtro === 'avisos' ? estadoEtiqueta(i) !== 'ok' : filtro === 'repetidos' ? i.other_warranties?.length > 0 : productoDe(i) === filtro))
+  const listado = items.filter((i) => (!filtro || (filtro === 'avisos' ? estadoEtiqueta(i) !== 'ok' : filtro === 'repetidos' ? i.other_warranties?.length > 0 : filtro === 'plazo' ? i.term?.hardware_ok === false : productoDe(i) === filtro))
     && (!rev || (rev === 'fotos' ? faltanFotos(rv, i) : i.resolution === rev)))
   const nuevas = comp.results && comp.checked === comp.text ? comp.results.filter((r) => !r.blocked && !r.already).length : null
 
@@ -1106,6 +1122,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
             <button className={!filtro ? 'on' : ''} onClick={() => setFiltro('')}>Todos los productos</button>
             {conAvisos ? <button className={filtro === 'avisos' ? 'on' : ''} onClick={() => setFiltro('avisos')}>Con avisos ({conAvisos})</button> : null}
             {repetidos ? <button className={filtro === 'repetidos' ? 'on' : ''} onClick={() => setFiltro(filtro === 'repetidos' ? '' : 'repetidos')} title="Han estado también en otras garantías"><Icon.refresh /> Repetidos ({repetidos})</button> : null}
+            {fueraPlazo ? <button className={filtro === 'plazo' ? 'on' : ''} onClick={() => setFiltro(filtro === 'plazo' ? '' : 'plazo')} title="Instaladas hace más del plazo de garantía"><Icon.clock /> Fuera de plazo ({fueraPlazo})</button> : null}
             {Object.entries(porProducto).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
               <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(filtro === k ? '' : k)}>{k} ×{n}</button>
             ))}
@@ -1122,7 +1139,8 @@ function Productos({ w, items, opts, onReload, onChanged }) {
                 <span className="wr-lbl-code mono"><button className="link" title="Ver ficha e historial" onClick={() => setFicha(i.code)}>{i.code}</button>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}
                   {i.other_warranties?.length ? <button className="wr-rep" onClick={() => setFicha(i.code)}
                     title={`También en: ${i.other_warranties.map((o) => [o.code, fecha(o.received_at), o.client, rv?.resolutions?.[o.resolution]?.label].filter(Boolean).join(' · ')).join('\n')}`}>
-                    <Icon.refresh /> En {i.other_warranties.length + 1} garantías</button> : null}</span>
+                    <Icon.refresh /> En {i.other_warranties.length + 1} garantías</button> : null}
+                  <Plazo t={i.term} /></span>
                 <Donde r={i} />
                 <Modelo r={i} onPick={(ref) => cambiarModelo(i, ref)} />
                 {rv ? <ResPill rv={rv} it={i} onClick={() => setRevisar({ items: [i] })} /> : null}
@@ -1245,7 +1263,7 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
   )
 }
 
-const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const toast = useToast()
@@ -1278,7 +1296,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   const stale = abierta && diasSin != null && diasSin >= (opts?.stale_days || 15)
 
   const guardarCon = async (cambios, msg) => {
-    const r = await api.saveWarranty({ ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '', first_contact_at: w.first_contact_at || '', closed_at: (w.closed_at || '').slice(0, 10), ...cambios })
+    const r = await api.saveWarranty({ ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '', first_contact_at: w.first_contact_at || '', installed_at: w.installed_at || '', closed_at: (w.closed_at || '').slice(0, 10), ...cambios })
     if (r.ok) { toast(msg); cargar(); onChanged() } else toast(r.error || 'Error', 'err')
   }
   const cerrar = async () => {
@@ -1398,6 +1416,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
                 : '—'}</dd></div>
               <div><dt>Primer contacto</dt><dd>{fecha(w.first_contact_at)}</dd></div>
               <div><dt>Recepción</dt><dd>{fecha(w.received_at)}</dd></div>
+              <div><dt>Instalación</dt><dd>{w.installed_at ? fecha(w.installed_at) : <span className="dev-mute" title="Cada dispositivo cuenta desde su alta en ZKONG">Alta en ZKONG</span>}</dd></div>
               {w.closed_at ? <div><dt>Cierre</dt><dd>{fecha(w.closed_at)}</dd></div> : null}
               <div><dt>Creada</dt><dd>{fechaHora(w.created_at)}{w.created_by_name ? <small> · {w.created_by_name}</small> : null}</dd></div>
             </dl>

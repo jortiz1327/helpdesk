@@ -210,6 +210,24 @@ function Correo({ w, informe, onClose, onSent }) {
   )
 }
 
+/* --- Aviso a Finanzas de los presupuestos que hay que crear (formato en Configuración) --- */
+function Finanzas({ w, summary, onClose }) {
+  const toast = useToast()
+  const [t, setT] = useState(null)
+  useEffect(() => { api.warrantyFinanceText(w.id).then((r) => (r.ok ? setT(r.text) : (toast(r.error, 'err'), onClose()))) }, [w.id])
+  const copiar = async () => { try { await navigator.clipboard.writeText(t); toast('Texto copiado') } catch { toast('No se pudo copiar', 'err') } }
+  return (
+    <Modal title="Texto para Finanzas" onClose={onClose} foot={<>
+      <button className="btn ghost" onClick={onClose}>Cerrar</button>
+      <button className="btn" disabled={!t} onClick={copiar}><Icon.copy /> Copiar</button>
+    </>}>
+      <p className="dev-mute wd-tip">Los presupuestos que hay que crear, con las unidades de cada modelo, si cuentan stock y a qué coste. Puedes retocarlo antes de copiarlo; el formato se cambia en Configuración → Texto para Finanzas.</p>
+      {summary.pending ? <p className="wd-warn"><Icon.warn /> Quedan {summary.pending} {summary.pending === 1 ? 'dispositivo' : 'dispositivos'} sin revisar: no entran.</p> : null}
+      {t == null ? <div className="center-load"><div className="spinner" /></div> : <textarea className="wd-mail-body" rows={14} value={t} onChange={(e) => setT(e.target.value)} />}
+    </Modal>
+  )
+}
+
 /* --- Lo que hay en el portal: proyectos de garantía del cliente y sus presupuestos --- */
 const Enlace = ({ href, children, className = '' }) => <a className={`wd-link ${className}`} href={href} target="_blank" rel="noopener noreferrer">{children}</a>
 
@@ -311,6 +329,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
 
       <div className="wd-acts">
         <button className="btn sm" disabled={!revisados} title={revisados ? '' : 'Revisa los dispositivos primero'} onClick={() => setModal('preparar')}><Icon.doc /> Preparar presupuestos para el portal</button>
+        <button className="dev-btn" disabled={!revisados} title={revisados ? 'Los presupuestos que hay que crear, para avisar a Finanzas' : 'Revisa los dispositivos primero'} onClick={() => setModal('finanzas')}><Icon.copy /> Texto para Finanzas</button>
         <span className="spacer" />
         <button className="dev-btn" disabled={!summary.total} title={summary.pending ? 'Se genera con todo revisado' : ''} onClick={() => setModal('informe')}><Icon.file /> {report ? 'Informe de resolución' : 'Generar informe'}</button>
         {report ? <button className="dev-btn" title={`Descargar el informe${report.note ? ` (${report.note.toLowerCase()})` : ''}`} onClick={() => descargar(report.id, toast)}><Icon.download /> <span className="mono">{report.number}</span></button> : null}
@@ -320,6 +339,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
       <Portal w={w} onEditWarranty={editar} />
 
       {modal === 'preparar' && <Preparar w={w} onClose={cerrar} onEditWarranty={editar} />}
+      {modal === 'finanzas' && <Finanzas w={w} summary={summary} onClose={cerrar} />}
       {modal === 'informe' && <Informe w={w} summary={summary} actual={report} onClose={cerrar} onDone={() => { cerrar(); cargar() }} />}
       {modal === 'correo' && <Correo w={w} informe={report} onClose={cerrar} onSent={onChanged} />}
     </>

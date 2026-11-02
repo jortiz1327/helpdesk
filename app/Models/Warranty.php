@@ -19,6 +19,7 @@ class Warranty extends Model
     protected $casts = [
         'first_contact_at' => 'date',
         'received_at'      => 'date',
+        'installed_at'     => 'date',
         'closed_at'        => 'datetime',
         'last_activity_at' => 'datetime',
         'status_changed_at' => 'datetime',
@@ -79,6 +80,7 @@ class Warranty extends Model
     public const TRACKED = [
         'first_contact_at' => 'Primera fecha de contacto',
         'received_at'    => 'Fecha de recepción',
+        'installed_at'   => 'Fecha de instalación',
         'closed_at'      => 'Fecha de cierre',
         'client_name'    => 'Cliente',
         'project_name'   => 'Proyecto',

@@ -238,9 +238,124 @@ function Plantillas({ list, hacer }) {
   )
 }
 
-const VARIABLES = [['{codigo}', 'Nº de garantía'], ['{cliente}', 'Cliente'], ['{proyecto}', 'Hotel o tienda'], ['{resumen}', 'Resultado de la revisión'], ['{agente}', 'Quien lo prepara'], ['{fecha}', 'Hoy']]
+const VARIABLES = [['{codigo}', 'Nº de garantía'], ['{cliente}', 'Cliente'], ['{proyecto}', 'Hotel o tienda'], ['{detalle}', 'Los bloques de abajo que tengan dispositivos'], ['{resumen}', 'Recuento por solución'],
+  ['{plazo_hardware}', 'Plazo de garantía'], ['{plazo_pilas}', 'Plazo de las pilas'], ['{ciclos}', 'Refrescos de las pilas'], ['{agente}', 'Quien lo prepara'], ['{fecha}', 'Hoy']]
+const VARS_BLOQUE = [['{n}', 'Cuántos'], ['{codigos}', 'Sus códigos'], ['{motivos}', 'Motivos del daño'], ['{plazo_hardware}', 'Plazo de garantía'], ['{plazo_pilas}', 'Plazo de las pilas'], ['{ciclos}', 'Refrescos de las pilas']]
 
-function Documentos({ docs, hacer }) {
+/* Plazos de garantía: los generales y, si hace falta, los de cada categoría. */
+function Plazos({ terms, refs, categorias, hacer }) {
+  const [v, setV] = useState(terms)
+  useEffect(() => setV(terms), [terms])
+  const set = (c) => setV((x) => ({ ...x, ...c }))
+  const setCat = (i, c) => set({ categories: v.categories.map((x, j) => (j === i ? { ...x, ...c } : x)) })
+  const libres = categorias.filter((c) => !v.categories.some((x) => x.category === c.name))
+  const cambiado = JSON.stringify(v) !== JSON.stringify(terms)
+  const meses = (val, on) => <input type="number" min={1} max={240} value={val} onChange={(e) => on(e.target.value)} />
+  return (
+    <Card title="Plazos de garantía" sub="Cuánto cubre la garantía desde la instalación. Cada dispositivo cuenta desde su alta en ZKONG, salvo que la garantía indique su fecha de instalación."
+      foot={(
+        <div className="ws-foot">
+          <span className="dev-mute">Fuera de plazo se marca en cada dispositivo y tiene su filtro en la garantía.</span>
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(terms)}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado} onClick={() => hacer('terms_save', v, 'Plazos guardados')}><Icon.save /> Guardar plazos</button>
+        </div>
+      )}>
+      <div className="ws-body">
+      <div className="ws-plazos">
+        <label className="field"><span className="lbl">Hardware (meses)</span>{meses(v.hardware_months, (x) => set({ hardware_months: x }))}</label>
+        <label className="field"><span className="lbl">Pilas (meses)</span>{meses(v.battery_months, (x) => set({ battery_months: x }))}</label>
+        <label className="field"><span className="lbl">Refrescos de las pilas</span><input type="number" min={0} value={v.battery_cycles} onChange={(e) => set({ battery_cycles: e.target.value })} />
+          <small className="dev-mute">Solo para el correo: los servidores no dan el contador.</small></label>
+        <div className="field"><span className="lbl">Se compara con</span>
+          <select value={v.reference} onChange={(e) => set({ reference: e.target.value })}>{Object.entries(refs).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+      </div>
+      <label className="wr-check"><input type="checkbox" checked={!!v.out_of_term_to_client} onChange={(e) => set({ out_of_term_to_client: e.target.checked })} /> Al revisar uno fuera de plazo, proponer «Paga el cliente» en lugar de «Garantía» <span className="dev-mute">(el técnico puede cambiarlo)</span></label>
+
+      <h4 className="ws-sub">Plazos propios de una categoría</h4>
+      {v.categories.length ? (
+        <div className="dev-table-wrap keep">
+          <table className="dev-table ws-alertas">
+            <thead><tr><th>Categoría</th><th className="c">Hardware (meses)</th><th className="c">Pilas (meses)</th><th /></tr></thead>
+            <tbody>
+              {v.categories.map((c, i) => (
+                <tr key={c.category}>
+                  <td><b>{c.category}</b></td>
+                  <td className="c">{meses(c.hardware_months, (x) => setCat(i, { hardware_months: x }))}</td>
+                  <td className="c">{meses(c.battery_months, (x) => setCat(i, { battery_months: x }))}</td>
+                  <td className="r"><Txt danger onClick={() => set({ categories: v.categories.filter((_, j) => j !== i) })}>Quitar</Txt></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <p className="dev-mute">Todas usan los plazos generales.</p>}
+      {libres.length ? (
+        <div className="ws-add">
+          <Icon.plus className="ws-add-ic" />
+          <select value="" onChange={(e) => e.target.value && set({ categories: [...v.categories, { category: e.target.value, hardware_months: v.hardware_months, battery_months: v.battery_months }] })}>
+            <option value="">Añadir plazos propios para…</option>
+            {libres.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
+        </div>
+      ) : null}
+      </div>
+    </Card>
+  )
+}
+
+/* Texto para Finanzas: cabecera y un presupuesto por grupo. */
+function Finanzas({ finance, grupos, soluciones, hacer }) {
+  const [v, setV] = useState(finance)
+  useEffect(() => setV(finance), [finance])
+  const set = (c) => setV((x) => ({ ...x, ...c }))
+  const setG = (k, c) => set({ groups: { ...v.groups, [k]: { ...v.groups[k], ...c } } })
+  const cambiado = JSON.stringify(v) !== JSON.stringify(finance)
+  const toggleSol = (k) => set({ replaced: v.replaced.includes(k) ? v.replaced.filter((x) => x !== k) : [...v.replaced, k] })
+  return (
+    <Card title="Texto para Finanzas" sub="El aviso para que Finanzas cree los presupuestos (botón «Texto para Finanzas» en Documentos de cada garantía). Un presupuesto por grupo con dispositivos."
+      foot={(
+        <div className="ws-foot">
+          <span className="dev-mute">Cada línea sale como «13 etiquetas AMC42V a coste 0».</span>
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(finance)}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado || !v.header.trim()} onClick={() => hacer('finance_save', v, 'Texto para Finanzas guardado')}><Icon.save /> Guardar</button>
+        </div>
+      )}>
+      <div className="ws-body">
+      <div className="field"><span className="lbl">Cabecera</span><textarea rows={2} maxLength={500} value={v.header} onChange={(e) => set({ header: e.target.value })} /></div>
+      <div className="ws-vars">{[['{cliente}', 'Hotel o tienda'], ['{empresa}', 'Cliente'], ['{codigo}', 'G-26-0001'], ['{enlace}', 'Proyecto en el portal'], ['{fecha}', 'Hoy']].map(([k, l]) => <span key={k} title={l}><code>{k}</code> {l}</span>)}</div>
+
+      <h4 className="ws-sub">Grupos</h4>
+      <div className="dev-table-wrap keep">
+        <table className="dev-table ws-fin">
+          <thead><tr><th>Grupo</th><th className="c">Sale</th><th>Stock</th><th>Coste</th><th>Nota</th></tr></thead>
+          <tbody>
+            {Object.entries(grupos).map(([k, l]) => (
+              <tr key={k} className={v.groups[k]?.active ? '' : 'off'}>
+                <td><b>{l}</b></td>
+                <td className="c"><input type="checkbox" checked={!!v.groups[k]?.active} onChange={(e) => setG(k, { active: e.target.checked })} aria-label={`Incluir ${l}`} /></td>
+                <td><input value={v.groups[k]?.stock || ''} maxLength={60} placeholder="cuenta stock" onChange={(e) => setG(k, { stock: e.target.value })} /></td>
+                <td><input value={v.groups[k]?.cost || ''} maxLength={60} placeholder="a coste 0" onChange={(e) => setG(k, { cost: e.target.value })} /></td>
+                <td><input value={v.groups[k]?.note || ''} maxLength={200} onChange={(e) => setG(k, { note: e.target.value })} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h4 className="ws-sub">Se sustituyen por unidades nuevas</h4>
+      <p className="dev-mute">Con estas soluciones el dispositivo no se devuelve: va a «Sustituidas en garantía» (o «Paga el cliente») y cuenta stock. También decide el bloque del correo.</p>
+      <div className="ws-sols">{Object.entries(soluciones).map(([k, l]) => (
+        <label key={k} className="wr-check"><input type="checkbox" checked={v.replaced.includes(k)} onChange={() => toggleSol(k)} /> {l}</label>
+      ))}</div>
+
+      <div className="field ws-bat"><span className="lbl">Referencia de las pilas</span><input value={v.battery_ref || ''} maxLength={40} onChange={(e) => set({ battery_ref: e.target.value })} />
+        <small className="dev-mute"><code>{'{numero}'}</code> los números del tipo de pila del catálogo (CR2450 → 2450), <code>{'{tipo}'}</code> el tipo entero.</small></div>
+      </div>
+    </Card>
+  )
+}
+
+function Documentos({ docs, grupos, hacer }) {
   const [v, setV] = useState(docs)
   useEffect(() => setV(docs), [docs])
   const set = (grupo, c) => setV((x) => ({ ...x, [grupo]: { ...x[grupo], ...c } }))
@@ -274,6 +389,23 @@ function Documentos({ docs, hacer }) {
           <div className="ws-vars">{VARIABLES.map(([k, l]) => <span key={k} title={l}><code>{k}</code> {l}</span>)}</div>
         </div>
       </div>
+      <div className="ws-body">
+      <h4 className="ws-sub">Bloques de <code>{'{detalle}'}</code></h4>
+      <p className="dev-mute">Un párrafo por grupo de dispositivos, solo si la garantía tiene alguno de ese grupo y en este orden.</p>
+      <div className="ws-bloques">
+        {Object.entries(grupos).map(([k, l]) => {
+          const b = v.resolution_blocks?.[k] || {}
+          const setB = (c) => set('resolution_blocks', { [k]: { ...b, ...c } })
+          return (
+            <div key={k} className={`ws-bloque${b.active ? '' : ' off'}`}>
+              <label className="wr-check"><input type="checkbox" checked={!!b.active} onChange={(e) => setB({ active: e.target.checked })} /> <b>{l}</b></label>
+              <textarea rows={4} maxLength={3000} value={b.text || ''} disabled={!b.active} onChange={(e) => setB({ text: e.target.value })} />
+            </div>
+          )
+        })}
+      </div>
+      <div className="ws-vars">{VARS_BLOQUE.map(([k, l]) => <span key={k} title={l}><code>{k}</code> {l}</span>)}</div>
+      </div>
     </Card>
   )
 }
@@ -287,7 +419,9 @@ const SECCIONES = [
   ]],
   ['Revisión y documentos', [
     ['plantillas', 'Plantillas de diagnóstico', Icon.doc, (d) => d.templates.filter((t) => t.active).length],
+    ['plazos', 'Plazos de garantía', Icon.clock, null],
     ['documentos', 'Documentos y correo', Icon.file, null],
+    ['finanzas', 'Texto para Finanzas', Icon.copy, null],
   ]],
 ]
 const MEMO = 'warranty_settings.section'
@@ -316,7 +450,7 @@ export default function WarrantySettings() {
       <header className="page-head">
         <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Configuración</h1></div>
-        <span className="sub">· Estados, categorías, urgencias, alertas, plantillas y documentos de Gestión de garantías</span>
+        <span className="sub">· Estados, categorías, urgencias, alertas, plantillas, plazos, documentos y texto para Finanzas de Gestión de garantías</span>
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
         {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
@@ -343,7 +477,9 @@ export default function WarrantySettings() {
               {sec === 'urgencias' && <Urgencias list={d.urgencies} />}
               {sec === 'alertas' && <Alertas list={d.alerts} hacer={hacer} />}
               {sec === 'plantillas' && <Plantillas list={d.templates} hacer={hacer} />}
-              {sec === 'documentos' && <Documentos docs={d.docs} hacer={hacer} />}
+              {sec === 'plazos' && <Plazos terms={d.terms} refs={d.term_references} categorias={d.categories} hacer={hacer} />}
+              {sec === 'documentos' && <Documentos docs={d.docs} grupos={d.block_groups} hacer={hacer} />}
+              {sec === 'finanzas' && <Finanzas finance={d.finance} grupos={d.finance_groups} soluciones={d.resolutions} hacer={hacer} />}
             </div>
           </div>
         )}

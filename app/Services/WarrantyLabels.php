@@ -225,6 +225,7 @@ class WarrantyLabels
                     'online'        => $v ? $vivo($v) : null,
                     'last_commu_at' => $ultima?->toDateTimeString(),
                     'server_model'  => $v && trim((string) ($v['model'] ?? '')) !== '' ? trim((string) $v['model']) : null,
+                    'added_at'      => $v ? self::fecha($v['addTime'] ?? null)?->toDateString() : null,
                     'rows'          => array_map(fn ($x) => [
                         'server' => $x['server'] ?? null, 'url' => $x['server_url'] ?? '',
                         'online' => $vivo($x), 'store' => $x['storeName'] ?? null,
@@ -429,7 +430,16 @@ class WarrantyLabels
             'last_commu_at' => $r['last_commu_at'], 'server_model' => $r['server_model'],
             'device_model_id' => $r['device_model_id'], 'aeme_ref' => $r['aeme_ref'], 'product_name' => $r['product_name'],
             'model_manual' => (bool) $r['model_manual'], 'warnings' => $r['warnings'] ?: null, 'checked_at' => now(),
+            'installed_at' => self::instalada($r['code'], $r['added_at'] ?? null),
         ];
+    }
+
+    /** La instalación: la primera alta en ZKONG que se conoce (la de ahora o una anterior). */
+    private static function instalada(string $code, ?string $ahora): ?string
+    {
+        $antes = DeviceSighting::where('code', $code)->whereNotNull('added_at')->min('added_at');
+        $fechas = array_filter([$ahora, $antes ? substr((string) $antes, 0, 10) : null]);
+        return $fechas ? min($fechas) : null;
     }
 
     private function desdeFila(WarrantyItem $i): array
@@ -439,7 +449,7 @@ class WarrantyLabels
             'store_name' => $i->store_name, 'merchant_name' => $i->merchant_name, 'online' => $i->online,
             'last_commu_at' => $i->last_commu_at?->toDateTimeString(), 'server_model' => $i->server_model,
             'device_model_id' => $i->device_model_id, 'aeme_ref' => $i->aeme_ref, 'product_name' => $i->product_name,
-            'model_manual' => $i->model_manual,
+            'model_manual' => $i->model_manual, 'added_at' => $i->installed_at?->toDateString(),
             // Las filas por servidor no se guardan: el servidor vivo basta para el aviso de app02.
             'rows' => $i->server ? [['server' => $i->server, 'url' => (string) ZkongServer::where('name', $i->server)->value('base_url'), 'online' => (bool) $i->online, 'store' => $i->store_name]] : [],
         ];

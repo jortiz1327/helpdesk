@@ -439,6 +439,7 @@ export const api = {
   warrantyPortalDocs: (id, fresh) => req(`warranty_docs.php?action=portal&id=${id}${fresh ? '&fresh=1' : ''}`),
   warrantyDocsDo: (action, payload) => postJson(`warranty_docs.php?action=${action}`, payload),
   warrantyResolutionEmail: (id) => req(`warranty_docs.php?action=email&id=${id}`),
+  warrantyFinanceText: (id) => req(`warranty_docs.php?action=finance&id=${id}`),
   warrantyDocDownload: async (id) => {
     try {
       const r = await fetch(`${BASE}/warranty_docs.php?action=download&id=${id}`, { headers: { 'X-App-Token': getToken() } })

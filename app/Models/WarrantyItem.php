@@ -19,6 +19,7 @@ class WarrantyItem extends Model
         'broken_cases'    => 'array',
         'battery_changed' => 'boolean',
         'last_commu_at'   => 'datetime',
+        'installed_at'    => 'date',
         'checked_at'      => 'datetime',
         'reviewed_at'     => 'datetime',
     ];

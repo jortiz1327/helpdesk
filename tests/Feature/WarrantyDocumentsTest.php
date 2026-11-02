@@ -78,8 +78,9 @@ class WarrantyDocumentsTest extends TestCase
         $m = $this->getJson("/api/warranty_docs.php?action=email&id={$this->w->id}", $this->h)->assertOk()->json();
         $this->assertSame('Resolución de la garantía G-2026-0001', $m['subject']);
         $this->assertStringContainsString('Hola Hoteles Sol', $m['body']);
-        $this->assertStringContainsString('Dispositivos revisados: 2 de 2', $m['body']);
-        $this->assertStringContainsString('Garantía: 1 · Paga el cliente: 1', $m['body']);
+        // El detalle por bloques (los de Configuración): uno por grupo con dispositivos.
+        $this->assertStringContainsString('• Sustituidas en garantía (1):', $m['body']);
+        $this->assertStringContainsString('• Con daños físicos (1): líquidos.', $m['body']);
         $this->assertStringNotContainsString('{', $m['body']);
     }
 
