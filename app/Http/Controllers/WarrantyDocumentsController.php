@@ -32,8 +32,43 @@ class WarrantyDocumentsController extends Controller
             'email'         => $this->email($request),
             'send_email'    => $this->sendEmail($request),
             'finance'       => $this->finance($request),
+            'sticker_data'  => $this->stickerData($request),
+            'sticker'       => $this->sticker($request),
             default         => $this->list($request),
         };
+    }
+
+    // Pegatina del paquete: lo que se propone (se retoca en el modal antes de imprimir).
+    private function stickerData(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->query('id'));
+        return response()->json(['ok' => true, 'slots' => WarrantyDocuments::STICKER_SLOTS] + WarrantyDocuments::stickerData($w));
+    }
+
+    // El PDF de la pegatina con lo del modal: suelta o en posiciones de una hoja A4.
+    private function sticker(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        $v = validator($request->all(), [
+            'code' => 'required|string|max:30', 'client' => 'nullable|string|max:120', 'company' => 'nullable|string|max:120',
+            'shipped_at' => 'nullable|date', 'received_at' => 'nullable|date',
+            'products' => 'array|max:16', 'products.*.name' => 'required|string|max:40', 'products.*.qty' => 'required|integer|min:1|max:99999',
+            'format' => 'required|in:label,a4',
+            'slots' => 'required_if:format,a4|array|min:1|max:' . WarrantyDocuments::STICKER_SLOTS,
+            'slots.*' => 'integer|distinct|min:1|max:' . WarrantyDocuments::STICKER_SLOTS,
+        ], [], ['products.*.name' => 'producto', 'products.*.qty' => 'cantidad', 'slots' => 'posiciones de la hoja']);
+        if ($v->fails()) {
+            return response()->json(['ok' => false, 'error' => $v->errors()->first()], 400);
+        }
+        $d = $v->validated();
+        $slots = collect($d['slots'] ?? [1])->map(fn ($s) => (int) $s)->sort()->values()->all();
+        $bin = WarrantyDocuments::sticker($d, $d['format'], $slots);
+        $name = "Pegatina-{$w->code}.pdf";
+        return response($bin, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . preg_replace('/[^A-Za-z0-9._-]+/', '_', $name) . '"',
+            'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'no-store',
+        ]);
     }
 
     // Aviso a Finanzas de los presupuestos a crear (para copiarlo; formato en Configuración).

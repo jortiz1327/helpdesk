@@ -440,6 +440,21 @@ export const api = {
   warrantyDocsDo: (action, payload) => postJson(`warranty_docs.php?action=${action}`, payload),
   warrantyResolutionEmail: (id) => req(`warranty_docs.php?action=email&id=${id}`),
   warrantyFinanceText: (id) => req(`warranty_docs.php?action=finance&id=${id}`),
+  // Pegatina del paquete: lo que se propone y el PDF con lo retocado ({ ok, blob }).
+  warrantyStickerData: (id) => req(`warranty_docs.php?action=sticker_data&id=${id}`),
+  warrantySticker: async (payload) => {
+    try {
+      const r = await fetch(`${BASE}/warranty_docs.php?action=sticker`, { method: 'POST', headers: { 'X-App-Token': getToken(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!r.ok) {
+        let error = 'No se pudo generar la pegatina'
+        try { error = (await r.json()).error || error } catch { /* no-json */ }
+        return { ok: false, error }
+      }
+      return { ok: true, blob: await r.blob() }
+    } catch {
+      return { ok: false, error: 'Sin conexión al generar la pegatina' }
+    }
+  },
   warrantyDocDownload: async (id) => {
     try {
       const r = await fetch(`${BASE}/warranty_docs.php?action=download&id=${id}`, { headers: { 'X-App-Token': getToken() } })

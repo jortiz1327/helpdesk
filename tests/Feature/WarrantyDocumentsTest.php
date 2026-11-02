@@ -84,6 +84,26 @@ class WarrantyDocumentsTest extends TestCase
         $this->assertStringNotContainsString('{', $m['body']);
     }
 
+    public function test_pegatina_del_paquete(): void
+    {
+        $this->item('8E9749440');
+        $this->item('8E9749441');
+        $this->item('AABBCCDDEEFF', ['kind' => 'ap', 'aeme_ref' => 'AMAP-C']);
+        $d = $this->getJson("/api/warranty_docs.php?action=sticker_data&id={$this->w->id}", $this->h)->assertOk()->json();
+        $this->assertSame(['G-26-0001', '2026-10-01', 'Hotel Mar', 'Hoteles Sol', 8], [$d['code'], $d['received_at'], $d['client'], $d['company'], $d['slots']]);
+        $this->assertSame([['name' => 'AMC26V', 'qty' => 2], ['name' => 'AMAP-C', 'qty' => 1]], $d['products']);
+
+        $url = '/api/warranty_docs.php?action=sticker';
+        $base = ['id' => $this->w->id, 'code' => 'G-26-0001', 'client' => 'Hotel Mar', 'products' => $d['products']];
+        $r = $this->postJson($url, $base + ['format' => 'label'], $this->h)->assertOk();
+        $this->assertSame('application/pdf', $r->headers->get('Content-Type'));
+        $this->assertStringStartsWith('%PDF', $r->getContent());
+        $this->postJson($url, $base + ['format' => 'a4', 'slots' => [2, 7]], $this->h)->assertOk();
+        $this->postJson($url, $base + ['format' => 'a4', 'slots' => [9]], $this->h)->assertStatus(400);
+        $this->postJson($url, $base + ['format' => 'a4'], $this->h)->assertStatus(400);
+        $this->postJson($url, ['products' => [['name' => 'X', 'qty' => 0]]] + $base + ['format' => 'label'], $this->h)->assertStatus(400);
+    }
+
     public function test_ajustes_solo_con_configuracion_y_sin_tarifa(): void
     {
         $u = User::create(['name' => 'Luis', 'email' => 'luis@x.com', 'password' => bcrypt('x'), 'active' => 1]);

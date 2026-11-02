@@ -5034,20 +5034,27 @@ button.dev-code:hover { text-decoration: underline; }
 /* Plazos de garantía, texto para Finanzas y bloques del correo. */
 .ws-panel .ws-sub:not(:first-child) { margin-top: 20px; }
 .ws-plazos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; margin-bottom: 12px; }
-.ws-plazos .field input, .ws-plazos .field select { padding: 8px 11px; font-size: 13px; }
+.ws-plazos .field input { padding: 8px 11px; font-size: 13px; }
 .ws-plazos .field small { display: block; margin-top: 4px; font-size: 11.5px; }
-.ws-panel .ws-add select { flex: 1; padding: 7px 10px; font-size: 13px; }
+.ws-add-cat { margin-top: 10px; max-width: 320px; }
 .ws-fin td { height: auto; padding-top: 8px; padding-bottom: 8px; }
-.ws-fin td input:not([type=checkbox]) { box-sizing: border-box; width: 100%; min-width: 110px; padding: 6px 9px; font-size: 13px; }
+.ws-fin td input:not([type=checkbox]), .ws-bloque textarea { box-sizing: border-box; width: 100%; padding: 8px 11px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; transition: border-color .15s, box-shadow .15s; }
+.ws-fin td input:not([type=checkbox]) { min-width: 120px; }
+.ws-fin td input:focus, .ws-bloque textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent); }
+.ws-fin td input::placeholder, .ws-bloque textarea::placeholder { color: var(--ink-3); }
+.ws-fin tr.off td input:not([type=checkbox]) { opacity: 0.55; }
 .ws-fin th.c, .ws-fin td.c { text-align: center; }
+.ws-fin th:nth-child(3), .ws-fin th:nth-child(4) { width: 20%; }
+.ws-fin th:nth-child(5) { width: 40%; }
 .ws-fin input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary); }
 .ws-fin tr.off td b { color: var(--ink-3); }
 .ws-sols { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 14px; }
 .ws-bat input { max-width: 260px; padding: 8px 11px; font-size: 13px; }
 .ws-bat small { display: block; margin-top: 4px; font-size: 11.5px; }
 .ws-bloques { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; margin: 10px 0 12px; }
-.ws-bloque textarea { width: 100%; margin-top: 6px; padding: 8px 11px; font-size: 13px; line-height: 1.45; }
-.ws-bloque.off textarea { opacity: 0.5; }
+.ws-bloque { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.ws-bloque textarea { margin-top: 8px; line-height: 1.5; resize: vertical; min-height: 96px; }
+.ws-bloque.off textarea { opacity: 0.5; cursor: not-allowed; }
 @media (max-width: 900px) { .ws-plazos { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ws-bloques { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 980px) { .ws-docs { grid-template-columns: 1fr; } }
 
@@ -5614,3 +5621,28 @@ button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); 
 .ws-panel > .ws-body { padding: 16px 20px 18px; }
 .ws-panel > .ws-body > .ws-sub:first-child { margin-top: 0; }
 .ws-panel > .ws-docs + .ws-body { border-top: 1px solid var(--line); margin-top: 6px; }
+
+/* Pegatina del paquete */
+.wd-peg { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+.wd-peg .grid2 { gap: 10px 12px; }
+.wd-peg .field { margin: 0; }
+.wd-peg .field input { padding: 8px 11px; font-size: 13px; }
+.wd-peg-h { margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
+.wd-peg-h small { margin-left: 6px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.wd-peg-h:not(:first-child) { margin-top: 16px; }
+.wd-peg-prods { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.wd-peg-prod { display: grid; grid-template-columns: minmax(0, 1fr) 78px 30px; gap: 6px; align-items: center; }
+.wd-peg-prod input { box-sizing: border-box; width: 100%; padding: 8px 11px; border: 1.5px solid var(--line-2); border-radius: 10px; background: var(--panel-2); color: var(--ink); font: inherit; font-size: 13px; }
+.wd-peg-prod input[type=number] { text-align: center; }
+.wd-peg-prod input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent); }
+.wd-peg .wf-link svg { width: 14px; height: 14px; fill: currentColor; vertical-align: -2px; }
+.wd-peg-fmt { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wd-peg-fmt label { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; cursor: pointer; font-size: 13px; }
+.wd-peg-fmt label.on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.wd-peg-fmt input { accent-color: var(--primary); margin: 0; }
+.wd-peg-fmt small { grid-column: 2; color: var(--ink-3); font-size: 11.5px; }
+.wd-peg-hoja { display: grid; grid-template-columns: repeat(2, 64px); gap: 4px; margin-top: 10px; padding: 6px; width: max-content; border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel-2); }
+.wd-peg-hoja button { height: 44px; border: 1px dashed var(--line-2); border-radius: 4px; background: var(--panel); color: var(--ink-3); font: inherit; font-size: 12px; cursor: pointer; }
+.wd-peg-hoja button.on { border: 1px solid var(--primary); background: var(--primary); color: #fff; }
+.wd-peg-hoja button svg { width: 16px; height: 16px; fill: currentColor; }
+@media (max-width: 760px) { .wd-peg, .wd-peg-fmt { grid-template-columns: 1fr; } }

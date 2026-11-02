@@ -279,11 +279,47 @@ class WarrantyDocuments
         Warranty::whereKey($warrantyId)->update(['last_activity_at' => now()]);
     }
 
-    private static function pdf(string $html): string
+    /**
+     * Pegatina del paquete (la de la app antigua, 105 × 74 mm): lo que se propone; el
+     * agente lo retoca antes de imprimir. Productos: los dispositivos por referencia.
+     */
+    public static function stickerData(Warranty $w): array
+    {
+        $productos = WarrantyItem::where('warranty_id', $w->id)->orderBy('id')->get(['aeme_ref', 'product_name', 'kind'])
+            ->groupBy(fn ($i) => $i->aeme_ref ?: ($i->product_name ?: ($i->kind === 'ap' ? 'Antena' : 'Etiqueta')))
+            ->map(fn ($g, $k) => ['name' => (string) $k, 'qty' => $g->count()])
+            ->sortByDesc('qty')->values()->all();
+        return [
+            'code' => self::codigoCorto($w->code), 'shipped_at' => null, 'received_at' => $w->received_at?->toDateString(),
+            'client' => (string) ($w->project_name ?: $w->client_name), 'company' => $w->project_name ? (string) $w->client_name : '',
+            'products' => $productos,
+        ];
+    }
+
+    /** Hojas A4 de pegatinas: 2 columnas × 4 filas de 105 × 74 mm. */
+    public const STICKER_SLOTS = 8;
+
+    /** El PDF de la pegatina: suelta (105 × 74 mm) o en las posiciones elegidas de una hoja A4. */
+    public static function sticker(array $d, string $format = 'label', array $slots = [1]): string
+    {
+        $productos = array_values($d['products'] ?? []);
+        $cols = count($productos) > 4 ? 2 : 1;
+        $filas = (int) ceil(count($productos) / $cols);
+        $escala = $filas > 4 ? 4 / $filas : 1;
+        $html = view('warranty-sticker-pdf', [
+            'd' => $d, 'a4' => $format === 'a4', 'slots' => $format === 'a4' ? $slots : [1],
+            'logo' => 'data:image/png;base64,' . base64_encode(file_get_contents(resource_path('brand/aeme-full.png'))),
+            'columnas' => $filas ? array_chunk($productos, $filas) : [], 'filas' => $filas, 'cols' => $cols,
+            'letra' => max(4.4, round(($cols === 2 ? 6 : 6.8) * $escala, 2)), 'relleno' => max(0.2, round(0.78 * $escala, 2)),
+        ])->render();
+        return self::pdf($html, $format === 'a4' ? 'A4' : [0, 0, 297.64, 209.76]);
+    }
+
+    private static function pdf(string $html, string|array $papel = 'A4'): string
     {
         $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => false, 'defaultFont' => 'DejaVu Sans']);
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4');
+        $dompdf->setPaper($papel);
         $dompdf->render();
         return $dompdf->output();
     }

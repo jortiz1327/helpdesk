@@ -228,6 +228,86 @@ function Finanzas({ w, summary, onClose }) {
   )
 }
 
+/*
+ * --- Pegatina del paquete (la de la app antigua, 105 × 74 mm): se retoca aquí y sale en
+ * PDF, suelta o en las posiciones libres de una hoja A4 de 8 (lo que antes se hacía en Publisher).
+ */
+function Pegatina({ w, onClose }) {
+  const toast = useToast()
+  const [d, setD] = useState(null)
+  const [formato, setFormato] = useState('label')
+  const [slots, setSlots] = useState([1])
+  const [ocupado, setOcupado] = useState(false)
+  useEffect(() => { api.warrantyStickerData(w.id).then((r) => (r.ok ? setD({ ...r, products: r.products.length ? r.products : [{ name: '', qty: 1 }] }) : (toast(r.error, 'err'), onClose()))) }, [w.id])
+  const set = (c) => setD((x) => ({ ...x, ...c }))
+  const setP = (i, c) => set({ products: d.products.map((p, j) => (j === i ? { ...p, ...c } : p)) })
+  const toggle = (s) => setSlots((x) => (x.includes(s) ? x.filter((y) => y !== s) : [...x, s]))
+  const productos = (d?.products || []).filter((p) => p.name.trim())
+  const listo = d && d.code.trim() && (formato === 'label' || slots.length) && productos.every((p) => Number(p.qty) >= 1)
+
+  const generar = async (abrir) => {
+    setOcupado(true)
+    const r = await api.warrantySticker({ id: w.id, code: d.code.trim(), client: d.client, company: d.company, shipped_at: d.shipped_at || null,
+      received_at: d.received_at || null, products: productos.map((p) => ({ name: p.name.trim(), qty: Number(p.qty) })), format: formato, slots })
+    setOcupado(false)
+    if (!r.ok) { toast(r.error, 'err'); return }
+    const url = URL.createObjectURL(r.blob)
+    if (abrir) window.open(url, '_blank', 'noopener')
+    else { const a = document.createElement('a'); a.href = url; a.download = `Pegatina-${d.code.trim()}.pdf`; a.click() }
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  }
+
+  return (
+    <Modal wide title="Pegatina del paquete" onClose={onClose} foot={<>
+      <button className="btn ghost" onClick={onClose}>Cerrar</button>
+      <button className="dev-btn" disabled={!listo || ocupado} onClick={() => generar(false)}><Icon.download /> Descargar</button>
+      <button className="btn" disabled={!listo || ocupado} onClick={() => generar(true)}><Icon.print /> {ocupado ? 'Generando…' : 'Abrir para imprimir'}</button>
+    </>}>
+      {!d ? <div className="center-load"><div className="spinner" /></div> : (
+        <div className="wd-peg">
+          <div>
+            <div className="grid2">
+              <label className="field"><span className="lbl">Garantía</span><input value={d.code} maxLength={30} onChange={(e) => set({ code: e.target.value })} /></label>
+              <span />
+              <label className="field"><span className="lbl">Enviado por el cliente el</span><input type="date" value={d.shipped_at || ''} onChange={(e) => set({ shipped_at: e.target.value })} /></label>
+              <label className="field"><span className="lbl">Recibido en almacén</span><input type="date" value={d.received_at || ''} onChange={(e) => set({ received_at: e.target.value })} /></label>
+              <label className="field"><span className="lbl">Cliente</span><input value={d.client} maxLength={120} placeholder="Hotel o tienda" onChange={(e) => set({ client: e.target.value })} /></label>
+              <label className="field"><span className="lbl">Empresa</span><input value={d.company} maxLength={120} onChange={(e) => set({ company: e.target.value })} /></label>
+            </div>
+            <p className="dev-mute wd-tip">«Revisado el», «Pte. creación presupuesto» y «Resolución enviada el» salen con su casilla y una línea para rellenar a mano.</p>
+          </div>
+          <div>
+            <h4 className="wd-peg-h">Productos <small className="dev-mute">{productos.length > 4 ? 'a dos columnas' : 'hasta 4 a tamaño normal'}</small></h4>
+            <div className="wd-peg-prods">
+              {d.products.map((p, i) => (
+                <div key={i} className="wd-peg-prod">
+                  <input value={p.name} maxLength={40} placeholder="Referencia o modelo" onChange={(e) => setP(i, { name: e.target.value })} />
+                  <input type="number" min={1} value={p.qty} onChange={(e) => setP(i, { qty: e.target.value })} aria-label="Cantidad" />
+                  <button className="icon-btn" title="Quitar" onClick={() => set({ products: d.products.filter((_, j) => j !== i) })}>✕</button>
+                </div>
+              ))}
+            </div>
+            {d.products.length < 16 ? <button className="wf-link" onClick={() => set({ products: [...d.products, { name: '', qty: 1 }] })}><Icon.plus /> Añadir producto</button> : null}
+
+            <h4 className="wd-peg-h">Formato</h4>
+            <div className="wd-peg-fmt">
+              <label className={formato === 'label' ? 'on' : ''}><input type="radio" checked={formato === 'label'} onChange={() => setFormato('label')} /> <b>Etiqueta suelta</b><small>105 × 74 mm, para la impresora de etiquetas</small></label>
+              <label className={formato === 'a4' ? 'on' : ''}><input type="radio" checked={formato === 'a4'} onChange={() => setFormato('a4')} /> <b>Hoja A4 de {d.slots}</b><small>Elige dónde va (las posiciones libres de la hoja)</small></label>
+            </div>
+            {formato === 'a4' ? (
+              <div className="wd-peg-hoja" role="group" aria-label="Posiciones de la hoja">
+                {Array.from({ length: d.slots }, (_, i) => i + 1).map((s) => (
+                  <button key={s} type="button" className={slots.includes(s) ? 'on' : ''} onClick={() => toggle(s)} aria-pressed={slots.includes(s)}>{slots.includes(s) ? <Icon.check /> : s}</button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 /* --- Lo que hay en el portal: proyectos de garantía del cliente y sus presupuestos --- */
 const Enlace = ({ href, children, className = '' }) => <a className={`wd-link ${className}`} href={href} target="_blank" rel="noopener noreferrer">{children}</a>
 
@@ -303,7 +383,7 @@ function Portal({ w, onEditWarranty }) {
 export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty, onChanged }) {
   const toast = useToast()
   const [d, setD] = useState(null)
-  const [modal, setModal] = useState(null)   // 'preparar' | 'informe' | 'correo'
+  const [modal, setModal] = useState(null)   // 'preparar' | 'finanzas' | 'pegatina' | 'informe' | 'correo'
   const cargar = useCallback(() => api.warrantyDocs(w.id).then((r) => setD(r.ok ? r : { error: r.error })), [w.id])
   useEffect(() => { cargar() }, [cargar])
 
@@ -331,6 +411,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
         <button className="btn sm" disabled={!revisados} title={revisados ? '' : 'Revisa los dispositivos primero'} onClick={() => setModal('preparar')}><Icon.doc /> Preparar presupuestos para el portal</button>
         <button className="dev-btn" disabled={!revisados} title={revisados ? 'Los presupuestos que hay que crear, para avisar a Finanzas' : 'Revisa los dispositivos primero'} onClick={() => setModal('finanzas')}><Icon.copy /> Texto para Finanzas</button>
         <span className="spacer" />
+        <button className="dev-btn" title="La pegatina para el paquete, en PDF para imprimir" onClick={() => setModal('pegatina')}><Icon.print /> Pegatina del paquete</button>
         <button className="dev-btn" disabled={!summary.total} title={summary.pending ? 'Se genera con todo revisado' : ''} onClick={() => setModal('informe')}><Icon.file /> {report ? 'Informe de resolución' : 'Generar informe'}</button>
         {report ? <button className="dev-btn" title={`Descargar el informe${report.note ? ` (${report.note.toLowerCase()})` : ''}`} onClick={() => descargar(report.id, toast)}><Icon.download /> <span className="mono">{report.number}</span></button> : null}
         <button className="dev-btn" onClick={() => setModal('correo')}><Icon.mail /> Correo de resolución</button>
@@ -339,6 +420,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
       <Portal w={w} onEditWarranty={editar} />
 
       {modal === 'preparar' && <Preparar w={w} onClose={cerrar} onEditWarranty={editar} />}
+      {modal === 'pegatina' && <Pegatina w={w} onClose={cerrar} />}
       {modal === 'finanzas' && <Finanzas w={w} summary={summary} onClose={cerrar} />}
       {modal === 'informe' && <Informe w={w} summary={summary} actual={report} onClose={cerrar} onDone={() => { cerrar(); cargar() }} />}
       {modal === 'correo' && <Correo w={w} informe={report} onClose={cerrar} onSent={onChanged} />}

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
+import Select from './Select.jsx'
 
 
 /* -------------------------------------------------------------------------
@@ -267,7 +268,7 @@ function Plazos({ terms, refs, categorias, hacer }) {
         <label className="field"><span className="lbl">Refrescos de las pilas</span><input type="number" min={0} value={v.battery_cycles} onChange={(e) => set({ battery_cycles: e.target.value })} />
           <small className="dev-mute">Solo para el correo: los servidores no dan el contador.</small></label>
         <div className="field"><span className="lbl">Se compara con</span>
-          <select value={v.reference} onChange={(e) => set({ reference: e.target.value })}>{Object.entries(refs).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+          <Select block value={v.reference} onChange={(x) => set({ reference: x })} options={Object.entries(refs).map(([k, l]) => ({ value: k, label: l }))} /></div>
       </div>
       <label className="wr-check"><input type="checkbox" checked={!!v.out_of_term_to_client} onChange={(e) => set({ out_of_term_to_client: e.target.checked })} /> Al revisar uno fuera de plazo, proponer «Paga el cliente» en lugar de «Garantía» <span className="dev-mute">(el técnico puede cambiarlo)</span></label>
 
@@ -290,12 +291,9 @@ function Plazos({ terms, refs, categorias, hacer }) {
         </div>
       ) : <p className="dev-mute">Todas usan los plazos generales.</p>}
       {libres.length ? (
-        <div className="ws-add">
-          <Icon.plus className="ws-add-ic" />
-          <select value="" onChange={(e) => e.target.value && set({ categories: [...v.categories, { category: e.target.value, hardware_months: v.hardware_months, battery_months: v.battery_months }] })}>
-            <option value="">Añadir plazos propios para…</option>
-            {libres.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-          </select>
+        <div className="ws-add ws-add-cat">
+          <Select value="" placeholder="Añadir plazos propios para…" options={libres.map((c) => ({ value: c.name, label: c.name }))}
+            onChange={(x) => x && set({ categories: [...v.categories, { category: x, hardware_months: v.hardware_months, battery_months: v.battery_months }] })} />
         </div>
       ) : null}
       </div>
