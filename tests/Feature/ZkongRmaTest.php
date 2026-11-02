@@ -100,6 +100,9 @@ class ZkongRmaTest extends TestCase
         $this->rma('send', ['id' => $c['id']], $h)->assertOk();
         $this->rma('add', ['id' => $c['id'], 'item_ids' => [$a['A0A3B85B5F7F']]], $h)->assertStatus(400);
         $rev($w1, [$a['8E9749440']], ['resolution' => 'correcta'])->assertStatus(400);
+        $this->postJson('/api/warranties.php?action=label_model', ['item_id' => $a['8E9749440'], 'aeme_ref' => ''], $h)->assertStatus(400);
+        $this->postJson('/api/warranties.php?action=label_delete', ['item_id' => $a['8E9749440']], $h)->assertStatus(400);
+        $this->assertNotNull(\App\Models\WarrantyItem::find($a['8E9749440']));
         $this->rma('delete', ['id' => $c['id']], $h)->assertStatus(400);
 
         // Excel con las columnas de ZKONG, agrupado por modelo y fallo.

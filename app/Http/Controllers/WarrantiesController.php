@@ -390,9 +390,22 @@ class WarrantiesController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /**
+     * Lo que ya se mandó a ZKONG no se toca desde la garantía (ni revisión, ni modelo, ni
+     * quitarlo): su respuesta va en la remesa. Código de la remesa enviada, o null.
+     */
+    private function remesaEnviada($items): ?string
+    {
+        $ids = collect($items)->pluck('zkong_batch_id')->filter()->unique();
+        return $ids->isEmpty() ? null : ZkongBatch::whereIn('id', $ids)->where('status', '!=', 'borrador')->value('code');
+    }
+
     private function labelModel(Request $request)
     {
         $item = WarrantyItem::findOrFail((int) $request->input('item_id'));
+        if ($remesa = $this->remesaEnviada([$item])) {
+            return response()->json(['ok' => false, 'error' => "{$item->code} ya va en la remesa {$remesa}, enviada a ZKONG"], 400);
+        }
         $antes = $item->aeme_ref;
         if (! $this->labels()->setModel($item, (string) $request->input('aeme_ref', ''))) {
             return response()->json(['ok' => false, 'error' => 'Ese modelo no está en el catálogo'], 400);
@@ -407,6 +420,9 @@ class WarrantiesController extends Controller
     private function labelDelete(Request $request)
     {
         $item = WarrantyItem::findOrFail((int) $request->input('item_id'));
+        if ($remesa = $this->remesaEnviada([$item])) {
+            return response()->json(['ok' => false, 'error' => "{$item->code} ya va en la remesa {$remesa}, enviada a ZKONG"], 400);
+        }
         WarrantyPhotos::purgeFiles([$item->id]);
         $item->delete();
         $this->evento($item->warranty_id, $request->user()->id, 'items', null, '−1: ' . $item->code);
@@ -488,12 +504,8 @@ class WarrantiesController extends Controller
             return response()->json(['ok' => false, 'error' => $error], 400);
         }
 
-        // Lo que ya se mandó a ZKONG no se toca desde aquí: su respuesta va en la remesa.
-        $enviadas = $items->filter(fn ($i) => $i->zkong_batch_id)->pluck('zkong_batch_id')->unique();
-        $remesa = $enviadas->isEmpty() ? null
-            : ZkongBatch::whereIn('id', $enviadas)->where('status', '!=', 'borrador')->first(['code']);
-        if ($remesa) {
-            return response()->json(['ok' => false, 'error' => "Hay dispositivos que ya van en la remesa {$remesa->code}, enviada a ZKONG"], 400);
+        if ($remesa = $this->remesaEnviada($items)) {
+            return response()->json(['ok' => false, 'error' => "Hay dispositivos que ya van en la remesa {$remesa}, enviada a ZKONG"], 400);
         }
 
         $pendiente = $res === 'pendiente';
