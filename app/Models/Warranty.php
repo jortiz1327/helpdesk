@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\TicketVisibility;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -105,5 +106,20 @@ class Warranty extends Model
     public function isOpen(): bool
     {
         return ! in_array($this->status, self::closedStatuses(), true);
+    }
+
+    /**
+     * ¿Puede este usuario ver un ticket del Helpdesk? Lo que la garantía saca del ticket
+     * (asunto, correo del cliente, imágenes) sigue las mismas reglas que el Helpdesk: hace
+     * falta helpdesk.access y que el ticket entre en lo que ve (sus categorías, etc.).
+     */
+    public static function canSeeTicket(?User $user, ?int $ticketId): bool
+    {
+        return $user && $ticketId && $user->can('helpdesk.access') && TicketVisibility::puedeVer($user, $ticketId);
+    }
+
+    public function ticketVisibleTo(?User $user): bool
+    {
+        return self::canSeeTicket($user, $this->ticket_id);
     }
 }

@@ -86,7 +86,8 @@ class WarrantyDocumentsController extends Controller
     private function email(Request $request)
     {
         $w = Warranty::findOrFail((int) $request->query('id'));
-        $contacto = $w->ticket_id ? DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+        // El correo del cliente sale del ticket: solo si este usuario puede verlo en el Helpdesk.
+        $contacto = $w->ticketVisibleTo($request->user()) ? DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
             ->where('t.id', $w->ticket_id)->first(['c.email as contact_email']) : null;
         return response()->json(['ok' => true, 'to' => $contacto->contact_email ?? null]
             + WarrantyDocuments::resolutionEmail($w, $request->user()->name));

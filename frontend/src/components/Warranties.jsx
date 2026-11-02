@@ -785,7 +785,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
   const conFotos = items.filter((it) => pideFotos(rv, it))
   const res = rv.resolutions[f.resolution]
 
-  useEffect(() => { if (paso === 'fotos' && galeria === null) api.warrantyTicketImages(w.id).then((r) => setGaleria(r.ok ? r.images : [])) }, [paso, galeria, w.id])
+  useEffect(() => { if (paso === 'fotos' && galeria === null) api.warrantyTicketImages(w.id).then((r) => setGaleria(!r.ok ? [] : r.visible === false ? false : r.images)) }, [paso, galeria, w.id])
 
   // Primer hueco vacío (para que pegar o elegir una imagen del ticket vaya solo a su sitio).
   const huecos = conFotos.flatMap((it) => tiposFoto(rv, it).map(([t]) => ({ key: `${it.id}|${t}`, it, t, lleno: (it.photos || []).some((p) => p.type === t) })))
@@ -945,7 +945,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
             {w.ticket_id ? (
               <aside className="wr-gal">
                 <h4><Icon.ticket /> Imágenes del ticket {w.ticket_code ? <span className="mono">{w.ticket_code}</span> : null}</h4>
-                {galeria === null ? <div className="spinner sm" /> : !galeria.length ? <p className="dev-mute">El cliente no ha mandado imágenes en el ticket.</p> : (
+                {galeria === null ? <div className="spinner sm" /> : galeria === false ? <p className="dev-mute">No puedes ver este ticket en el Helpdesk, así que tampoco sus imágenes.</p> : !galeria.length ? <p className="dev-mute">El cliente no ha mandado imágenes en el ticket.</p> : (
                   <div className="wr-gal-grid">
                     {galeria.map((g) => (
                       <button key={g.src} type="button" draggable title={`${g.name} · ${g.from === 'cliente' ? 'del cliente' : 'del equipo'} · ${fechaHora(g.at)}`}

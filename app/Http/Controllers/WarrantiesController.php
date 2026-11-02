@@ -247,7 +247,9 @@ class WarrantiesController extends Controller
             'alerts'          => $this->alertas()->alerts([$w])[$w->id] ?? [],
             'status_changed_at' => $w->status_changed_at?->toDateTimeString(),
             'description'     => $w->description,
-            'ticket_subject'  => $w->ticket_subject,
+            // El asunto es del Helpdesk: solo para quien puede ver ese ticket.
+            'ticket_subject'  => $w->ticketVisibleTo($request->user()) ? $w->ticket_subject : null,
+            'ticket_visible'  => $w->ticketVisibleTo($request->user()),
             'created_by_name' => $w->created_by_name,
         ], 'notes' => $notes, 'events' => $events, 'items' => $this->items($w->id)]);
     }
@@ -544,6 +546,9 @@ class WarrantiesController extends Controller
     {
         [$item, $type] = $this->fotoDe($request);
         $w = Warranty::findOrFail($item->warranty_id);
+        if (! $w->ticketVisibleTo($request->user())) {
+            return response()->json(['ok' => false, 'error' => 'No puedes ver el ticket de esta garantía en el Helpdesk'], 403);
+        }
         $error = WarrantyPhotos::fromTicket($w, $item, $type, (string) $request->input('src'), $request->user()->id);
         return $this->trasFoto($item, $error);
     }
@@ -567,7 +572,9 @@ class WarrantiesController extends Controller
     private function ticketImages(Request $request)
     {
         $w = Warranty::findOrFail((int) $request->query('id'));
-        return response()->json(['ok' => true, 'images' => WarrantyPhotos::ticketImages($w)]);
+        // Las imágenes son del Helpdesk: si no puede ver el ticket, no las ve (sin error).
+        $visible = $w->ticketVisibleTo($request->user());
+        return response()->json(['ok' => true, 'visible' => $visible, 'images' => $visible ? WarrantyPhotos::ticketImages($w) : []]);
     }
 
     /**
@@ -583,7 +590,7 @@ class WarrantiesController extends Controller
                 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=31536000']);
         }
         $w = Warranty::find((int) $request->query('w'));
-        $img = $w ? WarrantyPhotos::ticketImage($w, (string) $request->query('src')) : null;
+        $img = $w && $w->ticketVisibleTo($request->user()) ? WarrantyPhotos::ticketImage($w, (string) $request->query('src')) : null;
         if (! $img) abort(404);
         return response($img[0], 200, ['Content-Type' => $img[1], 'Content-Disposition' => 'inline',
             'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=86400']);
@@ -650,13 +657,18 @@ class WarrantiesController extends Controller
         }
 
         // El ticket se indica por su código (TK-…); vacío lo desvincula.
+        // Solo se vincula un ticket que este usuario puede ver en el Helpdesk; si no, la
+        // garantía serviría para leer tickets ajenos. El mismo error para «no existe» y
+        // «no lo ves», para no confirmar qué códigos hay. Mantener el que ya tenía vale.
         $ticketCode = trim((string) $request->input('ticket_code', ''));
         $datos['ticket_id'] = null;
         if ($ticketCode !== '') {
-            $datos['ticket_id'] = DB::table('tickets')->where('code', $ticketCode)->value('id');
-            if (! $datos['ticket_id']) {
-                return response()->json(['ok' => false, 'error' => "No existe el ticket {$ticketCode}"], 400);
+            $tid = (int) DB::table('tickets')->where('code', $ticketCode)->value('id');
+            $yaEra = $id && $tid && (int) Warranty::whereKey($id)->value('ticket_id') === $tid;
+            if (! $tid || (! $yaEra && ! Warranty::canSeeTicket($me, $tid))) {
+                return response()->json(['ok' => false, 'error' => "No encuentras el ticket {$ticketCode} entre los que puedes ver en el Helpdesk"], 400);
             }
+            $datos['ticket_id'] = $tid;
         }
 
         // En el alta, la garantía no se crea mientras alguna etiqueta no esté en ningún

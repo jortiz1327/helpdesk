@@ -112,6 +112,55 @@ class WarrantiesTest extends TestCase
         $this->postJson('/api/warranties.php?action=save', ['received_at' => ''], $h)->assertStatus(400);
     }
 
+    /**
+     * La garantía no sirve para leer tickets del Helpdesk que el usuario no ve: no se
+     * vinculan, y si ya lo estaban, ni asunto, ni imágenes, ni correo del cliente.
+     */
+    public function test_ticket_de_otra_area_no_se_vincula_ni_se_lee(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $mia = DB::table('ticket_categories')->insertGetId(['key' => 'mia', 'name' => 'Garantías', 'color' => '#888', 'position' => 1, 'active' => 1]);
+        $ajena = DB::table('ticket_categories')->insertGetId(['key' => 'ajena', 'name' => 'Comercial', 'color' => '#888', 'position' => 2, 'active' => 1]);
+        $ticket = function (int $cat, string $code) {
+            $cid = DB::table('contacts')->insertGetId(['name' => 'C', 'email' => $code . '@cliente.com']);
+            return DB::table('tickets')->insertGetId(['code' => $code, 'subject' => "Asunto {$code}", 'status' => 'abierto', 'priority' => 'media',
+                'channel' => 'email', 'contact_id' => $cid, 'category_id' => $cat, 'opened_at' => now(), 'last_message_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        };
+        $ticket($mia, 'TK-MIA');
+        $tAjena = $ticket($ajena, 'TK-AJENA');
+        $jpg = \Illuminate\Http\UploadedFile::fake()->image('f.jpg', 20, 20)->get();
+        \Illuminate\Support\Facades\Storage::disk('local')->put('attachments/x/f.jpg', $jpg);
+        $foto = DB::table('attachments')->insertGetId(['ticket_id' => $tAjena, 'name' => 'f.jpg', 'path' => 'attachments/x/f.jpg', 'mime' => 'image/jpeg', 'size' => strlen($jpg)]);
+
+        // Agente del Helpdesk limitado a su categoría, con garantías; y otro solo de garantías.
+        [$ana, $h] = $this->agente(['warranties.access', 'helpdesk.access']);
+        DB::table('user_ticket_categories')->insert(['user_id' => $ana->id, 'category_id' => $mia]);
+        [, $hl] = $this->agente(['warranties.access'], 'Luis');
+
+        $base = ['received_at' => '2026-10-20', 'status' => 'no_iniciado'];
+        $this->postJson('/api/warranties.php?action=save', $base + ['ticket_code' => 'TK-MIA'], $h)->assertOk();
+        $err = $this->postJson('/api/warranties.php?action=save', $base + ['ticket_code' => 'TK-AJENA'], $h)->assertStatus(400)->json('error');
+        // El mismo mensaje que si no existiera: no confirma qué códigos hay.
+        $noExiste = $this->postJson('/api/warranties.php?action=save', $base + ['ticket_code' => 'TK-NO-EXISTE'], $h)->assertStatus(400)->json('error');
+        $this->assertSame(str_replace('TK-NO-EXISTE', 'TK-AJENA', $noExiste), $err);
+        $this->postJson('/api/warranties.php?action=save', $base + ['ticket_code' => 'TK-MIA'], $hl)->assertStatus(400);
+
+        // Una garantía que ya estaba enlazada al ticket ajeno (la hizo otro): no se lee nada de él.
+        $w = Warranty::create($base + ['code' => 'G-2026-0099', 'ticket_id' => $tAjena, 'last_activity_at' => now(), 'status_changed_at' => now()]);
+        $this->assertNull($this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->assertOk()->json('warranty.ticket_subject'));
+        $this->assertSame([], $this->getJson("/api/warranties.php?action=ticket_images&id={$w->id}", $h)->assertOk()->json('images'));
+        $media = TokenService::mediaToken($ana);
+        $this->get("/api/warranty_photo.php?w={$w->id}&src=a:{$foto}&token={$media}")->assertNotFound();
+        $this->assertNull($this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->assertOk()->json('to'));
+        // Editarla sin cambiar el ticket sigue funcionando.
+        $this->postJson('/api/warranties.php?action=save', $base + ['id' => $w->id, 'ticket_code' => 'TK-AJENA', 'client_name' => 'X'], $h)->assertOk();
+
+        // Quien sí ve el ticket, sí lo lee.
+        DB::table('user_ticket_categories')->insert(['user_id' => $ana->id, 'category_id' => $ajena]);
+        $this->assertSame('Asunto TK-AJENA', $this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->json('warranty.ticket_subject'));
+        $this->assertSame('TK-AJENA@cliente.com', $this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->json('to'));
+    }
+
     public function test_seguimiento_y_filtros_rapidos(): void
     {
         [$ana, $h] = $this->agente();
@@ -329,7 +378,7 @@ class WarrantiesTest extends TestCase
     {
         config(['database.connections.portal_aeme.host' => '']);
         \Illuminate\Support\Facades\Storage::fake('local');
-        [$u, $h] = $this->agente();
+        [$u, $h] = $this->agente(['warranties.access', 'helpdesk.access']);
         $this->zkong([
             '8E9749440' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
             '854A49907' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
