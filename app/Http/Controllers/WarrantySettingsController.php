@@ -56,6 +56,9 @@ class WarrantySettingsController extends Controller
                 'active' => $reglas[$k]['active'] ?? false, 'warn_days' => $reglas[$k]['warn_days'] ?? 0, 'crit_days' => $reglas[$k]['crit_days'] ?? 0,
             ])->values(),
             'templates' => DB::table('warranty_diagnosis_templates')->orderBy('sort')->orderBy('id')->get(['id', 'title', 'body', 'active']),
+            // Fijas; solo se enseña cuántas garantías abiertas tiene cada una.
+            'urgencies' => (fn ($uso) => collect(array_reverse(Warranty::URGENCIES, true))->map(fn ($l, $k) => ['key' => $k, 'label' => $l, 'open' => (int) ($uso[$k] ?? 0)])->values())(
+                DB::table('warranties')->whereNotIn('status', Warranty::closedStatuses())->groupBy('urgency')->selectRaw('urgency, count(*) as n')->pluck('n', 'urgency')),
             'docs' => [
                 'company'          => WarrantyDocument::setting('company'),
                 'resolution_email' => WarrantyDocument::setting('resolution_email'),
