@@ -20,15 +20,17 @@ class PortalCreateOwnershipTest extends TestCase
         return $this->withHeaders($headers)->postJson('/api/portal.php?action=create', $body);
     }
 
-    public function test_un_correo_ya_registrado_exige_codigo(): void
+    // Crear una incidencia es público aunque el correo ya exista (el código solo hace falta
+    // para VER las incidencias): el acuse va a ese correo.
+    public function test_un_correo_ya_registrado_puede_crear_sin_codigo(): void
     {
         DB::table('contacts')->insert(['name' => 'Ana', 'email' => 'ana@x.com']);
 
         $this->crear(['email' => 'ana@x.com', 'subject' => 'Fallo', 'body' => 'algo va mal por aqui'])
-            ->assertStatus(401)
-            ->assertJson(['reauth' => true]);
+            ->assertOk()
+            ->assertJson(['ok' => true]);
 
-        $this->assertSame(0, DB::table('tickets')->count());   // no se creó nada
+        $this->assertSame(1, DB::table('tickets')->count());
     }
 
     public function test_un_correo_nuevo_puede_crear_sin_codigo(): void

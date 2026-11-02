@@ -44,11 +44,11 @@ class HelpdeskAltoFixesTest extends TestCase
 
         // Corriendo y pasado de plazo → SÍ vencido.
         $corriendo = $this->ticket([
-            'status' => 'en_progreso', 'sla_resolve_due_at' => now()->subHour(), 'sla_paused_since' => null,
+            'status' => 'abierto', 'sla_resolve_due_at' => now()->subHour(), 'sla_paused_since' => null,
         ]);
         // En pausa (esperando cliente) con el due_at congelado en el pasado → NO vencido.
         $pausado = $this->ticket([
-            'status' => 'esperando_respuesta', 'sla_resolve_due_at' => now()->subDay(), 'sla_paused_since' => now()->subHour(),
+            'status' => 'abierto', 'last_direction' => 'out', 'sla_resolve_due_at' => now()->subDay(), 'sla_paused_since' => now()->subHour(),
         ]);
 
         $r = $this->withHeader('X-App-Token', $token)->getJson('/api/tickets.php?action=list');
