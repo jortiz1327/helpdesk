@@ -109,12 +109,17 @@ class ZkongRmaController extends Controller
                 DB::raw('sum(zkong_result is not null) as answered'),
                 DB::raw("sum(zkong_result = 'rechazada') as rejected")])
             ->keyBy('zkong_batch_id');
+        // Las garantías de cada remesa (código y cliente), para verlas en la lista.
+        $garantias = DB::table('warranty_items as i')->join('warranties as w', 'w.id', '=', 'i.warranty_id')
+            ->whereIn('i.zkong_batch_id', $rows->pluck('id'))->distinct()->orderBy('w.code')
+            ->get(['i.zkong_batch_id', 'w.id', 'w.code', 'w.client_name'])->groupBy('zkong_batch_id');
 
         return response()->json(['ok' => true, 'batches' => $rows->map(fn ($b) => $this->remesa($b) + [
             'items'      => (int) ($cuentas[$b->id]->n ?? 0),
             'warranties' => (int) ($cuentas[$b->id]->w ?? 0),
             'answered'   => (int) ($cuentas[$b->id]->answered ?? 0),
             'rejected'   => (int) ($cuentas[$b->id]->rejected ?? 0),
+            'warranty_list' => ($garantias[$b->id] ?? collect())->map(fn ($w) => ['id' => $w->id, 'code' => $w->code, 'client_name' => $w->client_name])->values(),
         ])]);
     }
 

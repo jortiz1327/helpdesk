@@ -23,6 +23,7 @@ const fecha = (v) => { const d = aFecha(v); return d && !isNaN(d) ? d.toLocaleDa
 const dias = (v) => { const d = aFecha(v); return d ? Math.max(0, Math.floor((Date.now() - d) / 86400000)) : null }
 const tono = (n) => (n == null ? '' : n >= 30 ? 'bad' : n >= 15 ? 'warn' : '')
 const num = (n) => Number(n || 0).toLocaleString('es-ES')
+const dec = (n) => (n == null ? '—' : String(n).replace('.', ','))
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
 const sinFotos = (i) => i.photos.length < i.photos_total
 
@@ -43,21 +44,6 @@ function Fotos({ it }) {
       {it.photos.map((p) => <a key={p.id} href={api.warrantyPhotoUrl(p.id)} target="_blank" rel="noreferrer"><img src={api.warrantyPhotoUrl(p.id)} alt="" loading="lazy" /></a>)}
       <em><Icon.image /> {it.photos.length}/{it.photos_total}</em>
     </span>
-  )
-}
-
-/* Filas de dispositivos (en la bandeja, desplegadas bajo su expediente; en la remesa, todas). */
-function Dispositivo({ it, sel, onPick, rv, extra }) {
-  return (
-    <div className={`zk-item${sel ? ' sel' : ''}`}>
-      {onPick ? <input type="checkbox" checked={sel} onChange={onPick} aria-label={`Seleccionar ${it.code}`} /> : null}
-      <span className="mono zk-sn">{it.code}{it.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</span>
-      <span className="zk-model" title={it.product_name || ''}>{it.model || <span className="dev-mute">Sin modelo</span>}</span>
-      <span className="zk-issue" title={it.issue || ''}>{it.issue || <span className="dev-mute">Sin fallo descrito</span>}</span>
-      <Fotos it={it} />
-      {extra}
-      {rv && it.resolution !== 'defectuosa' ? <span className="zk-tag">{rv.resolutions?.[it.resolution]?.label}</span> : null}
-    </div>
   )
 }
 
@@ -290,44 +276,133 @@ const CAMPOS_TRANSPORTE = [
 ]
 
 /* --- Remesas --- */
-function Remesas({ rv, onOpen }) {
+// Cifras de lo que está fuera, filtros por estado y transportista, y una fila por remesa.
+const POR_PAGINA = 25
+const ABIERTAS = ['borrador', 'enviada', 'recibida', 'respondida']
+
+function Remesas({ rv, onOpen, onOpenWarranty }) {
   const [d, setD] = useState(null)
-  const [filtro, setFiltro] = useState('')
+  const [filtro, setFiltro] = useState('abiertas')
+  const [q, setQ] = useState('')
+  const [transp, setTransp] = useState('')
+  const [pag, setPag] = useState(0)
   useEffect(() => { api.zkongBatches().then((r) => setD(r.ok ? r.batches : [])) }, [])
+  useEffect(() => { setPag(0) }, [filtro, q, transp])
   if (!d) return <div className="center-load"><div className="spinner" /></div>
 
-  const lista = d.filter((b) => !filtro || (filtro === 'abiertas' ? !['cerrada', 'anulada'].includes(b.status) : b.status === filtro))
+  const estados = rv?.batch_statuses || {}
   const cuenta = (s) => d.filter((b) => b.status === s).length
+  const abiertas = d.filter((b) => ABIERTAS.includes(b.status))
+  const fuera = d.filter((b) => ['enviada', 'recibida', 'respondida'].includes(b.status))
+  const enZkong = fuera.reduce((s, b) => s + b.items, 0)
+  const sinResp = fuera.reduce((s, b) => s + (b.items - b.answered), 0)
+  const respondidas = d.reduce((s, b) => s + b.answered, 0)
+  const aceptadas = d.reduce((s, b) => s + (b.answered - b.rejected), 0)
+  const llegadas = d.filter((b) => b.sent_at && b.received_at)
+  const mediaLlegada = llegadas.length ? Math.round((llegadas.reduce((s, b) => s + Math.max(0, (aFecha(b.received_at) - aFecha(b.sent_at)) / 86400000), 0) / llegadas.length) * 10) / 10 : null
+  const transportistas = [...new Set(d.map((b) => b.carrier).filter(Boolean))].sort()
+
+  const busca = q.trim().toLowerCase()
+  const lista = d.filter((b) => (filtro === 'abiertas' ? ABIERTAS.includes(b.status) : !filtro || b.status === filtro)
+    && (!transp || b.carrier === transp)
+    && (!busca || [b.code, b.tracking, b.shipping_ref, b.carrier, b.note, ...(b.warranty_list || []).flatMap((w) => [w.code, w.client_name])].some((v) => String(v || '').toLowerCase().includes(busca))))
+  const paginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA))
+  const visibles = lista.slice(pag * POR_PAGINA, (pag + 1) * POR_PAGINA)
+
+  const exportar = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const filas = [['Remesa', 'Estado', 'Etiquetas', 'Garantías', 'Con respuesta', 'Rechazadas', 'Creada', 'Enviada', 'Transportista', 'Tracking', 'Referencia', 'Recibida por ZKONG', 'Cerrada']]
+    lista.forEach((b) => filas.push([b.code, estados[b.status] || b.status, b.status === 'anulada' ? (b.units_sent ?? '') : b.items, (b.warranty_list || []).map((w) => w.code).join(', '),
+      b.answered, b.rejected, fecha(b.created_at), b.sent_at ? fecha(b.sent_at) : '', b.carrier, b.tracking, b.shipping_ref, b.received_at ? fecha(b.received_at) : '', b.closed_at ? fecha(b.closed_at) : '']))
+    const blob = new Blob(['﻿' + filas.map((l) => l.map(esc).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = `remesas-zkong-${hoyISO()}.csv`; a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
+
+  const pestañas = [['abiertas', 'Abiertas', abiertas.length], ['', 'Todas', d.length],
+    ...Object.entries(estados).map(([k, l]) => [k, l, cuenta(k)]).filter(([, , n]) => n)]
+
   return (
     <>
-      <div className="wr-chips">
-        <button className={!filtro ? 'on' : ''} onClick={() => setFiltro('')}>Todas ({d.length})</button>
-        <button className={filtro === 'abiertas' ? 'on' : ''} onClick={() => setFiltro('abiertas')}>Abiertas ({d.filter((b) => !['cerrada', 'anulada'].includes(b.status)).length})</button>
-        {Object.entries(rv?.batch_statuses || {}).map(([k, l]) => cuenta(k) ? <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(filtro === k ? '' : k)}>{l} ({cuenta(k)})</button> : null)}
+      <div className="wi-kpis zk-kpis4">
+        <div className="wi-kpi">
+          <div className="v">{num(abiertas.length)}<span className="wi-de">{abiertas.length === 1 ? 'remesa abierta' : 'remesas abiertas'}</span></div>
+          <div className="k">Sin cerrar todavía</div>
+          <div className="h">{abiertas.length ? ABIERTAS.map((s) => [s, cuenta(s)]).filter(([, n]) => n).map(([s, n]) => `${n} ${(estados[s] || s).toLowerCase()}`).join(' · ') : 'Todas cerradas'}</div>
+        </div>
+        <div className="wi-kpi">
+          <div className="v">{num(enZkong)}<span className="wi-de">{enZkong === 1 ? 'dispositivo' : 'dispositivos'}</span></div>
+          <div className="k">Enviados a ZKONG</div>
+          <div className="h">{enZkong ? (sinResp ? <span className="zk-warn-t">{num(sinResp)} sin respuesta aún</span> : 'Todos con respuesta') : 'Nada enviado ahora mismo'}</div>
+        </div>
+        <div className="wi-kpi">
+          <div className="v">{respondidas ? `${Math.round((aceptadas / respondidas) * 100)} %` : '—'}</div>
+          <div className="k">Aceptadas por ZKONG</div>
+          <div className="h">{respondidas ? `${num(aceptadas)} de ${num(respondidas)} respondidas (reposición o abono)` : 'ZKONG aún no ha respondido nada'}</div>
+        </div>
+        <div className="wi-kpi">
+          <div className="v">{mediaLlegada == null ? '—' : dec(mediaLlegada)}{mediaLlegada == null ? null : <span className="wi-de">días</span>}</div>
+          <div className="k">Tardan en llegar a ZKONG</div>
+          <div className="h">{llegadas.length ? `De media, desde el envío hasta que ZKONG confirma (${plural(llegadas.length, 'remesa', 'remesas')})` : 'Sin recepciones confirmadas todavía'}</div>
+        </div>
       </div>
-      <div className="dev-card">
+
+      <div className="dev-card zk-bandeja">
+        <div className="zk-bar">
+          <div className="dev-search wl-search">
+            <Icon.search />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar remesa, garantía, cliente, tracking o albarán…" />
+            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+          </div>
+          <div className="dc-seg zk-seg">{pestañas.map(([k, l, n]) => <button key={k || 'todas'} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(k)}>{l}<em>{n}</em></button>)}</div>
+          {transportistas.length > 1 ? <Select sm value={transp} onChange={setTransp} options={[{ value: '', label: 'Todos los transportistas' }, ...transportistas.map((t) => ({ value: t, label: t }))]} /> : null}
+          <span className="spacer" />
+          <button className="dev-btn" disabled={!lista.length} onClick={exportar} title="Descargar lo que se ve en CSV"><Icon.download /> Exportar</button>
+        </div>
+
         <div className="dev-table-wrap keep">
-          <table className="dev-table zk-table">
-            <thead><tr><th>Remesa</th><th>Estado</th><th>Etiquetas</th><th>Garantías</th><th>Respuesta de ZKONG</th><th>Enviada</th><th>Transportista</th><th>Tracking</th><th>Recibida</th></tr></thead>
+          <table className="dev-table zk-rt">
+            <thead><tr>
+              <th>Remesa</th><th>Estado</th><th className="r">Etiquetas</th><th>Garantías</th><th>Respuesta de ZKONG</th><th>Envío</th><th>Tracking</th><th>Llegada a ZKONG</th><th />
+            </tr></thead>
             <tbody>
-              {lista.map((b) => (
-                <tr key={b.id} className="wr-row" onClick={() => onOpen(b.id)}>
-                  <td><span className="wr-code">{b.code}</span></td>
-                  <td>
-                    <Pill cls={ESTADO_CLS[b.status]}>{rv?.batch_statuses?.[b.status] || b.status}</Pill>
-                    {b.waiting_days != null ? <span className={`zk-espera ${tono(b.waiting_days)}`} title="Días desde el envío sin que ZKONG confirme la recepción">{plural(b.waiting_days, 'día', 'días')}</span> : null}
-                  </td>
-                  <td><b>{b.status === 'anulada' ? (b.units_sent ?? '—') : b.items}</b></td>
-                  <td>{b.status === 'anulada' ? <span className="dev-mute">—</span> : b.warranties}</td>
-                  <td>{['borrador', 'anulada'].includes(b.status) ? <span className="dev-mute">—</span> : (
-                    <span className="zk-prog"><span><i style={{ width: `${b.items ? (b.answered / b.items) * 100 : 0}%` }} /></span>{b.answered}/{b.items}{b.rejected ? <em>{b.rejected} rechazadas</em> : null}</span>
-                  )}</td>
-                  <td>{b.sent_at ? fecha(b.sent_at) : <span className="dev-mute">—</span>}</td>
-                  <td>{b.carrier || <span className="dev-mute">—</span>}</td>
-                  <td>{b.tracking ? <span className="mono">{b.tracking}</span> : <span className="dev-mute">—</span>}</td>
-                  <td>{b.received_at ? fecha(b.received_at) : <span className="dev-mute">—</span>}</td>
-                </tr>
-              ))}
+              {visibles.map((b) => {
+                const anulada = b.status === 'anulada'
+                const gs = b.warranty_list || []
+                const pct = b.answered ? Math.round(((b.answered - b.rejected) / b.answered) * 100) : null
+                return (
+                  <tr key={b.id} className={`wr-row ${anulada ? 'zk-anul' : ''}`} onClick={(e) => { if (!e.target.closest('button.link')) onOpen(b.id) }}>
+                    <td><span className="wr-code">{b.code}</span><small className="zk-sub">Creada el {fecha(b.created_at)}{b.created_by_name ? ` · ${b.created_by_name}` : ''}</small></td>
+                    <td><Pill cls={ESTADO_CLS[b.status]}>{estados[b.status] || b.status}</Pill></td>
+                    <td className="r"><b className="wt-num">{anulada ? (b.units_sent ?? '—') : b.items}</b></td>
+                    <td className="zk-gs">
+                      {anulada ? <span className="dev-mute">Volvieron a la bandeja</span> : gs.length ? (
+                        <>
+                          <span>{gs.slice(0, 2).map((w, k) => <span key={w.id}>{k ? ', ' : ''}<button className="link" onClick={() => onOpenWarranty(w.id)}>{w.code}</button></span>)}{gs.length > 2 ? <span className="dev-mute"> +{gs.length - 2}</span> : null}</span>
+                          <small className="zk-sub" title={gs.map((w) => w.client_name).filter(Boolean).join(', ')}>{[...new Set(gs.map((w) => w.client_name).filter(Boolean))].join(', ') || '—'}</small>
+                        </>
+                      ) : <span className="dev-mute">—</span>}
+                    </td>
+                    <td>
+                      {['borrador', 'anulada'].includes(b.status) || !b.items ? <span className="dev-mute">—</span> : (
+                        <div className="zk-resp">
+                          <span className="zk-prog"><span><i style={{ width: `${(b.answered / b.items) * 100}%` }} /></span>{b.answered}/{b.items}</span>
+                          <small className="zk-sub">{pct == null ? 'Sin respuestas aún' : `${pct} % aceptadas`}{b.rejected ? <em className="zk-rech"> · {b.rejected} rechazadas</em> : null}</small>
+                        </div>
+                      )}
+                    </td>
+                    <td>{b.sent_at ? <><span>{fecha(b.sent_at)}</span><small className="zk-sub">{b.carrier || 'Sin transportista'}</small></> : <span className="dev-mute">{b.status === 'borrador' ? 'Sin enviar' : '—'}</span>}</td>
+                    <td>{b.tracking ? <span className="zk-track mono">{b.tracking}</span> : <span className="dev-mute">—</span>}</td>
+                    <td>
+                      {b.received_at ? <span className="zk-ok"><Icon.check /> {fecha(b.received_at)}</span>
+                        : b.waiting_days != null ? <span className={`zk-chip dias ${tono(b.waiting_days) || 'warn'}`} title="Días desde el envío sin que ZKONG confirme que le ha llegado"><i />Esperando · {plural(b.waiting_days, 'día', 'días')}</span>
+                        : <span className="dev-mute">—</span>}
+                    </td>
+                    <td className="wt-ver"><span className="wf-link">Ver <Icon.arrowRight /></span></td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
           {!lista.length && (
@@ -335,6 +410,18 @@ function Remesas({ rv, onOpen }) {
               <p>{d.length ? 'Ninguna remesa con este filtro.' : 'Todavía no hay remesas. Se crean desde la bandeja, eligiendo las etiquetas que se mandan juntas.'}</p></div>
           )}
         </div>
+        {lista.length ? (
+          <div className="zk-pie">
+            <span>Se ven <b>{visibles.length}</b> de <b>{plural(lista.length, 'remesa', 'remesas')}</b></span>
+            {paginas > 1 ? (
+              <span className="zk-pag">
+                <button className="dev-btn" disabled={!pag} onClick={() => setPag(pag - 1)}>‹ Anterior</button>
+                <span className="dev-mute">Página {pag + 1} de {paginas}</span>
+                <button className="dev-btn" disabled={pag >= paginas - 1} onClick={() => setPag(pag + 1)}>Siguiente ›</button>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </>
   )
@@ -456,22 +543,65 @@ function Remesa({ id, rv, onBack, onOpenWarranty }) {
           placeholder="Notas de la remesa: nº de RMA de ZKONG, contacto, incidencias…" />
       </div>
 
-      <div className="wr-panel">
-        {items.length > 0 && (borrador || conRespuesta) && (
-          <label className="wr-selall"><input type="checkbox" checked={todas} onChange={() => setSel(todas ? new Set() : new Set(items.map((i) => i.id)))} />{todas ? 'Quitar la selección' : 'Seleccionar todas'}</label>
-        )}
-        {grupos.map((g) => (
-          <div key={g.warranty_id} className="zk-grupo">
-            <div className="zk-grupo-h"><button className="link wr-code" onClick={() => onOpenWarranty(g.warranty_id)}>{g.code}</button><span className="dev-mute">{g.client_name || ''}</span><span className="dev-mute">· {plural(g.items.length, 'etiqueta', 'etiquetas')}</span></div>
-            {g.items.map((i) => (
-              <Dispositivo key={i.id} it={i} rv={rv} sel={sel.has(i.id)} onPick={borrador || conRespuesta ? () => toggle(i.id) : null}
-                extra={!borrador ? (
-                  <span className="zk-res">{i.result ? <Pill cls={RESULT_CLS[i.result]}>{rv?.zkong_results?.[i.result]}</Pill> : <span className="dev-mute">Sin respuesta</span>}{i.result_note ? <small title={i.result_note}>{i.result_note}</small> : null}</span>
-                ) : null} />
-            ))}
+      <div className="dev-card zk-bandeja zk-det-card">
+        <div className="zk-bar">
+          <b className="zk-bar-t">Dispositivos de la remesa</b>
+          <span className="dev-mute">{plural(items.length, 'etiqueta', 'etiquetas')} de {plural(grupos.length, 'garantía', 'garantías')}</span>
+          <span className="spacer" />
+          {sel.size > 0 ? (
+            <>
+              <span className="zk-elegidas"><b>{plural(sel.size, 'elegida', 'elegidas')}</b><button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button></span>
+              {borrador && <button className="dev-btn" disabled={ocupado} onClick={quitar}><Icon.x /> Quitar de la remesa</button>}
+              {conRespuesta && (
+                <>
+                  <input className="zk-resnota" value={resNota} maxLength={500} onChange={(e) => setResNota(e.target.value)} placeholder="Nota (opcional): nº de abono, motivo del rechazo…" />
+                  {Object.entries(rv?.zkong_results || {}).map(([k, l]) => <button key={k} className={`wr-res c-${RESULT_CLS[k]}`} disabled={ocupado} onClick={() => responder(k)}><span>{l}</span></button>)}
+                  <button className="dev-btn" disabled={ocupado} onClick={() => responder('')}>Sin respuesta</button>
+                </>
+              )}
+            </>
+          ) : (borrador || conRespuesta) && items.length ? <span className="dev-mute zk-ayuda">{borrador ? 'Marca etiquetas para quitarlas de la remesa' : 'Marca etiquetas para apuntar lo que ha respondido ZKONG'}</span> : null}
+        </div>
+        {items.length ? (
+          <div className="dev-table-wrap keep">
+            <table className="dev-table zk-t">
+              <thead><tr>
+                {borrador || conRespuesta ? <th className="zk-ck"><input type="checkbox" checked={todas} onChange={() => setSel(todas ? new Set() : new Set(items.map((i) => i.id)))} aria-label="Elegir todas" /></th> : null}
+                <th>Nº de serie</th><th>Modelo</th><th>Fallo enviado a ZKONG</th><th>Fotos</th>{!borrador ? <th>Respuesta de ZKONG</th> : null}
+              </tr></thead>
+              {grupos.map((g) => (
+                <tbody key={g.warranty_id} className="zk-g">
+                  <tr className="zk-gh"><td colSpan={borrador || conRespuesta ? 6 : 5}>
+                    <div className="zk-gh-in">
+                      <button className="link wr-code" onClick={() => onOpenWarranty(g.warranty_id)}>{g.code}</button>
+                      <span className="zk-cli">{g.client_name || 'Sin cliente'}</span>
+                      <span className="spacer" />
+                      <span className="zk-chip">{plural(g.items.length, 'etiqueta', 'etiquetas')}</span>
+                    </div>
+                  </td></tr>
+                  {g.items.map((i) => {
+                    const elegible = borrador || conRespuesta
+                    return (
+                      <tr key={i.id} className={`zk-it ${sel.has(i.id) ? 'zk-on' : ''}`} style={elegible ? null : { cursor: 'default' }} onClick={(e) => { if (elegible && !e.target.closest('a,button,input')) toggle(i.id) }}>
+                        {elegible ? <td className="zk-ck"><input type="checkbox" checked={sel.has(i.id)} onChange={() => toggle(i.id)} aria-label={`Elegir ${i.code}`} /></td> : null}
+                        <td><span className="mono zk-sn">{i.code}</span>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</td>
+                        <td className="zk-mod"><b>{i.model || <span className="dev-mute">Sin modelo</span>}</b>{i.product_name ? <small>{i.product_name}</small> : null}</td>
+                        <td className="zk-fallo">
+                          {i.issue ? <span title={i.issue}>{i.issue}</span> : <span className="zk-warn-t">Sin fallo descrito</span>}
+                          {rv && i.resolution !== 'defectuosa' ? <small>{rv.resolutions?.[i.resolution]?.label}</small> : null}
+                        </td>
+                        <td><Fotos it={i} /></td>
+                        {!borrador ? (
+                          <td><span className="zk-res zk-res-l">{i.result ? <Pill cls={RESULT_CLS[i.result]}>{rv?.zkong_results?.[i.result]}</Pill> : <span className="dev-mute">Sin respuesta</span>}{i.result_note ? <small title={i.result_note}>{i.result_note}</small> : null}</span></td>
+                        ) : null}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              ))}
+            </table>
           </div>
-        ))}
-        {!items.length && <p className="dev-mute">{b.status === 'anulada' ? 'Anulada: sus etiquetas volvieron a la bandeja.' : 'La remesa no tiene etiquetas.'}</p>}
+        ) : <p className="dev-mute zk-vacia">{b.status === 'anulada' ? 'Anulada: sus etiquetas volvieron a la bandeja.' : 'La remesa no tiene etiquetas.'}</p>}
       </div>
 
       {d.events?.length > 0 && (
@@ -512,22 +642,6 @@ function Remesa({ id, rv, onBack, onOpenWarranty }) {
           campos={[{ k: 'reason', l: 'Motivo de la anulación', tipo: 'area', req: true, ancho: true, ph: 'Paquete perdido, devuelto por el transportista…' }]} />
       )}
 
-      {sel.size > 0 && borrador && (
-        <div className="wr-selbar">
-          <b>{plural(sel.size, 'seleccionada', 'seleccionadas')}:</b>
-          <button className="dev-btn" disabled={ocupado} onClick={quitar}><Icon.x /> Quitar de la remesa</button>
-          <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button>
-        </div>
-      )}
-      {sel.size > 0 && conRespuesta && (
-        <div className="wr-selbar">
-          <b>{plural(sel.size, 'seleccionada', 'seleccionadas')}:</b>
-          <input className="zk-resnota" value={resNota} maxLength={500} onChange={(e) => setResNota(e.target.value)} placeholder="Nota (opcional): nº de abono, motivo del rechazo…" />
-          {Object.entries(rv?.zkong_results || {}).map(([k, l]) => <button key={k} className={`wr-res c-${RESULT_CLS[k]}`} disabled={ocupado} onClick={() => responder(k)}><span>{l}</span></button>)}
-          <button className="dev-btn" disabled={ocupado} onClick={() => responder('')}>Sin respuesta</button>
-          <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button>
-        </div>
-      )}
     </>
   )
 }
@@ -565,7 +679,7 @@ export default function Zkong({ onOpenWarranty }) {
         {tab === 'bandeja' && <Bandeja rv={rv} onOpenWarranty={onOpenWarranty} onBatch={abrirRemesa} />}
         {tab === 'remesas' && (remesa
           ? <Remesa key={`${remesa}-${reload}`} id={remesa} rv={rv} onBack={() => { setRemesa(null); setReload((x) => x + 1) }} onOpenWarranty={onOpenWarranty} />
-          : <Remesas key={reload} rv={rv} onOpen={setRemesa} />)}
+          : <Remesas key={reload} rv={rv} onOpen={setRemesa} onOpenWarranty={onOpenWarranty} />)}
       </div></div>
     </>
   )

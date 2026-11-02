@@ -4885,6 +4885,32 @@ button.dev-code:hover { text-decoration: underline; }
 .zk-t tr.zk-mas svg { width: 14px; height: 14px; fill: currentColor; }
 .zk-pie { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 16px; border-top: 1px solid var(--line); background: var(--panel-2); font-size: 12.5px; border-radius: 0 0 14px 14px; }
 .zk-pie .zk-chip { margin-left: 4px; }
+/* ZKONG · remesas: 4 cifras, pestañas por estado y una fila por remesa. */
+.zk-kpis4 { margin-bottom: 14px; }
+.zk-seg { flex-wrap: wrap; }
+.zk-seg button { flex: none; padding: 0 11px; white-space: nowrap; }
+.zk-seg button em { margin-left: 6px; font-style: normal; font-size: 11px; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.zk-seg button.on em { color: var(--primary); }
+.zk-rt th.r, .zk-rt td.r { text-align: right; }
+.zk-rt td { vertical-align: middle; }
+.zk-sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+.zk-rt .wr-code { font-weight: 800; }
+.zk-rt tr.zk-anul .wr-code { text-decoration: line-through; color: var(--ink-3); }
+.zk-rt tr.zk-anul td { background: color-mix(in srgb, var(--ink) 2%, transparent); }
+.zk-gs .link { font-weight: 700; }
+.zk-resp .zk-prog { font-variant-numeric: tabular-nums; }
+.zk-rech { font-style: normal; color: var(--danger); font-weight: 600; }
+.zk-track { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.zk-ok { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.zk-ok svg { width: 14px; height: 14px; fill: #16a34a; }
+.zk-det-card { margin-top: 14px; }
+.zk-bar-t { font-size: 14px; }
+.zk-res-l { align-items: flex-start; }
+.zk-vacia { padding: 16px; }
+.zk-bar .zk-resnota { flex: 0 1 300px; }
+.zk-pag { display: inline-flex; align-items: center; gap: 10px; }
+.zk-rt .wt-ver .wf-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; }
+.zk-rt .wt-ver svg { width: 14px; height: 14px; fill: currentColor; }
 /* Selector de rango de fechas (DateRange.jsx): botón con el rango y calendario de dos meses. */
 .dr { position: relative; }
 .dr-btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
