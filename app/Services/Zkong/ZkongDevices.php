@@ -224,7 +224,7 @@ class ZkongDevices
                 foreach ($res as $clave => $json) {
                     $code = explode('|', (string) $clave)[0];
                     if ($json === null) {
-                        throw new \RuntimeException("Sin respuesta de {$s->name} para {$code}");
+                        throw new ZkongException("Sin respuesta de {$s->name} para {$code}");
                     }
                     $ap = self::kindOf($code) === DeviceSighting::AP;
                     // La búsqueda es por «contiene»: solo vale la fila con el código exacto.

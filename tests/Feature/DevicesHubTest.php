@@ -223,4 +223,21 @@ class DevicesHubTest extends TestCase
         $this->assertSame(['ROTO'], $r['failed']);
         $this->assertCount(1, $r['results'][0]['rows']);
     }
+
+    public function test_un_servidor_que_falla_da_su_aviso(): void
+    {
+        $tok = $this->token(['warranties.access']);
+        ZkongServer::create(['name' => 'ROTO', 'base_url' => 'https://roto.test/zk', 'username' => 'a', 'password' => 'b', 'active' => true]);
+        $id = ZkongServer::value('id');
+        $this->getJson("/api/devices.php?action=stats&server={$id}&kind=esl", ['X-App-Token' => $tok])
+            ->assertStatus(502)->assertJsonFragment(['error' => 'Respuesta inesperada de ROTO (HTTP 502).']);
+    }
+
+    public function test_un_fallo_que_no_es_del_servidor_no_sale_al_navegador(): void
+    {
+        $tok = $this->token(['warranties.access']);
+        $this->mock(\App\Services\Zkong\ZkongDevices::class, fn ($m) => $m->shouldReceive('servers')->andThrow(new \Exception('SQLSTATE[42S02] tabla secreta')));
+        $r = $this->getJson('/api/devices.php', ['X-App-Token' => $tok])->assertStatus(500);
+        $this->assertStringNotContainsString('SQLSTATE', $r->getContent());
+    }
 }

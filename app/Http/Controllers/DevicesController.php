@@ -8,6 +8,7 @@ use App\Models\WarrantyItem;
 use App\Models\ZkongBatch;
 use App\Models\ZkongServer;
 use App\Services\Zkong\ZkongDevices;
+use App\Services\Zkong\ZkongException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,10 +40,14 @@ class DevicesController extends Controller
             };
         } catch (ModelNotFoundException) {
             return response()->json(['ok' => false, 'error' => 'Ese servidor no existe o está desactivado'], 404);
-        } catch (Throwable $e) {
+        } catch (ZkongException $e) {
             // Un servidor caído o que rechaza el acceso no es un error de la app: se cuenta.
             report($e);
             return response()->json(['ok' => false, 'error' => $e->getMessage() ?: 'No se pudo consultar el servidor'], 502);
+        } catch (Throwable $e) {
+            // Cualquier otro fallo, solo en el log: su mensaje puede llevar SQL o rutas.
+            report($e);
+            return response()->json(['ok' => false, 'error' => 'No se pudo consultar el servidor'], 500);
         }
     }
 

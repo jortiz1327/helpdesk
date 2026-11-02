@@ -7,7 +7,6 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
 
 /**
  * Conexión con UN servidor ZKONG.
@@ -81,18 +80,18 @@ class ZkongClient
     {
         $key = $this->send('GET', '/user/getErpPublicKey', [], null)['data'] ?? null;
         if (! is_string($key) || $key === '') {
-            throw new RuntimeException('El servidor no devolvió su clave pública.');
+            throw new ZkongException('El servidor no devolvió su clave pública.');
         }
         // Clave fijada: la primera vez se apunta su huella y, si luego cambia, no se manda la
         // contraseña (por http alguien en medio podría haber puesto la suya).
         $huella = hash('sha256', preg_replace('/\s+/', '', $key));
         if ($this->server->public_key_sha256 && ! hash_equals($this->server->public_key_sha256, $huella)) {
-            throw new RuntimeException('La clave pública de ' . $this->server->name . ' no es la de siempre y no se le ha enviado la contraseña. '
+            throw new ZkongException('La clave pública de ' . $this->server->name . ' no es la de siempre y no se le ha enviado la contraseña. '
                 . 'Si el servidor la ha cambiado de verdad, vuelve a escribir su contraseña en Servidores ZKONG para aceptar la nueva.');
         }
         $pem = "-----BEGIN PUBLIC KEY-----\n" . trim($key) . "\n-----END PUBLIC KEY-----\n";
         if (! openssl_public_encrypt((string) $this->server->password, $cifrada, $pem)) {
-            throw new RuntimeException('No se pudo cifrar la contraseña con la clave del servidor.');
+            throw new ZkongException('No se pudo cifrar la contraseña con la clave del servidor.');
         }
 
         $json = $this->send('POST', '/user/login', [
@@ -103,7 +102,7 @@ class ZkongClient
 
         $token = $json['data']['token'] ?? null;
         if (! $token) {
-            throw new RuntimeException('Usuario o contraseña incorrectos: ' . ($json['message'] ?? 'el servidor rechazó el acceso'));
+            throw new ZkongException('Usuario o contraseña incorrectos: ' . ($json['message'] ?? 'el servidor rechazó el acceso'));
         }
 
         // Sin tocar updated_at: es la marca de «se editó el servidor» que invalida su caché.
@@ -134,7 +133,7 @@ class ZkongClient
         }
 
         if (! ($json['success'] ?? false)) {
-            throw new RuntimeException($json['message'] ?? 'El servidor devolvió un error.');
+            throw new ZkongException($json['message'] ?? 'El servidor devolvió un error.');
         }
         return $json;
     }
@@ -151,12 +150,12 @@ class ZkongClient
             $http = Http::withHeaders($headers)->acceptJson()->connectTimeout(8)->timeout(25);
             $res = $method === 'GET' ? $http->get($url, $data) : $http->asJson()->post($url, $data);
         } catch (ConnectionException $e) {
-            throw new RuntimeException('No se pudo conectar con ' . $this->server->name . ' (sin respuesta: revisa la dirección y el puerto).');
+            throw new ZkongException('No se pudo conectar con ' . $this->server->name . ' (sin respuesta: revisa la dirección y el puerto).');
         }
 
         $json = $res->json();
         if (! is_array($json)) {
-            throw new RuntimeException('Respuesta inesperada de ' . $this->server->name . ' (HTTP ' . $res->status() . ').');
+            throw new ZkongException('Respuesta inesperada de ' . $this->server->name . ' (HTTP ' . $res->status() . ').');
         }
         return $json;
     }
