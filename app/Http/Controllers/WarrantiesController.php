@@ -53,7 +53,7 @@ class WarrantiesController extends Controller
             'photo_from_ticket' => $this->photoFromTicket($request),
             'photo_delete'      => $this->photoDelete($request),
             'ticket_images'     => $this->ticketImages($request),
-            'team'              => $this->team(),
+            'team'              => $this->team($request),
             'report'            => $this->report($request),
             default   => $this->list($request),
         };
@@ -796,8 +796,18 @@ class WarrantiesController extends Controller
      * abiertas, con alertas, críticas, urgentes, sin actividad, pendientes de cliente y
      * de ZKONG, y dispositivos sin revisar. Salen también los que no tienen ninguna.
      */
-    private function team()
+    private function team(Request $request)
     {
+        // Periodo de lo hecho: garantías cerradas (y días medios desde la recepción) y
+        // dispositivos revisados por cada uno.
+        $desde = $this->esFecha($d = (string) $request->query('from', '')) ? $d : now()->startOfMonth()->toDateString();
+        $hasta = $this->esFecha($h = (string) $request->query('to', '')) ? $h : now()->toDateString();
+        $rango = [$desde . ' 00:00:00', $hasta . ' 23:59:59'];
+        $cerradas = Warranty::whereIn('status', Warranty::closedStatuses())->whereBetween('closed_at', $rango)
+            ->get(['responsible_id', 'received_at', 'created_at', 'closed_at'])->groupBy(fn ($w) => $w->responsible_id ?: 'none');
+        $revisados = WarrantyItem::whereBetween('reviewed_at', $rango)->whereNotNull('reviewed_by')
+            ->groupBy('reviewed_by')->selectRaw('reviewed_by, count(*) as n')->pluck('n', 'reviewed_by');
+
         $abiertas = Warranty::whereNotIn('status', Warranty::closedStatuses())
             ->get(['id', 'status', 'urgency', 'responsible_id', 'last_activity_at', 'status_changed_at', 'created_at']);
         $alertas = $this->alertas()->alerts($abiertas);
@@ -806,7 +816,7 @@ class WarrantiesController extends Controller
         $limite = now()->subDays($this->diasSinActividad());
 
         $vacia = fn ($id, $name) => ['id' => $id, 'name' => $name, 'open' => 0, 'alerts' => 0, 'critical' => 0, 'urgent' => 0,
-            'stale' => 0, 'pte_cliente' => 0, 'pte_zkong' => 0, 'unreviewed' => 0];
+            'stale' => 0, 'pte_cliente' => 0, 'pte_zkong' => 0, 'unreviewed' => 0, 'closed' => 0, 'avg_days' => null, 'reviewed' => 0];
         $filas = [];
         foreach ($this->agentes() as $id => $name) $filas[$id] = $vacia($id, $name);
         foreach ($abiertas as $w) {
@@ -824,9 +834,19 @@ class WarrantiesController extends Controller
             $f['unreviewed'] += (int) ($sinRevisar[$w->id] ?? 0);
             unset($f);
         }
-        $filas = array_values($filas);
+        foreach ($cerradas as $k => $ws) {
+            $filas[$k] ??= $vacia($k, $k === 'none' ? null : (User::whereKey($k)->value('name') ?? "#{$k}"));
+            $filas[$k]['closed'] = $ws->count();
+            $dias = $ws->map(fn ($w) => ($w->received_at ?? $w->created_at)?->diffInDays($w->closed_at))->filter(fn ($n) => $n !== null);
+            $filas[$k]['avg_days'] = $dias->count() ? round($dias->avg(), 1) : null;
+        }
+        foreach ($revisados as $k => $n) {
+            if (isset($filas[$k])) $filas[$k]['reviewed'] = (int) $n;
+        }
+        // Fuera quien no tiene nada abierto ni hizo nada en el periodo (agentes sin garantías).
+        $filas = array_values(array_filter($filas, fn ($f) => $f['open'] || $f['closed'] || $f['reviewed'] || $f['id'] !== 'none'));
         usort($filas, fn ($a, $b) => [$b['critical'], $b['open']] <=> [$a['critical'], $a['open']]);
-        return response()->json(['ok' => true, 'rows' => $filas, 'stale_days' => $this->diasSinActividad()]);
+        return response()->json(['ok' => true, 'rows' => $filas, 'stale_days' => $this->diasSinActividad(), 'from' => $desde, 'to' => $hasta]);
     }
 
     private const REPORT_GROUPS = ['status', 'urgency', 'category', 'responsible', 'client', 'month'];

@@ -24,56 +24,146 @@ function Cabecera({ icon: Ic, title, sub }) {
 }
 
 /* --- Equipo --- */
-const COLS = [
-  ['open', 'Abiertas', 'open', ''],
-  ['critical', 'Críticas', 'critical', 'crit'],
-  ['alerts', 'Con alertas', 'alerts', 'warn'],
-  ['urgent', 'Urgentes', 'urgent', ''],
-  ['stale', 'Sin actividad', 'stale', ''],
-  ['pte_cliente', 'Pte. cliente', 'pte_cliente', ''],
-  ['pte_zkong', 'Pte. ZKONG', 'pte_zkong', ''],
-  ['unreviewed', 'Dispositivos sin revisar', 'unreviewed', ''],
+// Lo abierto es siempre el ahora; cerradas, días de cierre y revisados son del periodo.
+const PERIODOS = [
+  ['mes', 'Este mes', () => { const n = new Date(); return [iso(new Date(n.getFullYear(), n.getMonth(), 1)), hoy()] }],
+  ['prev', 'Mes anterior', () => { const n = new Date(); return [iso(new Date(n.getFullYear(), n.getMonth() - 1, 1)), iso(new Date(n.getFullYear(), n.getMonth(), 0))] }],
+  ['3m', 'Últimos 3 meses', () => { const n = new Date(); return [iso(new Date(n.getFullYear(), n.getMonth() - 2, 1)), hoy()] }],
+  ['anio', `Año ${new Date().getFullYear()}`, () => [`${new Date().getFullYear()}-01-01`, hoy()]],
 ]
+// [título, qué cuenta, ¿del periodo?]
+const CABECERAS = [
+  ['Garantías abiertas', 'Garantías asignadas que aún no están cerradas', false],
+  ['Dispositivos por revisar', 'Etiquetas y dispositivos de sus garantías abiertas que todavía no tienen resultado de revisión', false],
+  ['Esperando al cliente', 'Garantías en estado «Pendiente cliente»: falta algo del cliente para seguir', false],
+  ['Esperando a ZKONG', 'Garantías en estado «Pendiente ZKONG»: enviadas a ZKONG, a la espera de su respuesta', false],
+  ['Necesitan atención', 'Garantías con alguna alerta (llevan demasiado en un estado, sin moverse…). En rojo si alguna es crítica. Las reglas están en Configuración', false],
+  ['Garantías cerradas', 'Garantías que cerró en el periodo elegido', true],
+  ['Tiempo medio en cerrarlas', 'Días de media desde que se recibió la garantía hasta que se cerró', true],
+  ['Dispositivos revisados', 'Dispositivos a los que puso resultado de revisión en el periodo elegido', true],
+]
+const iniciales = (n) => String(n || '').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
+const dec = (n) => (n == null ? '—' : String(n).replace('.', ','))
 
 export function WarrantyTeam({ onFilter }) {
+  const [periodo, setPeriodo] = useState('mes')
+  const [q, setQ] = useState('')
   const [d, setD] = useState(null)
-  useEffect(() => { api.warrantyTeam().then((r) => setD(r.ok ? r : { rows: [], error: r.error })) }, [])
+  const [cargando, setCargando] = useState(true)
+  useEffect(() => {
+    const [from, to] = PERIODOS.find(([k]) => k === periodo)[2]()
+    setCargando(true)
+    api.warrantyTeam({ from, to }).then((r) => { setCargando(false); setD(r.ok ? r : { rows: [], error: r.error }) })
+  }, [periodo])
 
-  const total = Object.fromEntries(COLS.map(([k]) => [k, (d?.rows || []).reduce((s, r) => s + r[k], 0)]))
-  const abrir = (r, chip) => onFilter({ responsible: r.id, name: r.name, chip: chip === 'unreviewed' ? 'unreviewed' : chip })
-  const celda = (r, [k, , chip, tono]) => (
-    <td key={k} className="c">
-      {r[k] ? <button className={`wt-n ${tono}`} title={`Ver ${r[k]} en la lista`} onClick={() => abrir(r, chip)}>{num(r[k])}</button> : <span className="wt-0">0</span>}
-    </td>
-  )
+  const todas = d?.rows || []
+  const busca = q.trim().toLowerCase()
+  const filas = busca ? todas.filter((r) => (r.id === 'none' ? 'sin responsable' : (r.name || '').toLowerCase()).includes(busca)) : todas
+  const suma = (k) => todas.reduce((s, r) => s + (r[k] || 0), 0)
+  const abiertas = suma('open')
+  const cerradas = suma('closed')
+  const mediaCierre = cerradas ? Math.round((todas.reduce((s, r) => s + (r.avg_days || 0) * r.closed, 0) / cerradas) * 10) / 10 : null
+  const nombrePeriodo = PERIODOS.find(([k]) => k === periodo)[1]
+  const abrir = (r, chip) => onFilter({ responsible: r.id, name: r.name, chip })
+  const n = (r, k, chip, tono = '') => (r[k]
+    ? <button className={`wt-n ${tono}`} title={`Ver ${r[k]} en la lista`} onClick={() => abrir(r, chip)}>{num(r[k])}</button>
+    : <span className="wt-0">0</span>)
+
+  const exportar = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const cab = ['Responsable', 'Abiertas', 'Dispositivos sin revisar', 'Pte. cliente', 'Pte. ZKONG', 'Con alertas', 'Críticas', 'Urgentes', 'Sin actividad', 'Cerradas', 'Días medios de cierre', 'Dispositivos revisados']
+    const lineas = todas.map((r) => [r.id === 'none' ? 'Sin responsable' : r.name, r.open, r.unreviewed, r.pte_cliente, r.pte_zkong, r.alerts, r.critical, r.urgent, r.stale, r.closed, r.avg_days == null ? '' : dec(r.avg_days), r.reviewed])
+    const blob = new Blob(['﻿' + [cab, ...lineas].map((l) => l.map(esc).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `equipo-garantias-${d.from}-${d.to}.csv`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
 
   return (
     <>
-      <Cabecera icon={Icon.user} title="Equipo" sub="Carga de cada responsable en las garantías abiertas" />
+      <Cabecera icon={Icon.user} title="Equipo" sub="Carga de cada responsable y lo hecho en el periodo" />
       <div className="page-scroll"><div className="page dev-page wr-page">
-        {!d ? <div className="center-load"><div className="spinner" /></div> : (
-          <>
-            <p className="dev-mute wt-help">Pulsa un número para ver esas garantías. «Sin actividad»: más de {d.stale_days} días sin movimiento. Las alertas siguen las reglas de Configuración.</p>
-            <div className="dev-card">
-              <div className="dev-table-wrap keep wt-wrap">
-                <table className="dev-table wt-table">
-                  <thead><tr><th>Responsable</th>{COLS.map(([k, l]) => <th key={k} className="c">{l}</th>)}</tr></thead>
-                  <tbody>
-                    {d.rows.map((r) => (
+        <div className="wt-filtros">
+          <div className="dev-search wl-search">
+            <Icon.search />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar responsable…" />
+            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+          </div>
+          <div className="dc-seg">{PERIODOS.map(([k, l]) => <button key={k} className={periodo === k ? 'on' : ''} onClick={() => setPeriodo(k)}>{l}</button>)}</div>
+          <span className="spacer" />
+          {d && !d.error ? (
+            <span className="wt-resumen">
+              <b>{num(abiertas)}</b> {abiertas === 1 ? 'abierta' : 'abiertas'} · <b>{num(cerradas)}</b> {cerradas === 1 ? 'cerrada' : 'cerradas'}{mediaCierre != null ? <> · cierre medio <b>{dec(mediaCierre)} días</b></> : null}
+            </span>
+          ) : null}
+          <button className="dev-btn" disabled={!todas.length} onClick={exportar} title="Exportar la tabla a CSV"><Icon.download /> Exportar</button>
+        </div>
+        {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
+          <div className="dev-card wt-card">
+            {cargando && <div className="dev-progress" />}
+            <div className="dev-table-wrap keep wt-wrap">
+              <table className="dev-table wt-table wt-eq">
+                <thead>
+                  <tr className="wt-grp">
+                    <th /><th colSpan={5}>Lo que tiene pendiente hoy</th><th colSpan={3} className="per">Lo que ha hecho · {nombrePeriodo.toLowerCase()}</th><th />
+                  </tr>
+                  <tr>
+                    <th>Responsable</th>
+                    {CABECERAS.map(([l, t, per]) => <th key={l} className={`c ${per ? 'per' : ''}`} title={t}>{l}</th>)}
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filas.map((r) => {
+                    const avisos = [
+                      r.urgent ? <button key="u" className="wf-link" onClick={() => abrir(r, 'urgent')}>{r.urgent} {r.urgent === 1 ? 'urgente' : 'urgentes'}</button> : null,
+                      r.stale ? <button key="s" className="wf-link" onClick={() => abrir(r, 'stale')}>{r.stale} sin actividad</button> : null,
+                    ].filter(Boolean)
+                    return (
                       <tr key={r.id} className={r.id === 'none' ? 'wt-none' : ''}>
-                        <td><b>{r.id === 'none' ? 'Sin responsable' : r.name}</b></td>
-                        {COLS.map((c) => celda(r, c))}
+                        <td>
+                          <div className="wt-who">
+                            <i>{r.id === 'none' ? '?' : iniciales(r.name)}</i>
+                            <div>
+                              <b>{r.id === 'none' ? 'Sin responsable' : r.name}</b>
+                              <small>{avisos.length ? avisos.flatMap((x, i) => (i ? [' · ', x] : [x])) : <span className="dev-mute">{r.open ? 'Al día' : 'Sin garantías abiertas'}</span>}</small>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="c">{n(r, 'open', 'open', 'main')}</td>
+                        <td className="c">{n(r, 'unreviewed', 'unreviewed')}</td>
+                        <td className="c">{n(r, 'pte_cliente', 'pte_cliente')}</td>
+                        <td className="c">{n(r, 'pte_zkong', 'pte_zkong')}</td>
+                        <td className="c">
+                          {n(r, 'alerts', r.critical ? 'critical' : 'alerts', r.critical ? 'crit' : 'warn')}
+                          {r.critical ? <small className="wt-sub crit">{r.critical === r.alerts ? 'todas críticas' : `${r.critical} ${r.critical === 1 ? 'crítica' : 'críticas'}`}</small> : null}
+                        </td>
+                        <td className="c per">{r.closed ? <b className="wt-num">{num(r.closed)}</b> : <span className="wt-0">0</span>}</td>
+                        <td className="c per">{r.avg_days == null ? <span className="wt-0">—</span> : <span className="wt-num">{dec(r.avg_days)} días</span>}</td>
+                        <td className="c per">{r.reviewed ? <span className="wt-num">{num(r.reviewed)}</span> : <span className="wt-0">0</span>}</td>
+                        <td className="wt-ver">{r.open ? <button className="wf-link" onClick={() => abrir(r, 'open')}>Ver sus garantías <Icon.arrowRight /></button> : null}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                  {d.rows.length > 1 && (
-                    <tfoot><tr><td>Total</td>{COLS.map(([k]) => <td key={k} className="c">{num(total[k])}</td>)}</tr></tfoot>
-                  )}
-                </table>
-              </div>
+                    )
+                  })}
+                </tbody>
+                {todas.length > 1 && !busca ? (
+                  <tfoot>
+                    <tr>
+                      <td>Total del equipo</td>
+                      {['open', 'unreviewed', 'pte_cliente', 'pte_zkong', 'alerts'].map((k) => <td key={k} className="c">{num(suma(k))}</td>)}
+                      <td className="c per">{num(cerradas)}</td><td className="c per">{mediaCierre == null ? '—' : `${dec(mediaCierre)} días`}</td><td className="c per">{num(suma('reviewed'))}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                ) : null}
+              </table>
+              {!filas.length ? <p className="dev-mute" style={{ padding: 14 }}>{todas.length ? `Nadie coincide con «${q}».` : 'No hay garantías abiertas ni actividad en el periodo.'}</p> : null}
             </div>
-          </>
+          </div>
         )}
+        <p className="dev-mute wt-help">Pulsa cualquier número para ver esas garantías en la lista (desde allí se reasignan). Pasa el ratón por el título de una columna para ver qué cuenta. «Sin actividad»: más de {d?.stale_days ?? '—'} días sin ningún movimiento.</p>
       </div></div>
     </>
   )

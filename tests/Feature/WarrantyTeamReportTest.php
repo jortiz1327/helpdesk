@@ -54,6 +54,14 @@ class WarrantyTeamReportTest extends TestCase
         $sin = collect($this->getJson('/api/warranties.php?action=team', $h)->json('rows'))->firstWhere('id', 'none');
         $this->assertSame([1, 1, 1], [$sin['open'], $sin['critical'], $sin['stale']]);
 
+        // Lo hecho es del periodo: cerradas, días medios desde la recepción y dispositivos revisados.
+        WarrantyItem::where('warranty_id', $a2->id)->first()->update(['reviewed_at' => now(), 'reviewed_by' => $ana->id]);
+        $ana2 = collect($this->getJson('/api/warranties.php?action=team', $h)->json('rows'))->firstWhere('name', 'Ana');
+        $this->assertSame([1, 1], [$ana2['closed'], $ana2['reviewed']]);
+        $this->assertNotNull($ana2['avg_days']);
+        $antes = collect($this->getJson('/api/warranties.php?action=team&from=2025-01-01&to=2025-12-31', $h)->json('rows'))->firstWhere('name', 'Ana');
+        $this->assertSame([2, 0, 0, null], [$antes['open'], $antes['closed'], $antes['reviewed'], $antes['avg_days']]);
+
         // Cada número abre la lista con ese filtro.
         $this->assertSame(2, $this->getJson("/api/warranties.php?chip=open&responsible={$ana->id}", $h)->json('total'));
         $this->assertSame(1, $this->getJson("/api/warranties.php?chip=critical&responsible={$ana->id}", $h)->json('total'));

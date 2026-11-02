@@ -425,7 +425,7 @@ export const api = {
   deleteWarranty: (id) => req('warranties.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
-  warrantyTeam: () => req('warranties.php?action=team'),
+  warrantyTeam: (p = {}) => req(`warranties.php?action=team&from=${p.from || ''}&to=${p.to || ''}`),
   warrantyReport: (params) => req('warranties.php?action=report&' + new URLSearchParams(params).toString()),
   // Catálogo de modelos: deviceCatalogDo('save' | 'delete', {...}).
   deviceCatalog: () => req('device_catalog.php'),
