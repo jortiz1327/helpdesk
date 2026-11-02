@@ -232,7 +232,7 @@ class WarrantiesTest extends TestCase
         $c = $this->crear($h, ['status' => 'cerrada']);
 
         $r = $this->getJson('/api/warranties.php', $h)->json();
-        $this->assertSame(['open' => 2, 'mine' => 1, 'pte_zkong' => 0, 'closed' => 1, 'all' => 3], $r['counts']);
+        $this->assertSame(['open' => 2, 'mine' => 1, 'pte_zkong' => 0, 'closed' => 1, 'all' => 3, 'repeated' => 0], $r['counts']);
         $this->assertSame([$b['id']], collect($this->getJson('/api/warranties.php?category=Tiendas', $h)->json('rows'))->pluck('id')->all());
 
         // Estado y responsable de varias a la vez; cada cambio queda en su historial.
@@ -510,5 +510,31 @@ class WarrantiesTest extends TestCase
         $this->postJson('/api/warranties.php?action=delete', ['id' => $id], ['X-App-Token' => TokenService::make($super)])->assertOk();
         $this->assertSame(0, Warranty::count());
         $this->assertSame(0, DB::table('warranty_events')->count());
+    }
+
+    public function test_dispositivo_en_varias_garantias_se_marca(): void
+    {
+        [, $h] = $this->agente();
+        $g = fn (string $code, string $fecha, string $cli) => Warranty::create(['code' => $code, 'status' => 'en_curso', 'received_at' => $fecha,
+            'client_name' => $cli, 'last_activity_at' => now(), 'status_changed_at' => now()]);
+        $a = $g('G-2026-0001', '2026-03-01', 'Hotel Sol');
+        $b = $g('G-2026-0002', '2026-06-01', 'Hotel Sol');
+        $c = $g('G-2026-0003', '2026-09-01', 'Otro');
+        $item = fn ($w, $code, $res = 'pendiente') => \App\Models\WarrantyItem::create(['warranty_id' => $w->id, 'code' => $code, 'kind' => 'esl', 'lookup_state' => 'found', 'resolution' => $res]);
+        $item($a, '8E9749440', 'defectuosa');
+        $item($b, '8E9749440', 'bateria');
+        $item($c, '8E9749440');
+        $item($c, '854A49907');
+
+        $items = collect($this->getJson("/api/warranties.php?action=get&id={$c->id}", $h)->assertOk()->json('items'))->keyBy('code');
+        $this->assertSame(['G-2026-0002', 'G-2026-0001'], array_column($items['8E9749440']['other_warranties'], 'code'));   // la más reciente primero
+        $this->assertSame('bateria', $items['8E9749440']['other_warranties'][0]['resolution']);
+        $this->assertSame([], $items['854A49907']['other_warranties']);
+
+        $l = $this->getJson('/api/warranties.php?action=list', $h)->assertOk()->json();
+        $this->assertSame(3, $l['counts']['repeated']);
+        $this->assertSame(['G-2026-0001' => 1, 'G-2026-0002' => 1, 'G-2026-0003' => 1], collect($l['rows'])->pluck('repeated', 'code')->sortKeys()->all());
+        $item($c, 'A0A3B85B5F7F');
+        $this->assertSame(3, $this->getJson('/api/warranties.php?action=list&chip=repeated', $h)->json('total'));
     }
 }

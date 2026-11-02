@@ -5581,3 +5581,10 @@ button.dev-code:hover { text-decoration: underline; }
 .wd-sug button:hover { border-color: var(--primary); }
 .wd-sug small { color: var(--ink-3); font-size: 11px; }
 @media (max-width: 640px) { .wd-sug { margin-left: 0; } }
+
+/* Garantías · dispositivos que han estado en más de una garantía */
+.wr-rep { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, #dc2626 35%, transparent); background: color-mix(in srgb, #dc2626 9%, transparent); color: #b91c1c; font-size: 11px; font-weight: 700; font-family: var(--font, inherit); white-space: nowrap; cursor: pointer; vertical-align: middle; }
+.wr-rep svg { width: 11px; height: 11px; fill: currentColor; }
+button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); }
+.wr-rep.sm { cursor: default; padding: 0 6px; font-size: 10.5px; }
+.wr-chips button svg { width: 12px; height: 12px; fill: currentColor; vertical-align: -1px; }

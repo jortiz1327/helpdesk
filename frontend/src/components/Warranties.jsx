@@ -25,7 +25,7 @@ const COLOR = { gray: '#94a3b8', blue: '#3b82f6', amber: '#f59e0b', purple: '#8b
 const CHIPS = [
   ['mine', 'Mis garantías'], ['open', 'Abiertas'], ['alerts', 'Con alertas'], ['critical', 'Críticas'], ['urgent', 'Urgentes'], ['pte_cliente', 'Pte. cliente'],
   ['pte_zkong', 'Pte. ZKONG'], ['pte_envio', 'Pte. envío'], ['stale', 'Sin actualizar'], ['no_owner', 'Sin responsable'],
-  ['unreviewed', 'Con dispositivos sin revisar'], ['no_client', 'Sin cliente'], ['no_project', 'Sin proyecto'], ['no_category', 'Sin categoría'], ['closed', 'Cerradas'],
+  ['unreviewed', 'Con dispositivos sin revisar'], ['no_client', 'Sin cliente'], ['no_project', 'Sin proyecto'], ['no_category', 'Sin categoría'], ['repeated', 'Con dispositivos repetidos'], ['closed', 'Cerradas'],
 ]
 const SIZE = 25
 const hoy = () => new Date().toISOString().slice(0, 10)
@@ -409,7 +409,8 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
                     <span>{[w.project_name, w.category].filter(Boolean).join(' · ') || '—'}</span>
                   </td>
                   <td>{w.ticket_code ? <span className="wl-tk">{w.ticket_code}</span> : <span className="dev-mute">—</span>}</td>
-                  <td className="r">{w.labels_count ? <b>{num(w.labels_count)}</b> : <span className="dev-mute">—</span>}</td>
+                  <td className="r">{w.labels_count ? <b>{num(w.labels_count)}</b> : <span className="dev-mute">—</span>}
+                    {w.repeated ? <span className="wr-rep sm" title={`${w.repeated} ${w.repeated === 1 ? 'dispositivo ya ha estado' : 'dispositivos ya han estado'} en otra garantía`}><Icon.refresh /> {w.repeated}</span> : null}</td>
                   <td>{w.responsible_name
                     ? <span className="wl-resp"><i>{iniciales(w.responsible_name)}</i>{w.responsible_name}</span>
                     : <span className="dev-mute">Sin asignar</span>}</td>
@@ -1022,11 +1023,11 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   }
   const exportar = () => {
     const esc = csvCell
-    const cab = ['Código', 'Tipo', 'Referencia AEME', 'Producto', 'Modelo en el servidor', 'Servidor', 'Tienda', 'Conectada', 'Última comunicación', 'Avisos', 'Revisión', 'Detalle de la revisión', 'Fotos']
+    const cab = ['Código', 'Tipo', 'Referencia AEME', 'Producto', 'Modelo en el servidor', 'Servidor', 'Tienda', 'Conectada', 'Última comunicación', 'Avisos', 'Revisión', 'Detalle de la revisión', 'Fotos', 'Otras garantías']
     const lineas = items.map((i) => [i.code, i.kind === 'ap' ? 'Antena' : 'Etiqueta', i.aeme_ref, i.product_name, i.server_model, i.server, i.store_name, i.online == null ? '' : i.online ? 'Sí' : 'No', fechaHora(i.last_commu_at), (i.warnings || []).map((a) => a.text).join(' | '),
       rv?.resolutions?.[i.resolution]?.label || i.resolution,
       [i.battery_changed ? 'Pilas cambiadas' : '', i.zkong_decision ? rv?.zkong?.[i.zkong_decision] : '', i.zkong_issue, (i.broken_cases || []).map((k) => rv?.broken_cases?.[k] || k).join(', '), i.resolution_note].filter(Boolean).join(' · '),
-      pideFotos(rv, i) ? `${fotosDe(rv, i).hay}/${fotosDe(rv, i).total}` : ''])
+      pideFotos(rv, i) ? `${fotosDe(rv, i).hay}/${fotosDe(rv, i).total}` : '', (i.other_warranties || []).map((o) => o.code).join(', ')])
     const blob = new Blob(['﻿' + [cab.map(esc).join(';'), ...lineas.map((l) => l.map(esc).join(';'))].join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob); a.download = `${w.code}-etiquetas.csv`; a.click()
@@ -1038,11 +1039,12 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   items.forEach((i) => { const k = productoDe(i); porProducto[k] = (porProducto[k] || 0) + 1 })
   const conectadas = items.filter((i) => i.online).length
   const conAvisos = items.filter((i) => estadoEtiqueta(i) !== 'ok').length
+  const repetidos = items.filter((i) => i.other_warranties?.length).length
   const porRes = {}
   items.forEach((i) => { porRes[i.resolution] = (porRes[i.resolution] || 0) + 1 })
   const revisadas = items.length - (porRes.pendiente || 0)
   const sinFotos = items.filter((i) => faltanFotos(rv, i)).length
-  const listado = items.filter((i) => (!filtro || (filtro === 'avisos' ? estadoEtiqueta(i) !== 'ok' : productoDe(i) === filtro))
+  const listado = items.filter((i) => (!filtro || (filtro === 'avisos' ? estadoEtiqueta(i) !== 'ok' : filtro === 'repetidos' ? i.other_warranties?.length > 0 : productoDe(i) === filtro))
     && (!rev || (rev === 'fotos' ? faltanFotos(rv, i) : i.resolution === rev)))
   const nuevas = comp.results && comp.checked === comp.text ? comp.results.filter((r) => !r.blocked && !r.already).length : null
 
@@ -1103,6 +1105,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
           <div className="wr-chips sm">
             <button className={!filtro ? 'on' : ''} onClick={() => setFiltro('')}>Todos los productos</button>
             {conAvisos ? <button className={filtro === 'avisos' ? 'on' : ''} onClick={() => setFiltro('avisos')}>Con avisos ({conAvisos})</button> : null}
+            {repetidos ? <button className={filtro === 'repetidos' ? 'on' : ''} onClick={() => setFiltro(filtro === 'repetidos' ? '' : 'repetidos')} title="Han estado también en otras garantías"><Icon.refresh /> Repetidos ({repetidos})</button> : null}
             {Object.entries(porProducto).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
               <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(filtro === k ? '' : k)}>{k} ×{n}</button>
             ))}
@@ -1116,7 +1119,10 @@ function Productos({ w, items, opts, onReload, onChanged }) {
             {listado.map((i) => (
               <li key={i.id} className={`st-${estadoEtiqueta(i)}${sel.has(i.id) ? ' sel' : ''}`}>
                 {rv ? <input type="checkbox" className="wr-pick" checked={sel.has(i.id)} onChange={() => marcar(i.id)} aria-label={`Seleccionar ${i.code}`} /> : null}
-                <span className="wr-lbl-code mono"><button className="link" title="Ver ficha e historial" onClick={() => setFicha(i.code)}>{i.code}</button>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</span>
+                <span className="wr-lbl-code mono"><button className="link" title="Ver ficha e historial" onClick={() => setFicha(i.code)}>{i.code}</button>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}
+                  {i.other_warranties?.length ? <button className="wr-rep" onClick={() => setFicha(i.code)}
+                    title={`También en: ${i.other_warranties.map((o) => [o.code, fecha(o.received_at), o.client, rv?.resolutions?.[o.resolution]?.label].filter(Boolean).join(' · ')).join('\n')}`}>
+                    <Icon.refresh /> En {i.other_warranties.length + 1} garantías</button> : null}</span>
                 <Donde r={i} />
                 <Modelo r={i} onPick={(ref) => cambiarModelo(i, ref)} />
                 {rv ? <ResPill rv={rv} it={i} onClick={() => setRevisar({ items: [i] })} /> : null}

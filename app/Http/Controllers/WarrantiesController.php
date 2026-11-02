@@ -86,6 +86,11 @@ class WarrantiesController extends Controller
         if ($cat === 'none') $q->where(fn ($w) => $w->whereNull('warranties.category')->orWhere('warranties.category', ''));
         elseif ($cat !== '') $q->where('warranties.category', $cat);
 
+        // Garantías con algún dispositivo que ya ha estado en otra (lote malo o mal uso).
+        $repetidos = fn ($w) => $w->whereExists(fn ($e) => $e->selectRaw('1')->from('warranty_items as ri')
+            ->whereColumn('ri.warranty_id', 'warranties.id')
+            ->whereExists(fn ($o) => $o->selectRaw('1')->from('warranty_items as ro')->whereColumn('ro.code', 'ri.code')->whereColumn('ro.warranty_id', '!=', 'ri.warranty_id')));
+
         // Contadores de las pestañas, con la búsqueda y los desplegables ya aplicados.
         $counts = [
             'open'      => (clone $q)->where($abierta)->count(),
@@ -93,6 +98,7 @@ class WarrantiesController extends Controller
             'pte_zkong' => (clone $q)->where('warranties.status', 'pte_zkong')->count(),
             'closed'    => (clone $q)->whereIn('warranties.status', $cerrados)->count(),
             'all'       => (clone $q)->count(),
+            'repeated'  => (clone $q)->where($repetidos)->count(),
         ];
 
         $vacio = fn (string $col) => fn ($w) => $w->whereNull($col)->orWhere($col, '');
@@ -112,6 +118,7 @@ class WarrantiesController extends Controller
             'no_project'  => $q->where($vacio('warranties.project_name')),
             'no_category' => $q->where($vacio('warranties.category')),
             'closed'      => $q->whereIn('warranties.status', $cerrados),
+            'repeated'    => $q->where($repetidos),
             default       => null,
         };
 
@@ -131,10 +138,14 @@ class WarrantiesController extends Controller
             ->addSelect(['labels_count' => WarrantyItem::selectRaw('count(*)')->whereColumn('warranty_id', 'warranties.id')])
             // Quién paga: lo que se ha puesto en la revisión de sus etiquetas (garantía, cliente, pilas).
             ->addSelect(['coverages' => WarrantyItem::selectRaw('group_concat(distinct coverage)')->whereColumn('warranty_id', 'warranties.id')->whereNotNull('coverage')])
+            // Cuántos de sus dispositivos han estado ya en otra garantía.
+            ->addSelect(['repeated' => DB::table('warranty_items as ri')->selectRaw('count(*)')->whereColumn('ri.warranty_id', 'warranties.id')
+                ->whereExists(fn ($o) => $o->selectRaw('1')->from('warranty_items as ro')->whereColumn('ro.code', 'ri.code')->whereColumn('ro.warranty_id', '!=', 'ri.warranty_id'))])
             ->get();
         $alertas = $this->alertas()->alerts($rows);
         $rows = $rows->map(fn ($w) => $this->row($w) + [
             'alerts'    => $alertas[$w->id] ?? [],
+            'repeated'  => (int) $w->repeated,
             'coverages' => $w->coverages ? array_values(array_intersect(array_keys(WarrantyItem::COVERAGES), explode(',', $w->coverages))) : [],
         ]);
 
@@ -467,6 +478,11 @@ class WarrantiesController extends Controller
             ->where('warranty_id', $warrantyId)->orderBy('warranty_items.id')
             ->get(['warranty_items.*', 'r.name as reviewed_by_name', 'b.code as batch_code', 'b.status as batch_status']);
         $fotos = WarrantyPhotos::forItems($items->pluck('id')->all());
+        // Otras garantías en las que ha estado cada dispositivo (2 o más: se avisa).
+        $otras = DB::table('warranty_items as i')->join('warranties as w', 'w.id', '=', 'i.warranty_id')
+            ->whereIn('i.code', $items->pluck('code'))->where('i.warranty_id', '!=', $warrantyId)
+            ->orderByDesc('w.received_at')->orderByDesc('w.id')
+            ->get(['i.code', 'w.id', 'w.code as warranty_code', 'w.received_at', 'w.client_name', 'i.resolution'])->groupBy('code');
 
         return $items->map(fn ($i) => [
             'id' => $i->id, 'code' => $i->code, 'kind' => $i->kind, 'lookup_state' => $i->lookup_state, 'server' => $i->server,
@@ -482,6 +498,8 @@ class WarrantiesController extends Controller
             'batch_code' => $i->batch_code, 'batch_status' => $i->batch_status,
             'zkong_result' => $i->zkong_result, 'zkong_result_note' => $i->zkong_result_note,
             'photos' => $fotos[$i->id] ?? [],
+            'other_warranties' => ($otras[$i->code] ?? collect())->map(fn ($o) => ['id' => $o->id, 'code' => $o->warranty_code,
+                'received_at' => $o->received_at, 'client' => $o->client_name, 'resolution' => $o->resolution])->values()->all(),
         ])->all();
     }
 
