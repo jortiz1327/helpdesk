@@ -4,10 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Warranty;
 use App\Models\WarrantyDocument;
+use App\Services\AemePortal;
+use App\Services\AttachmentService;
 use App\Services\PortalDocCheck;
+use App\Services\TicketLockService;
+use App\Services\TicketReplyService;
 use App\Services\WarrantyDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * warranty_docs.php — documentos de una garantía. Presupuestos, pedidos y albaranes
@@ -24,6 +30,7 @@ class WarrantyDocumentsController extends Controller
             'download'      => $this->download($request),
             'report'        => $this->report($request),
             'email'         => $this->email($request),
+            'send_email'    => $this->sendEmail($request),
             default         => $this->list($request),
         };
     }
@@ -82,14 +89,112 @@ class WarrantyDocumentsController extends Controller
             : response()->json(['ok' => true, 'id' => $r->id]);
     }
 
-    // El correo de resolución ya rellenado, para copiarlo (no se envía desde aquí).
+    /**
+     * Correo de resolución: la plantilla rellenada, a quién (el último usado o el del
+     * contacto del ticket), correos que se pueden sugerir y si este usuario puede enviarlo
+     * desde el ticket. La resolución va SIEMPRE por correo: si el ticket es de WhatsApp,
+     * hay que preguntarle al cliente su correo.
+     */
     private function email(Request $request)
     {
         $w = Warranty::findOrFail((int) $request->query('id'));
-        // El correo del cliente sale del ticket: solo si este usuario puede verlo en el Helpdesk.
-        $contacto = $w->ticketVisibleTo($request->user()) ? DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
-            ->where('t.id', $w->ticket_id)->first(['c.email as contact_email']) : null;
-        return response()->json(['ok' => true, 'to' => $contacto->contact_email ?? null]
-            + WarrantyDocuments::resolutionEmail($w, $request->user()->name));
+        $me = $request->user();
+        // Lo que sale del ticket (correo del contacto, canal) solo si lo ve en el Helpdesk.
+        $t = $w->ticketVisibleTo($me) ? DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+            ->where('t.id', $w->ticket_id)->first(['t.code', 't.channel', 'c.email as contact_email']) : null;
+
+        $sugerencias = [];
+        if ($w->customer_email) $sugerencias[$w->customer_email] = 'Usado antes en esta garantía';
+        if ($t?->contact_email) $sugerencias[mb_strtolower($t->contact_email)] ??= 'Contacto del ticket';
+        foreach ($this->correosPortal($w) as $email => $nombre) $sugerencias[$email] ??= "Portal AEME · {$nombre}";
+
+        $motivo = $this->puedeEnviar($w, $me);
+        return response()->json(['ok' => true, 'to' => $w->customer_email ?: ($t->contact_email ?? null),
+            'suggestions' => collect($sugerencias)->map(fn ($l, $e) => ['email' => $e, 'label' => $l])->values(),
+            'ticket' => $t ? ['code' => $t->code, 'channel' => $t->channel] : null,
+            'can_send' => $motivo === null, 'cannot_send' => $motivo]
+            + WarrantyDocuments::resolutionEmail($w, $me->name));
+    }
+
+    /** Por qué este usuario no puede enviar el correo desde el ticket, o null si puede. */
+    private function puedeEnviar(Warranty $w, $me): ?string
+    {
+        if (! $w->ticket_id) return 'La garantía no tiene ticket: vincúlala a uno para enviarlo desde él.';
+        if (! $w->ticketVisibleTo($me) || ! $me->can('tickets.reply')) return 'No puedes responder a este ticket en el Helpdesk.';
+        return null;
+    }
+
+    /** Correos de las personas del cliente en el portal AEME (solo lectura). [correo => nombre] */
+    private function correosPortal(Warranty $w): array
+    {
+        if (! $w->portal_client_id || ! AemePortal::configured()) return [];
+        try {
+            return DB::connection('portal_aeme')->table('users')->where('clientid', $w->portal_client_id)->where('type', 'client')
+                ->whereNotNull('email')->where('email', '!=', '')->orderByDesc('account_owner')->limit(10)
+                ->get(['email', 'first_name', 'last_name'])
+                ->mapWithKeys(fn ($u) => [mb_strtolower(trim($u->email)) => trim("{$u->first_name} {$u->last_name}") ?: 'cliente'])->all();
+        } catch (Throwable $e) {
+            Log::warning('Portal AEME: no se pudieron leer los correos del cliente: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Envía el correo de resolución como respuesta del ticket de la garantía (queda en la
+     * conversación con el cliente), con el informe en PDF si se pide. Mismo envío y mismas
+     * reglas que responder desde el Helpdesk; el correo se guarda en la garantía, no en la
+     * ficha del contacto.
+     */
+    private function sendEmail(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        $me = $request->user();
+        if ($motivo = $this->puedeEnviar($w, $me)) {
+            return response()->json(['ok' => false, 'error' => $motivo], 403);
+        }
+        $to = mb_strtolower(trim((string) $request->input('to')));
+        if (! filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return response()->json(['ok' => false, 'error' => 'Escribe un correo válido del cliente'], 400);
+        }
+        $asunto = trim((string) $request->input('subject'));
+        $texto = trim((string) $request->input('body'));
+        if ($asunto === '' || $texto === '') {
+            return response()->json(['ok' => false, 'error' => 'Faltan el asunto o el texto'], 400);
+        }
+
+        $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+            ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')->where('t.id', $w->ticket_id)
+            ->first(['t.id', 't.code', 't.subject', 't.assigned_to', 't.contact_id', 'c.name as contact_name', 'c.wa_id as contact_wa',
+                'cat.signature as cat_signature', 'cat.name as category_name']);
+        // Las mismas reglas que al responder en el Helpdesk: el ticket de otro agente, no.
+        if (! $me->can('tickets.view_all') && $t->assigned_to && (int) $t->assigned_to !== (int) $me->id) {
+            $otro = DB::table('users')->where('id', $t->assigned_to)->value('name') ?: 'otro agente';
+            return response()->json(['ok' => false, 'error' => "El ticket {$t->code} lo tiene {$otro}: pídele que lo envíe o que te lo pase."], 403);
+        }
+        if ($quien = app(TicketLockService::class)->blockedBy((int) $t->id, (int) $me->id)) {
+            return response()->json(['ok' => false, 'error' => "{$quien} está atendiendo el ticket {$t->code} ahora mismo"], 409);
+        }
+        $t->contact_email = $to;
+        $t->subject = $asunto;   // la respuesta lleva [código del ticket] para volver al mismo hilo
+
+        $adjuntos = null;
+        if ($request->boolean('attach_report')) {
+            $doc = WarrantyDocument::where('warranty_id', $w->id)->where('kind', 'informe')->where('source', 'generado')->latest('id')->first();
+            $f = $doc ? WarrantyDocuments::file($doc) : null;
+            if (! $f) return response()->json(['ok' => false, 'error' => 'Todavía no hay informe de resolución: genéralo antes'], 400);
+            $aid = app(AttachmentService::class)->storeRaw($f[2], $f[0], $f[1], (int) $t->id, null, (int) $me->id);
+            if (! $aid) return response()->json(['ok' => false, 'error' => 'No se pudo adjuntar el informe'], 500);
+            $adjuntos = [$aid];
+        }
+
+        $html = collect(preg_split('/\R{2,}/u', $texto))->map(fn ($p) => '<p>' . nl2br(e(trim($p)), false) . '</p>')->implode('');
+        $r = app(TicketReplyService::class)->porCorreo($t, $html, [], [], [], $me, $adjuntos, true, 'Resolución de tu garantía');
+        if (! ($r['ok'] ?? false)) {
+            return response()->json(['ok' => false, 'error' => $r['error'] ?? 'No se pudo enviar el correo'], $r['_status'] ?? 502);
+        }
+
+        $w->forceFill(['customer_email' => $to])->save();
+        WarrantyDocuments::evento($w->id, $me->id, "Correo de resolución enviado a {$to} desde el ticket {$t->code}" . ($adjuntos ? ' (con el informe)' : ''));
+        return response()->json(['ok' => true, 'ticket' => $t->code]);
     }
 }

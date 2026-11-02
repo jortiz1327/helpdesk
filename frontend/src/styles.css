@@ -5573,3 +5573,11 @@ button.dev-code:hover { text-decoration: underline; }
 .wr-type.t-msg-whatsapp { --tc: #128c4a; }
 .wf-tl li.msg::before { background: #128c4a; }
 .wf-tl li.msg p { margin: 4px 0 0; padding: 7px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* Garantías · correo de resolución: sugerencias de correo */
+.wd-mail-row input.bad { border-color: var(--danger); }
+.wd-sug { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 12px 62px; }
+.wd-sug button { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 12.5px; cursor: pointer; }
+.wd-sug button:hover { border-color: var(--primary); }
+.wd-sug small { color: var(--ink-3); font-size: 11px; }
+@media (max-width: 640px) { .wd-sug { margin-left: 0; } }

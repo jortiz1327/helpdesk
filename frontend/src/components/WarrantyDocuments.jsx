@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
-import { useToast } from '../App.jsx'
+import { useToast, useConfirm } from '../App.jsx'
 
 /* -------------------------------------------------------------------------
  * DOCUMENTOS de una garantía (pestaña de la ficha). Presupuestos, pedidos y albaranes
@@ -138,24 +138,71 @@ function Informe({ w, summary, actual, onClose, onDone }) {
   )
 }
 
-/* --- Correo de resolución: la plantilla rellenada, para copiar --- */
-function Correo({ w, informe, onClose }) {
+/*
+ * --- Correo de resolución: la plantilla rellenada. Se envía desde el ticket de la garantía
+ * (queda en la conversación con el cliente) o se copia. La resolución va siempre por
+ * correo: si el cliente escribió por WhatsApp, hay que pedirle su correo.
+ */
+const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+function Correo({ w, informe, onClose, onSent }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [m, setM] = useState(null)
-  useEffect(() => { api.warrantyResolutionEmail(w.id).then((r) => (r.ok ? setM(r) : (toast(r.error, 'err'), onClose()))) }, [w.id])
+  const [adjuntar, setAdjuntar] = useState(!!informe)
+  const [enviando, setEnviando] = useState(false)
+  useEffect(() => { api.warrantyResolutionEmail(w.id).then((r) => (r.ok ? setM({ ...r, to: r.to || '' }) : (toast(r.error, 'err'), onClose()))) }, [w.id])
   const copiar = async (t, que) => { try { await navigator.clipboard.writeText(t); toast(`${que} copiado`) } catch { toast('No se pudo copiar', 'err') } }
+  const correoOk = EMAIL_OK.test((m?.to || '').trim())
+  const porWhatsApp = m?.ticket?.channel === 'whatsapp'
+
+  const enviar = async () => {
+    const extra = adjuntar && informe ? ` con el informe ${informe.number}` : ''
+    if (!(await confirm({ title: 'Enviar correo de resolución', message: `¿Enviar a ${m.to.trim()}${extra}? Saldrá como respuesta del ticket ${m.ticket.code} y quedará en la conversación con el cliente.`, confirmText: 'Enviar' }))) return
+    setEnviando(true)
+    const r = await api.warrantyDocsDo('send_email', { id: w.id, to: m.to.trim(), subject: m.subject, body: m.body, attach_report: adjuntar && !!informe })
+    setEnviando(false)
+    if (!r.ok) { toast(r.error || 'No se pudo enviar', 'err'); return }
+    toast(`Correo enviado desde ${r.ticket}`)
+    onSent?.()
+    onClose()
+  }
+
+  const pie = m?.can_send
+    ? <>
+        <button className="btn ghost" onClick={onClose}>Cancelar</button>
+        <button className="btn" disabled={enviando || !correoOk || !m.subject.trim() || !m.body.trim()} onClick={enviar}><Icon.send /> {enviando ? 'Enviando…' : `Enviar desde ${m.ticket.code}`}</button>
+      </>
+    : <button className="btn" onClick={onClose}>Listo</button>
+
   return (
-    <Modal wide title="Correo de resolución" onClose={onClose} foot={<button className="btn" onClick={onClose}>Listo</button>}>
+    <Modal wide title="Correo de resolución" onClose={onClose} foot={pie}>
       {!m ? <div className="center-load"><div className="spinner" /></div> : (
         <>
-          <p className="dev-mute wd-tip">Rellenado con la plantilla de Configuración. Cópialo en tu correo o en la respuesta del ticket y adjunta el informe y los presupuestos del portal.</p>
-          {m.to ? <div className="wd-mail-row"><span>Para</span><b>{m.to}</b><button className="dev-btn" onClick={() => copiar(m.to, 'Correo')}><Icon.copy /> Copiar</button></div> : null}
+          <p className="dev-mute wd-tip">{m.can_send
+            ? <>Rellenado con la plantilla de Configuración. Se envía por correo como respuesta del ticket <b className="mono">{m.ticket.code}</b>: el cliente lo recibe en su correo y queda en la conversación.</>
+            : <>{m.cannot_send} Puedes copiarlo y enviarlo desde tu correo.</>}</p>
+          {porWhatsApp && m.can_send ? <p className="wd-warn"><Icon.whatsapp /> El cliente escribió por WhatsApp y la resolución va por correo: {m.to ? 'comprueba que este es su correo.' : 'pídele su correo y escríbelo aquí.'}</p> : null}
+          <div className="wd-mail-row">
+            <span>Para</span>
+            <input type="email" list="wd-mail-sug" value={m.to} onChange={(e) => setM({ ...m, to: e.target.value })} placeholder="correo@cliente.com"
+              className={m.to && !correoOk ? 'bad' : ''} />
+            <datalist id="wd-mail-sug">{(m.suggestions || []).map((s) => <option key={s.email} value={s.email}>{s.label}</option>)}</datalist>
+            <button className="dev-btn" disabled={!m.to} onClick={() => copiar(m.to, 'Correo')}><Icon.copy /> Copiar</button>
+          </div>
+          {m.suggestions?.length ? (
+            <div className="wd-sug">{m.suggestions.filter((s) => s.email !== m.to.trim().toLowerCase()).map((s) => (
+              <button key={s.email} type="button" onClick={() => setM({ ...m, to: s.email })} title={s.label}>{s.email} <small>{s.label}</small></button>
+            ))}</div>
+          ) : null}
           <div className="wd-mail-row"><span>Asunto</span><input value={m.subject} onChange={(e) => setM({ ...m, subject: e.target.value })} /><button className="dev-btn" onClick={() => copiar(m.subject, 'Asunto')}><Icon.copy /> Copiar</button></div>
           <textarea className="wd-mail-body" rows={12} value={m.body} onChange={(e) => setM({ ...m, body: e.target.value })} />
           <div className="wd-mail-f">
             <button className="dev-btn" onClick={() => copiar(m.body, 'Texto')}><Icon.copy /> Copiar el texto</button>
             <span className="spacer" />
-            {informe ? <button className="dev-btn" onClick={() => descargar(informe.id, toast)}><Icon.download /> {informe.number}</button> : <span className="dev-mute">Sin informe todavía: genéralo para adjuntarlo.</span>}
+            {informe
+              ? <>{m.can_send ? <label className="wr-check"><input type="checkbox" checked={adjuntar} onChange={(e) => setAdjuntar(e.target.checked)} /> Adjuntar el informe</label> : null}
+                  <button className="dev-btn" onClick={() => descargar(informe.id, toast)}><Icon.download /> {informe.number}</button></>
+              : <span className="dev-mute">Sin informe todavía: genéralo para adjuntarlo.</span>}
           </div>
         </>
       )}
@@ -235,7 +282,7 @@ function Portal({ w, onEditWarranty }) {
   )
 }
 
-export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty }) {
+export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty, onChanged }) {
   const toast = useToast()
   const [d, setD] = useState(null)
   const [modal, setModal] = useState(null)   // 'preparar' | 'informe' | 'correo'
@@ -274,7 +321,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty 
 
       {modal === 'preparar' && <Preparar w={w} onClose={cerrar} onEditWarranty={editar} />}
       {modal === 'informe' && <Informe w={w} summary={summary} actual={report} onClose={cerrar} onDone={() => { cerrar(); cargar() }} />}
-      {modal === 'correo' && <Correo w={w} informe={report} onClose={cerrar} />}
+      {modal === 'correo' && <Correo w={w} informe={report} onClose={cerrar} onSent={onChanged} />}
     </>
   )
 }
