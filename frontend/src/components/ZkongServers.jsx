@@ -8,10 +8,42 @@ import InfoTip from './InfoTip.jsx'
  * SERVIDORES ZKONG (Gestión de garantías → Ajustes). Solo superadmin.
  * Cada servidor es una cuenta de ADMINISTRADOR de la nube de etiquetas: con ella
  * el Centro de dispositivos lista y busca etiquetas y antenas. La contraseña se
- * guarda cifrada y no vuelve nunca al navegador; «Probar» dice si entra.
+ * guarda cifrada y no vuelve nunca al navegador; «Probar» dice si entra y cuánto tarda.
  * ---------------------------------------------------------------------- */
 
 const blank = { id: 0, name: '', base_url: 'http://', username: '', password: '', active: true }
+const num = (n) => Number(n || 0).toLocaleString('es-ES')
+const aFecha = (v) => (v ? new Date(String(v).replace(' ', 'T')) : null)
+const hace = (v) => {
+  const d = aFecha(v)
+  if (!d || isNaN(d)) return null
+  const m = Math.max(0, Math.round((Date.now() - d) / 60000))
+  if (m < 1) return 'hace un momento'
+  if (m < 60) return `hace ${m} min`
+  const h = Math.round(m / 60)
+  if (h < 24) return `hace ${h} ${h === 1 ? 'hora' : 'horas'}`
+  const dd = Math.round(h / 24)
+  return `hace ${dd} ${dd === 1 ? 'día' : 'días'}`
+}
+const fechaHora = (v) => { const d = aFecha(v); return d && !isNaN(d) ? d.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '' }
+
+function Totales({ s, t }) {
+  if (!s.active) return <><td className="r"><span className="dev-mute">—</span></td><td className="r"><span className="dev-mute">—</span></td></>
+  if (!t || t.loading) return <><td className="r"><span className="zs-load" /></td><td className="r"><span className="zs-load" /></td></>
+  if (t.error) return <td className="r" colSpan={2}><span className="dev-mute" title={t.error}>No se pudo contar</span></td>
+  const e = t.esl
+  return (
+    <>
+      <td className="r">
+        <b className="wt-num">{num(e.total)}</b>
+        <small className="zk-sub">{e.online != null ? `${num(e.online)} en línea · ${num(e.offline)} sin conexión` : ''}</small>
+      </td>
+      <td className="r">
+        {t.ap ? <><b className="wt-num">{num(t.ap.total)}</b><small className="zk-sub">{t.ap.online != null ? `${num(t.ap.online)} en línea` : ''}</small></> : <span className="dev-mute">—</span>}
+      </td>
+    </>
+  )
+}
 
 export default function ZkongServers() {
   const toast = useToast()
@@ -19,10 +51,25 @@ export default function ZkongServers() {
   const [rows, setRows] = useState(null)
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [testing, setTesting] = useState(0)
+  const [testing, setTesting] = useState([])       // ids probándose ahora
+  const [pruebas, setPruebas] = useState({})       // id → { ok, ms, error } de esta sesión
+
+  const [totales, setTotales] = useState({})       // id → { esl, ap } leídos del propio servidor, o { error }
 
   const load = useCallback(() => { api.zkongServers().then((d) => setRows(d.servers || [])) }, [])
   useEffect(() => { load() }, [load])
+
+  // Cuántas etiquetas y antenas tiene cada servidor activo, preguntándoselo a él (caché de 2 min).
+  const contar = useCallback((lista) => {
+    lista.filter((s) => s.active).forEach((s) => {
+      setTotales((t) => ({ ...t, [s.id]: { loading: true } }))
+      Promise.all([api.deviceStats(s.id, 'esl'), api.deviceStats(s.id, 'ap')])
+        .then(([e, a]) => setTotales((t) => ({ ...t, [s.id]: e.ok ? { esl: e.stats, ap: a.ok ? a.stats : null } : { error: e.error || 'No responde' } })))
+        .catch(() => setTotales((t) => ({ ...t, [s.id]: { error: 'No responde' } })))
+    })
+  }, [])
+  const ids = (rows || []).filter((s) => s.active).map((s) => s.id).join(',')
+  useEffect(() => { if (rows) contar(rows) }, [ids])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const abrir = (s) => setForm(s ? { ...blank, ...s, password: '' } : { ...blank })
 
@@ -34,8 +81,11 @@ export default function ZkongServers() {
     if (form.id && !form.password) delete payload.password
     const r = await api.saveZkongServer(payload)
     setSaving(false)
-    if (r.ok) { toast(form.id ? 'Servidor actualizado' : 'Servidor añadido'); setForm(null); load() }
-    else toast(r.error || 'Error', 'err')
+    if (r.ok) {
+      toast(form.id ? 'Servidor actualizado' : 'Servidor añadido')
+      setPruebas((p) => { const x = { ...p }; delete x[form.id]; return x })
+      setForm(null); load()
+    } else toast(r.error || 'Error', 'err')
   }
 
   const del = async (s) => {
@@ -44,62 +94,131 @@ export default function ZkongServers() {
     if (r.ok) { toast('Servidor quitado'); load() } else toast(r.error || 'Error', 'err')
   }
 
+  const probarUno = async (s) => {
+    setTesting((t) => [...t, s.id])
+    const r = await api.testZkongServer(s.id).catch(() => ({ ok: false, error: 'No se pudo conectar' }))
+    setTesting((t) => t.filter((x) => x !== s.id))
+    setPruebas((p) => ({ ...p, [s.id]: { ok: !!r.ok, ms: r.ms ?? null, error: r.error || null } }))
+    return r.ok
+  }
   const probar = async (s) => {
-    setTesting(s.id)
-    const r = await api.testZkongServer(s.id)
-    setTesting(0)
-    if (r.ok) { toast(`Conecta ✓ ${s.name}`); load() }
-    else toast(r.error || 'No se pudo conectar', 'err')
+    const ok = await probarUno(s)
+    toast(ok ? `${s.name}: conecta` : `${s.name}: no conecta`, ok ? undefined : 'err')
+    load()
+  }
+  const probarTodos = async () => {
+    const activos = (rows || []).filter((s) => s.active)
+    const res = await Promise.all(activos.map(probarUno))
+    const mal = res.filter((x) => !x).length
+    toast(mal ? `${mal} de ${activos.length} no conectan` : `Los ${activos.length} servidores conectan`, mal ? 'err' : undefined)
+    load()
+  }
+
+  const lista = rows || []
+  const activos = lista.filter((s) => s.active)
+  const conectan = activos.filter((s) => (pruebas[s.id] ? pruebas[s.id].ok : !!s.token_updated_at))
+  const fallan = activos.filter((s) => pruebas[s.id] && !pruebas[s.id].ok)
+  const leidos = activos.map((s) => totales[s.id]).filter((t) => t && t.esl)
+  const cargandoTot = activos.some((s) => !totales[s.id] || totales[s.id].loading)
+  const suma = (k, campo) => leidos.reduce((n, t) => n + ((t[k] && t[k][campo]) || 0), 0)
+  const etiquetas = suma('esl', 'total')
+  const enLinea = suma('esl', 'online')
+  const antenas = suma('ap', 'total')
+  const ultima = lista.map((s) => s.token_updated_at).filter(Boolean).sort().pop()
+  const tiempos = Object.values(pruebas).filter((p) => p.ok && p.ms != null).map((p) => p.ms)
+
+  const estado = (s) => {
+    const p = pruebas[s.id]
+    if (testing.includes(s.id)) return <span className="zs-st wait"><i />Probando…</span>
+    if (!s.active) return <span className="zs-st off"><i />Inactivo<small>El Centro de dispositivos no lo consulta</small></span>
+    if (p && !p.ok) return <span className="zs-st bad" title={p.error}><i />No conecta<small>{p.error}</small></span>
+    if (p) return <span className="zs-st ok"><i />Conecta<small>Ahora · respondió en {num(p.ms)} ms</small></span>
+    if (s.token_updated_at) return <span className="zs-st ok" title={`Última entrada correcta: ${fechaHora(s.token_updated_at)}`}><i />Conectado<small>Última entrada {hace(s.token_updated_at)}</small></span>
+    return <span className="zs-st off"><i />Sin probar<small>Pulsa «Probar» para comprobar el acceso</small></span>
   }
 
   return (
     <>
       <header className="page-head">
-        <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
+        <span className="sc-ic"><Icon.server style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Servidores ZKONG</h1></div>
-        <span className="sub">· Cuentas que usa el Centro de dispositivos</span>
+        <span className="sub">· Cuentas que usa el Centro de dispositivos para ver etiquetas y antenas</span>
       </header>
 
-      <div className="page-scroll"><div className="page" style={{ maxWidth: 820 }}>
-        <div className="card">
-          <div className="wa-num-head">
-            <div>
-              <h2>Servidores</h2>
-              <p className="desc" style={{ margin: '2px 0 0' }}>Una cuenta de administrador por servidor de etiquetas. La contraseña se guarda cifrada y no se vuelve a mostrar.</p>
+      <div className="page-scroll"><div className="page dev-page wr-page">
+        {rows === null ? <div className="center-load"><div className="spinner" /></div> : (
+          <>
+            <div className="wi-kpis">
+              <div className="wi-kpi">
+                <div className="v">{num(activos.length)}<span className="wi-de">{activos.length === 1 ? 'activo' : 'activos'}</span></div>
+                <div className="k">Servidores</div>
+                <div className="h">{lista.length - activos.length ? `${lista.length - activos.length} desactivado${lista.length - activos.length === 1 ? '' : 's'}` : 'Todos se consultan'}</div>
+              </div>
+              <div className="wi-kpi">
+                <div className="v">{num(conectan.length)}<span className="wi-de">de {num(activos.length)}</span></div>
+                <div className="k">Con acceso</div>
+                <div className="h">{fallan.length ? <span className="zk-warn-t">{fallan.length} no {fallan.length === 1 ? 'conecta' : 'conectan'} ahora mismo</span> : ultima ? `Última entrada correcta ${hace(ultima)}` : 'Ninguno probado todavía'}</div>
+              </div>
+              <div className="wi-kpi">
+                <div className="v">{tiempos.length ? num(Math.round(tiempos.reduce((a, b) => a + b, 0) / tiempos.length)) : '—'}{tiempos.length ? <span className="wi-de">ms</span> : null}</div>
+                <div className="k">Tiempo de respuesta</div>
+                <div className="h">{tiempos.length ? 'Media de las pruebas de ahora (entrar en la cuenta)' : 'Pulsa «Probar todos» para medirlo'}</div>
+              </div>
+              <div className="wi-kpi">
+                <div className="v">{leidos.length ? num(etiquetas) : '—'}{leidos.length ? <span className="wi-de">etiquetas</span> : null}</div>
+                <div className="k">En los servidores</div>
+                <div className="h">{cargandoTot ? 'Preguntando a los servidores…' : leidos.length
+                  ? <>{num(enLinea)} en línea ({etiquetas ? Math.round((enLinea / etiquetas) * 100) : 0} %) · {num(antenas)} antenas{leidos.length < activos.length ? <span className="zk-warn-t"> · falta {activos.length - leidos.length} servidor</span> : null}</>
+                  : 'Ningún servidor ha respondido'}</div>
+              </div>
             </div>
-            <button className="btn" onClick={() => abrir(null)}><Icon.plus /> Añadir servidor</button>
-          </div>
 
-          {rows === null ? <div className="center-load"><div className="spinner" /></div> : rows.length === 0 ? (
-            <div className="wa-num-empty">
-              <Icon.shield style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
-              <p>Aún no hay servidores. Añade los de etiquetas (por ejemplo <b>APP01</b> y <b>APP02</b>) para ver sus dispositivos.</p>
+            <div className="dev-card zk-bandeja">
+              <div className="zk-bar">
+                <span className="zs-bar-t">{lista.length === 1 ? '1 servidor' : `${lista.length} servidores`}</span>
+                <span className="spacer" />
+                <button className="dev-btn" disabled={!activos.length || testing.length > 0} onClick={probarTodos} title="Entra en cada servidor activo con su cuenta"><Icon.refresh /> {testing.length ? 'Probando…' : 'Probar todos'}</button>
+                <button className="btn" onClick={() => abrir(null)}><Icon.plus /> Añadir servidor</button>
+              </div>
+              <div className="dev-table-wrap keep">
+                <table className="dev-table zs-t">
+                  <thead><tr>
+                    <th>Servidor</th>
+                    <th>Dirección</th>
+                    <th>Usuario</th>
+                    <th>Estado de la conexión</th>
+                    <th className="r" title="Etiquetas registradas en el servidor (en línea / sin conexión)">Etiquetas</th>
+                    <th className="r" title="Antenas (puntos de acceso) registradas en el servidor">Antenas</th>
+                    <th />
+                  </tr></thead>
+                  <tbody>
+                    {lista.map((s) => (
+                      <tr key={s.id} className={s.active ? '' : 'zs-off'}>
+                        <td><span className="zs-name"><span className="zs-ic"><Icon.server /></span><span><b>{s.name}</b><small className="zk-sub">{s.updated_at ? `Editado el ${fechaHora(s.updated_at)}` : ''}</small></span></span></td>
+                        <td><code className="zs-url">{s.base_url}</code></td>
+                        <td>{s.username}<small className="zk-sub zs-pass" title="Se guarda cifrada y no vuelve nunca al navegador"><Icon.lock /> Contraseña guardada cifrada</small></td>
+                        <td>{estado(s)}</td>
+                        <Totales s={s} t={totales[s.id]} />
+                        <td className="zs-acts">
+                          <button className="ws-txt" disabled={testing.includes(s.id) || !s.active} onClick={() => probar(s)} title={s.active ? 'Entrar con la cuenta para comprobar que funciona' : 'Actívalo para probarlo'}>Probar</button>
+                          <button className="ws-txt" onClick={() => abrir(s)}>Editar</button>
+                          <button className="ws-txt danger" onClick={() => del(s)}>Quitar</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!lista.length && (
+                  <div className="act-empty"><Icon.server style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
+                    <p>Aún no hay servidores. Añade los de etiquetas (por ejemplo <b>APP01</b> y <b>APP02</b>) para ver sus dispositivos.</p></div>
+                )}
+              </div>
+              <div className="zk-pie">
+                <span className="dev-mute"><Icon.lock style={{ width: 13, height: 13, fill: 'currentColor', verticalAlign: '-2px' }} /> Una cuenta de administrador por servidor. Cambiar la dirección, el usuario o la contraseña obliga a volver a entrar.</span>
+              </div>
             </div>
-          ) : (
-            <div className="wa-num-list">
-              {rows.map((s) => (
-                <div key={s.id} className="wa-num" style={{ '--fc': '#f59e0b' }}>
-                  <span className="wa-num-ic"><Icon.shield style={{ width: 18, height: 18, fill: '#f59e0b' }} /></span>
-                  <div className="wa-num-body">
-                    <div className="wa-num-top">
-                      <b>{s.name}</b>
-                      {!s.active && <span className="wa-num-off">Inactivo</span>}
-                      {s.token_updated_at
-                        ? <span className="wa-num-env real" title={`Última entrada: ${s.token_updated_at}`}>Conectado</span>
-                        : <span className="wa-num-env prueba">Sin probar</span>}
-                    </div>
-                    <div className="wa-num-sub"><code>{s.base_url}</code> · {s.username}</div>
-                  </div>
-                  <div className="wa-num-acts">
-                    <button className="btn ghost sm" disabled={testing === s.id} onClick={() => probar(s)}>{testing === s.id ? 'Probando…' : 'Probar'}</button>
-                    <button className="icon-btn" title="Editar" onClick={() => abrir(s)}><Icon.pencil /></button>
-                    <button className="icon-btn" title="Quitar" style={{ color: 'var(--danger)' }} onClick={() => del(s)}><Icon.trash /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          </>
+        )}
       </div></div>
 
       {form && (

@@ -30,6 +30,7 @@ class ZkongServersController extends Controller
             'id' => $s->id, 'name' => $s->name, 'base_url' => $s->base_url, 'username' => $s->username,
             'active' => $s->active, 'merchant_id' => $s->merchant_id,
             'token_updated_at' => $s->token_updated_at?->toDateTimeString(),
+            'updated_at' => $s->updated_at?->toDateTimeString(),
         ]);
         return response()->json(['ok' => true, 'servers' => $rows]);
     }
@@ -84,11 +85,13 @@ class ZkongServersController extends Controller
     private function test(Request $request)
     {
         $s = ZkongServer::findOrFail((int) $request->input('id'));
+        $t = microtime(true);
+        $ms = fn () => (int) round((microtime(true) - $t) * 1000);
         try {
             $info = (new ZkongClient($s))->login();
-            return response()->json(['ok' => true, 'merchant_id' => $info['merchant_id']]);
+            return response()->json(['ok' => true, 'merchant_id' => $info['merchant_id'], 'ms' => $ms()]);
         } catch (Throwable $e) {
-            return response()->json(['ok' => false, 'error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'error' => $e->getMessage(), 'ms' => $ms()]);
         }
     }
 }

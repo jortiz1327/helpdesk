@@ -5477,3 +5477,32 @@ button.dev-code:hover { text-decoration: underline; }
 .ws-txt-ph { display: inline-block; width: 58px; }
 .ws-panel .ws-acts { gap: 4px; margin-left: 12px; }
 @media (max-width: 1000px) { .ws-layout { grid-template-columns: 1fr; } .ws-nav { position: static; } }
+
+/* Servidores ZKONG */
+.zs-bar-t { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.zs-t td { vertical-align: middle; white-space: nowrap; }
+.zs-t td:nth-child(2), .zs-t td:nth-child(4) { white-space: normal; }
+.zs-t .zs-url { white-space: normal; word-break: normal; overflow-wrap: anywhere; }
+.zs-t .zs-name b { white-space: nowrap; }
+.zs-t tr.zs-off td { color: var(--ink-3); }
+.zs-name { display: inline-flex; align-items: center; gap: 10px; }
+.zs-ic { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: color-mix(in srgb, #f59e0b 14%, transparent); flex: none; }
+.zs-ic svg { width: 17px; height: 17px; fill: #c27803; }
+.zs-off .zs-ic { filter: grayscale(1); opacity: 0.6; }
+.zs-url { font-size: 12px; padding: 2px 6px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); word-break: break-all; }
+.zs-st { display: inline-grid; grid-template-columns: auto 1fr; column-gap: 7px; align-items: center; font-size: 13px; font-weight: 700; }
+.zs-st i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.zs-st small { grid-column: 2; font-size: 12px; font-weight: 500; color: var(--ink-3); max-width: 280px; white-space: normal; }
+.zs-st.ok { color: #12925a; } .zs-st.ok i { background: #12925a; box-shadow: 0 0 0 3px color-mix(in srgb, #12925a 18%, transparent); }
+.zs-st.bad { color: #dc2626; } .zs-st.bad i { background: #dc2626; box-shadow: 0 0 0 3px color-mix(in srgb, #dc2626 18%, transparent); }
+.zs-st.wait { color: var(--primary); } .zs-st.wait i { background: var(--primary); animation: zs-pulse 1s infinite; }
+.zs-st.off { color: var(--ink-2); }
+@keyframes zs-pulse { 50% { opacity: 0.3; } }
+.zs-pass { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.zs-pass svg { width: 14px; height: 14px; fill: var(--ink-3); }
+.zs-acts { text-align: right; white-space: nowrap; }
+.zs-acts .ws-txt:disabled { opacity: 0.4; cursor: default; }
+.zs-load { display: inline-block; width: 46px; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--panel-2), var(--line), var(--panel-2)); background-size: 200% 100%; animation: zs-shim 1.2s infinite; }
+@keyframes zs-shim { to { background-position: -200% 0; } }
+.zs-t td:nth-child(2) { min-width: 230px; }
+.zs-t td small.zk-sub { white-space: normal; }
