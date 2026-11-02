@@ -86,6 +86,11 @@ class WarrantyTeamReportTest extends TestCase
         $this->assertSame([2, 2, 0], [$g['Hoteles']['total'], $g['Hoteles']['closed'], $g['Hoteles']['open']]);
         $this->assertSame(['defectuosa' => 1, 'pendiente' => 1], collect($r['resolutions'])->sortKeys()->all());
         $this->assertSame(['abono' => 1], $r['zkong_results']);
+        $this->assertSame(['sent' => 0, 'to_send' => 0], $r['zkong_pending']);
+        $this->assertSame(1, $r['previous']);                                   // la de 2025-01-01 cae en el año anterior
+        $this->assertCount(12, $r['monthly']);
+        $this->assertSame('2026-12', end($r['monthly'])['key']);                 // 12 meses que acaban en el final del rango
+        $this->assertSame(3, array_sum(array_column($r['monthly'], 'received')));
 
         $m = $this->getJson('/api/warranties.php?action=report&from=2026-01-01&group=month', $h)->json('rows');
         $this->assertSame(['2026-10', '2026-09'], array_column($m, 'key'));

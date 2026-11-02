@@ -868,7 +868,7 @@ class WarrantiesController extends Controller
         $ws = $q->get(['warranties.id', 'warranties.status', 'warranties.urgency', 'warranties.category', 'warranties.client_name',
             'warranties.received_at', 'warranties.closed_at', 'u.name as responsible_name']);
 
-        $items = WarrantyItem::whereIn('warranty_id', $ws->pluck('id'))->get(['warranty_id', 'resolution', 'zkong_result']);
+        $items = WarrantyItem::whereIn('warranty_id', $ws->pluck('id'))->get(['warranty_id', 'resolution', 'zkong_decision', 'zkong_batch_id', 'zkong_result']);
         $porW = $items->groupBy('warranty_id');
         $cerrados = Warranty::closedStatuses();
         $estados = Warranty::statuses();
@@ -917,10 +917,36 @@ class WarrantiesController extends Controller
             usort($grupos, fn ($a, $b) => $b['total'] <=> $a['total']);
         }
 
+        // Para comparar: las recibidas en el periodo anterior de la misma duración.
+        $anterior = null;
+        if ($this->esFecha($desde) && $this->esFecha($hasta)) {
+            $d0 = \Carbon\Carbon::parse($desde);
+            $dias = $d0->diffInDays(\Carbon\Carbon::parse($hasta)) + 1;
+            $anterior = Warranty::whereBetween('received_at', [$d0->copy()->subDays($dias)->toDateString(), $d0->copy()->subDay()->toDateString()])->count();
+        }
+
+        // Recibidas y cerradas por mes: los 12 meses que acaban en el final del periodo.
+        $fin12 = ($this->esFecha($hasta) ? \Carbon\Carbon::parse($hasta) : now())->startOfMonth();
+        $ini12 = $fin12->copy()->subMonths(11);
+        $rec = Warranty::where('received_at', '>=', $ini12->toDateString())->where('received_at', '<', $fin12->copy()->addMonth()->toDateString())
+            ->get(['received_at'])->countBy(fn ($w) => $w->received_at->format('Y-m'));
+        $cer = Warranty::whereIn('status', $cerrados)->where('closed_at', '>=', $ini12)->where('closed_at', '<', $fin12->copy()->addMonth())
+            ->get(['closed_at'])->countBy(fn ($w) => $w->closed_at->format('Y-m'));
+        $meses = [];
+        for ($m = $ini12->copy(); $m <= $fin12; $m->addMonth()) {
+            $k = $m->format('Y-m');
+            $meses[] = ['key' => $k, 'label' => ucfirst($m->locale('es')->isoFormat('MMM YY')), 'received' => $rec[$k] ?? 0, 'closed' => $cer[$k] ?? 0];
+        }
+
         return response()->json([
-            'ok' => true, 'group' => $grupo, 'rows' => $grupos, 'total' => $fin($total),
+            'ok' => true, 'group' => $grupo, 'rows' => $grupos, 'total' => $fin($total), 'previous' => $anterior, 'monthly' => $meses,
             'resolutions' => $items->countBy('resolution'),
             'zkong_results' => $items->whereNotNull('zkong_result')->countBy('zkong_result'),
+            // Lo que aún no tiene respuesta: enviado a ZKONG o marcado para enviar.
+            'zkong_pending' => [
+                'sent'    => $items->whereNull('zkong_result')->whereNotNull('zkong_batch_id')->count(),
+                'to_send' => $items->whereNull('zkong_result')->whereNull('zkong_batch_id')->where('zkong_decision', 'enviar')->count(),
+            ],
         ]);
     }
 
