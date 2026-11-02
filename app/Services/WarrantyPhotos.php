@@ -22,6 +22,7 @@ use Illuminate\Support\Str;
 class WarrantyPhotos
 {
     public const MAX_BYTES = 15 * 1024 * 1024;
+    public const MAX_PIXELS = 40_000_000;   // más que eso agota la memoria al montar el PDF
     private const EXT = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
     private const META_DAYS = 30;           // lo que guarda Meta un medio de WhatsApp
     private const LOGO_BYTES = 30 * 1024;   // imágenes en línea más pequeñas: firmas y logos del correo
@@ -104,7 +105,7 @@ class WarrantyPhotos
         if (! $file->isValid()) return 'La foto no ha llegado bien';
         if ($file->getSize() > self::MAX_BYTES) return 'La foto supera los 15 MB';
         $bin = (string) file_get_contents($file->getRealPath());
-        if (! self::mimeReal($bin)) return 'Solo fotos JPG, PNG, WEBP o GIF (las HEIC del iPhone, mejor en JPG)';
+        if ($error = self::problema($bin)) return $error;
         self::guardar($item, $type, $bin, $file->getClientOriginalName(), null, $userId);
         return null;
     }
@@ -123,6 +124,7 @@ class WarrantyPhotos
         if (! $img) return 'Esa imagen no es del ticket de esta garantía o ya no está';
         [$bin, , $name] = $img;
         if (strlen($bin) > self::MAX_BYTES) return 'La foto supera los 15 MB';
+        if ($error = self::problema($bin)) return $error;
         self::guardar($item, $type, $bin, $name, $src, $userId);
         return null;
     }
@@ -149,6 +151,15 @@ class WarrantyPhotos
         $info = @getimagesizefromstring($bin);
         $mime = $info['mime'] ?? null;
         return isset(self::EXT[$mime]) ? $mime : null;
+    }
+
+    /** Por qué no se puede guardar esta imagen (tipo o tamaño en píxeles), o null si vale. */
+    private static function problema(string $bin): ?string
+    {
+        $info = @getimagesizefromstring($bin);
+        if (! isset(self::EXT[$info['mime'] ?? null])) return 'Solo fotos JPG, PNG, WEBP o GIF (las HEIC del iPhone, mejor en JPG)';
+        if ($info[0] * $info[1] > self::MAX_PIXELS) return 'La foto es demasiado grande (más de 40 megapíxeles): redúcela antes de subirla';
+        return null;
     }
 
     private static function guardar(WarrantyItem $item, string $type, string $bin, ?string $name, ?string $source, int $userId): void

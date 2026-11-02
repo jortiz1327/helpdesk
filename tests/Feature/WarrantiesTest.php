@@ -443,7 +443,13 @@ class WarrantiesTest extends TestCase
         $foto1($ids[0], 'front', \Illuminate\Http\UploadedFile::fake()->create('virus.jpg', 10, 'image/jpeg'))->assertStatus(400);   // no es una imagen de verdad
         $foto1($ap, 'back_batteries', \Illuminate\Http\UploadedFile::fake()->image('f.png'))->assertStatus(400);                    // las antenas no tienen pilas
         $this->postJson('/api/warranties.php?action=photo_from_ticket', ['item_id' => $ids[0], 'type' => 'back_batteries', 'src' => "a:{$ajena}"], $h)->assertStatus(400);
-        $p = $this->postJson('/api/warranties.php?action=photo_from_ticket', ['item_id' => $ids[0], 'type' => 'back_batteries', 'src' => "a:{$foto}"], $h)->assertOk()->json('photos');
+        // Un adjunto que se llama .png sin serlo, y una imagen de 50 megapíxeles (solo la cabecera).
+        \Illuminate\Support\Facades\Storage::disk('local')->put('attachments/x/falsa.png', 'no soy una imagen');
+        $falsa = DB::table('attachments')->insertGetId(['ticket_id' => $tid, 'name' => 'falsa.png', 'path' => 'attachments/x/falsa.png', 'mime' => 'image/png', 'size' => 17]);
+        $this->postJson('/api/warranties.php?action=photo_from_ticket', ['item_id' => $ids[0], 'type' => 'back_batteries', 'src' => "a:{$falsa}"], $h)->assertStatus(400);
+        $gigante = "\x89PNG\r\n\x1a\n" . pack('N', 13) . 'IHDR' . pack('NN', 10000, 5000) . "\x08\x02\x00\x00\x00" . pack('N', 0);
+        $foto1($ids[0], 'front', \Illuminate\Http\UploadedFile::fake()->createWithContent('g.png', $gigante))->assertStatus(400)->assertJsonFragment(['error' => 'La foto es demasiado grande (más de 40 megapíxeles): redúcela antes de subirla']);
+        $p =$this->postJson('/api/warranties.php?action=photo_from_ticket', ['item_id' => $ids[0], 'type' => 'back_batteries', 'src' => "a:{$foto}"], $h)->assertOk()->json('photos');
         $this->assertSame(['front', 'back_batteries'], array_column($p, 'type'));
         $this->assertSame([null, "a:{$foto}"], array_column($p, 'source'));
         $foto1($ids[0], 'front', \Illuminate\Http\UploadedFile::fake()->image('g.jpg'))->assertOk();
