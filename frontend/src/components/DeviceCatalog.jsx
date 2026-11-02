@@ -15,7 +15,45 @@ import Select from './Select.jsx'
 
 const pulgadas = (s) => (s == null ? '—' : `${String(Number(s)).replace('.', ',')}"`)
 const pilas = (m) => (m.has_batteries ? `${m.battery_type || '¿tipo?'}${m.battery_quantity > 1 ? ` ×${m.battery_quantity}` : ''}` : null)
-const EINK_C = { BW: '#64748b', BWR: '#dc2626', BWRY: '#c27803' }
+// Tintas reales de cada pantalla y color de cada carcasa.
+const TINTAS = { BW: ['#111827', '#ffffff'], BWR: ['#111827', '#ffffff', '#dc2626'], BWRY: ['#111827', '#ffffff', '#dc2626', '#eab308'] }
+const EINK_CORTO = { BW: 'B/W', BWR: 'B/W/R', BWRY: 'B/W/R/Y' }
+const CARCASA = { white: '#ffffff', black: '#18181b' }
+const CARCASA_F = { white: 'Blanca', black: 'Negra' }
+// La ZKONG es la misma en blanco y en negro: el «(White)»/«(Black)» lo añadió quien la
+// dio de alta. Se enseña sin él; el color va en la muestra de la carcasa.
+const baseZk = (z) => String(z || '').replace(/\s*\((white|black|blanco|negro)\)/gi, '').trim()
+
+const Tintas = ({ eink }) => <span className="dc-ink">{(TINTAS[eink] || TINTAS.BW).map((c, i) => <i key={i} style={{ background: c }} />)}</span>
+const Sw = ({ color }) => <i className="dc-sw" style={{ background: CARCASA[color] || '#94a3b8' }} />
+
+/**
+ * Una fila por tamaño + pantalla. Dentro, las referencias por ZKONG: si una misma ZKONG
+ * está en carcasa blanca y negra, sale una vez con una rama por carcasa.
+ */
+function agrupar(models) {
+  const grupos = new Map()
+  for (const m of models) {
+    const k = m.size == null ? `x${m.id}` : `${m.size}|${m.eink_colors}`
+    if (!grupos.has(k)) grupos.set(k, { key: k, size: m.size, eink: m.eink_colors, models: [], zk: new Map() })
+    const g = grupos.get(k)
+    g.models.push(m)
+    for (const r of m.refs) {
+      const zk = baseZk(r.zkong)
+      const fk = zk ? zk.toUpperCase() : `~${r.aeme}`
+      if (!g.zk.has(fk)) g.zk.set(fk, { key: fk, zk, vars: [] })
+      g.zk.get(fk).vars.push({ m, r })
+    }
+  }
+  const orden = { white: 0, black: 1 }
+  return [...grupos.values()].map((g) => {
+    g.models.sort((a, b) => (orden[a.color] ?? 2) - (orden[b.color] ?? 2))
+    const refs = [...g.zk.values()]
+    refs.forEach((f) => f.vars.sort((a, b) => (orden[a.m.color] ?? 2) - (orden[b.m.color] ?? 2)))
+    const pilasDe = [...new Set(g.models.map((m) => pilas(m) || ''))]
+    return { ...g, refs, colores: [...new Set(g.models.map((m) => m.color))], pilasDe, used: g.models.reduce((s, m) => s + m.used, 0) }
+  })
+}
 const FILTROS = [['', 'Todos'], ['pilas', 'Con pilas'], ['sin_pilas', 'Sin pilas'], ['sin_aeme', 'Sin referencia AEME'], ['fuera', 'AEME que no está en el portal']]
 const VACIO = { id: 0, size: '', eink_colors: 'BWR', color: 'white', variant: '', has_batteries: true, battery_type: 'CR2450', battery_quantity: 2, refs: [{ zkong: '', aeme: '' }] }
 
@@ -58,18 +96,28 @@ function Editor({ inicial, d, onClose, onSaved }) {
         <div className="modal-body">
           <div className="dc-grid">
             <div className="field"><span className="lbl">Tamaño <span className="hint">— pulgadas</span></span><input inputMode="decimal" value={m.size} placeholder="2,6" onChange={(e) => set({ size: e.target.value })} /></div>
-            <div className="field"><span className="lbl">Pantalla</span><Select block value={m.eink_colors} onChange={(v) => set({ eink_colors: v })} options={Object.entries(d.eink).map(([value, label]) => ({ value, label: `${label} (${value})` }))} /></div>
-            <div className="field"><span className="lbl">Carcasa</span><Select block value={m.color} onChange={(v) => set({ color: v })} options={Object.entries(d.colors).map(([value, label]) => ({ value, label }))} /></div>
+            <div className="field"><span className="lbl">Pantalla</span><Select block value={m.eink_colors} onChange={(v) => set({ eink_colors: v })} options={Object.entries(d.eink).map(([value, label]) => ({ value, label: `${label} (${EINK_CORTO[value] || value})` }))} />
+              <span className="dc-hint"><Tintas eink={m.eink_colors} /> {['Negro', 'blanco', 'rojo', 'amarillo'].slice(0, (TINTAS[m.eink_colors] || TINTAS.BW).length).join(', ')}</span></div>
+            <div className="field"><span className="lbl">Carcasa</span>
+              <div className="dc-seg">
+                {Object.keys(d.colors).map((c) => (
+                  <button key={c} type="button" className={m.color === c ? 'on' : ''} onClick={() => set({ color: c })}><Sw color={c} />{CARCASA_F[c] || d.colors[c]}</button>
+                ))}
+              </div></div>
             <div className="field"><span className="lbl">Variante <span className="hint">— opcional</span></span><input value={m.variant || ''} maxLength={60} placeholder="NFC, congelado…" onChange={(e) => set({ variant: e.target.value })} /></div>
           </div>
 
           <div className="dc-pilas">
-            <label className="wr-check"><input type="checkbox" checked={m.has_batteries} onChange={(e) => set({ has_batteries: e.target.checked })} /> Lleva pilas</label>
+            <label className="wr-check"><input type="checkbox" checked={m.has_batteries} onChange={(e) => set(e.target.checked ? { has_batteries: true, battery_type: m.battery_type || 'CR2450', battery_quantity: m.battery_quantity || 1 } : { has_batteries: false })} /> Lleva pilas</label>
             {m.has_batteries ? (
               <>
                 <label>Tipo <input value={m.battery_type || ''} maxLength={30} placeholder="CR2450" onChange={(e) => set({ battery_type: e.target.value.toUpperCase() })} /></label>
                 {d.battery_types.filter((t) => t !== m.battery_type).map((t) => <button key={t} type="button" className="dc-chip" onClick={() => set({ battery_type: t })}>{t}</button>)}
-                <label>Cantidad <input type="number" min={1} max={9} value={m.battery_quantity || ''} onChange={(e) => set({ battery_quantity: e.target.value })} /></label>
+                <span className="dc-qty">Cantidad
+                  <button type="button" onClick={() => set({ battery_quantity: Math.max(1, (Number(m.battery_quantity) || 1) - 1) })}>−</button>
+                  <input type="number" min={1} max={9} value={m.battery_quantity || ''} onChange={(e) => set({ battery_quantity: e.target.value })} />
+                  <button type="button" onClick={() => set({ battery_quantity: Math.min(9, (Number(m.battery_quantity) || 0) + 1) })}>+</button>
+                </span>
               </>
             ) : <span className="dev-mute">Sin pilas: no entra en los presupuestos de pilas.</span>}
           </div>
@@ -80,8 +128,8 @@ function Editor({ inicial, d, onClose, onSaved }) {
             <div className="dc-refs-h"><span>ZKONG</span><i /><span>AEME</span><b /></div>
             {m.refs.map((r, i) => (
               <div key={i} className="dc-ref">
-                <input value={r.zkong} maxLength={80} placeholder="ZKC26V-NE4 (White)" onChange={(e) => setRef(i, { zkong: e.target.value })} />
-                <Icon.link className="dc-link" />
+                <input value={r.zkong} maxLength={80} placeholder="ZKC26V-NE4" onChange={(e) => setRef(i, { zkong: e.target.value })} />
+                <span className="dc-link">⇄</span>
                 {portal ? <Select block value={r.aeme} placeholder="Producto del portal…" onChange={(v) => setRef(i, { aeme: v })} options={[{ value: '', label: 'Sin referencia AEME' }, ...opcionesAeme(r.aeme)]} searchable />
                   : <input value={r.aeme} maxLength={80} placeholder="AMC26V" onChange={(e) => setRef(i, { aeme: e.target.value.toUpperCase() })} />}
                 <button className="icon-btn" title="Quitar" disabled={m.refs.length === 1} onClick={() => set({ refs: m.refs.filter((_, k) => k !== i) })}><Icon.trash /></button>
@@ -111,10 +159,12 @@ export default function DeviceCatalog() {
 
   const fuera = (r) => r.aeme && d?.portal && !d.portal[r.aeme]
   const texto = q.trim().toUpperCase()
-  const lista = (d?.models || []).filter((m) =>
-    (!texto || m.refs.some((r) => r.zkong.toUpperCase().includes(texto) || r.aeme.includes(texto)) || m.description.toUpperCase().includes(texto) || (m.battery_type || '').includes(texto))
-    && (!filtro || (filtro === 'pilas' ? m.has_batteries : filtro === 'sin_pilas' ? !m.has_batteries : filtro === 'sin_aeme' ? !m.refs.some((r) => r.aeme) : m.refs.some(fuera))))
-  const n = (k) => (d?.models || []).filter((m) => (k === 'pilas' ? m.has_batteries : k === 'sin_pilas' ? !m.has_batteries : k === 'sin_aeme' ? !m.refs.some((r) => r.aeme) : k === 'fuera' ? m.refs.some(fuera) : true)).length
+  const pasa = (m, k) => (k === 'pilas' ? m.has_batteries : k === 'sin_pilas' ? !m.has_batteries : k === 'sin_aeme' ? !m.refs.some((r) => r.aeme) : k === 'fuera' ? m.refs.some(fuera) : true)
+  const busca = (m) => !texto || m.refs.some((r) => r.zkong.toUpperCase().includes(texto) || r.aeme.includes(texto))
+    || m.description.toUpperCase().includes(texto) || (m.battery_type || '').includes(texto) || pulgadas(m.size).startsWith(texto.replace('.', ','))
+  const lista = agrupar((d?.models || []).filter((m) => busca(m) && pasa(m, filtro)))
+  const n = (k) => agrupar((d?.models || []).filter((m) => pasa(m, k))).length
+  const portalDe = (r) => (r.aeme ? d.portal?.[r.aeme]?.name : null)
   const anadirA = (id, ref) => { const m = d.models.find((x) => x.id === id); if (m) setEd({ ...m, refs: [...m.refs, { zkong: '', aeme: ref }] }) }
 
   return (
@@ -139,34 +189,68 @@ export default function DeviceCatalog() {
             <div className="dev-card">
               <div className="dev-table-wrap keep wt-wrap">
                 <table className="dev-table dc-table">
-                  <thead><tr><th>Modelo</th><th>Pilas</th><th>ZKONG ↔ AEME</th><th className="c">En garantías</th>{d.can_edit ? <th /> : null}</tr></thead>
+                  <thead><tr><th>Modelo y pantalla</th><th>Pilas</th><th><div className="dc-list-h"><span>Ref. ZKONG</span><span><Sw color="white" /> AEME blanca</span><span><Sw color="black" /> AEME negra</span><span>Portal</span></div></th><th className="c">En garantías</th>{d.can_edit ? <th className="r">Editar</th> : null}</tr></thead>
                   <tbody>
-                    {lista.map((m) => (
-                      <tr key={m.id}>
-                        <td>
-                          <div className="dc-mod">
-                            <b>{pulgadas(m.size)}</b>
-                            <span className="wr-pill" style={{ '--pc': EINK_C[m.eink_colors] || '#64748b' }}><i />{d.eink[m.eink_colors] || m.eink_colors}</span>
-                            <span className="dev-mute">{d.colors[m.color] || m.color}{m.variant ? ` · ${m.variant}` : ''}</span>
-                          </div>
-                        </td>
-                        <td>{pilas(m) ? <span className="dc-bat"><Icon.bolt /> {pilas(m)}</span> : <span className="dev-mute">Sin pilas</span>}</td>
-                        <td>
-                          <ul className="dc-pairs">
-                            {m.refs.map((r, i) => (
-                              <li key={i}>
-                                <span className="mono">{r.zkong || <span className="dev-mute">—</span>}</span>
-                                <Icon.link />
-                                <span className={`mono${fuera(r) ? ' dc-out' : ''}`} title={r.aeme ? (d.portal?.[r.aeme]?.name || (d.portal ? 'No está en el portal AEME' : '')) : ''}>{r.aeme || <span className="dev-mute">—</span>}{fuera(r) ? <Icon.warn /> : null}</span>
-                                {r.aeme && d.portal?.[r.aeme] ? <span className="dev-mute dc-pname">{d.portal[r.aeme].name}</span> : null}
-                              </li>
-                            ))}
-                          </ul>
-                        </td>
-                        <td className="c">{m.used ? <b>{m.used}</b> : <span className="wt-0">0</span>}</td>
-                        {d.can_edit ? <td className="wd-row-acts"><button className="icon-btn" title="Editar" onClick={() => setEd(m)}><Icon.pencil /></button></td> : null}
-                      </tr>
-                    ))}
+                    {lista.map((g) => {
+                      const sinTam = g.size == null
+                      const variantes = [...new Set(g.models.map((m) => m.variant).filter(Boolean))]
+                      return (
+                        <tr key={g.key} className={sinTam || !g.refs.length ? 'dc-bad-row' : ''}>
+                          <td>
+                            <div className="dc-mod">
+                              <span className="dc-size">{sinTam ? '¿?' : pulgadas(g.size)}</span>
+                              <div className="dc-mod-t">
+                                <span className="dc-tag"><Tintas eink={g.eink} />{d.eink[g.eink] || g.eink} <small>({EINK_CORTO[g.eink] || g.eink})</small></span>
+                                {variantes.map((v) => <span key={v} className="dc-tag var">{v}</span>)}
+                                {sinTam ? <span className="dc-warn"><Icon.warn /> Sin tamaño{g.refs.length ? '' : ' ni referencias'}</span> : null}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            {g.pilasDe.length === 1
+                              ? (g.pilasDe[0] ? <span className="dc-bat"><Icon.bolt /> {g.pilasDe[0]}</span> : <span className="dc-nobat">Sin pilas</span>)
+                              : g.models.map((m) => <div key={m.id} className="dc-bat-v"><Sw color={m.color} />{pilas(m) ? <span className="dc-bat"><Icon.bolt /> {pilas(m)}</span> : <span className="dc-nobat">Sin pilas</span>}</div>)}
+                          </td>
+                          <td>
+                            {/* Lista: una línea por referencia ZKONG; a la derecha, su AEME en carcasa
+                                blanca y en negra (columnas fijas para leerlo de un vistazo). */}
+                            <ul className="dc-list">
+                              {g.refs.map((f) => {
+                                const por = (c) => f.vars.filter((v) => v.m.color === c)
+                                const nombre = f.vars.map((v) => portalDe(v.r)).find(Boolean)
+                                const celda = (c) => por(c).map(({ m, r }, i) => (
+                                  <button key={i} type="button" className={`dc-ae-b${fuera(r) ? ' out' : ''}`} disabled={!d.can_edit} onClick={() => setEd(m)}
+                                    title={[`Carcasa ${(CARCASA_F[c] || c).toLowerCase()}`, portalDe(r) || (fuera(r) ? 'No está en el portal AEME' : '')].filter(Boolean).join(' · ')}>
+                                    <Sw color={c} /><span className="dc-ae">{r.aeme || '—'}</span>{fuera(r) ? <Icon.warn /> : null}
+                                  </button>
+                                ))
+                                return (
+                                  <li key={f.key}>
+                                    <span className={`dc-zk${f.zk ? '' : ' none'}`}>{f.zk || 'Sin ZKONG'}</span>
+                                    <span className="dc-c">{celda('white')}</span>
+                                    <span className="dc-c">{celda('black')}</span>
+                                    <span className="dc-pname" title={nombre || ''}>{nombre || ''}</span>
+                                  </li>
+                                )
+                              })}
+                              {!g.refs.length ? <li className="dc-empty"><span className="dc-nobat">Sin referencias</span></li> : null}
+                            </ul>
+                          </td>
+                          <td className="c">{g.used ? <span className="dc-used on"><i />{g.used} {g.used === 1 ? 'etiqueta' : 'etiquetas'}</span> : <span className="dc-used">0</span>}</td>
+                          {d.can_edit ? (
+                            <td className="r">
+                              <div className="dc-acts">
+                                {g.models.map((m) => (
+                                  <button key={m.id} className="icon-btn" title={g.models.length > 1 ? `Editar carcasa ${(CARCASA_F[m.color] || '').toLowerCase()}` : 'Editar modelo'} onClick={() => setEd(m)}>
+                                    <Icon.pencil />{g.models.length > 1 ? <Sw color={m.color} /> : null}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                          ) : null}
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
                 {!lista.length ? <p className="dev-mute" style={{ padding: 14 }}>Ningún modelo con este filtro.</p> : null}

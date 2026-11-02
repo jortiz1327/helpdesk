@@ -4915,19 +4915,6 @@ button.dev-code:hover { text-decoration: underline; }
 .dc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
 .dc-bar .spacer { flex: 1; }
 .dc-search input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 13.5px; color: var(--ink); }
-.dc-table td { height: auto; padding-top: 10px; padding-bottom: 10px; vertical-align: top; }
-.dc-table th.c, .dc-table td.c { text-align: center; }
-.dc-mod { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.dc-mod b { font-size: 15px; font-variant-numeric: tabular-nums; min-width: 42px; }
-.dc-mod .dev-mute { font-size: 12.5px; }
-.dc-bat { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 12.5px; color: #a16207; white-space: nowrap; }
-.dc-bat svg { width: 13px; height: 13px; fill: currentColor; }
-.dc-pairs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-.dc-pairs li { display: grid; grid-template-columns: minmax(150px, auto) 14px minmax(90px, auto) minmax(0, 1fr); align-items: center; gap: 8px; font-size: 12.5px; }
-.dc-pairs li > svg { width: 12px; height: 12px; fill: var(--ink-3); }
-.dc-pairs .mono { display: inline-flex; align-items: center; gap: 4px; }
-.dc-out { color: #b45309; }
-.dc-out svg { width: 12px; height: 12px; fill: currentColor; }
 .dc-pname { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dc-unmapped { margin-top: 16px; }
 .dc-unmapped h3 svg { fill: #d97706 !important; }
@@ -4956,8 +4943,66 @@ button.dev-code:hover { text-decoration: underline; }
 .dc-ref .icon-btn { width: 32px; height: 32px; }
 .dc-del { margin-right: auto; color: var(--danger); }
 .dc-del svg { fill: currentColor; }
-@media (max-width: 760px) { .dc-grid { grid-template-columns: 1fr 1fr; } .dc-pairs li { grid-template-columns: auto 14px auto; } .dc-pairs .dc-pname { grid-column: 1 / -1; } }
-.dc-table td:first-child { min-width: 250px; }
-.dc-mod { flex-wrap: nowrap; white-space: nowrap; }
+@media (max-width: 760px) { .dc-grid { grid-template-columns: 1fr 1fr; } }
 .dc-pilas input:not([type=checkbox]), .dc-ref input { border: 1.5px solid var(--line-2); border-radius: 9px; background: var(--panel); color: var(--ink); }
 .dc-pilas input:focus, .dc-ref input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+/* Catálogo (diseño Stitch): tabla por tamaño + pantalla, tintas y carcasas en color,
+   la misma ZKONG una sola vez con una rama por carcasa. */
+.dc-table td { height: auto; padding-top: 12px; padding-bottom: 12px; vertical-align: top; }
+.dc-table th.c, .dc-table td.c { text-align: center; }
+.dc-table th.r, .dc-table td.r { text-align: right; }
+.dc-table td:first-child { min-width: 260px; }
+.dc-bad-row > td { background: rgba(245, 158, 11, .07); }
+.dc-mod { display: flex; align-items: flex-start; gap: 12px; }
+.dc-size { flex: none; min-width: 54px; height: 42px; padding: 0 8px; display: grid; place-items: center; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.dc-mod-t { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+.dc-tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 6px; background: var(--panel-2); font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.dc-tag small { font-weight: 500; color: var(--ink-3); font-size: 11px; }
+.dc-tag.soft { font-weight: 500; color: var(--ink-2); }
+.dc-tag.var { background: rgba(124, 58, 237, .1); color: #6d28d9; }
+.dc-warn { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #b45309; }
+.dc-warn svg { width: 13px; height: 13px; fill: currentColor; }
+.dc-ink { display: inline-flex; height: 11px; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0, 0, 0, .18); }
+.dc-ink i { width: 6px; height: 100%; }
+.dc-sw { display: inline-block; width: 11px; height: 11px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .28); }
+.dc-sws { display: inline-flex; }
+.dc-sws .dc-sw + .dc-sw { margin-left: -3px; }
+.dc-bat { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; background: rgba(234, 179, 8, .14); font-weight: 700; font-size: 12px; color: #a16207; white-space: nowrap; font-family: var(--mono, monospace); }
+.dc-bat svg { width: 12px; height: 12px; fill: currentColor; }
+.dc-nobat { display: inline-flex; padding: 3px 8px; border-radius: 6px; background: var(--panel-2); font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.dc-bat-v { display: flex; align-items: center; gap: 6px; }
+.dc-bat-v + .dc-bat-v { margin-top: 5px; }
+.dc-zk { font-family: var(--mono, monospace); font-size: 12.5px; font-weight: 700; color: var(--primary); }
+.dc-zk.none { color: var(--ink-3); font-weight: 500; }
+.dc-ae { font-family: var(--mono, monospace); font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.dc-pname { font-size: 11px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.dc-used { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 12px; color: var(--ink-3); background: var(--panel-2); font-family: var(--mono, monospace); white-space: nowrap; }
+.dc-used.on { color: var(--primary); background: var(--primary-soft); font-weight: 700; }
+.dc-used.on i { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+.dc-acts { display: inline-flex; gap: 2px; justify-content: flex-end; }
+.dc-acts .icon-btn { display: inline-flex; align-items: center; gap: 3px; width: auto; min-width: 32px; height: 32px; padding: 0 6px; }
+.dc-acts .icon-btn .dc-sw { width: 9px; height: 9px; }
+.dc-hint { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px; color: var(--ink-3); }
+.dc-seg { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+.dc-seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.dc-seg button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+.dc-qty { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.dc-qty button { width: 30px; height: 32px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); font-size: 15px; font-weight: 700; color: var(--ink); }
+.dc-qty button:hover { border-color: var(--primary); color: var(--primary); }
+.dc-qty input { width: 46px !important; text-align: center; }
+.dc-ref .dc-link { text-align: center; color: var(--ink-3); font-size: 15px; }
+/* Referencias en lista: ZKONG · AEME blanca · AEME negra · nombre del portal. */
+.dc-list-h, .dc-list li { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(0, 1.6fr); align-items: center; gap: 10px; }
+.dc-list-h span { display: inline-flex; align-items: center; gap: 5px; }
+.dc-list { list-style: none; margin: 0; padding: 0; }
+.dc-list li { padding: 4px 0; }
+.dc-list li + li { border-top: 1px dashed var(--line); }
+.dc-list li.dc-empty { display: block; }
+.dc-c { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.dc-ae-b { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 7px; border: 1px solid transparent; background: var(--panel-2); color: var(--ink); cursor: pointer; transition: border-color .15s; }
+.dc-ae-b:hover:not(:disabled) { border-color: var(--primary); }
+.dc-ae-b:disabled { cursor: default; }
+.dc-ae-b.out { border-color: #f59e0b; }
+.dc-ae-b.out .dc-ae { color: #b45309; }
+.dc-ae-b > svg { width: 12px; height: 12px; fill: #d97706; }
+.dc-list .dc-pname { max-width: none; font-size: 11.5px; }
