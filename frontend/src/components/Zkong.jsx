@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
+import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
@@ -103,7 +104,7 @@ function Bandeja({ rv, onOpenWarranty, onBatch }) {
   }
 
   const exportar = () => {
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const esc = csvCell
     const filas = [['Garantía', 'Cliente', 'Proyecto', 'Nº de serie', 'Tipo', 'Modelo', 'Producto', 'Fallo', 'Fotos', 'En la bandeja desde', 'Días']]
     d.groups.forEach((g) => g.items.forEach((i) => filas.push([g.code, g.client_name, g.project_name, i.code, i.kind === 'ap' ? 'Antena' : 'Etiqueta', i.model, i.product_name, i.issue,
       `${i.photos.length}/${i.photos_total}`, fecha(i.queued_at || g.queued_at), dias(i.queued_at || g.queued_at) ?? ''])))
@@ -310,7 +311,7 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
   const visibles = lista.slice(pag * POR_PAGINA, (pag + 1) * POR_PAGINA)
 
   const exportar = () => {
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const esc = csvCell
     const filas = [['Remesa', 'Estado', 'Etiquetas', 'Garantías', 'Con respuesta', 'Rechazadas', 'Creada', 'Enviada', 'Transportista', 'Tracking', 'Referencia', 'Recibida por ZKONG', 'Cerrada']]
     lista.forEach((b) => filas.push([b.code, estados[b.status] || b.status, b.status === 'anulada' ? (b.units_sent ?? '') : b.items, (b.warranty_list || []).map((w) => w.code).join(', '),
       b.answered, b.rejected, fecha(b.created_at), b.sent_at ? fecha(b.sent_at) : '', b.carrier, b.tracking, b.shipping_ref, b.received_at ? fecha(b.received_at) : '', b.closed_at ? fecha(b.closed_at) : '']))

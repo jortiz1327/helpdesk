@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api.js'
+import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
 
@@ -91,7 +92,7 @@ function descargar(nombre, lineas) {
   a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }
-const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+const esc = csvCell
 
 // Exporta lo que se ve a CSV (Excel lo abre con el BOM y el punto y coma).
 function exportar(kind, rows) {

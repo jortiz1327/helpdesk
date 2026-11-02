@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
+import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
 import DateRange from './DateRange.jsx'
@@ -72,7 +73,7 @@ export function WarrantyTeam({ onFilter }) {
     : <span className="wt-0">0</span>)
 
   const exportar = () => {
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const esc = csvCell
     const cab = ['Responsable', 'Abiertas', 'Dispositivos sin revisar', 'Pte. cliente', 'Pte. ZKONG', 'Con alertas', 'Críticas', 'Urgentes', 'Sin actividad', 'Cerradas', 'Días medios de cierre', 'Dispositivos revisados']
     const lineas = todas.map((r) => [r.id === 'none' ? 'Sin responsable' : r.name, r.open, r.unreviewed, r.pte_cliente, r.pte_zkong, r.alerts, r.critical, r.urgent, r.stale, r.closed, r.avg_days == null ? '' : dec(r.avg_days), r.reviewed])
     const blob = new Blob(['﻿' + [cab, ...lineas].map((l) => l.map(esc).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
@@ -315,7 +316,7 @@ export function WarrantyReports() {
   const dif = d?.previous == null ? null : (t.total || 0) - d.previous
 
   const exportar = () => {
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const esc = csvCell
     const cab = [nombreGrupo, 'Recibidas', 'Siguen abiertas', 'Cerradas', 'Días de media en cerrarlas', 'Dispositivos', 'Dispositivos revisados']
     const fila = (r, l) => [l, r.total, r.open, r.closed, r.avg_days == null ? '' : dec(r.avg_days), r.devices, r.reviewed]
     const lineas = [...d.rows.map((r) => fila(r, r.label)), fila(t, 'Total')]

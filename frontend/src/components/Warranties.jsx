@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../api.js'
+import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
@@ -315,7 +316,7 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
   const elegidas = filas.filter((w) => sel.has(w.id))
 
   const exportar = (lista) => {
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const esc = csvCell
     const cab = ['Expediente', 'Recepción', 'Cliente', 'Proyecto', 'Etiquetas', 'Categoría', 'Urgencia', 'Responsable', 'Estado', 'Quién paga', 'Ticket', 'Última actividad']
     const lineas = lista.map((w) => [w.code, fecha(w.received_at), w.client_name, w.project_name, w.labels_count, w.category, opts?.urgencies?.[w.urgency] || 'No disponible',
       w.responsible_name, opts?.statuses?.[w.status], (w.coverages || []).map((c) => COB_CORTO[c] || c).join(' + '), w.ticket_code, fechaHora(w.last_activity_at)])
@@ -1020,7 +1021,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
     if (r.ok) { onReload(); onChanged() } else toast(r.error || 'Error', 'err')
   }
   const exportar = () => {
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const esc = csvCell
     const cab = ['Código', 'Tipo', 'Referencia AEME', 'Producto', 'Modelo en el servidor', 'Servidor', 'Tienda', 'Conectada', 'Última comunicación', 'Avisos', 'Revisión', 'Detalle de la revisión', 'Fotos']
     const lineas = items.map((i) => [i.code, i.kind === 'ap' ? 'Antena' : 'Etiqueta', i.aeme_ref, i.product_name, i.server_model, i.server, i.store_name, i.online == null ? '' : i.online ? 'Sí' : 'No', fechaHora(i.last_commu_at), (i.warnings || []).map((a) => a.text).join(' | '),
       rv?.resolutions?.[i.resolution]?.label || i.resolution,

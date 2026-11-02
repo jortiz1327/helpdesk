@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api.js'
+import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
 
@@ -28,7 +29,7 @@ function Cabecera() {
 }
 
 const descargarCsv = (nombre, cab, lineas) => {
-  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const esc = csvCell
   const blob = new Blob(['﻿' + [cab, ...lineas].map((l) => l.map(esc).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
