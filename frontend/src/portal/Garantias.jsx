@@ -341,20 +341,22 @@ export function DetalleGarantia({ code, back, onExpire }) {
 
 /* --------------------------- Solicitar garantía --------------------------- */
 
-/* Dónde está el código: la etiqueta dibujada con el número bajo las barras marcado. */
+/* Dónde está el código: una etiqueta mostrando un producto, con su código de barras (el
+   pequeño del borde, sin número: el número solo sale si está desvinculada) marcado. */
 function AyudaCodigo({ onClose }) {
   const { t } = useLang()
   return (
     <div className="gw-ayuda">
       <svg className="gw-ayuda-img" viewBox="0 0 220 150" aria-hidden="true">
         <rect x="6" y="6" width="208" height="138" rx="10" fill="#fff" stroke="#c9d3e0" strokeWidth="3" />
-        <rect x="24" y="22" width="172" height="42" rx="5" fill="#eef3f9" />
-        <text x="110" y="49" textAnchor="middle" fontSize="15" fontWeight="700" fill="#46586e">ESL</text>
-        <rect x="68" y="76" width="84" height="20" rx="3" fill="none" stroke="#e5484d" strokeWidth="2.5" />
-        <text x="110" y="91" textAnchor="middle" fontSize="14" fontFamily="monospace" fill="#0e1e33">812345679</text>
-        {[0, 4, 7, 12, 15, 19, 24, 27, 31, 36, 39, 44, 48, 52, 57, 60, 64, 69, 72, 77].map((x, i) => (
-          <rect key={i} x={68 + x} y="102" width={i % 3 ? 2 : 3} height="28" fill="#0e1e33" />
+        <rect x="20" y="20" width="148" height="110" rx="4" fill="#eef3f9" />
+        <rect x="30" y="32" width="96" height="9" rx="2" fill="#9aabbf" />
+        <rect x="30" y="47" width="64" height="7" rx="2" fill="#c3cfdc" />
+        <text x="30" y="108" fontSize="30" fontWeight="800" fill="#46586e">3,95€</text>
+        {[0, 3, 5, 9, 12, 14, 18, 21, 25, 27, 30, 34, 37, 40, 44, 46, 50, 53, 57, 60, 63, 67, 70, 74, 77, 80].map((y, i) => (
+          <rect key={i} x="181" y={34 + y} width="14" height={i % 3 ? 1.6 : 2.6} fill="#0e1e33" />
         ))}
+        <rect x="175" y="28" width="26" height="94" rx="4" fill="none" stroke="#e5484d" strokeWidth="2.5" />
       </svg>
       <div className="gw-ayuda-tx">
         <b>{t('g_help_code_title')}</b>

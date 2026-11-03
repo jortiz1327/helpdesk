@@ -839,7 +839,7 @@ function LecturaCodigo({ photo, code }) {
   if (leidos === null) return <em className="wr-slot-bc lee" title="Leyendo el código de barras…"><span className="spinner xs" /> Leyendo código</em>
   if (leidos.includes(code)) return <em className="wr-slot-bc ok" title={`El código de barras de la foto es ${code}`}><Icon.check /> Código {code}</em>
   if (leidos.length) return <em className="wr-slot-bc mal" title={`La foto es de ${leidos.join(', ')} y el dispositivo es ${code}: ¿foto equivocada?`}><Icon.warn /> Es de {leidos[0]}</em>
-  return <em className="wr-slot-bc no" title="No se ha podido leer el código de barras de la foto. Compáralo a mano con el número que lleva debajo, o léelo con la cámara del móvil o una app de escáner de códigos (Google Lens, la cámara del iPhone…). Si la foto está borrosa o con reflejos, pide otra.">No se lee el código</em>
+  return <em className="wr-slot-bc no" title="No se ha podido leer el código de barras de la foto. Compruébalo con la cámara del móvil o una app de escáner de códigos (Google Lens, la cámara del iPhone…). Si la foto está borrosa o con reflejos, pide otra.">No se lee el código</em>
 }
 
 /* Hueco de una foto: vacío acepta clic, arrastrar un fichero o una imagen del ticket, y
