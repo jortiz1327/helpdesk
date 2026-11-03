@@ -125,9 +125,10 @@ Route::middleware('token')->group(function () {
     Route::match(['get', 'post'], 'ticket_fields.php', [\App\Http\Controllers\TicketFieldsController::class, 'handle'])
         ->middleware('can:helpdesk.access');
 
-    // Centro de notificaciones del agente (campana): sus propios avisos.
+    // Centro de notificaciones del agente (campana): sus propios avisos. También para quien
+    // solo entra a garantías (le llegan los avisos de sus alertas).
     Route::match(['get', 'post'], 'notifications.php', [\App\Http\Controllers\NotificationsController::class, 'handle'])
-        ->middleware('can:helpdesk.access');
+        ->middleware('permission:helpdesk.access|warranties.access');
 
     // --- Configuración de Soporte (categorías, respuestas): superadmin / encargado ---
     Route::match(['get', 'post', 'delete'], 'support_settings.php', [SupportSettingsController::class, 'handle'])

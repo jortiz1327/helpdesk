@@ -4,9 +4,10 @@ import { Icon } from '../icons.jsx'
 
 /*
  * Campana del centro de notificaciones. Muestra el nº de no leídas (sondeo cada 45s)
- * y, al abrir, el historial; al pulsar una, la marca leída y salta a su ticket.
+ * y, al abrir, el historial; al pulsar una, la marca leída y salta a su ticket (o a su
+ * garantía: los avisos de alertas de garantías).
  */
-export default function NotificationBell({ onOpenTicket, expanded, onCount }) {
+export default function NotificationBell({ onOpenTicket, onOpenWarranty, expanded, onCount }) {
   const [unread, setUnread] = useState(0)
   // Avisa al padre del número de notificaciones (para el badge del favicon).
   useEffect(() => { onCount?.(unread) }, [unread, onCount])
@@ -63,7 +64,8 @@ export default function NotificationBell({ onOpenTicket, expanded, onCount }) {
   const clickNotif = async (n) => {
     if (!n.read_at) { const r = await api.readNotification(n.id); if (r?.ok) setUnread(r.unread || 0) }
     setOpen(false)
-    if (n.ticket_id) onOpenTicket?.(n.ticket_id)
+    if (n.warranty_id) onOpenWarranty?.(n.warranty_id)
+    else if (n.ticket_id) onOpenTicket?.(n.ticket_id)
   }
 
   const marcarTodas = async () => {
@@ -96,6 +98,7 @@ export default function NotificationBell({ onOpenTicket, expanded, onCount }) {
                     <span className="notif-tx">
                       <span className="notif-body">{n.body}</span>
                       {n.ticket_code && <small>{n.ticket_code}</small>}
+                      {n.warranty_code && !n.ticket_code && <small>{n.warranty_code}</small>}
                     </span>
                   </button>
                 ))}

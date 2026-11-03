@@ -5864,3 +5864,14 @@ button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); 
 .hc-formato { margin: -6px 0 0; font-size: 12px; }
 .hc-formato code { font-size: 11.5px; padding: 1px 4px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); }
 @media (max-width: 900px) { .hc-layout { grid-template-columns: minmax(0, 1fr); } .hc-nav { display: none; } .hc-art { padding: 18px 16px; } .hc-paso { max-width: none; } }
+
+/* Configuración de garantías: avisos de alertas */
+.ws-avisos { display: flex; flex-direction: column; gap: 0; }
+.ws-aviso { padding: 14px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.ws-aviso:first-child { padding-top: 0; }
+.ws-aviso:last-child { border-bottom: 0; padding-bottom: 0; }
+.ws-aviso > p { margin: 0; font-size: 12.5px; line-height: 1.5; }
+.ws-aviso-op { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin-top: 4px; }
+.ws-aviso-op .field { margin: 0; width: 140px; }
+.ws-aviso-op .wr-check { padding-bottom: 9px; }
+.ws-aviso .field { margin: 0; max-width: 520px; }

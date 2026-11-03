@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\Warranty;
 use App\Models\WarrantyDocument;
 use App\Models\WarrantyItem;
+use App\Services\WarrantyAlertNotices;
 use App\Services\WarrantyAlerts;
 use App\Services\WarrantyDocuments;
 use App\Services\WarrantyReplacements;
@@ -48,6 +50,7 @@ class WarrantySettingsController extends Controller
             'steps_save'      => $this->stepsSave($request),
             'tour_save'       => $this->tourSave($request),
             'close_reasons_save' => $this->closeReasonsSave($request),
+            'notices_save'    => $this->noticesSave($request),
             default           => $this->get(),
         };
     }
@@ -86,6 +89,9 @@ class WarrantySettingsController extends Controller
             'replacements' => WarrantyReplacements::settings(),
             'checklists' => WarrantySteps::settings(),
             'tour' => WarrantyTour::settings(),
+            'notices' => WarrantyAlertNotices::settings(),
+            'notice_users' => User::where('active', true)->permission('warranties.access')->orderBy('name')->get(['id', 'name']),
+            'notice_default_to' => User::whereIn('id', WarrantyAlertNotices::sinResponsable())->orderBy('name')->pluck('name'),
             'close_reasons' => collect(WarrantyClosing::reasons())->map(fn ($r) => $r + ['used' => (int) ($usoMotivo[$r['key']] ?? 0)])->values(),
             'ticket_categories' => DB::table('ticket_categories')->where('active', true)->orderBy('position')->orderBy('name')->get(['id', 'name']),
             'resolutions' => collect(WarrantyItem::RESOLUTIONS)->except('pendiente')->map(fn ($r) => $r['label']),
@@ -182,6 +188,16 @@ class WarrantySettingsController extends Controller
         $quitados = $usados->diff($quedan);
         if ($quitados->isNotEmpty()) return $this->error('«' . WarrantyClosing::label($quitados->first()) . '» ya lo usa alguna garantía: desactívalo en lugar de quitarlo');
         $this->guardar('close_reasons', ['list' => $lista]);
+        return response()->json(['ok' => true]);
+    }
+
+    /* --- Avisos de alertas --- */
+
+    private function noticesSave(Request $request)
+    {
+        [$v, $error] = WarrantyAlertNotices::clean($request->all());
+        if ($error) return $this->error($error);
+        $this->guardar('notices', $v);
         return response()->json(['ok' => true]);
     }
 

@@ -513,6 +513,46 @@ function MotivosCierre({ list, hacer }) {
   )
 }
 
+/* Avisos de alertas: campana al pasar a crítico y correo diario (lo manda warranties:alerts). */
+function Avisos({ cfg, users, porDefecto, hacer }) {
+  const [v, setV] = useState(cfg)
+  useEffect(() => setV(cfg), [cfg])
+  const set = (c) => setV((x) => ({ ...x, ...c }))
+  const cambiado = JSON.stringify(v) !== JSON.stringify(cfg)
+  return (
+    <Card title="Avisos de alertas" sub="Qué pasa cuando una garantía tiene alertas, además de verlas en la lista, en la ficha y en Equipo. Los días de cada alerta se ajustan en «Alertas»."
+      foot={(
+        <div className="ws-foot">
+          <span className="spacer" />
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(cfg)}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado} onClick={() => hacer('notices_save', v, 'Avisos guardados')}><Icon.save /> Guardar</button>
+        </div>
+      )}>
+      <div className="ws-body ws-avisos">
+        <div className="ws-aviso">
+          <label className="wr-check"><input type="checkbox" checked={v.bell} onChange={(e) => set({ bell: e.target.checked })} /> <b>Aviso en la campana</b></label>
+          <p className="dev-mute">Cuando una garantía pasa a <b>crítica</b> por una alerta, le llega un aviso a su responsable. Una vez por alerta: si deja de ser crítica y vuelve, se avisa otra vez. Al pulsarlo se abre la garantía.</p>
+        </div>
+        <div className="ws-aviso">
+          <label className="wr-check"><input type="checkbox" checked={v.email} onChange={(e) => set({ email: e.target.checked })} /> <b>Resumen diario por correo</b></label>
+          <p className="dev-mute">Los días laborables, un solo correo a cada responsable con sus garantías con alertas y el enlace a cada una. Si no tiene ninguna, no se manda. Sale del buzón de soporte.</p>
+          <div className="ws-aviso-op">
+            <label className="field"><span className="lbl">A partir de las</span>
+              <input type="time" value={v.hour} disabled={!v.email} onChange={(e) => set({ hour: e.target.value })} /></label>
+            <label className="wr-check"><input type="checkbox" checked={v.include_warn} disabled={!v.email} onChange={(e) => set({ include_warn: e.target.checked })} /> Incluir también las que solo están en aviso <span className="dev-mute">(no solo las críticas)</span></label>
+          </div>
+        </div>
+        <div className="ws-aviso">
+          <b>Garantías sin responsable</b>
+          <p className="dev-mute">Sus avisos y su correo van a estas personas.</p>
+          <div className="field"><Select block multiple searchable value={v.unassigned_to} placeholder={`Quien gestiona la configuración (${porDefecto.join(', ') || 'nadie'})`}
+            onChange={(x) => set({ unassigned_to: x.map(Number) })} options={users.map((u) => ({ value: u.id, label: u.name }))} /></div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 /* Tour guiado: el título y el texto de cada paso (qué se señala lo fija la app). */
 function TourTextos({ steps, hacer }) {
   const [v, setV] = useState(steps)
@@ -586,6 +626,7 @@ const SECCIONES = [
     ['categorias', 'Categorías', Icon.tag, (d) => d.categories.filter((c) => c.active).length],
     ['urgencias', 'Urgencias', Icon.bolt, (d) => d.urgencies.length],
     ['alertas', 'Alertas', Icon.bell, (d) => d.alerts.filter((r) => r.active).length],
+    ['avisos', 'Avisos de alertas', Icon.mail, (d) => [d.notices.bell && 'Campana', d.notices.email && 'Correo'].filter(Boolean).join(' · ') || 'No'],
     ['pasos', 'Pasos por tipo de cliente', Icon.check, (d) => d.checklists.filter((l) => l.active).length],
     ['motivos', 'Motivos de cierre', Icon.lock, (d) => d.close_reasons.filter((r) => r.active).length],
   ]],
@@ -626,7 +667,7 @@ export default function WarrantySettings() {
       <header className="page-head">
         <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Configuración</h1></div>
-        <span className="sub">· Estados, categorías, urgencias, alertas, pasos, motivos de cierre, plantillas, plazos, documentos, texto para Finanzas, sustituciones y tour guiado de Gestión de garantías</span>
+        <span className="sub">· Estados, categorías, urgencias, alertas y sus avisos, pasos, motivos de cierre, plantillas, plazos, documentos, texto para Finanzas, sustituciones y tour guiado de Gestión de garantías</span>
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
         {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
@@ -652,6 +693,7 @@ export default function WarrantySettings() {
               {sec === 'categorias' && <Categorias list={d.categories} hacer={hacer} />}
               {sec === 'urgencias' && <Urgencias list={d.urgencies} />}
               {sec === 'alertas' && <Alertas list={d.alerts} hacer={hacer} />}
+              {sec === 'avisos' && <Avisos cfg={d.notices} users={d.notice_users} porDefecto={d.notice_default_to} hacer={hacer} />}
               {sec === 'plantillas' && <Plantillas list={d.templates} hacer={hacer} />}
               {sec === 'plazos' && <Plazos terms={d.terms} refs={d.term_references} categorias={d.categories} hacer={hacer} />}
               {sec === 'documentos' && <Documentos docs={d.docs} grupos={d.block_groups} hacer={hacer} />}

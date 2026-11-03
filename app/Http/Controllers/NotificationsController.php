@@ -77,13 +77,14 @@ class NotificationsController extends Controller
         $rows = DB::table('notifications as n')
             ->leftJoin('tickets as t', 't.id', '=', 'n.ticket_id')
             ->leftJoin('users as a', 'a.id', '=', 'n.actor_user_id')
+            ->leftJoin('warranties as w', 'w.id', '=', 'n.warranty_id')
             ->where('n.user_id', $me->id)
             ->orderByRaw('n.read_at IS NULL DESC')   // no leídas arriba
             ->orderByDesc('n.id')
             ->limit(40)
             ->get([
-                'n.id', 'n.type', 'n.ticket_id', 'n.body', 'n.read_at', 'n.created_at',
-                't.code as ticket_code', 'a.name as actor_name',
+                'n.id', 'n.type', 'n.ticket_id', 'n.warranty_id', 'n.body', 'n.read_at', 'n.created_at',
+                't.code as ticket_code', 'w.code as warranty_code', 'a.name as actor_name',
             ]);
 
         return response()->json([

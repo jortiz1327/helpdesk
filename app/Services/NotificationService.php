@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 class NotificationService
 {
     /** Crea una notificación para un usuario. Devuelve su id (o 0 si se omite). */
-    public function push(int $userId, string $type, string $body, ?int $ticketId = null, ?int $actorId = null): int
+    public function push(int $userId, string $type, string $body, ?int $ticketId = null, ?int $actorId = null, ?int $warrantyId = null): int
     {
         if ($userId <= 0) return 0;
         // No te notificas a ti mismo (mencionarte en tu propia nota no avisa).
@@ -23,6 +23,7 @@ class NotificationService
             'user_id'       => $userId,
             'type'          => $type,
             'ticket_id'     => $ticketId,
+            'warranty_id'   => $warrantyId,
             'actor_user_id' => $actorId,
             'body'          => mb_substr($body, 0, 500),
             'created_at'    => now(),

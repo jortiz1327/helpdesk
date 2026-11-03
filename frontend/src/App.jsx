@@ -860,6 +860,12 @@ const codigoDeUrl = () => {
     return base === "tickets" && code ? decodeURIComponent(code).trim().toUpperCase() : null;
 };
 
+// Garantía incrustada en la URL (enlaces del correo de alertas): «/agentes/garantias/12» → 12.
+const garantiaDeUrl = () => {
+    const [base, id] = window.location.pathname.replace(/^\/agentes/, "").replace(/^\/+|\/+$/g, "").split("/");
+    return base === "garantias" && /^\d+$/.test(id || "") ? Number(id) : null;
+};
+
 // ¿Puede el usuario ver esta entrada del menú?
 const allows = (user, item) =>
     (!item.perm || (user?.permissions || []).includes(item.perm)) &&
@@ -959,7 +965,7 @@ export default function App() {
     // Ticket que hay que abrir nada más llegar (al pinchar uno de los recientes).
     const [ticketAbierto, setTicketAbierto] = useState(null);
     // Gestión de garantías: saltar de un ticket a su garantía y al revés.
-    const [garantiaAbierta, setGarantiaAbierta] = useState(null);
+    const [garantiaAbierta, setGarantiaAbierta] = useState(garantiaDeUrl);
     const [garantiaFiltro, setGarantiaFiltro] = useState(null);   // desde Equipo: { responsible, name, chip }
     const [ticketGarantia, setTicketGarantia] = useState(null);
     useEffect(() => { if (view !== "garantias_tickets") setTicketGarantia(null); }, [view]);
@@ -1522,10 +1528,11 @@ export default function App() {
                         <div className="spacer" />
 
                         {/* Campana de notificaciones (menciones, y a futuro asignaciones/SLA) */}
-                        {can("helpdesk.access") && (
+                        {(can("helpdesk.access") || can("warranties.access")) && (
                             <NotificationBell
                                 expanded={expanded}
                                 onCount={setNotifCount}
+                                onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }}
                                 onOpenTicket={(id) => {
                                     setTicketsTab("tickets");
                                     setTicketAbierto(id);

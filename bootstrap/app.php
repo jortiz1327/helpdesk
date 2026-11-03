@@ -40,6 +40,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('sla:check')->everyFiveMinutes()->withoutOverlapping();
         // Despierta los tickets pospuestos cuya fecha venció (limpia el chip + recibimiento)
         $schedule->command('tickets:wake')->everyFiveMinutes()->withoutOverlapping();
+        // Garantías: aviso en la campana al pasar a crítico y, si está encendido, el correo diario.
+        $schedule->command('warranties:alerts')->everyFifteenMinutes()->withoutOverlapping();
         // Envía las respuestas programadas que ya toca mandar
         $schedule->command('replies:send')->everyMinute()->withoutOverlapping();
         // WhatsApp de soporte: copia de los archivos en el servidor (Meta los borra a las
