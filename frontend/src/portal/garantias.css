@@ -230,7 +230,12 @@
 .gw-dir-q{min-width:0}
 .gw-dir-q:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .gw-dir-l{right:0;width:auto;max-width:none}
-.gw-dir-nada{cursor:default!important;color:var(--ink-3)!important;font-size:13.5px}
+.gw-dir-nada{display:block!important;color:var(--ink-3)!important;font-size:13.5px}
+.gw-dir-mano{color:var(--brand);font-weight:700;white-space:nowrap}
+.gw-dir-q.mal,.inp.mal{border-color:#b42318!important;box-shadow:0 0 0 3px color-mix(in srgb,#b42318 14%,transparent)}
+.gw-dir-txt[readonly]{background:var(--surface-2);color:var(--ink-2);cursor:default;resize:none}
+.gw-dir-txt[readonly]:focus{border-color:var(--line);box-shadow:none}
+.gw-dir-txt[readonly]::placeholder{color:var(--ink-3)}
 .gw-dir-spin{flex:none;width:15px;height:15px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--brand);animation:gw-giro .7s linear infinite}
 @keyframes gw-giro{to{transform:rotate(360deg)}}
 .gw-dir-msg{display:block;margin-top:6px;color:#b42318}

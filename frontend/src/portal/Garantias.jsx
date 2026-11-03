@@ -464,7 +464,7 @@ function FotoSlot({ tipo, kind, foto, onPick, onRemove }) {
  * sugerencia; rellena la dirección (que sigue editable para piso, puerta…). Si no sale o
  * se pasa del cupo, se escribe a mano. Una «sesión» por búsqueda (Google la cobra así).
  */
-function BuscarDireccion({ onPick }) {
+function BuscarDireccion({ onPick, onManual, invalid }) {
   const { t, lang } = useLang()
   const [q, setQ] = useState('')
   const [res, setRes] = useState(null)      // null | [] | [{id, main, secondary, address?}]
@@ -486,7 +486,8 @@ function BuscarDireccion({ onPick }) {
       const r = await portal.addressSearch(txt, lang, sesion.current)
       if (n !== ultima.current) return
       setCargando(false)
-      if (!r.ok) { setRes(null); setMsg(r.error || t('g_addr_fail')); return }
+      // Buscador caído o sin cupo: no se puede dejar al cliente sin poder seguir.
+      if (!r.ok) { setRes(null); setMsg(r.error || t('g_addr_fail')); onManual(); return }
       setMsg(''); setRes(r.results || []); setAct(0); setAbierto(true)
     }, 300)
     return () => clearTimeout(h)
@@ -524,7 +525,7 @@ function BuscarDireccion({ onPick }) {
   const lista = abierto && res
   return (
     <div className={`gw-dir ${lista ? 'on' : ''}`} ref={caja}>
-      <label className="gw-search gw-dir-q">{I.mag}
+      <label className={`gw-search gw-dir-q ${invalid ? 'mal' : ''}`}>{I.mag}
         <input value={q} onChange={(e) => { setQ(e.target.value); setMsg('') }} onKeyDown={tecla} onFocus={() => res && setAbierto(true)}
           placeholder={t('g_addr_search_ph')} autoComplete="off" role="combobox" aria-expanded={!!lista} aria-autocomplete="list"
           aria-label={t('g_addr_search_ph')} />
@@ -532,7 +533,12 @@ function BuscarDireccion({ onPick }) {
       </label>
       {lista && (
         <ul className="gw-dd-l gw-dir-l" role="listbox">
-          {res.length === 0 && <li className="gw-dir-nada">{t('g_addr_none')}</li>}
+          {res.length === 0 && (
+            <li className="gw-dir-nada" onPointerDown={(e) => e.preventDefault()}
+              onClick={() => { setAbierto(false); onManual() }}>
+              {t('g_addr_none')} <span className="gw-dir-mano">{t('g_addr_manual')}</span>
+            </li>
+          )}
           {res.map((s, i) => (
             <li key={s.id + i} role="option" aria-selected={i === act} className={i === act ? 'act' : ''}
               onPointerEnter={() => setAct(i)} onPointerDown={(e) => e.preventDefault()} onClick={() => elegir(s)}>
@@ -563,6 +569,7 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
   const [nombre, setNombre] = useState('')
   const [tel, setTel] = useState('')
   const [dir, setDir] = useState('')
+  const [dirLibre, setDirLibre] = useState(false)   // se puede escribir: ya eligió una o no la encontró
   const [enviando, setEnviando] = useState(null)  // null | {hechas, total}
   const [err, setErr] = useState('')
   const fotoCodigo = useRef(null)
@@ -628,7 +635,7 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
   const issueOpts = ISSUES.map((k) => ({ value: k, label: t('g_issue_' + k), desc: t('g_issue_desc_' + k), icon: G[k] }))
 
   const puede = { 1: !!sitio, 2: items.length > 0 && faltanFotos.length === 0 && sinExplicar.length === 0, 3: nombre.trim() && dir.trim(), 4: true }
-  const siguiente = () => { setErr(''); setPaso((p) => Math.min(4, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const siguiente = () => { setErr(''); setMarcar(false); setPaso((p) => Math.min(4, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const atras = () => { setErr(''); setPaso((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const ir = (p) => { setErr(''); setPaso(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
@@ -780,16 +787,20 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
             <p className="gw-paso-sub">{t('g_contact_sub')}</p>
             <div className="gw-grid2">
               <label className="f"><span className="lab">{t('g_name')}</span>
-                <input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="name" autoFocus /></label>
+                <input className={`inp ${marcar && !nombre.trim() ? 'mal' : ''}`} value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="name" autoFocus /></label>
               <label className="f"><span className="lab">{t('phone')} <span className="hint" style={{ fontWeight: 400 }}>{t('phone_optional')}</span></span>
                 <input className="inp" type="tel" value={tel} onChange={(e) => setTel(e.target.value)} autoComplete="tel" inputMode="tel" placeholder={t('phone_placeholder')} /></label>
             </div>
             <label className="f"><span className="lab">{t('your_email')}</span>
               <input className="inp" value={email} disabled /></label>
+            {/* La dirección sale del buscador: hasta elegir una no se escribe (sí se retoca
+                después, para piso o puerta). Solo si el buscador no la encuentra, a mano. */}
             <div className="f"><span className="lab">{t('g_address')}</span>
-              <BuscarDireccion onPick={setDir} />
-              <textarea className="inp" rows={4} value={dir} aria-label={t('g_address')} onChange={(e) => setDir(e.target.value)} autoComplete="street-address"
-                placeholder={t('g_address_ph')} />
+              <BuscarDireccion onPick={(d) => { setDir(d); setDirLibre(true) }} onManual={() => setDirLibre(true)}
+                invalid={marcar && !dir.trim()} />
+              <textarea className={`inp gw-dir-txt ${marcar && !dir.trim() ? 'mal' : ''}`} rows={4} value={dir} aria-label={t('g_address')}
+                readOnly={!dirLibre} onChange={(e) => setDir(e.target.value)} autoComplete="street-address"
+                placeholder={dirLibre ? t('g_address_ph') : t('g_address_locked')} />
               <span className="hint">{t('g_address_hint')}</span></div>
           </>
         )}
@@ -835,7 +846,7 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
             ].filter(Boolean).join(' · ')}</span>
           )}
           {paso < 4
-            ? <button type="button" className={`btn gw-sig ${!puede[paso] && paso === 2 && items.length ? 'casi' : ''}`} aria-disabled={!puede[paso]}
+            ? <button type="button" className={`btn gw-sig ${!puede[paso] && ((paso === 2 && items.length) || paso === 3) ? 'casi' : ''}`} aria-disabled={!puede[paso]}
                 disabled={!puede[paso] && !(paso === 2 && items.length)}
                 onClick={() => { if (puede[paso]) siguiente(); else setMarcar(true) }}>{t('g_next')} {I.arrow}</button>
             : <button type="button" className="btn gw-sig" disabled={!!enviando} onClick={enviar}>{enviando ? t('sending') : <>{I.send} {t('g_send_request')}</>}</button>}
