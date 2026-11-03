@@ -711,3 +711,5 @@
 @keyframes salido-in{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
 @media (prefers-reduced-motion:reduce){.salido{animation:none}}
 @media (max-width:560px){.ghostlink.salir{padding:7px 8px}}
+/* Con sesión no caben Salir y «Acceso agentes» en el móvil: el candado solo */
+@media (max-width:480px){.ghostlink.agentes-corto{padding:7px 8px}.ghostlink.agentes-corto span{display:none}}

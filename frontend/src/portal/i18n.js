@@ -10,6 +10,7 @@
  * SOLO el portal del cliente usa esto; la app de agentes NO se toca.
  * ------------------------------------------------------------------------- */
 import { createContext, useContext, useState, useCallback, createElement } from 'react'
+import { garantias } from './i18n_garantias.js'
 
 export const dict = {
   es: {
@@ -617,6 +618,9 @@ export const dict = {
     rel_days: 'há {n} dias',
   },
 }
+
+/* Los textos del apartado de garantías viven aparte (i18n_garantias.js). */
+for (const l of Object.keys(garantias)) Object.assign(dict[l], garantias[l])
 
 /* Siglas para el selector de la cabecera. */
 export const LANGS = [['es', 'ES'], ['en', 'EN'], ['pt', 'PT']]

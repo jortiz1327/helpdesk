@@ -113,6 +113,31 @@ export const portal = {
       return res.ok ? { ok: true, blob: await res.blob() } : { ok: false }
     } catch { return { ok: false } }
   },
+  // GARANTÍAS de su empresa (todo con pase).
+  warranties: () => call('warranties'),
+  warranty: (code) => call('warranty', { query: { code } }),
+  warrantyPlaces: () => call('warranty-places'),
+  warrantyRequest: (data) => call('warranty-request', { method: 'POST', body: data }),
+  warrantyPhoto: (ticket, code, type, file) => {
+    const fd = new FormData()
+    fd.append('ticket', ticket); fd.append('code', code); fd.append('type', type); fd.append('file', file)
+    return call('warranty-photo', { method: 'POST', form: fd })
+  },
+  warrantyReply: (code, body, files = []) => {
+    const fd = new FormData()
+    fd.append('code', code); fd.append('body', body)
+    files.forEach((f) => fd.append('files[]', f))
+    return call('warranty-reply', { method: 'POST', form: fd })
+  },
+  // Pegatina («sticker») o informe («report») en PDF. Devuelve { ok, blob }.
+  warrantyPdf: async (code, doc) => {
+    const headers = {}
+    const pass = getPass(); if (pass) headers['X-Portal-Token'] = pass
+    try {
+      const res = await fetch(`/api/portal.php?action=warranty-pdf&code=${encodeURIComponent(code)}&doc=${doc}`, { headers })
+      return res.ok ? { ok: true, blob: await res.blob() } : { ok: false }
+    } catch { return { ok: false } }
+  },
   reply: async (code, body, files = []) => {
     let r
     if (!files.length) r = await call('reply', { method: 'POST', body: { code, body }, ttoken: getTicketToken(code) })

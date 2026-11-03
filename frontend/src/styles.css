@@ -4635,6 +4635,16 @@ button.dev-code:hover { text-decoration: underline; }
 .wr-slot-acts .icon-btn svg { width: 14px; height: 14px; fill: #fff; }
 .wr-slot-src { position: absolute; top: 6px; left: 6px; font-style: normal; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: rgba(15, 23, 42, 0.6); color: #fff; }
 .wr-slot.busy { cursor: progress; }
+/* Lectura del código de barras de la foto (frontal de etiqueta, trasera de antena) */
+.wr-slot-bc { position: absolute; left: 6px; bottom: 26px; max-width: calc(100% - 12px); display: inline-flex; align-items: center; gap: 4px; font-style: normal; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; color: #fff; background: rgba(15, 23, 42, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help; }
+.wr-slot-bc svg { width: 11px; height: 11px; fill: currentColor; flex: none; }
+.wr-slot-bc.ok { background: #15803d; }
+.wr-slot-bc.mal { background: #b91c1c; }
+.wr-slot-bc.no { background: #b45309; }
+.spinner.xs { width: 10px; height: 10px; border-width: 2px; }
+.wr-cliente-dijo { margin: 2px 0 0; display: flex; gap: 6px; align-items: flex-start; font-size: 12px; line-height: 1.45; color: var(--ink-2); }
+.wr-cliente-dijo svg { width: 13px; height: 13px; fill: var(--ink-3); flex: none; margin-top: 2px; }
+.wr-cliente-dijo span::before { content: 'Cliente: '; font-weight: 700; color: var(--ink-3); }
 .spinner.sm { width: 18px; height: 18px; border-width: 2px; }
 .wr-gal { position: sticky; top: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); max-height: 62vh; overflow: auto; }
 .wr-gal h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 12.5px; }

@@ -8,6 +8,7 @@ import Select from './Select.jsx'
 import { FichaDispositivo } from './Devices.jsx'
 import WarrantyDocuments from './WarrantyDocuments.jsx'
 import { GuiasRelacionadas } from './WarrantyGuides.jsx'
+import { leerCodigos } from '../barcode.js'
 
 /* -------------------------------------------------------------------------
  * GARANTÍAS (Gestión de garantías). Expedientes G-AAAA-NNNN.
@@ -185,7 +186,7 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
   const valProyecto = f.portal_project_id || (f.project_name ? '__txt' : '')
 
   // En el alta, las etiquetas afectadas (solo sus códigos).
-  const [comp, setComp] = useState(COMP_VACIO)
+  const [comp, setComp] = useState(() => (inicial.labels_text ? { ...COMP_VACIO, text: inicial.labels_text } : COMP_VACIO))
   // Alta en dos pasos: primero los datos y después las etiquetas (pantalla propia, sin scroll).
   const [paso, setPaso] = useState('datos')
   const enEtiquetas = !f.id && paso === 'etiquetas'
@@ -305,11 +306,23 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
 
 /* Alta desde otra pantalla (la ficha de un ticket): carga sus opciones y abre el
    formulario con lo que ya se sabe del ticket. */
+// Si el ticket vino del formulario de garantías del portal, trae ya el cliente, el sitio
+// y los dispositivos que dio el cliente (su fallo y sus fotos pasan solos al añadirlos).
 export function NuevaGarantia({ inicial, onClose, onSaved }) {
   const [opts, setOpts] = useState(null)
+  const [solicitud, setSolicitud] = useState(inicial?.ticket_code ? undefined : null)
   useEffect(() => { api.warrantyOptions().then((r) => setOpts(r.ok ? r : {})) }, [])
-  if (!opts) return null
-  return <Formulario inicial={{ ...VACIA, received_at: hoy(), ...inicial }} opts={opts} onClose={onClose} onSaved={onSaved} />
+  useEffect(() => {
+    if (inicial?.ticket_code) api.warrantyTicketRequest(inicial.ticket_code).then((r) => setSolicitud(r.ok ? r.request : null))
+  }, [inicial?.ticket_code])
+  if (!opts || solicitud === undefined) return null
+  const s = solicitud
+  const desdePortal = s ? {
+    portal_client_id: s.portal_client_id || null, client_name: s.client_name || inicial.client_name || '',
+    portal_project_id: s.portal_project_id || null, project_name: s.project_name || '',
+    labels_text: (s.items || []).map((i) => i.code).join('\n'),
+  } : {}
+  return <Formulario inicial={{ ...VACIA, received_at: hoy(), ...inicial, ...desdePortal }} opts={opts} onClose={onClose} onSaved={onSaved} />
 }
 
 /* --- Lista --- */
@@ -803,9 +816,36 @@ function ResDetalle({ rv, it }) {
   return <p className="wr-res-det">{it.coverage ? <span className={`wr-cov cov-${it.coverage}`}>{rv?.coverages?.[it.coverage] || it.coverage}</span> : null}{partes.join(' · ')}{it.reviewed_by_name ? <span className="dev-mute">{partes.length ? ' — ' : ''}{it.reviewed_by_name}, {fechaHora(it.reviewed_at)}</span> : null}</p>
 }
 
+/* La foto que lleva el código de barras: la frontal de la etiqueta y la trasera (MAC) de
+   la antena. Se lee en el navegador y se compara con el dispositivo. */
+const fotoConCodigo = (it, t) => (it.kind === 'ap' ? t === 'back' : t === 'front')
+const lecturas = new Map()   // id de foto → promesa con los códigos leídos
+const leerFoto = (id) => {
+  if (!lecturas.has(id)) {
+    lecturas.set(id, fetch(api.warrantyPhotoUrl(id)).then((r) => (r.ok ? r.blob() : null))
+      .then((b) => (b ? leerCodigos(new File([b], 'foto', { type: b.type })) : [])).catch(() => []))
+  }
+  return lecturas.get(id)
+}
+
+function LecturaCodigo({ photo, code }) {
+  const [leidos, setLeidos] = useState(null)
+  useEffect(() => {
+    let vivo = true
+    setLeidos(null)
+    leerFoto(photo.id).then((c) => { if (vivo) setLeidos(c) })
+    return () => { vivo = false }
+  }, [photo.id])
+  if (leidos === null) return <em className="wr-slot-bc lee" title="Leyendo el código de barras…"><span className="spinner xs" /> Leyendo código</em>
+  if (leidos.includes(code)) return <em className="wr-slot-bc ok" title={`El código de barras de la foto es ${code}`}><Icon.check /> Código {code}</em>
+  if (leidos.length) return <em className="wr-slot-bc mal" title={`La foto es de ${leidos.join(', ')} y el dispositivo es ${code}: ¿foto equivocada?`}><Icon.warn /> Es de {leidos[0]}</em>
+  return <em className="wr-slot-bc no" title="No se ha podido leer el código de barras de la foto. Compáralo a mano con el número que lleva debajo, o léelo con la cámara del móvil o una app de escáner de códigos (Google Lens, la cámara del iPhone…). Si la foto está borrosa o con reflejos, pide otra.">No se lee el código</em>
+}
+
 /* Hueco de una foto: vacío acepta clic, arrastrar un fichero o una imagen del ticket, y
-   pegar (Ctrl+V) cuando está activo; lleno enseña la miniatura con «quitar». */
-function FotoSlot({ label, photo, active, busy, onActivate, onFile, onSrc, onDelete }) {
+   pegar (Ctrl+V) cuando está activo; lleno enseña la miniatura con «quitar». Con `code`,
+   la foto debe llevar ese código de barras y se comprueba. */
+function FotoSlot({ label, photo, code, active, busy, onActivate, onFile, onSrc, onDelete }) {
   const input = useRef(null)
   const [encima, setEncima] = useState(false)
   const soltar = (e) => {
@@ -827,6 +867,7 @@ function FotoSlot({ label, photo, active, busy, onActivate, onFile, onSrc, onDel
               <button type="button" className="icon-btn" title="Quitar" onClick={(e) => { e.stopPropagation(); onDelete() }}><Icon.trash /></button>
             </div>
             {photo.source ? <em className="wr-slot-src">Del ticket</em> : null}
+            {code ? <LecturaCodigo photo={photo} code={code} /> : null}
           </>
         : <div className="wr-slot-empty">{busy ? <div className="spinner sm" /> : <Icon.upload />}<small>{busy ? 'Subiendo…' : active ? 'Suelta, pega o haz clic' : 'Añadir'}</small></div>}
       <span className="wr-slot-l">{label}</span>
@@ -1017,7 +1058,8 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
         ) : (
           <div className="modal-body wr-fotos">
             <div className="wr-fotos-l">
-              <p className="dev-mute wr-fotos-tip">{w.ticket_id ? 'Elige un hueco y haz clic en una imagen del cliente, arrástrala, pega con Ctrl+V o sube un fichero.' : 'Haz clic en un hueco para subir la foto, arrástrala o pégala con Ctrl+V.'}</p>
+              <p className="dev-mute wr-fotos-tip">{w.ticket_id ? 'Elige un hueco y haz clic en una imagen del cliente, arrástrala, pega con Ctrl+V o sube un fichero.' : 'Haz clic en un hueco para subir la foto, arrástrala o pégala con Ctrl+V.'}
+                {' '}Cada etiqueta lleva frontal, trasera con pilas y sin pilas; de la frontal (en las antenas, la trasera) se lee el código de barras para comprobar que es la suya.</p>
               {conFotos.map((it) => (
                 <div key={it.id} className="wr-fotos-it">
                   <div className="wr-fotos-ith"><b className="mono">{it.code}</b>{it.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}<span className="dev-mute">{productoDe(it)}</span>
@@ -1025,7 +1067,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
                   <div className="wr-slots">
                     {tiposFoto(rv, it).map(([t, l]) => {
                       const key = `${it.id}|${t}`
-                      return <FotoSlot key={t} label={l} photo={(it.photos || []).find((p) => p.type === t)} active={activo === key} busy={subiendo === key}
+                      return <FotoSlot key={t} label={l} code={fotoConCodigo(it, t) ? it.code : null} photo={(it.photos || []).find((p) => p.type === t)} active={activo === key} busy={subiendo === key}
                         onActivate={() => setActivo(key)} onFile={(file) => subir(it, t, file)} onSrc={(src) => delTicket(it, t, src)}
                         onDelete={() => quitar(it, (it.photos || []).find((p) => p.type === t))} />
                     })}
@@ -1220,7 +1262,9 @@ function Productos({ w, items, opts, onReload, onChanged }) {
                 <Modelo r={i} onPick={p.edit ? (ref) => cambiarModelo(i, ref) : null} />
                 {rv ? <ResPill rv={rv} it={i} onClick={p.review ? () => setRevisar({ items: [i] }) : null} /> : null}
                 {p.edit ? <button className="icon-btn" title="Quitar de la garantía" onClick={() => quitar(i)}><Icon.trash /></button> : null}
-                <div className="full"><Avisos list={i.warnings} />{rv ? <ResDetalle rv={rv} it={i} /> : null}</div>
+                <div className="full"><Avisos list={i.warnings} />
+                  {i.reported_issue ? <p className="wr-cliente-dijo" title="Lo que contó el cliente al pedir la garantía desde el portal"><Icon.chat /> <span>{i.reported_issue}</span></p> : null}
+                  {rv ? <ResDetalle rv={rv} it={i} /> : null}</div>
               </li>
             ))}
           </ul>

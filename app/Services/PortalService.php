@@ -380,20 +380,6 @@ class PortalService
             ->first(['t.id', 't.code', 't.subject', 't.status', 't.source', 't.created_at', 't.resolved_at']);
         if (!$t) return null;   // no existe, o no es de este correo
 
-        // Solo mensajes visibles para el cliente: NADA de notas internas.
-        $msgs = DB::table('messages as m')
-            ->leftJoin('users as u', 'u.id', '=', 'm.author_user_id')
-            ->where('m.ticket_id', $t->id)->where('m.is_internal_note', 0)
-            ->orderBy('m.id')
-            ->get(['m.id', 'm.direction', 'm.body', 'm.is_html', 'm.created_at', 'u.name as agent_name']);
-
-        // Adjuntos por mensaje. Los `inline` NO van en la tira: ya están dentro del
-        // cuerpo del correo (imágenes de firma), así que se saltan. La URL va FIRMADA:
-        // como con las imágenes en línea, la firma es la autorización y así el <img>
-        // o el enlace descargan sin cabeceras. Solo se firman los de ESTE ticket,
-        // que ya se ha comprobado que es del correo del pase.
-        $porMensaje = app(AttachmentService::class)->forTicket((int) $t->id);
-
         return [
             'code'    => $t->code,
             'subject' => $t->subject,
@@ -408,7 +394,31 @@ class PortalService
             // Hitos de estado que le importan al cliente, para intercalarlos en el
             // hilo: cuándo se puso en marcha, cuándo se resolvió, si se reabrió…
             'hitos'   => $this->hitosCliente((int) $t->id),
-            'mensajes' => $msgs->map(fn ($m) => [
+            'mensajes' => $this->mensajesCliente((int) $t->id),
+        ];
+    }
+
+    /**
+     * La conversación que ve el cliente de un ticket: sin notas internas y con los
+     * adjuntos por URL firmada. Quien llama ya ha comprobado que puede verlo.
+     */
+    public function mensajesCliente(int $ticketId): array
+    {
+        // Solo mensajes visibles para el cliente: NADA de notas internas.
+        $msgs = DB::table('messages as m')
+            ->leftJoin('users as u', 'u.id', '=', 'm.author_user_id')
+            ->where('m.ticket_id', $ticketId)->where('m.is_internal_note', 0)
+            ->orderBy('m.id')
+            ->get(['m.id', 'm.direction', 'm.body', 'm.is_html', 'm.created_at', 'u.name as agent_name']);
+
+        // Adjuntos por mensaje. Los `inline` NO van en la tira: ya están dentro del
+        // cuerpo del correo (imágenes de firma), así que se saltan. La URL va FIRMADA:
+        // como con las imágenes en línea, la firma es la autorización y así el <img>
+        // o el enlace descargan sin cabeceras. Solo se firman los de ESTE ticket,
+        // que ya se ha comprobado que es del correo del pase.
+        $porMensaje = app(AttachmentService::class)->forTicket($ticketId);
+
+        return $msgs->map(fn ($m) => [
                 'de'      => $m->direction === 'in' ? 'cliente' : 'soporte',
                 'autor'   => $m->direction === 'in' ? null : ($m->agent_name ?: 'Soporte'),
                 'html'    => (bool) $m->is_html,
@@ -422,8 +432,7 @@ class PortalService
                         'image' => (bool) $a->is_image,
                         'url'   => URL::signedRoute('portal.file', ['id' => $a->id], now()->addHours(6), false),
                     ])->values()->all(),
-            ])->all(),
-        ];
+            ])->all();
     }
 
     /**
@@ -538,6 +547,19 @@ class PortalService
             ->where('c.email', mb_strtolower($email))   // collation _ci → compara sin distinguir mayúsculas y USA el índice
             ->first(['t.id', 't.contact_id', 't.status']);
         if (!$t) return [false, 'No encontramos esa incidencia'];
+
+        return $this->responderTicket($t, $cuerpo, $files);
+    }
+
+    /**
+     * Guarda la respuesta del cliente en un ticket ($t: id, contact_id, status) que quien
+     * llama ya ha comprobado que puede tocar. También la usa el apartado de garantías,
+     * donde responde cualquiera de la empresa en el ticket de la garantía.
+     */
+    public function responderTicket(object $t, string $cuerpo, array $files = []): array
+    {
+        $cuerpo = trim($cuerpo);
+        if (mb_strlen($cuerpo) < 1 && !$files) return [false, 'Escribe tu respuesta o adjunta un archivo'];
 
         // Mensaje + actualización del ticket (y reapertura si estaba resuelto) van JUNTOS
         // en una transacción. Los adjuntos (disco) y el broadcast van FUERA, tras confirmar.

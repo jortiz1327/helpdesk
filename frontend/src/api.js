@@ -405,6 +405,7 @@ export const api = {
   deleteWarrantyLabel: (item_id) => postJson('warranties.php?action=label_delete', { item_id }),
   warrantyCatalog: () => req('warranties.php?action=catalog'),
   portalClients: () => req('warranties.php?action=portal_clients'),
+  warrantyTicketRequest: (ticketCode) => req(`warranties.php?action=ticket_request&ticket_code=${encodeURIComponent(ticketCode)}`),
   portalProjects: (clientId) => req(`warranties.php?action=portal_projects&client_id=${clientId}`),
   reviewWarrantyItems: (payload) => postJson('warranties.php?action=review', payload),
   uploadWarrantyPhoto: (item_id, type, file) => {

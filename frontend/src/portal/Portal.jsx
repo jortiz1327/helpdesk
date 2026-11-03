@@ -3,6 +3,7 @@ import { portal, getPass, setPass, setTicketToken, getSeen, markSeen, haySesion 
 import { LangProvider, useLang, LANGS, LOCALES } from './i18n.js'
 import { parseDate } from '../util.js'
 import logo from '../assets/logo.png'
+import { MisGarantias, DetalleGarantia, SolicitarGarantia, GarantiaEnviada, GarantiasCard } from './Garantias.jsx'
 
 /* Banderas del selector de idioma en SVG en línea. Los emoji de bandera (🇪🇸…) NO se
    renderizan como banderas en Windows —se ven las siglas—, así que van dibujadas. */
@@ -243,6 +244,8 @@ function PortalApp() {
   const [openCode, setOpenCode] = useState(null)   // código del ticket abierto
   const [caducado, setCaducado] = useState(false)  // el pase dejó de valer: re-autenticar
   const [prefill, setPrefill] = useState(null)     // datos que precargan el formulario (CTA de una FAQ)
+  const [gCode, setGCode] = useState(null)         // garantía (o solicitud) abierta
+  const [gEnviada, setGEnviada] = useState(null)   // resultado de la última solicitud de garantía
 
   // ENTRADA POR ENLACE: el correo de «reenviar acceso» trae ?ver=CÓDIGO&t=TOKEN. Se
   // guarda el token del ticket, se abre ese ticket y se LIMPIA la URL (no dejar el
@@ -263,6 +266,10 @@ function PortalApp() {
     if (window.location.pathname.replace(/\/+$/, '').endsWith('/create-ticket')) {
       setView('crear')
     }
+    // …/garantias abre el apartado de garantías (pide el código si no hay sesión).
+    if (window.location.pathname.replace(/\/+$/, '').endsWith('/garantias')) {
+      setView('g_mis')
+    }
   }, [])
 
   // Al volver a la home se olvida cualquier pre-relleno de una FAQ, para que un
@@ -280,7 +287,7 @@ function PortalApp() {
    */
   const caduco = () => {
     setPass(''); setPassState(''); setCaducado(true)
-    setView((v) => (v === 'ticket' ? 'mis' : v))
+    setView((v) => (v === 'ticket' ? 'mis' : v === 'g_garantia' || v === 'g_enviada' ? 'g_mis' : v))
   }
   // Salir: se anula el pase y se olvida todo en este navegador; vuelta al inicio.
   const [saliendo, setSaliendo] = useState(false)
@@ -306,6 +313,15 @@ function PortalApp() {
         : <Acceso intent="mis" go={go} onReady={onPass} caducado={caducado} />)}
       {view === 'ticket' && <Detalle code={openCode} back={() => go('mis')} onExpire={caduco} />}
       {view === 'estado' && <Estado go={go} />}
+      {/* GARANTÍAS: todo pide el código (son datos de la empresa). */}
+      {view.startsWith('g_') && !pass && view !== 'g_enviada'
+        ? <Acceso intent="garantias" go={go} onReady={onPass} caducado={caducado} />
+        : <>
+          {view === 'g_mis' && <MisGarantias go={go} onOpen={(c) => { setGCode(c); go('g_garantia') }} onExpire={caduco} />}
+          {view === 'g_garantia' && <DetalleGarantia code={gCode} back={() => go('g_mis')} onExpire={caduco} />}
+          {view === 'g_solicitar' && <SolicitarGarantia go={go} onExpire={caduco} onDone={(r) => { setGEnviada(r); go('g_enviada') }} />}
+          {view === 'g_enviada' && gEnviada && <GarantiaEnviada res={gEnviada} go={go} onOpen={(c) => { setGCode(c); go('g_garantia') }} />}
+        </>}
       <Footer />
     </>
   )
@@ -341,7 +357,9 @@ function Top({ onLogo, onSalir, saliendo }) {
             {I.out} {t('logout')}
           </button>
         )}
-        <a className="ghostlink" href="/agentes">{I.lock} {t('agent_access')}</a>
+        <a className={`ghostlink${onSalir ? ' agentes-corto' : ''}`} href="/agentes" aria-label={t('agent_access')} title={t('agent_access')}>
+          {I.lock} <span>{t('agent_access')}</span>
+        </a>
       </div>
     </div>
   )
@@ -488,6 +506,9 @@ function Home({ go, irCrear }) {
           </div>
         </div>
 
+        {/* Garantías: no es una duda que resuelva una FAQ, así que va arriba, a mano. */}
+        <GarantiasCard go={go} />
+
         <div ref={faqRef} className="section-h reveal">
           <h2>{t('faq_title')}</h2>
           {filtro && <span className="section-n">{items.length} {items.length === 1 ? t('result_one') : t('result_many')}</span>}
@@ -587,7 +608,7 @@ function Acceso({ intent, go, onReady, caducado }) {
   const [err, setErr] = useState('')
   const [espera, setEspera] = useState(0)   // segundos hasta poder pedir otro código
   const valido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)
-  const titulo = intent === 'crear' ? t('create_ticket') : t('my_tickets')
+  const titulo = intent === 'crear' ? t('create_ticket') : intent === 'garantias' ? t('g_my_warranties') : t('my_tickets')
 
   // Cuenta atrás del enfriamiento: sin esto, el botón de reenviar se puede
   // machacar hasta topar con el límite del servidor. 60 s es el estándar.
@@ -1412,3 +1433,6 @@ function Footer() {
 }
 
 function escapeHtml(s) { return (s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c])) }
+
+/* Lo que comparte el apartado de garantías (Garantias.jsx). */
+export { I, Rich, Adjuntar, Adjuntos, CorreoFrame, esCorreo, relTime, fmtDate, fmtHora, escapeHtml, Acceso }

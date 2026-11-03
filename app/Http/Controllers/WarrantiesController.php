@@ -8,6 +8,7 @@ use App\Models\WarrantyItem;
 use App\Services\WarrantyDocuments;
 use App\Models\ZkongBatch;
 use App\Services\AemePortal;
+use App\Services\PortalWarranties;
 use App\Services\TicketService;
 use App\Services\WarrantyAlerts;
 use App\Services\WarrantyLabels;
@@ -44,6 +45,7 @@ class WarrantiesController extends Controller
             'delete'  => $this->delete($request),
             'options' => $this->options(),
             'by_ticket' => $this->byTicket($request),
+            'ticket_request' => $this->ticketRequest($request),
             'inbox'     => $this->inbox($request),
             'bulk'      => $this->bulk($request),
             'labels_check'    => $this->labelsCheck($request),
@@ -346,6 +348,17 @@ class WarrantiesController extends Controller
     }
 
     /**
+     * Lo que pidió el cliente en el formulario de garantías del portal, para rellenar el
+     * alta desde su ticket (cliente, hotel, códigos). Solo si ve ese ticket en el Helpdesk.
+     */
+    private function ticketRequest(Request $request)
+    {
+        $tid = (int) DB::table('tickets')->where('code', (string) $request->query('ticket_code'))->value('id');
+        $req = $tid && Warranty::canSeeTicket($request->user(), $tid) ? PortalWarranties::forTicket($tid) : null;
+        return response()->json(['ok' => true, 'request' => $req]);
+    }
+
+    /**
      * Bandeja «Tickets de garantías»: los tickets de la categoría Garantías que ve este
      * usuario, con la garantía que se haya creado de cada uno. Pendientes = vivos y aún
      * sin garantía; con garantía = ya tienen al menos una; todos = cualquiera.
@@ -460,6 +473,9 @@ class WarrantiesController extends Controller
         if ($r['added']) {
             $this->evento($w->id, $userId, 'items', null, '+' . count($r['added']) . ': ' . $this->lista($r['added']));
             $w->forceFill(['last_activity_at' => now()])->save();
+            // Si el ticket vino del formulario de garantías del portal: el fallo que contó
+            // el cliente y sus fotos pasan solos a cada dispositivo.
+            PortalWarranties::applyToItems($w, $r['added'], $userId);
         }
         return $r;
     }
@@ -540,7 +556,7 @@ class WarrantiesController extends Controller
             'aeme_ref' => $i->aeme_ref, 'product_name' => $i->product_name, 'model_manual' => $i->model_manual,
             'warnings' => $i->warnings ?? [], 'checked_at' => $i->checked_at?->toDateTimeString(),
             'resolution' => $i->resolution, 'coverage' => $i->coverage, 'resolution_note' => $i->resolution_note,
-            'device_model_id' => $i->device_model_id,
+            'device_model_id' => $i->device_model_id, 'reported_issue' => $i->reported_issue,
             'broken_cases' => $i->broken_cases ?? [], 'battery_changed' => $i->battery_changed,
             'zkong_decision' => $i->zkong_decision, 'zkong_issue' => $i->zkong_issue,
             'reviewed_at' => $i->reviewed_at?->toDateTimeString(), 'reviewed_by_name' => $i->reviewed_by_name,

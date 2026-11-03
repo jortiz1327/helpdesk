@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\PortalService;
+use App\Services\PortalWarranties;
 use Illuminate\Http\Request;
 
 /**
@@ -49,12 +50,73 @@ class PortalController extends Controller
             // Descargar el hilo en PDF (siempre anónimo) y recuperar el enlace de 24h.
             'pdf'          => $this->pdf($request),
             'resend-link'  => $this->resendLink($request),
+            // GARANTÍAS de su empresa: todo con pase (código), que aquí hay datos de la empresa.
+            'warranties'        => $this->conPase($request, fn ($email) =>
+                                    response()->json(['ok' => true] + $this->garantias()->list($email))),
+            'warranty'          => $this->conPase($request, fn ($email) => $this->garantia($email, (string) $request->query('code'))),
+            'warranty-places'   => $this->conPase($request, fn ($email) =>
+                                    response()->json(['ok' => true] + $this->garantias()->places($email))),
+            'warranty-request'  => $this->conPase($request, fn ($email) => $this->solicitarGarantia($request, $email)),
+            'warranty-photo'    => $this->conPase($request, fn ($email) => $this->fotoGarantia($request, $email)),
+            'warranty-reply'    => $this->conPase($request, fn ($email) => $this->responderGarantia($request, $email)),
+            'warranty-pdf'      => $this->conPase($request, fn ($email) => $this->pdfGarantia($request, $email)),
             // Salir: anula el pase de este navegador. Siempre «ok» (salir dos veces no falla).
             'logout'       => $request->isMethod('post')
                                 ? tap(response()->json(['ok' => true]), fn () => $this->portal->cerrarSesion($request->header('X-Portal-Token') ?: $request->bearerToken()))
                                 : response()->json(['ok' => false, 'error' => 'Método no permitido'], 405),
             default        => response()->json(['ok' => false, 'error' => 'Acción no válida'], 400),
         };
+    }
+
+    protected function garantias(): PortalWarranties
+    {
+        return app(PortalWarranties::class);
+    }
+
+    protected function garantia(string $email, string $code)
+    {
+        $d = $this->garantias()->detail($email, $code);
+        if (!$d) return response()->json(['ok' => false, 'error' => 'Garantía no encontrada'], 404);
+        return response()->json(['ok' => true, 'warranty' => $d]);
+    }
+
+    /** Solicitar una garantía: crea el ticket con todo ordenado. Las fotos van después. */
+    protected function solicitarGarantia(Request $request, string $email)
+    {
+        if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        [$ok, $error, $code] = $this->garantias()->request($email, $request->only(['place_id', 'place_other', 'items', 'name', 'phone', 'address']));
+        if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
+        return response()->json(['ok' => true, 'code' => $code]);
+    }
+
+    /** Una foto (frontal, trasera, sin pilas…) de un dispositivo de la solicitud. */
+    protected function fotoGarantia(Request $request, string $email)
+    {
+        if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        [$ok, $error] = $this->garantias()->photo($email, (string) $request->input('ticket'), (string) $request->input('code'),
+            (string) $request->input('type'), $request->file('file'));
+        if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
+        return response()->json(['ok' => true]);
+    }
+
+    protected function responderGarantia(Request $request, string $email)
+    {
+        if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        [$ok, $error] = $this->garantias()->reply($email, (string) $request->input('code'), (string) $request->input('body'),
+            (array) $request->file('files', []));
+        if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
+        return response()->json(['ok' => true]);
+    }
+
+    /** Pegatina del paquete o informe de resolución, si la garantía es de su empresa. */
+    protected function pdfGarantia(Request $request, string $email)
+    {
+        $f = $this->garantias()->pdf($email, (string) $request->query('code'), (string) $request->query('doc'));
+        if (!$f) return response()->json(['ok' => false, 'error' => 'Documento no disponible'], 404);
+        return response($f[0], 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $f[1] . '"',
+        ]);
     }
 
     /** Envuelve una acción que exige PASE completo del correo (código): o 401. */
