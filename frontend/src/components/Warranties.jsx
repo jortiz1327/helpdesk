@@ -29,6 +29,58 @@ const CHIPS = [
 ]
 const SIZE = 25
 const hoy = () => new Date().toISOString().slice(0, 10)
+const motivoDe = (opts, k) => (opts?.close_reasons || []).find((r) => r.key === k)?.label || k
+
+/* Lo que pide cerrar (motivo y cómo se resolvió) o reabrir (por qué). v: valores · pon(campo)(valor). */
+function CamposCierre({ modo, v, pon, opts, actual }) {
+  if (modo === 'reabrir') return (
+    <label className="field"><span className="lbl">Por qué se reabre <em>*</em></span>
+      <textarea rows={2} maxLength={500} value={v.reopen_reason || ''} onChange={(e) => pon('reopen_reason')(e.target.value)} placeholder="El cliente vuelve a tener el problema, faltaba algo…" /></label>
+  )
+  const motivos = (opts?.close_reasons || []).filter((r) => r.active || r.key === actual).map((r) => ({ value: r.key, label: r.label }))
+  return (
+    <>
+      <div className="field"><span className="lbl">Motivo de cierre <em>*</em></span>
+        <Select block value={v.close_reason || ''} placeholder="Elige el motivo" onChange={pon('close_reason')} options={motivos} /></div>
+      <label className="field"><span className="lbl">Cómo se ha resuelto <span className="hint">(opcional)</span></span>
+        <textarea rows={3} maxLength={2000} value={v.close_resolution || ''} onChange={(e) => pon('close_resolution')(e.target.value)} placeholder="Qué se ha hecho al final, qué se ha acordado con el cliente…" /></label>
+    </>
+  )
+}
+
+/* Cerrar o reabrir una o varias garantías: estado de destino y lo que pide cada caso. */
+function CierreModal({ modo, titulo, estados, inicial, opts, agentes, conFecha, onClose, onOk }) {
+  const [v, setV] = useState(inicial)
+  const [busy, setBusy] = useState(false)
+  const pon = (k) => (x) => setV((s) => ({ ...s, [k]: x }))
+  const falta = modo === 'cerrar' ? !v.close_reason : !(v.reopen_reason || '').trim()
+  const ok = async () => { setBusy(true); const r = await onOk(v); setBusy(false); if (r) onClose() }
+  return (
+    <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="modal-head"><h3>{titulo}</h3><button className="x" onClick={onClose}>×</button></div>
+        <div className="modal-body">
+          <div className={conFecha ? 'grid2' : ''}>
+            <div className="field"><span className="lbl">{modo === 'cerrar' ? 'Queda como' : 'Vuelve a'}</span>
+              <Select block value={v.status} onChange={pon('status')} options={estados} /></div>
+            {conFecha ? <label className="field"><span className="lbl">Fecha de cierre</span>
+              <input type="date" value={v.closed_at || ''} max={hoy()} onChange={(e) => pon('closed_at')(e.target.value)} /></label> : null}
+          </div>
+          <CamposCierre modo={modo} v={v} pon={pon} opts={opts} />
+          {agentes ? <div className="field"><span className="lbl">Responsable <span className="hint">(si cambia)</span></span>
+            <Select block searchable value={String(v.responsible_id || '')} onChange={pon('responsible_id')}
+              options={[{ value: '', label: 'Sin responsable' }, ...agentes]} /></div> : null}
+        </div>
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button className={`btn ${modo === 'cerrar' ? 'dark' : ''}`} disabled={busy || falta} onClick={ok}>
+            {modo === 'cerrar' ? <><Icon.lock /> {busy ? 'Cerrando…' : 'Cerrar'}</> : <><Icon.refresh /> {busy ? 'Reabriendo…' : 'Reabrir'}</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 const VACIA = { id: 0, first_contact_at: '', received_at: '', installed_at: '', closed_at: '', portal_client_id: null, client_name: '', portal_project_id: null, project_name: '', category: '', urgency: '', status: 'no_iniciado', responsible_id: '', ticket_code: '', description: '' }
 
 const aFecha = (v) => (v ? new Date(String(v).replace(' ', 'T')) : null)
@@ -63,6 +115,8 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
   // Al pasar a «Cerrada» la fecha de cierre propone hoy (se puede cambiar).
   const elegirEstado = (v) => setF((s) => ({ ...s, status: v, closed_at: cerradaEn(opts, v) ? s.closed_at || hoy() : s.closed_at }))
   const cerrado = cerradaEn(opts, f.status)
+  const eraCerrada = !!f.id && cerradaEn(opts, inicial.status)
+  const modoCierre = cerrado && !eraCerrada ? 'cerrar' : eraCerrada && !cerrado ? 'reabrir' : eraCerrada ? 'corregir' : null
 
   // Cliente y proyecto salen del portal AEME; si no responde, se escriben a mano.
   const [clientes, setClientes] = useState(null)       // null = cargando
@@ -215,6 +269,7 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
             <label className="field"><span className="lbl">Fecha de cierre {!cerrado && <span className="hint">(al cerrarla)</span>}</span>
               <input type="date" value={cerrado ? f.closed_at || '' : ''} onChange={set('closed_at')} disabled={!cerrado} /></label>
           </div>
+          {modoCierre ? <div className="wr-cierre-f"><CamposCierre modo={modoCierre === 'reabrir' ? 'reabrir' : 'cerrar'} v={f} pon={pon} opts={opts} actual={inicial.close_reason} /></div> : null}
           <div className="grid2">
             <div className="field"><span className="lbl">Urgencia</span>
               <Select block value={f.urgency || ''} onChange={pon('urgency')}
@@ -319,9 +374,9 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
 
   const exportar = (lista) => {
     const esc = csvCell
-    const cab = ['Expediente', 'Recepción', 'Cliente', 'Proyecto', 'Etiquetas', 'Categoría', 'Urgencia', 'Responsable', 'Estado', 'Quién paga', 'Ticket', 'Última actividad']
+    const cab = ['Expediente', 'Recepción', 'Cliente', 'Proyecto', 'Etiquetas', 'Categoría', 'Urgencia', 'Responsable', 'Estado', 'Motivo de cierre', 'Quién paga', 'Ticket', 'Última actividad']
     const lineas = lista.map((w) => [w.code, fecha(w.received_at), w.client_name, w.project_name, w.labels_count, w.category, opts?.urgencies?.[w.urgency] || 'No disponible',
-      w.responsible_name, opts?.statuses?.[w.status], (w.coverages || []).map((c) => COB_CORTO[c] || c).join(' + '), w.ticket_code, fechaHora(w.last_activity_at)])
+      w.responsible_name, opts?.statuses?.[w.status], w.close_reason ? motivoDe(opts, w.close_reason) : '', (w.coverages || []).map((c) => COB_CORTO[c] || c).join(' + '), w.ticket_code, fechaHora(w.last_activity_at)])
     const blob = new Blob(['﻿' + [cab.map(esc).join(';'), ...lineas.map((l) => l.map(esc).join(';'))].join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -330,6 +385,7 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   }
 
+  const [loteCierre, setLoteCierre] = useState(null)   // {modo, status}: cerrar o reabrir las elegidas
   const enLote = async (cambios, texto) => {
     const n = sel.size
     if (!(await confirm({ title: `${texto} en ${n} ${n === 1 ? 'garantía' : 'garantías'}`, message: 'Cada cambio queda en el historial de su garantía.', confirmText: 'Aplicar' }))) return
@@ -367,6 +423,19 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
           options={[{ value: '', label: 'Más filtros' }, ...MAS_FILTROS.map(([k, l]) => ({ value: k, label: l }))]} />
         {filtrando ? <button className="dev-clear" onClick={() => { setQLive(''); setResp(''); setCat(''); setChip('open'); setPage(0) }}><Icon.x /> Limpiar</button> : null}
       </div>
+      {loteCierre ? (
+        <CierreModal modo={loteCierre.modo} opts={opts} onClose={() => setLoteCierre(null)}
+          titulo={loteCierre.modo === 'cerrar' ? `Cerrar ${sel.size} ${sel.size === 1 ? 'garantía' : 'garantías'}` : `Reabrir las cerradas de las ${sel.size} elegidas`}
+          estados={estadosActivos.filter((e) => cerradaEn(opts, e.value) === (loteCierre.modo === 'cerrar'))}
+          inicial={{ status: loteCierre.status }}
+          onOk={async (v) => {
+            const r = await api.bulkWarranties([...sel], { status: v.status, close_reason: v.close_reason, close_resolution: v.close_resolution, reopen_reason: v.reopen_reason })
+            if (!r.ok) { toast(r.error || 'No se pudo cambiar', 'err'); return false }
+            toast(r.changed ? `${r.changed} ${r.changed === 1 ? 'garantía cambiada' : 'garantías cambiadas'}` : 'Ya estaban así: no ha cambiado nada')
+            setSel(new Set()); setOtra((x) => x + 1)
+            return true
+          }} />
+      ) : null}
       {hueco && createPortal(<>
         <button className="dev-btn" disabled={!filas.length} onClick={() => exportar(filas)} title="Exportar a CSV lo que se ve"><Icon.download /> Exportar</button>
         {opts?.perms?.edit ? <button className="btn" onClick={onNew}><Icon.plus /> Nueva garantía</button> : null}
@@ -376,7 +445,11 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
         <div className="wl-bulk">
           <b>{sel.size} {sel.size === 1 ? 'seleccionada' : 'seleccionadas'}</b>
           <span className="sep" />
-          <Select sm value="" onChange={(v) => enLote({ status: v }, `Poner «${opts?.statuses?.[v] || v}»`)} options={[{ value: '', label: 'Cambiar estado…' }, ...estadosActivos]} />
+          <Select sm value="" onChange={(v) => {
+            if (cerradaEn(opts, v)) setLoteCierre({ modo: 'cerrar', status: v })
+            else if (elegidas.some((w) => cerradaEn(opts, w.status))) setLoteCierre({ modo: 'reabrir', status: v })
+            else enLote({ status: v }, `Poner «${opts?.statuses?.[v] || v}»`)
+          }} options={[{ value: '', label: 'Cambiar estado…' }, ...estadosActivos]} />
           <Select sm searchable value="" onChange={(v) => enLote({ responsible_id: v }, v === 'none' ? 'Quitar el responsable' : `Asignar a ${agentes.find((a) => a.value === v)?.label}`)}
             options={[{ value: '', label: 'Asignar a…' }, { value: 'none', label: 'Sin responsable' }, ...agentes]} />
           <button className="dev-btn" onClick={() => exportar(elegidas)}><Icon.download /> Exportar selección</button>
@@ -1264,7 +1337,7 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
   )
 }
 
-const CAMPOS = { created: 'Garantía creada', steps: 'Pasos', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', close: 'Cierre', reopen: 'Reapertura', steps: 'Pasos', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 /* Pasos por tipo de cliente (Configuración): los de todas y los de su categoría o cliente. */
 function Pasos({ w, listas, puede, onChanged }) {
@@ -1318,6 +1391,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
   const notaRef = useRef(null)
   const [fotos, setFotos] = useState(null)         // imágenes de los tickets del cliente; false si no ve el ticket
   const [verFotos, setVerFotos] = useState(undefined)   // undefined cerrado; null rejilla; src abre el visor
+  const [cierre, setCierre] = useState(null)            // {modo, status}: formulario de cerrar o reabrir
 
   const cargar = useCallback(() => api.warranty(id).then((r) => setD(r.ok ? r : { error: r.error || 'No se pudo cargar' })), [id])
   useEffect(() => { setD(null); cargar() }, [cargar])
@@ -1341,9 +1415,13 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
     const r = await api.saveWarranty({ ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '', first_contact_at: w.first_contact_at || '', installed_at: w.installed_at || '', closed_at: (w.closed_at || '').slice(0, 10), ...cambios })
     if (r.ok) { toast(msg); cargar(); onChanged() } else toast(r.error || 'Error', 'err')
   }
-  const cerrar = async () => {
-    if (!(await confirm({ title: 'Cerrar garantía', message: `¿Cerrar ${w.code}? Se podrá reabrir después.`, confirmText: 'Cerrar garantía' }))) return
-    guardarCon({ status: opts?.status_closed || 'cerrada' }, 'Garantía cerrada')
+  const cerrar = () => setCierre({ modo: 'cerrar', status: opts?.status_closed || 'cerrada' })
+  // Del selector de estado: cerrar o reabrir pasan por su formulario; lo demás se guarda sin más.
+  const cambiarEstado = (v) => {
+    if (v === w.status) return
+    const va = cerradaEn(opts, v)
+    if (va !== !abierta) setCierre({ modo: va ? 'cerrar' : 'reabrir', status: v })
+    else guardarCon({ status: v }, `Estado: ${opts?.statuses?.[v] || v}`)
   }
   const borrar = async () => {
     if (!(await confirm({ title: 'Borrar garantía', message: `¿Borrar ${w.code} con todo su seguimiento e historial? No se puede deshacer.`, danger: true, confirmText: 'Borrar' }))) return
@@ -1397,10 +1475,10 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
         </div>
         <div className="wf-acts">
           {p.edit ? <>
-            <Select value={w.status} onChange={(v) => v !== w.status && guardarCon({ status: v }, `Estado: ${opts?.statuses?.[v] || v}`)} options={estados} />
+            <Select value={w.status} onChange={cambiarEstado} options={estados} />
             {abierta
               ? <button className="btn dark" onClick={cerrar}><Icon.lock /> Cerrar</button>
-              : <button className="btn ghost" onClick={() => guardarCon({ status: opts?.status_reopen || 'en_curso' }, 'Garantía reabierta')}><Icon.refresh /> Reabrir</button>}
+              : <button className="btn ghost" onClick={() => setCierre({ modo: 'reabrir', status: opts?.status_reopen || 'en_curso' })}><Icon.refresh /> Reabrir</button>}
           </> : null}
           {w.ticket_id && fotos !== false ? (
             <button className="dev-btn" onClick={() => setVerFotos(null)} disabled={!fotos?.length} title={fotos && !fotos.length ? 'El cliente no ha mandado imágenes en sus tickets' : 'Lo que ha mandado el cliente por correo, WhatsApp o adjunto'}>
@@ -1463,6 +1541,8 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
               <div><dt>Recepción</dt><dd>{fecha(w.received_at)}</dd></div>
               <div><dt>Instalación</dt><dd>{w.installed_at ? fecha(w.installed_at) : <span className="dev-mute" title="Cada dispositivo cuenta desde su alta en ZKONG">Alta en ZKONG</span>}</dd></div>
               {w.closed_at ? <div><dt>Cierre</dt><dd>{fecha(w.closed_at)}</dd></div> : null}
+              {!abierta && w.close_reason ? <div><dt>Motivo de cierre</dt><dd>{motivoDe(opts, w.close_reason)}</dd></div> : null}
+              {!abierta && w.close_resolution ? <div className="wf-dl-largo"><dt>Resolución</dt><dd>{w.close_resolution}</dd></div> : null}
               <div><dt>Creada</dt><dd>{fechaHora(w.created_at)}{w.created_by_name ? <small> · {w.created_by_name}</small> : null}</dd></div>
             </dl>
           </section>
@@ -1506,6 +1586,22 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
           </section>
         </aside>
       </div>
+      {cierre ? (
+        <CierreModal modo={cierre.modo} opts={opts} onClose={() => setCierre(null)} conFecha={cierre.modo === 'cerrar'}
+          titulo={`${cierre.modo === 'cerrar' ? 'Cerrar' : 'Reabrir'} ${w.code}`}
+          estados={estados.filter((e) => cerradaEn(opts, e.value) === (cierre.modo === 'cerrar'))}
+          agentes={cierre.modo === 'reabrir' ? (opts?.agents || []).map((a) => ({ value: String(a.id), label: a.name })) : null}
+          inicial={{ status: cierre.status, closed_at: hoy(), responsible_id: w.responsible_id ? String(w.responsible_id) : '' }}
+          onOk={async (v) => {
+            const extra = cierre.modo === 'cerrar'
+              ? { close_reason: v.close_reason, close_resolution: v.close_resolution || '', closed_at: v.closed_at || '' }
+              : { reopen_reason: v.reopen_reason, responsible_id: v.responsible_id || '' }
+            const r = await api.saveWarranty({ ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '', first_contact_at: w.first_contact_at || '', installed_at: w.installed_at || '', closed_at: '', status: v.status, ...extra })
+            if (!r.ok) { toast(r.error || 'Error', 'err'); return false }
+            toast(cierre.modo === 'cerrar' ? 'Garantía cerrada' : 'Garantía reabierta'); cargar(); onChanged()
+            return true
+          }} />
+      ) : null}
       {verFotos !== undefined && fotos?.length ? <FotosCliente w={w} fotos={fotos} inicio={verFotos} onClose={() => setVerFotos(undefined)} onOpenTicket={onOpenTicket} /> : null}
     </>
   )

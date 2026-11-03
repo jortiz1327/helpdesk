@@ -14,6 +14,7 @@ use App\Services\WarrantyLabels;
 use App\Services\WarrantyPermissions;
 use App\Services\WarrantyPhotos;
 use App\Services\WarrantySteps;
+use App\Services\WarrantyClosing;
 use App\Services\WarrantyTour;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
@@ -177,6 +178,13 @@ class WarrantiesController extends Controller
                 return response()->json(['ok' => false, 'error' => 'Estado no válido'], 400);
             }
             $cambios['status'] = (string) $request->input('status');
+            // Cerrar en lote pide el motivo (el mismo para todas); reabrir alguna cerrada, por qué.
+            $hayCerradas = Warranty::whereIn('id', $ids)->whereIn('status', Warranty::closedStatuses())->exists();
+            [, , $error] = $estado['closed'] ? WarrantyClosing::apply($request->all(), false, true)
+                : ($hayCerradas ? WarrantyClosing::apply($request->all(), true, false) : [null, null, null]);
+            if ($error) {
+                return response()->json(['ok' => false, 'error' => $error], 400);
+            }
         }
         if ($request->has('responsible_id')) {
             $r = $request->input('responsible_id');
@@ -191,7 +199,8 @@ class WarrantiesController extends Controller
         }
 
         $tocadas = 0;
-        DB::transaction(function () use ($ids, $cambios, $me, &$tocadas) {
+        $entrada = $request->all();
+        DB::transaction(function () use ($ids, $cambios, $me, &$tocadas, $entrada) {
             foreach (Warranty::whereIn('id', $ids)->lockForUpdate()->get() as $w) {
                 $hubo = false;
                 foreach ($cambios as $campo => $nuevo) {
@@ -203,6 +212,9 @@ class WarrantiesController extends Controller
                         $w->status_changed_at = now();
                         $cerrada = Warranty::statusRows()[$nuevo]['closed'] ?? false;
                         $w->closed_at = $cerrada ? ($w->closed_at ?? now()) : null;
+                        [$cierre, $ev] = WarrantyClosing::apply($entrada, Warranty::statusRows()[$w->status]['closed'] ?? false, $cerrada);
+                        $w->fill($cierre);
+                        if ($ev) $this->evento($w->id, $me->id, $ev[0], null, $ev[1]);
                     }
                     $w->{$campo} = $nuevo;
                     $hubo = true;
@@ -237,6 +249,8 @@ class WarrantiesController extends Controller
             'ticket_id'        => $w->ticket_id,
             'ticket_code'      => $w->ticket_code ?? null,
             'closed_at'        => $w->closed_at?->toDateTimeString(),
+            'close_reason'     => $w->close_reason,
+            'close_resolution' => $w->close_resolution,
             'last_activity_at' => $w->last_activity_at?->toDateTimeString(),
             'created_at'       => $w->created_at?->toDateTimeString(),
             'labels_count'     => (int) ($w->labels_count ?? 0),
@@ -752,6 +766,13 @@ class WarrantiesController extends Controller
             return response()->json(['ok' => false, 'error' => "El estado «{$estado['label']}» está desactivado"], 400);
         }
         $cerrado = $estado['closed'];
+        // Cerrar pide el motivo; reabrir, por qué. Con la garantía cerrada se puede corregir el motivo.
+        $previa = $id ? Warranty::find($id, ['status', 'close_reason', 'close_resolution']) : null;
+        $era = $previa ? (Warranty::statusRows()[$previa->status]['closed'] ?? false) : false;
+        [$camposCierre, $eventoCierre, $error] = WarrantyClosing::apply($request->all(), $era, $cerrado, $previa?->only(['close_reason', 'close_resolution']) ?? []);
+        if ($error) {
+            return response()->json(['ok' => false, 'error' => $error], 400);
+        }
         if ($datos['urgency'] !== null && ! isset(Warranty::URGENCIES[$datos['urgency']])) {
             return response()->json(['ok' => false, 'error' => 'Urgencia no válida'], 400);
         }
@@ -794,9 +815,9 @@ class WarrantiesController extends Controller
             : ($cierre === '' ? ($w?->closed_at ?? now())
                 : ($w?->closed_at?->toDateString() === $cierre ? $w->closed_at : \Illuminate\Support\Carbon::parse($cierre)->setTimeFrom(now())));
 
-        $w = DB::transaction(function () use ($id, $datos, $me, $cerrarEl) {
+        $w = DB::transaction(function () use ($id, $datos, $me, $cerrarEl, $camposCierre, $eventoCierre) {
             if (! $id) {
-                $w = Warranty::create($datos + [
+                $w = Warranty::create($datos + $camposCierre + [
                     'code'             => Warranty::nextCode(),
                     'created_by'       => $me->id,
                     'closed_at'        => $cerrarEl(null),
@@ -804,6 +825,7 @@ class WarrantiesController extends Controller
                     'status_changed_at' => now(),
                 ]);
                 $this->evento($w->id, $me->id, 'created', null, $w->code);
+                if ($eventoCierre) $this->evento($w->id, $me->id, $eventoCierre[0], null, $eventoCierre[1]);
                 return $w;
             }
 
@@ -816,10 +838,14 @@ class WarrantiesController extends Controller
             if ($w->status !== $datos['status']) {
                 $w->status_changed_at = now();
             }
-            $w->fill($datos);
+            $w->fill($datos + $camposCierre);
             $w->closed_at = $cerrarEl($w);
 
             $cambios = 0;
+            if ($eventoCierre) {
+                $this->evento($w->id, $me->id, $eventoCierre[0], null, $eventoCierre[1]);
+                $cambios++;
+            }
             foreach (Warranty::TRACKED as $campo => $_) {
                 $nuevo = $valor($campo);
                 if ((string) ($antes[$campo] ?? '') !== (string) ($nuevo ?? '')) {
@@ -883,6 +909,7 @@ class WarrantiesController extends Controller
             'statuses'   => Warranty::statuses(),
             'status_meta' => Warranty::statusRows(),
             'status_closed' => Warranty::STATUS_CLOSED,
+            'close_reasons' => WarrantyClosing::reasons(),
             'status_reopen' => Warranty::STATUS_REOPEN,
             'urgencies'  => Warranty::URGENCIES,
             'note_types' => Warranty::NOTE_TYPES,
@@ -964,7 +991,7 @@ class WarrantiesController extends Controller
         return response()->json(['ok' => true, 'rows' => $filas, 'stale_days' => $this->diasSinActividad(), 'from' => $desde, 'to' => $hasta]);
     }
 
-    private const REPORT_GROUPS = ['status', 'urgency', 'category', 'responsible', 'client', 'month'];
+    private const REPORT_GROUPS = ['status', 'urgency', 'category', 'responsible', 'client', 'month', 'close_reason'];
 
     /**
      * Informe de las garantías recibidas en un rango: totales, tiempo medio hasta el
@@ -981,7 +1008,7 @@ class WarrantiesController extends Controller
         if ($this->esFecha($desde)) $q->where('warranties.received_at', '>=', $desde);
         if ($this->esFecha($hasta)) $q->where('warranties.received_at', '<=', $hasta);
         $ws = $q->get(['warranties.id', 'warranties.status', 'warranties.urgency', 'warranties.category', 'warranties.client_name',
-            'warranties.received_at', 'warranties.closed_at', 'u.name as responsible_name']);
+            'warranties.received_at', 'warranties.closed_at', 'warranties.close_reason', 'u.name as responsible_name']);
 
         $items = WarrantyItem::whereIn('warranty_id', $ws->pluck('id'))->get(['warranty_id', 'resolution', 'zkong_decision', 'zkong_batch_id', 'zkong_result']);
         $porW = $items->groupBy('warranty_id');
@@ -995,6 +1022,8 @@ class WarrantiesController extends Controller
             'responsible' => [$w->responsible_name ?: '', $w->responsible_name ?: 'Sin responsable'],
             'client'      => [$w->client_name ?: '', $w->client_name ?: 'Sin cliente'],
             'month'       => [$w->received_at?->format('Y-m') ?? '', $w->received_at ? ucfirst($w->received_at->locale('es')->isoFormat('MMMM YYYY')) : '—'],
+            'close_reason' => in_array($w->status, $cerrados, true)
+                ? [$w->close_reason ?: '', WarrantyClosing::label($w->close_reason) ?: 'Cerrada sin motivo'] : ['_open', 'Abiertas'],
         };
         $acum = fn () => ['total' => 0, 'open' => 0, 'closed' => 0, 'days_sum' => 0, 'days_n' => 0, 'devices' => 0, 'reviewed' => 0];
         $suma = function (array &$g, $w) use ($cerrados, $porW) {

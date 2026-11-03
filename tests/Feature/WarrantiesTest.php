@@ -74,7 +74,7 @@ class WarrantiesTest extends TestCase
 
         $this->postJson('/api/warranties.php?action=save', [
             'id' => $id, 'received_at' => '2026-10-20', 'client_name' => 'Hoteles Sol', 'project_name' => 'Sol Centro',
-            'category' => 'Hoteles', 'urgency' => 'muy_urgente', 'status' => 'cerrada', 'responsible_id' => $luis->id,
+            'category' => 'Hoteles', 'urgency' => 'muy_urgente', 'status' => 'cerrada', 'close_reason' => 'aceptada', 'responsible_id' => $luis->id,
         ], $h)->assertOk();
 
         $w = Warranty::find($id);
@@ -89,14 +89,15 @@ class WarrantiesTest extends TestCase
         $this->assertTrue($ev->has('created'));
 
         // Reabrir quita la fecha de cierre.
-        $this->postJson('/api/warranties.php?action=save', ['id' => $id, 'received_at' => '2026-10-20', 'status' => 'en_curso'], $h)->assertOk();
+        $this->postJson('/api/warranties.php?action=save', ['id' => $id, 'received_at' => '2026-10-20', 'status' => 'en_curso'], $h)->assertStatus(400);
+        $this->postJson('/api/warranties.php?action=save', ['id' => $id, 'received_at' => '2026-10-20', 'status' => 'en_curso', 'reopen_reason' => 'Vuelve a fallar'], $h)->assertOk();
         $this->assertNull(Warranty::find($id)->closed_at);
     }
 
     public function test_todas_las_fechas_se_pueden_cambiar_y_quedan_en_el_historial(): void
     {
         [, $h] = $this->agente();
-        $id = $this->crear($h, ['first_contact_at' => '2026-10-10', 'status' => 'cerrada', 'closed_at' => '2026-10-25'])['id'];
+        $id = $this->crear($h, ['first_contact_at' => '2026-10-10', 'status' => 'cerrada', 'close_reason' => 'aceptada', 'closed_at' => '2026-10-25'])['id'];
         $w = Warranty::find($id);
         $this->assertSame(['2026-10-10', '2026-10-25'], [$w->first_contact_at->toDateString(), $w->closed_at->toDateString()]);
 
@@ -108,7 +109,7 @@ class WarrantiesTest extends TestCase
         $this->assertSame(['10/10/2026', '08/10/2026'], [$ev['first_contact_at']['from_value'], $ev['first_contact_at']['to_value']]);
         $this->assertSame(['20/10/2026', '21/10/2026'], [$ev['received_at']['from_value'], $ev['received_at']['to_value']]);
         $this->assertSame(['25/10/2026', '27/10/2026'], [$ev['closed_at']['from_value'], $ev['closed_at']['to_value']]);
-        $this->assertSame(4, $ev->count());   // created + las tres fechas, nada más
+        $this->assertSame(5, $ev->count());   // created, el cierre (motivo) y las tres fechas, nada más
 
         $this->postJson('/api/warranties.php?action=save', ['id' => $id, 'received_at' => '2026-10-21', 'closed_at' => '2026-02-30'], $h)->assertStatus(400);
     }
@@ -199,7 +200,7 @@ class WarrantiesTest extends TestCase
         [$ana, $h] = $this->agente();
         $a = $this->crear($h, ['responsible_id' => $ana->id, 'urgency' => 'alta']);
         $b = $this->crear($h, ['status' => 'pte_cliente', 'client_name' => '']);
-        $c = $this->crear($h, ['status' => 'cerrada']);
+        $c = $this->crear($h, ['status' => 'cerrada', 'close_reason' => 'aceptada']);
         // b lleva un mes sin moverse.
         Warranty::whereKey($b['id'])->update(['last_activity_at' => now()->subDays(30)]);
 
@@ -229,14 +230,14 @@ class WarrantiesTest extends TestCase
         [$pepe] = $this->agente(['helpdesk.access'], 'Pepe');
         $a = $this->crear($h, ['responsible_id' => $ana->id]);
         $b = $this->crear($h, ['category' => 'Tiendas']);
-        $c = $this->crear($h, ['status' => 'cerrada']);
+        $c = $this->crear($h, ['status' => 'cerrada', 'close_reason' => 'aceptada']);
 
         $r = $this->getJson('/api/warranties.php', $h)->json();
         $this->assertSame(['open' => 2, 'mine' => 1, 'pte_zkong' => 0, 'closed' => 1, 'all' => 3, 'repeated' => 0], $r['counts']);
         $this->assertSame([$b['id']], collect($this->getJson('/api/warranties.php?category=Tiendas', $h)->json('rows'))->pluck('id')->all());
 
         // Estado y responsable de varias a la vez; cada cambio queda en su historial.
-        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id'], $b['id']], 'status' => 'cerrada', 'responsible_id' => $luis->id], $h)
+        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id'], $b['id']], 'status' => 'cerrada', 'close_reason' => 'duplicada', 'responsible_id' => $luis->id], $h)
             ->assertOk()->assertJson(['changed' => 2]);
         $this->assertNotNull(Warranty::find($a['id'])->closed_at);
         $this->assertSame($luis->id, Warranty::find($b['id'])->responsible_id);
@@ -245,7 +246,7 @@ class WarrantiesTest extends TestCase
         $this->assertSame('Luis', $ev['responsible_id']['to_value']);
 
         // Reabrir en lote quita la fecha de cierre; lo que no cambia no cuenta.
-        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id'], $c['id']], 'status' => 'en_curso'], $h)->assertJson(['changed' => 2]);
+        $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id'], $c['id']], 'status' => 'en_curso', 'reopen_reason' => 'Vuelve'], $h)->assertJson(['changed' => 2]);
         $this->assertNull(Warranty::find($c['id'])->closed_at);
         $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$a['id']], 'status' => 'en_curso'], $h)->assertJson(['changed' => 0]);
 

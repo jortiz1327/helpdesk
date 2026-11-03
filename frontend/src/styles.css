@@ -5739,3 +5739,19 @@ button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); 
 .tour-offer-acts { display: flex; gap: 8px; }
 .tour-offer-acts svg { width: 14px; height: 14px; fill: currentColor; }
 @media (prefers-reduced-motion: reduce) { .tour-spot, .tour-pop { transition: none; } }
+
+/* Cerrar y reabrir: lo que se pide en el formulario de la garantía */
+.wr-cierre-f { display: flex; flex-direction: column; gap: 12px; margin-top: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.wr-cierre-f .field { margin: 0; }
+.wf-dl-largo dd { white-space: pre-wrap; }
+
+/* Configuración: motivos de cierre */
+.ws-motivos { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ws-motivos li { display: flex; align-items: center; gap: 8px; }
+.ws-motivos li.off input:not([type=checkbox]) { opacity: .55; }
+.ws-motivos input:not([type=checkbox]) { flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 11px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
+.ws-motivos input:not([type=checkbox]):focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent); }
+.ws-motivo-n { flex: none; width: 92px; text-align: right; font-size: 12px; }
+.ws-motivos .wr-check { flex: none; font-size: 12.5px; }
+.ws-motivos .icon-btn svg { width: 16px; height: 16px; }
+.ws-body > .wf-link svg { width: 14px; height: 14px; fill: currentColor; vertical-align: -2px; }

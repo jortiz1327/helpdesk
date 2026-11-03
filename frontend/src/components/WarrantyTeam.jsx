@@ -173,7 +173,7 @@ export function WarrantyTeam({ onFilter }) {
 }
 
 /* --- Informes --- */
-const GRUPOS = [['status', 'Estado'], ['urgency', 'Urgencia'], ['category', 'Categoría'], ['responsible', 'Responsable'], ['client', 'Cliente'], ['month', 'Mes de recepción']]
+const GRUPOS = [['status', 'Estado'], ['urgency', 'Urgencia'], ['category', 'Categoría'], ['responsible', 'Responsable'], ['client', 'Cliente'], ['month', 'Mes de recepción'], ['close_reason', 'Motivo de cierre']]
 const RANGOS = [
   ['mes', 'Este mes', () => { const n = new Date(); return [iso(new Date(n.getFullYear(), n.getMonth(), 1)), hoy()] }],
   ['prev', 'Mes anterior', () => { const n = new Date(); return [iso(new Date(n.getFullYear(), n.getMonth() - 1, 1)), iso(new Date(n.getFullYear(), n.getMonth(), 0))] }],

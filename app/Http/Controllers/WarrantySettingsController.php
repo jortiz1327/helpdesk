@@ -9,6 +9,7 @@ use App\Services\WarrantyAlerts;
 use App\Services\WarrantyDocuments;
 use App\Services\WarrantyReplacements;
 use App\Services\WarrantySteps;
+use App\Services\WarrantyClosing;
 use App\Services\WarrantyTour;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
@@ -46,6 +47,7 @@ class WarrantySettingsController extends Controller
             'replacements_save' => $this->replacementsSave($request),
             'steps_save'      => $this->stepsSave($request),
             'tour_save'       => $this->tourSave($request),
+            'close_reasons_save' => $this->closeReasonsSave($request),
             default           => $this->get(),
         };
     }
@@ -55,6 +57,7 @@ class WarrantySettingsController extends Controller
         $usoEstado = DB::table('warranties')->groupBy('status')->selectRaw('status, count(*) as n')->pluck('n', 'status');
         $usoCat = DB::table('warranties')->whereNotNull('category')->groupBy('category')->selectRaw('category, count(*) as n')->pluck('n', 'category');
         $reglas = app(WarrantyAlerts::class)->rules();
+        $usoMotivo = DB::table('warranties')->whereNotNull('close_reason')->groupBy('close_reason')->selectRaw('close_reason, count(*) as n')->pluck('n', 'close_reason');
 
         return response()->json([
             'ok' => true,
@@ -83,6 +86,7 @@ class WarrantySettingsController extends Controller
             'replacements' => WarrantyReplacements::settings(),
             'checklists' => WarrantySteps::settings(),
             'tour' => WarrantyTour::settings(),
+            'close_reasons' => collect(WarrantyClosing::reasons())->map(fn ($r) => $r + ['used' => (int) ($usoMotivo[$r['key']] ?? 0)])->values(),
             'ticket_categories' => DB::table('ticket_categories')->where('active', true)->orderBy('position')->orderBy('name')->get(['id', 'name']),
             'resolutions' => collect(WarrantyItem::RESOLUTIONS)->except('pendiente')->map(fn ($r) => $r['label']),
         ]);
@@ -163,6 +167,21 @@ class WarrantySettingsController extends Controller
         [$listas, $error] = WarrantySteps::clean((array) $request->input('lists', []), DB::table('warranty_categories')->pluck('name')->all());
         if ($error) return $this->error($error);
         $this->guardar('checklists', ['lists' => $listas]);
+        return response()->json(['ok' => true]);
+    }
+
+    /* --- Motivos de cierre --- */
+
+    private function closeReasonsSave(Request $request)
+    {
+        [$lista, $error] = WarrantyClosing::clean((array) $request->input('list', []));
+        if ($error) return $this->error($error);
+        // Un motivo que ya usa alguna garantía no se quita: se desactiva.
+        $usados = DB::table('warranties')->whereNotNull('close_reason')->distinct()->pluck('close_reason');
+        $quedan = collect($lista)->pluck('key');
+        $quitados = $usados->diff($quedan);
+        if ($quitados->isNotEmpty()) return $this->error('«' . WarrantyClosing::label($quitados->first()) . '» ya lo usa alguna garantía: desactívalo en lugar de quitarlo');
+        $this->guardar('close_reasons', ['list' => $lista]);
         return response()->json(['ok' => true]);
     }
 

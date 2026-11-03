@@ -475,6 +475,44 @@ function PasosCliente({ lists, categorias, hacer }) {
   )
 }
 
+/* Motivos de cierre: lo que se elige al cerrar una garantía. Las claves no cambian al renombrar. */
+function MotivosCierre({ list, hacer }) {
+  const limpia = (l) => l.map(({ key, label, active }) => ({ key, label, active }))
+  const [v, setV] = useState(() => limpia(list))
+  useEffect(() => setV(limpia(list)), [list])
+  const usos = Object.fromEntries(list.map((r) => [r.key, r.used]))
+  const set = (i, c) => setV((x) => x.map((r, k) => (k === i ? { ...r, ...c } : r)))
+  const mover = (i, d) => setV((x) => { const n = [...x]; [n[i], n[i + d]] = [n[i + d], n[i]]; return n })
+  const cambiado = JSON.stringify(v) !== JSON.stringify(limpia(list))
+  return (
+    <Card title="Motivos de cierre" count={v.filter((r) => r.active).length}
+      sub="Al cerrar una garantía (o pasarla a cualquier estado que cuente como cerrada) se elige uno de estos motivos y, si se quiere, cómo se resolvió. Al reabrirla se pide por qué. En Informes se puede agrupar por motivo."
+      foot={(
+        <div className="ws-foot">
+          <span className="dev-mute">Los que ya usa alguna garantía no se pueden quitar: se desactivan.</span>
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(limpia(list))}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado || v.some((r) => !r.label.trim())} onClick={() => hacer('close_reasons_save', { list: v }, 'Motivos guardados')}><Icon.save /> Guardar</button>
+        </div>
+      )}>
+      <div className="ws-body">
+        <ul className="ws-motivos">
+          {v.map((r, i) => (
+            <li key={r.key || i} className={r.active ? '' : 'off'}>
+              <input value={r.label} maxLength={60} placeholder="Nombre del motivo" onChange={(e) => set(i, { label: e.target.value })} />
+              <span className="dev-mute ws-motivo-n">{usos[r.key] ? usos[r.key] + ' ' + (usos[r.key] === 1 ? 'garantía' : 'garantías') : ''}</span>
+              <label className="wr-check"><input type="checkbox" checked={r.active} onChange={(e) => set(i, { active: e.target.checked })} /> Activo</label>
+              <button className="icon-btn" disabled={!i} title="Subir" onClick={() => mover(i, -1)}><Icon.chevron style={{ transform: 'rotate(180deg)' }} /></button>
+              <button className="icon-btn" disabled={i === v.length - 1} title="Bajar" onClick={() => mover(i, 1)}><Icon.chevron /></button>
+              <button className="icon-btn" disabled={!!usos[r.key]} title={usos[r.key] ? 'Lo usa alguna garantía: desactívalo' : 'Quitar'} onClick={() => setV((x) => x.filter((_, k) => k !== i))}><Icon.trash /></button>
+            </li>
+          ))}
+        </ul>
+        <button className="wf-link" onClick={() => setV((x) => [...x, { key: '', label: '', active: true }])}><Icon.plus /> Añadir motivo</button>
+      </div>
+    </Card>
+  )
+}
+
 /* Tour guiado: el título y el texto de cada paso (qué se señala lo fija la app). */
 function TourTextos({ steps, hacer }) {
   const [v, setV] = useState(steps)
@@ -549,6 +587,7 @@ const SECCIONES = [
     ['urgencias', 'Urgencias', Icon.bolt, (d) => d.urgencies.length],
     ['alertas', 'Alertas', Icon.bell, (d) => d.alerts.filter((r) => r.active).length],
     ['pasos', 'Pasos por tipo de cliente', Icon.check, (d) => d.checklists.filter((l) => l.active).length],
+    ['motivos', 'Motivos de cierre', Icon.lock, (d) => d.close_reasons.filter((r) => r.active).length],
   ]],
   ['Revisión y documentos', [
     ['plantillas', 'Plantillas de diagnóstico', Icon.doc, (d) => d.templates.filter((t) => t.active).length],
@@ -587,7 +626,7 @@ export default function WarrantySettings() {
       <header className="page-head">
         <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Configuración</h1></div>
-        <span className="sub">· Estados, categorías, urgencias, alertas, pasos, plantillas, plazos, documentos, texto para Finanzas, sustituciones y tour guiado de Gestión de garantías</span>
+        <span className="sub">· Estados, categorías, urgencias, alertas, pasos, motivos de cierre, plantillas, plazos, documentos, texto para Finanzas, sustituciones y tour guiado de Gestión de garantías</span>
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
         {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
@@ -616,6 +655,7 @@ export default function WarrantySettings() {
               {sec === 'plantillas' && <Plantillas list={d.templates} hacer={hacer} />}
               {sec === 'plazos' && <Plazos terms={d.terms} refs={d.term_references} categorias={d.categories} hacer={hacer} />}
               {sec === 'documentos' && <Documentos docs={d.docs} grupos={d.block_groups} hacer={hacer} />}
+              {sec === 'motivos' && <MotivosCierre list={d.close_reasons} hacer={hacer} />}
               {sec === 'tour' && <TourTextos steps={d.tour} hacer={hacer} />}
               {sec === 'pasos' && <PasosCliente lists={d.checklists} categorias={d.categories} hacer={hacer} />}
               {sec === 'sustituciones' && <Sustituciones cfg={d.replacements} categorias={d.categories} ticketCats={d.ticket_categories} hacer={hacer} />}

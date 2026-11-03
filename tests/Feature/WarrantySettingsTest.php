@@ -60,7 +60,7 @@ class WarrantySettingsTest extends TestCase
         $this->cfg('status_save', ['label' => 'abonada', 'color' => '#12925a'], $h)->assertStatus(400);   // nombre repetido
         $this->cfg('status_save', ['label' => 'Otro', 'color' => 'rojo'], $h)->assertStatus(400);
         $w = $this->garantia($h);
-        $this->postJson('/api/warranties.php?action=save', ['id' => $w['id'], 'received_at' => '2026-10-20', 'status' => $k], $h)->assertOk();
+        $this->postJson('/api/warranties.php?action=save', ['id' => $w['id'], 'received_at' => '2026-10-20', 'status' => $k, 'close_reason' => 'aceptada'], $h)->assertOk();
         $this->assertNotNull(Warranty::find($w['id'])->closed_at);
         $this->assertSame(0, $this->getJson('/api/warranties.php?chip=open', $h)->json('total'));
         $this->assertSame(1, $this->getJson('/api/warranties.php?chip=closed', $h)->json('total'));
@@ -134,7 +134,7 @@ class WarrantySettingsTest extends TestCase
         // Cambiar de estado reinicia la cuenta; cerrada no tiene alertas.
         $this->postJson('/api/warranties.php?action=save', ['id' => $a['id'], 'received_at' => '2026-10-20', 'status' => 'en_curso', 'responsible_id' => $ana], $h)->assertOk();
         $this->assertTrue(Warranty::find($a['id'])->status_changed_at->isToday());
-        $this->postJson('/api/warranties.php?action=save', ['id' => $b['id'], 'received_at' => '2026-10-20', 'status' => 'cerrada'], $h)->assertOk();
+        $this->postJson('/api/warranties.php?action=save', ['id' => $b['id'], 'received_at' => '2026-10-20', 'status' => 'cerrada', 'close_reason' => 'aceptada'], $h)->assertOk();
         $this->assertSame(0, $this->getJson('/api/warranties.php?chip=alerts', $h)->json('total'));
 
         // RMA: remesa enviada a ZKONG hace 10 días sin respuesta (aviso a 7, crítico a 15).
