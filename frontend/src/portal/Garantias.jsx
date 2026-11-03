@@ -27,11 +27,83 @@ const G = {
   doc: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 3v5h5M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M8 13h8M8 17h5" /></svg>,
   warn: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l10 18H2z" /><path d="M12 10v5M12 18v.5" /></svg>,
   box: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7l9-4 9 4v10l-9 4-9-4z" /><path d="M3 7l9 4 9-4M12 11v10" /></svg>,
+  chev: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>,
+  // Lo que le pasa a un dispositivo (en el desplegable).
+  no_enciende: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v8M7.5 6.5a7 7 0 1 0 9 0" /></svg>,
+  pantalla: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="13" rx="2" /><path d="M10 5l2 5-3 3 2 5" /></svg>,
+  sin_conexion: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0M12 19h.01M3 3l18 18" /></svg>,
+  bateria: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="17" height="10" rx="2" /><path d="M22 11v2M6 10v4" /></svg>,
+  otro: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.6M12 17h.01" /></svg>,
+}
+
+/*
+ * Desplegable con el aspecto del portal (en vez del <select> del sistema): botón con lo
+ * elegido y una lista con icono y explicación de cada opción. Teclado: flechas, Inicio,
+ * Fin, Intro/espacio para elegir y Esc para cerrar.
+ * options: [{ value, label, desc?, icon? }]
+ */
+function Desplegable({ value, options, onChange, placeholder, label, className = '', invalid = false }) {
+  const [abierto, setAbierto] = useState(false)
+  const [activo, setActivo] = useState(0)
+  const raiz = useRef(null)
+  const boton = useRef(null)
+  const lista = useRef(null)
+  const sel = options.find((o) => o.value === value)
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e) => { if (!raiz.current?.contains(e.target)) setAbierto(false) }
+    document.addEventListener('pointerdown', fuera)
+    return () => document.removeEventListener('pointerdown', fuera)
+  }, [abierto])
+  useEffect(() => { if (abierto) lista.current?.children[activo]?.scrollIntoView({ block: 'nearest' }) }, [abierto, activo])
+
+  const abrir = () => { setActivo(Math.max(0, options.findIndex((o) => o.value === value))); setAbierto(true) }
+  const elegir = (o) => { onChange(o.value); setAbierto(false); boton.current?.focus() }
+  const tecla = (e) => {
+    if (!abierto) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); abrir() }
+      return
+    }
+    const mover = { ArrowDown: (a) => Math.min(options.length - 1, a + 1), ArrowUp: (a) => Math.max(0, a - 1), Home: () => 0, End: () => options.length - 1 }[e.key]
+    if (mover) { e.preventDefault(); setActivo(mover) }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (options[activo]) elegir(options[activo]) }
+    else if (e.key === 'Escape') { e.preventDefault(); setAbierto(false) }
+    else if (e.key === 'Tab') setAbierto(false)
+  }
+
+  return (
+    <div className={`gw-dd ${abierto ? 'on' : ''} ${className}`} ref={raiz}>
+      <button type="button" ref={boton} className={`gw-dd-b ${sel ? '' : 'vacio'} ${invalid ? 'mal' : ''}`} aria-haspopup="listbox" aria-expanded={abierto}
+        aria-label={label} onClick={() => (abierto ? setAbierto(false) : abrir())} onKeyDown={tecla}>
+        {sel?.icon && <span className="gw-dd-ic">{sel.icon}</span>}
+        <span className="gw-dd-v">{sel ? sel.label : placeholder}</span>
+        <span className="gw-dd-chev">{G.chev}</span>
+      </button>
+      {abierto && (
+        <ul className="gw-dd-l" role="listbox" ref={lista} aria-label={label}>
+          {options.map((o, k) => (
+            <li key={o.value || '_'} role="option" aria-selected={o.value === value}
+              className={`${k === activo ? 'act' : ''} ${o.value === value ? 'sel' : ''}`}
+              onPointerEnter={() => setActivo(k)} onPointerDown={(e) => e.preventDefault()} onClick={() => elegir(o)}>
+              {o.icon && <span className="gw-dd-ic">{o.icon}</span>}
+              <span className="gw-dd-t"><b>{o.label}</b>{o.desc && <small>{o.desc}</small>}</span>
+              {o.value === value && <span className="gw-dd-ok">{I.check}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 // Fotos de cada dispositivo: las mismas que pide la revisión del equipo.
 const FOTOS = { esl: ['front', 'back_batteries', 'back_no_batteries'], ap: ['front', 'back'] }
 const ISSUES = ['no_enciende', 'pantalla', 'sin_conexion', 'bateria', 'otro']
+// Lo que tiene que contar, como mínimo, de cada dispositivo (lo mismo exige el servidor):
+// sin explicación no se sabe si es un fallo o un uso que no cubre la garantía.
+const DETALLE_MIN = 15
+const explicado = (i) => !!i.issue && i.detail.trim().length >= DETALLE_MIN
 const ESL = /^[A-Z0-9]{9}$/
 const AP = /^[0-9A-F]{12}$/
 const limpiar = (s) => String(s || '').toUpperCase().replace(/[\s:\-]/g, '')
@@ -116,10 +188,8 @@ export function MisGarantias({ go, onOpen, onExpire }) {
           <label className="gw-search">{I.mag}
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('g_search_ph')} /></label>
           {sitios.length > 1 && (
-            <select className="inp gw-sitio" value={sitio} onChange={(e) => setSitio(e.target.value)}>
-              <option value="">{t('g_all_places')}</option>
-              {sitios.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <Desplegable className="gw-sitio" value={sitio} onChange={setSitio} label={t('g_all_places')}
+              options={[{ value: '', label: t('g_all_places'), icon: G.building }, ...sitios.map((s) => ({ value: s, label: s, icon: G.building }))]} />
           )}
         </div>
       )}
@@ -428,7 +498,7 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
       if (!c) continue
       if (!ESL.test(c) && !AP.test(c)) { malos.push(c); continue }
       if (items.some((i) => i.code === c) || nuevos.some((i) => i.code === c)) continue
-      nuevos.push({ code: c, kind: tipoDe(c), issue: 'no_enciende', detail: '', fotos: fotoFrontal ? { front: { file: fotoFrontal, leido: c } } : {} })
+      nuevos.push({ code: c, kind: tipoDe(c), issue: '', detail: '', fotos: fotoFrontal ? { front: { file: fotoFrontal, leido: c } } : {} })
     }
     setAviso(malos.length ? t('g_bad_codes', { codes: malos.slice(0, 5).join(', ') }) : '')
     if (nuevos.length) setItems((s) => [...s, ...nuevos])
@@ -461,10 +531,14 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
   const cambiar = (code, k, v) => setItems((s) => s.map((i) => (i.code === code ? { ...i, [k]: v } : i)))
 
   const faltanFotos = items.filter((i) => FOTOS[i.kind].some((f) => !i.fotos[f]))
+  const sinExplicar = items.filter((i) => !explicado(i))
   const nE = items.filter((i) => i.kind === 'esl').length
   const nA = items.filter((i) => i.kind === 'ap').length
+  // Los avisos de lo que falta en una fila salen cuando intenta seguir (no al añadirla).
+  const [marcar, setMarcar] = useState(false)
+  const issueOpts = ISSUES.map((k) => ({ value: k, label: t('g_issue_' + k), desc: t('g_issue_desc_' + k), icon: G[k] }))
 
-  const puede = { 1: !!sitio, 2: items.length > 0 && faltanFotos.length === 0, 3: nombre.trim() && dir.trim(), 4: true }
+  const puede = { 1: !!sitio, 2: items.length > 0 && faltanFotos.length === 0 && sinExplicar.length === 0, 3: nombre.trim() && dir.trim(), 4: true }
   const siguiente = () => { setErr(''); setPaso((p) => Math.min(4, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const atras = () => { setErr(''); setPaso((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const ir = (p) => { setErr(''); setPaso(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }
@@ -584,11 +658,14 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
                           <button type="button" className="gw-quitar" onClick={() => setItems((s) => s.filter((x) => x.code !== i.code))} title={t('remove')}>{G.trash}</button>
                         </div>
                         <div className="gw-item-f">
-                          <select className="inp" value={i.issue} onChange={(e) => cambiar(i.code, 'issue', e.target.value)} aria-label={t('g_issue_q')}>
-                            {ISSUES.map((k) => <option key={k} value={k}>{t('g_issue_' + k)}</option>)}
-                          </select>
-                          <input className="inp" value={i.detail} maxLength={200} onChange={(e) => cambiar(i.code, 'detail', e.target.value)}
-                            placeholder={t('g_detail_ph')} />
+                          <Desplegable value={i.issue} options={issueOpts} onChange={(v) => cambiar(i.code, 'issue', v)}
+                            placeholder={t('g_issue_pick')} label={t('g_issue_q')} invalid={marcar && !i.issue} />
+                          <textarea className={`inp gw-detalle ${marcar && i.detail.trim().length < DETALLE_MIN ? 'mal' : ''}`} rows={2} value={i.detail} maxLength={300}
+                            onChange={(e) => cambiar(i.code, 'detail', e.target.value)}
+                            placeholder={t(i.issue ? 'g_detail_ph_' + i.issue : 'g_detail_ph')} aria-label={t('g_detail_label')} />
+                          {i.detail.trim().length < DETALLE_MIN && (
+                            <small className={`gw-detalle-n ${marcar ? 'mal' : ''}`}>{t('g_detail_min', { n: DETALLE_MIN - i.detail.trim().length })}</small>
+                          )}
                         </div>
                         <div className="gw-fotos">
                           {FOTOS[i.kind].map((tipo) => (
@@ -661,9 +738,16 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
 
         <div className="gw-paso-pie">
           {paso > 1 ? <button type="button" className="btn sec gw-atras" disabled={!!enviando} onClick={atras}>{I.back} {t('g_back')}</button> : <span />}
-          {paso === 2 && items.length > 0 && faltanFotos.length > 0 && <span className="gw-pie-why">{t('g_photos_block', { n: faltanFotos.length })}</span>}
+          {paso === 2 && items.length > 0 && (faltanFotos.length > 0 || sinExplicar.length > 0) && (
+            <span className="gw-pie-why">{[
+              sinExplicar.length ? t(sinExplicar.length === 1 ? 'g_details_block_1' : 'g_details_block', { n: sinExplicar.length }) : '',
+              faltanFotos.length ? t(faltanFotos.length === 1 ? 'g_photos_block_1' : 'g_photos_block', { n: faltanFotos.length }) : '',
+            ].filter(Boolean).join(' · ')}</span>
+          )}
           {paso < 4
-            ? <button type="button" className="btn gw-sig" disabled={!puede[paso]} onClick={siguiente}>{t('g_next')} {I.arrow}</button>
+            ? <button type="button" className={`btn gw-sig ${!puede[paso] && paso === 2 && items.length ? 'casi' : ''}`} aria-disabled={!puede[paso]}
+                disabled={!puede[paso] && !(paso === 2 && items.length)}
+                onClick={() => { if (puede[paso]) siguiente(); else setMarcar(true) }}>{t('g_next')} {I.arrow}</button>
             : <button type="button" className="btn gw-sig" disabled={!!enviando} onClick={enviar}>{enviando ? t('sending') : <>{I.send} {t('g_send_request')}</>}</button>}
         </div>
       </div>

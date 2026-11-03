@@ -31,7 +31,6 @@
   border-radius:12px;padding:0 14px;box-shadow:var(--shadow)}
 .gw-search svg{width:17px;height:17px;color:var(--ink-3);flex:none}
 .gw-search input{flex:1;border:0;outline:0;background:none;font:inherit;font-size:14.5px;padding:11px 0;color:var(--ink)}
-.gw-sitio{width:auto;min-width:200px;padding:11px 38px 11px 14px;font-size:14.5px;box-shadow:var(--shadow)}
 .gw-list{display:flex;flex-direction:column;gap:16px}
 .gw-card{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);
   border-radius:20px;padding:24px 28px 20px;box-shadow:var(--shadow);transition:.18s;position:relative}
@@ -189,7 +188,44 @@
 .gw-quitar:hover{background:#fdeceb;opacity:1}
 .gw-item-f{display:grid;grid-template-columns:1fr;gap:6px}
 .gw-item-f .inp{padding:10px 12px;font-size:14px}
-.gw-item-f select.inp{padding-right:36px}
+.gw-item-f textarea.gw-detalle{min-height:62px;resize:vertical;line-height:1.45}
+.gw-detalle.mal,.gw-dd-b.mal{border-color:#b42318!important;box-shadow:0 0 0 3px color-mix(in srgb,#b42318 14%,transparent)}
+.gw-detalle-n{font-size:12px;color:var(--ink-3)}
+.gw-detalle-n.mal{color:#b42318;font-weight:700}
+.btn.gw-sig.casi{opacity:.55}
+
+/* Desplegable del portal */
+.gw-dd{position:relative;min-width:0}
+.gw-dd.on{z-index:40}
+/* La fila con el desplegable abierto, por encima de las de debajo. */
+.gw-item:has(.gw-dd.on){position:relative;z-index:6}
+.gw-dd-b{width:100%;display:flex;align-items:center;gap:10px;text-align:left;font:inherit;font-size:14px;color:var(--ink);
+  background:var(--surface-2);border:1.5px solid var(--line-2);border-radius:12px;padding:9px 12px;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
+.gw-dd-b:hover{border-color:color-mix(in srgb,var(--brand) 40%,var(--line-2))}
+.gw-dd-b:focus-visible,.gw-dd.on .gw-dd-b{outline:none;border-color:var(--brand);background:var(--surface);box-shadow:0 0 0 3px var(--brand-soft)}
+.gw-dd-b.vacio .gw-dd-v{color:var(--ink-3)}
+.gw-dd-v{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.gw-dd-ic{flex:none;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand)}
+.gw-dd-ic svg{width:16px;height:16px}
+.gw-dd-chev{flex:none;display:grid;color:var(--ink-3);transition:transform .2s}
+.gw-dd-chev svg{width:18px;height:18px}
+.gw-dd.on .gw-dd-chev{transform:rotate(180deg)}
+.gw-dd-l{position:absolute;z-index:30;left:0;right:auto;min-width:100%;width:max-content;max-width:min(380px,calc(100vw - 32px));top:calc(100% + 6px);margin:0;padding:6px;list-style:none;max-height:320px;overflow:auto;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 40px -12px rgba(16,30,51,.28),0 2px 6px rgba(16,30,51,.06);
+  animation:gw-dd-in .14s ease-out;transform-origin:top}
+@keyframes gw-dd-in{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.gw-dd-l{animation:none}.gw-dd-chev{transition:none}}
+.gw-dd-l li{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:10px;cursor:pointer;color:var(--ink)}
+.gw-dd-l li.act{background:var(--surface-2)}
+.gw-dd-l li.sel{background:var(--brand-soft)}
+.gw-dd-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.gw-dd-t b{font-size:14px;font-weight:700}
+.gw-dd-t small{font-size:12.5px;color:var(--ink-3);line-height:1.35}
+.gw-dd-ok{flex:none;display:grid;color:var(--brand)}
+.gw-dd-ok svg{width:17px;height:17px}
+.gw-sitio{width:auto;min-width:230px}
+.gw-sitio .gw-dd-b{background:var(--surface);border-width:1px;border-color:var(--line);padding:8px 12px;box-shadow:var(--shadow)}
+.gw-sitio .gw-dd-l{min-width:260px;left:auto}
 .gw-fotos{display:flex;align-items:flex-start;gap:8px}
 .gw-foto{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;width:64px}
 .gw-foto-b{width:58px;height:58px;border-radius:12px;border:1.5px dashed var(--line-2);background:var(--surface-2);color:var(--ink-3);

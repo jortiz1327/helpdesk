@@ -88,9 +88,14 @@ class PortalWarrantiesTest extends TestCase
         $this->postJson('/api/portal.php?action=warranty-request', $base + ['items' => [['code' => 'HOLA']]], $h)->assertStatus(422);
         $this->assertSame(0, DB::table('tickets')->count());
 
+        // Sin decir qué le pasa, o sin explicarlo, tampoco.
+        $this->postJson('/api/portal.php?action=warranty-request', $base + ['items' => [['code' => '812345679', 'detail' => 'pantalla en blanco desde el lunes']]], $h)->assertStatus(422);
+        $this->postJson('/api/portal.php?action=warranty-request', $base + ['items' => [['code' => '812345679', 'issue' => 'no_enciende', 'detail' => 'no va']]], $h)->assertStatus(422);
+        $this->assertSame(0, DB::table('tickets')->count());
+
         $code = $this->postJson('/api/portal.php?action=warranty-request', $base + ['items' => [
-            ['code' => '812345679', 'issue' => 'no_enciende', 'detail' => 'tras cambiar pilas'],
-            ['code' => 'aa:bb:cc:dd:ee:ff', 'issue' => 'sin_conexion'],
+            ['code' => '812345679', 'issue' => 'no_enciende', 'detail' => 'en blanco tras cambiar pilas'],
+            ['code' => 'aa:bb:cc:dd:ee:ff', 'issue' => 'sin_conexion', 'detail' => 'las etiquetas de su zona no reciben precios'],
         ]], $h)->assertOk()->json('code');
 
         $t = DB::table('tickets')->where('code', $code)->first();
@@ -124,7 +129,7 @@ class PortalWarrantiesTest extends TestCase
     public function test_sin_lugar_valido_no_se_crea(): void
     {
         $this->postJson('/api/portal.php?action=warranty-request', ['place_id' => 12345, 'name' => 'Ana', 'address' => 'X',
-            'items' => [['code' => '812345679']]], $this->pase('libre@libre.com'))->assertStatus(422);
+            'items' => [['code' => '812345679', 'issue' => 'no_enciende', 'detail' => 'pantalla en blanco desde el lunes']]], $this->pase('libre@libre.com'))->assertStatus(422);
         $this->assertSame(0, DB::table('tickets')->count());
     }
 }

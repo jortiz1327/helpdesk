@@ -41,6 +41,7 @@ class PortalWarranties
     ];
 
     private const MAX_ITEMS = 60;
+    private const DETAIL_MIN = 15;   // lo mínimo que hay que contar de cada dispositivo (igual que el formulario)
     private const PHOTO_HOURS = 6;   // tras solicitar, las fotos se pueden subir durante este rato
 
     public function __construct(private PortalService $portal) {}
@@ -368,9 +369,12 @@ class PortalWarranties
                 return [false, "«{$code}» no parece el código de una etiqueta ni de una antena", null];
             }
             if (isset($items[$code])) continue;
-            $issue = isset(self::ISSUES[$i['issue'] ?? '']) ? $i['issue'] : 'otro';
-            $items[$code] = ['code' => $code, 'kind' => $kind, 'issue' => $issue,
-                'detail' => mb_substr(trim((string) ($i['detail'] ?? '')), 0, 200), 'photos' => []];
+            // Qué le pasa y explicado: sin eso no se distingue un fallo de algo que no cubre la garantía.
+            $issue = (string) ($i['issue'] ?? '');
+            if (! isset(self::ISSUES[$issue])) return [false, "Elige qué le pasa a {$code}", null];
+            $detalle = mb_substr(trim(preg_replace('/\s+/u', ' ', (string) ($i['detail'] ?? ''))), 0, 300);
+            if (mb_strlen($detalle) < self::DETAIL_MIN) return [false, "Explica qué le pasa a {$code} (qué ves, desde cuándo y qué has probado)", null];
+            $items[$code] = ['code' => $code, 'kind' => $kind, 'issue' => $issue, 'detail' => $detalle, 'photos' => []];
         }
         if (! $items) return [false, 'Añade al menos una etiqueta o antena', null];
         if (count((array) ($in['items'] ?? [])) > self::MAX_ITEMS) return [false, 'Como mucho ' . self::MAX_ITEMS . ' dispositivos por solicitud', null];
