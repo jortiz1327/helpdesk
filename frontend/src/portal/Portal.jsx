@@ -506,6 +506,29 @@ function Home({ go, irCrear }) {
           </div>
         </div>
 
+        {/* Lo que se viene a hacer (abrir o ver incidencias, consultar por número), a mano
+            nada más llegar; las preguntas frecuentes, debajo. */}
+        <div className="actions">
+          <div className="act-sep reveal"><span>{t('not_here')}</span></div>
+          <div className="act-grid">
+            <button className="act primary reveal" style={{ '--r': 0 }} onClick={() => irCrear()}>
+              <span className="ic">{I.plus}</span>
+              <span><h3>{t('create_ticket')}</h3><p>{t('create_ticket_desc')}</p></span>
+              <span className="arrow">{I.arrow}</span>
+            </button>
+            <button className="act ghost reveal" style={{ '--r': 1 }} onClick={() => go('mis')}>
+              <span className="ic">{I.tickets}</span>
+              <span><h3>{t('my_tickets')}</h3><p>{t('my_tickets_desc')}</p></span>
+              <span className="arrow">{I.arrow}</span>
+            </button>
+          </div>
+          {/* Atajo sin correo: solo ver cómo va, por número. */}
+          <button className="est-link reveal" onClick={() => go('estado')}>
+            {I.mag}<Rich html={t('est_link')} />
+            <span className="est-link-arw">{I.arrow}</span>
+          </button>
+        </div>
+
         {/* Garantías: no es una duda que resuelva una FAQ, así que va arriba, a mano. */}
         <GarantiasCard go={go} />
 
@@ -550,27 +573,6 @@ function Home({ go, irCrear }) {
             <button className="btn" style={{ width: 'auto', margin: '4px auto 0' }} onClick={() => irCrear()}>{I.plus} {t('create_ticket')}</button>
           </div>
         )}
-
-        <div className="actions">
-          <div className="act-sep reveal"><span>{t('not_here')}</span></div>
-          <div className="act-grid">
-            <button className="act primary reveal" style={{ '--r': 0 }} onClick={() => irCrear()}>
-              <span className="ic">{I.plus}</span>
-              <span><h3>{t('create_ticket')}</h3><p>{t('create_ticket_desc')}</p></span>
-              <span className="arrow">{I.arrow}</span>
-            </button>
-            <button className="act ghost reveal" style={{ '--r': 1 }} onClick={() => go('mis')}>
-              <span className="ic">{I.tickets}</span>
-              <span><h3>{t('my_tickets')}</h3><p>{t('my_tickets_desc')}</p></span>
-              <span className="arrow">{I.arrow}</span>
-            </button>
-          </div>
-          {/* Atajo sin correo: solo ver cómo va, por número. */}
-          <button className="est-link reveal" onClick={() => go('estado')}>
-            {I.mag}<Rich html={t('est_link')} />
-            <span className="est-link-arw">{I.arrow}</span>
-          </button>
-        </div>
 
       </div>
 
