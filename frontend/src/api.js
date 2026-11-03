@@ -421,6 +421,8 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Pasos por tipo de cliente: marcar o desmarcar uno.
+  warrantyTour: () => req('warranties.php?action=tour'),
+  warrantyTourSeen: () => postJson('warranties.php?action=tour', {}),
   warrantyStep: (id, list, step, done) => req('warranties.php?action=step', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, list, step, done }),
   }),

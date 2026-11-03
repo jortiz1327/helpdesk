@@ -32,6 +32,7 @@ import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import CampaignEmailSettings from "./components/CampaignEmailSettings.jsx";
 import Manuals from "./components/Manuals.jsx";
+import WarrantyTour, { TourOffer } from "./components/WarrantyTour.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
 import MorningBriefing from "./components/MorningBriefing.jsx";
@@ -779,6 +780,15 @@ const HELP_GROUP = {
             icon: Icon.doc,
             color: "#8696a0",
         },
+        {
+            // No es una pantalla: arranca el tour de Gestión de garantías (solo en esa área).
+            key: "tour",
+            label: "Tour guiado",
+            icon: Icon.help,
+            perm: "warranties.access",
+            hideInAreas: ["helpdesk", "campaigns"],
+            color: "#2563eb",
+        },
     ],
 };
 
@@ -958,6 +968,7 @@ export default function App() {
         () => localStorage.getItem("rail_expanded") === "1",
     );
     const [railTip, setRailTip] = useState(null); // tooltip fijo del rail colapsado: { label, top, left, color }
+    const [tour, setTour] = useState(false);      // tour guiado de garantías en marcha
     const [theme, setTheme] = useState(
         () => localStorage.getItem("theme") || "light",
     );
@@ -1452,7 +1463,8 @@ export default function App() {
                                             key={n.key}
                                             className={`rail-btn ${view === n.key ? "active" : ""}`}
                                             style={{ "--bc": n.color }}
-                                            onClick={() => setView(n.key)}
+                                            data-tour={`nav-${n.key}`}
+                                            onClick={() => (n.key === "tour" ? setTour(true) : setView(n.key))}
                                             onMouseEnter={(e) => {
                                                 if (expanded) return;
                                                 const r =
@@ -1597,6 +1609,22 @@ export default function App() {
                         >
                             {railTip.label}
                         </div>
+                    )}
+
+                    {/* Tour guiado de garantías: se ofrece una vez al entrar al área y se repite desde el menú. */}
+                    {areaKey === "warranties" && can("warranties.access") && !tour && (
+                        <TourOffer onStart={() => setTour(true)} />
+                    )}
+                    {tour && (
+                        <WarrantyTour
+                            can={can}
+                            onClose={() => setTour(false)}
+                            onGo={(v, { lista, ficha }) => {
+                                if (ficha) setGarantiaAbierta(ficha);
+                                else if (lista) setGarantiaFiltro({ chip: "open" });
+                                if (v) setView(v);
+                            }}
+                        />
                     )}
 
                     <div className="main">

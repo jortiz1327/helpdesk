@@ -346,7 +346,7 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
   return (
     <div className={`dev-card wl-card ${loading ? 'busy' : ''}`}>
       {loading && <div className="dev-progress" />}
-      <div className="wi-bar">
+      <div className="wi-bar" data-tour="wl-filtros">
         <div className="dev-search wl-search">
           <Icon.search />
           <input value={qLive} onChange={(e) => setQLive(e.target.value)} placeholder="Buscar expediente, cliente, proyecto o ticket…" />
@@ -1378,7 +1378,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
     <>
       <button className="wr-back" onClick={onBack}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> Garantías</button>
 
-      <div className="wf-head">
+      <div className="wf-head" data-tour="wf-head">
         <div className="wf-id">
           <div className="wf-t">
             <span className="wf-code">{w.code}</span>
@@ -1431,7 +1431,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
             ) : null}
           </section>
 
-          <section className="wf-card wf-tabs-card">
+          <section className="wf-card wf-tabs-card" data-tour="wf-tabs">
             <div className="wr-tabs" role="tablist">
               {[['productos', `Etiquetas${d.items.length ? ` (${d.items.length})` : ''}`, Icon.tag], ['documentos', 'Documentos', Icon.file]].map(([k, l, Ic]) => (
                 <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Ic /> {l}</button>
@@ -1467,7 +1467,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
             </dl>
           </section>
 
-          <section className="wf-card">
+          <section className="wf-card" data-tour="wf-hist">
             <header><h3><Icon.clock /> Seguimiento e historial</h3></header>
             {p.edit ? <div className="wf-compose">
               <textarea ref={notaRef} rows={2} value={nota.body} onChange={(e) => setNota((s) => ({ ...s, body: e.target.value }))}

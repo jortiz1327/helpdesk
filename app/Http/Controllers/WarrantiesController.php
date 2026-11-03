@@ -14,6 +14,7 @@ use App\Services\WarrantyLabels;
 use App\Services\WarrantyPermissions;
 use App\Services\WarrantyPhotos;
 use App\Services\WarrantySteps;
+use App\Services\WarrantyTour;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,7 @@ class WarrantiesController extends Controller
             'team'              => $this->team($request),
             'report'            => $this->report($request),
             'step'              => $this->step($request),
+            'tour'              => $this->tour($request),
             default   => $this->list($request),
         };
     }
@@ -289,6 +291,18 @@ class WarrantiesController extends Controller
         $error = WarrantySteps::toggle($w, (string) $request->input('list'), (string) $request->input('step'), $request->boolean('done'), $request->user()->id);
         return $error ? response()->json(['ok' => false, 'error' => $error], 400)
             : response()->json(['ok' => true, 'steps' => WarrantySteps::forWarranty($w)]);
+    }
+
+    /** Tour guiado: sus textos y si este usuario ya lo ha visto (POST: marcarlo como visto). */
+    private function tour(Request $request)
+    {
+        $uid = $request->user()->id;
+        if ($request->isMethod('post')) {
+            WarrantyTour::markSeen($uid);
+            return response()->json(['ok' => true]);
+        }
+        $pasos = array_values(array_filter(WarrantyTour::settings(), fn ($s) => $s['active']));
+        return response()->json(['ok' => true, 'steps' => $pasos, 'seen' => WarrantyTour::seen($uid)]);
     }
 
     /** Un mensaje del cliente en una línea corta: el texto sin HTML o qué ha mandado. */

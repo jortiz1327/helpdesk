@@ -475,6 +475,40 @@ function PasosCliente({ lists, categorias, hacer }) {
   )
 }
 
+/* Tour guiado: el título y el texto de cada paso (qué se señala lo fija la app). */
+function TourTextos({ steps, hacer }) {
+  const [v, setV] = useState(steps)
+  useEffect(() => setV(steps), [steps])
+  const set = (i, c) => setV((x) => x.map((s, k) => (k === i ? { ...s, ...c } : s)))
+  const cambiado = JSON.stringify(v) !== JSON.stringify(steps)
+  const vacio = v.some((s) => !s.title.trim() || !s.text.trim())
+  return (
+    <Card title="Tour guiado" count={v.filter((s) => s.active).length}
+      sub="El recorrido que se ofrece la primera vez que alguien entra a Gestión de garantías y que se repite desde «Tour guiado» en el menú. Cada uno ve solo los pasos de lo que puede usar."
+      foot={(
+        <div className="ws-foot">
+          <button className="btn ghost sm" onClick={() => hacer('tour_save', { steps: [] }, 'Textos de serie recuperados')}><Icon.refresh /> Textos de serie</button>
+          <span className="spacer" />
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(steps)}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado || vacio} onClick={() => hacer('tour_save', { steps: v }, 'Tour guardado')}><Icon.save /> Guardar</button>
+        </div>
+      )}>
+      <div className="ws-body ws-pasos">
+        {v.map((s, i) => (
+          <div key={s.id} className={`ws-pl${s.active ? '' : ' off'}`}>
+            <div className="ws-pl-h">
+              <span className="ws-tour-n">{i + 1}</span>
+              <input className="ws-pl-name" value={s.title} maxLength={80} placeholder="Título" onChange={(e) => set(i, { title: e.target.value })} />
+              <label className="wr-check"><input type="checkbox" checked={s.active} onChange={(e) => set(i, { active: e.target.checked })} /> Se enseña</label>
+            </div>
+            <textarea className="ws-tour-t" rows={2} value={s.text} maxLength={600} placeholder="Qué se explica en este paso" onChange={(e) => set(i, { text: e.target.value })} />
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 /* Sustituciones: en qué categorías se ofrece el ticket de posiciones y cómo sale. */
 function Sustituciones({ cfg, categorias, ticketCats, hacer }) {
   const [v, setV] = useState(cfg)
@@ -523,6 +557,9 @@ const SECCIONES = [
     ['finanzas', 'Texto para Finanzas', Icon.copy, null],
     ['sustituciones', 'Sustituciones', Icon.swap, null],
   ]],
+  ['Ayuda', [
+    ['tour', 'Tour guiado', Icon.help, (d) => d.tour.filter((s) => s.active).length],
+  ]],
 ]
 const MEMO = 'warranty_settings.section'
 
@@ -550,7 +587,7 @@ export default function WarrantySettings() {
       <header className="page-head">
         <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Configuración</h1></div>
-        <span className="sub">· Estados, categorías, urgencias, alertas, pasos, plantillas, plazos, documentos, texto para Finanzas y sustituciones de Gestión de garantías</span>
+        <span className="sub">· Estados, categorías, urgencias, alertas, pasos, plantillas, plazos, documentos, texto para Finanzas, sustituciones y tour guiado de Gestión de garantías</span>
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
         {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
@@ -579,6 +616,7 @@ export default function WarrantySettings() {
               {sec === 'plantillas' && <Plantillas list={d.templates} hacer={hacer} />}
               {sec === 'plazos' && <Plazos terms={d.terms} refs={d.term_references} categorias={d.categories} hacer={hacer} />}
               {sec === 'documentos' && <Documentos docs={d.docs} grupos={d.block_groups} hacer={hacer} />}
+              {sec === 'tour' && <TourTextos steps={d.tour} hacer={hacer} />}
               {sec === 'pasos' && <PasosCliente lists={d.checklists} categorias={d.categories} hacer={hacer} />}
               {sec === 'sustituciones' && <Sustituciones cfg={d.replacements} categorias={d.categories} ticketCats={d.ticket_categories} hacer={hacer} />}
               {sec === 'finanzas' && <Finanzas finance={d.finance} grupos={d.finance_groups} soluciones={d.resolutions} hacer={hacer} />}

@@ -9,6 +9,7 @@ use App\Services\WarrantyAlerts;
 use App\Services\WarrantyDocuments;
 use App\Services\WarrantyReplacements;
 use App\Services\WarrantySteps;
+use App\Services\WarrantyTour;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,7 @@ class WarrantySettingsController extends Controller
             'finance_save'    => $this->financeSave($request),
             'replacements_save' => $this->replacementsSave($request),
             'steps_save'      => $this->stepsSave($request),
+            'tour_save'       => $this->tourSave($request),
             default           => $this->get(),
         };
     }
@@ -80,6 +82,7 @@ class WarrantySettingsController extends Controller
             'finance_groups' => WarrantyDocuments::FINANCE_GROUPS,
             'replacements' => WarrantyReplacements::settings(),
             'checklists' => WarrantySteps::settings(),
+            'tour' => WarrantyTour::settings(),
             'ticket_categories' => DB::table('ticket_categories')->where('active', true)->orderBy('position')->orderBy('name')->get(['id', 'name']),
             'resolutions' => collect(WarrantyItem::RESOLUTIONS)->except('pendiente')->map(fn ($r) => $r['label']),
         ]);
@@ -160,6 +163,16 @@ class WarrantySettingsController extends Controller
         [$listas, $error] = WarrantySteps::clean((array) $request->input('lists', []), DB::table('warranty_categories')->pluck('name')->all());
         if ($error) return $this->error($error);
         $this->guardar('checklists', ['lists' => $listas]);
+        return response()->json(['ok' => true]);
+    }
+
+    /* --- Tour guiado --- */
+
+    private function tourSave(Request $request)
+    {
+        [$pasos, $error] = WarrantyTour::clean((array) $request->input('steps', []));
+        if ($error) return $this->error($error);
+        $this->guardar('tour', ['steps' => $pasos]);
         return response()->json(['ok' => true]);
     }
 

@@ -29,6 +29,7 @@ export const Icon = {
   shield: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" /></svg>,
   home: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" /></svg>,
   building: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M3 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16h3v2H1v-2h2zm4-13h2v2H7V8zm0 4h2v2H7v-2zm0 4h2v2H7v-2zm4-8h2v2h-2V8zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zM18 21h3v-8h-3v8z" /></svg>,
+  help: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 17h-2v-2h2v2zm2.07-7.75-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26A2 2 0 1 0 10 9H8a4 4 0 1 1 7.07 2.25z" /></svg>,
   info: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" /></svg>,
   download: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" /></svg>,
   tag: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M21.4 11.6 12.4 2.6A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7c0 .5.2 1 .6 1.4l9 9a2 2 0 0 0 2.8 0l7-7a2 2 0 0 0 0-2.8zM6.5 8A1.5 1.5 0 1 1 8 6.5 1.5 1.5 0 0 1 6.5 8z" /></svg>,
