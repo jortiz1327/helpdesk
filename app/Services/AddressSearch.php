@@ -39,7 +39,9 @@ class AddressSearch
         // Lo mismo buscado por otros (o al borrar y volver a escribir) no se vuelve a pedir.
         return Cache::remember("addr.{$p}.{$lang}." . sha1(mb_strtolower($q)), now()->addDay(), function () use ($p, $q, $lang, $session) {
             try {
-                return $p === 'google' ? $this->googleSearch($q, $lang, $session) : $this->photonSearch($q, $lang);
+                // Si Google falla (clave sin Places, cuota…), Photon en su lugar: mejor algo que nada.
+                if ($p === 'google' && ($r = $this->googleSearch($q, $lang, $session)) !== null) return $r;
+                return $this->photonSearch($q, $lang);
             } catch (Throwable $e) {
                 Log::warning("Direcciones ({$p}): " . $e->getMessage());
                 return [];
@@ -69,13 +71,19 @@ class AddressSearch
 
     /* ----------------------------------------------------------------- Google */
 
-    private function googleSearch(string $q, string $lang, string $session): array
+    /** Sugerencias de Google, o null si Google no responde bien. */
+    private function googleSearch(string $q, string $lang, string $session): ?array
     {
-        $r = Http::timeout(self::TIMEOUT)->withHeaders(['X-Goog-Api-Key' => config('services.places.google_key')])
-            ->post('https://places.googleapis.com/v1/places:autocomplete', array_filter([
-                'input' => $q, 'languageCode' => $lang, 'sessionToken' => $session ?: null,
-            ]));
-        if (! $r->ok()) { Log::warning('Direcciones (google): HTTP ' . $r->status()); return []; }
+        try {
+            $r = Http::timeout(self::TIMEOUT)->withHeaders(['X-Goog-Api-Key' => config('services.places.google_key')])
+                ->post('https://places.googleapis.com/v1/places:autocomplete', array_filter([
+                    'input' => $q, 'languageCode' => $lang, 'sessionToken' => $session ?: null,
+                ]));
+        } catch (Throwable $e) {
+            Log::warning('Direcciones (google): ' . $e->getMessage());
+            return null;
+        }
+        if (! $r->ok()) { Log::warning('Direcciones (google): HTTP ' . $r->status() . ' ' . $r->json('error.status', '')); return null; }
         $out = [];
         foreach ((array) $r->json('suggestions', []) as $s) {
             $p = $s['placePrediction'] ?? null;

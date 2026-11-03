@@ -78,6 +78,21 @@ class PortalAddressSearchTest extends TestCase
         Http::assertSent(fn ($req) => $req->hasHeader('X-Goog-Api-Key', 'clave-de-prueba'));
     }
 
+    public function test_si_google_falla_tira_de_photon(): void
+    {
+        config(['services.places.google_key' => 'clave-sin-places']);
+        Http::fake([
+            'places.googleapis.com/*' => Http::response(['error' => ['status' => 'PERMISSION_DENIED']], 403),
+            'photon.komoot.io/*' => Http::response(['features' => [['properties' => [
+                'osm_type' => 'N', 'osm_id' => 2, 'street' => 'Avenida Paseo de la Reforma', 'housenumber' => '222',
+                'postcode' => '06600', 'city' => 'Ciudad de México', 'country' => 'México',
+            ]]]]),
+        ]);
+
+        $this->getJson('/api/portal.php?action=address-search&q=Reforma+222', $this->pase())->assertOk()
+            ->assertJsonPath('results.0.address', "Avenida Paseo de la Reforma 222\n06600 Ciudad de México\nMéxico");
+    }
+
     public function test_cupo_por_minuto(): void
     {
         config(['services.places.google_key' => null]);
