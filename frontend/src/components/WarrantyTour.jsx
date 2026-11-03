@@ -26,6 +26,7 @@ const DONDE = {
   informes: { view: 'garantias_informes', sel: 'nav-garantias_informes' },
   clientes: { view: 'garantias_clientes', sel: 'nav-garantias_clientes' },
   zkong: { view: 'zkong', sel: 'nav-zkong' },
+  guias: { view: 'garantias_guias', sel: 'nav-garantias_guias' },
   dispositivos: { view: 'devices', sel: 'nav-devices' },
   catalogo: { view: 'device_catalog', sel: 'nav-device_catalog' },
   config: { view: 'warranty_settings', sel: 'nav-warranty_settings', perm: ['warranties.config'] },

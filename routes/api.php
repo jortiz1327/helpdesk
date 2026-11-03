@@ -239,6 +239,11 @@ Route::middleware('token')->group(function () {
     // Documentos de una garantía: presupuestos, albaranes, informe de resolución y su correo.
     Route::match(['get', 'post'], 'warranty_docs.php', [\App\Http\Controllers\WarrantyDocumentsController::class, 'handle'])
         ->middleware('can:warranties.access');
+    // Protocolos y guías de garantías (gestionarlos: warranties.config) y su archivo (con ?token=).
+    Route::match(['get', 'post'], 'warranty_guides.php', [\App\Http\Controllers\WarrantyGuidesController::class, 'handle'])
+        ->middleware('can:warranties.access');
+    Route::get('warranty_guide.php', [\App\Http\Controllers\WarrantyGuidesController::class, 'file'])
+        ->middleware('can:warranties.access');
     // ZKONG: bandeja de dispositivos para enviar y remesas de RMA (Excel y fotos).
     Route::match(['get', 'post'], 'zkong_rma.php', [\App\Http\Controllers\ZkongRmaController::class, 'handle'])
         ->middleware('can:warranties.access');

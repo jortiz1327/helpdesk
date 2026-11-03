@@ -25,6 +25,7 @@ class WarrantyTour
         ['id' => 'informes', 'title' => 'Informes', 'text' => 'Las garantías recibidas en un periodo, con su desglose y exportación a CSV.'],
         ['id' => 'clientes', 'title' => 'Clientes y proyectos', 'text' => 'Las garantías de cada cliente y sus datos del portal AEME, solo para consultar.'],
         ['id' => 'zkong', 'title' => 'ZKONG', 'text' => 'La bandeja de lo que hay que mandar a ZKONG y las remesas de RMA: se crean, se envían, se reciben y se cierran.'],
+        ['id' => 'guias', 'title' => 'Protocolos y guías', 'text' => 'La documentación de cómo se trabaja: procedimientos, condiciones de garantía, guías técnicas y plantillas. En la ficha de cada garantía salen los documentos de su cliente o categoría.'],
         ['id' => 'dispositivos', 'title' => 'Centro de dispositivos', 'text' => 'Busca cualquier etiqueta o antena en los servidores ZKONG: dónde está, cómo está y en qué garantías ha estado.'],
         ['id' => 'catalogo', 'title' => 'Catálogo', 'text' => 'Los modelos de etiqueta, sus pilas y las referencias ZKONG ↔ AEME.'],
         ['id' => 'config', 'title' => 'Configuración', 'text' => 'Estados, categorías, alertas, pasos, plazos, los textos de los documentos y los de este tour.'],

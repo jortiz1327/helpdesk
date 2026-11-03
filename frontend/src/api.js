@@ -421,6 +421,11 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Pasos por tipo de cliente: marcar o desmarcar uno.
+  warrantyGuides: () => req('warranty_guides.php'),
+  warrantyGuidesFor: (id) => req(`warranty_guides.php?action=for_warranty&id=${id}`),
+  saveWarrantyGuide: (fd) => req('warranty_guides.php?action=save', { method: 'POST', body: fd }),
+  deleteWarrantyGuide: (id) => postJson('warranty_guides.php?action=delete', { id }),
+  warrantyGuideUrl: (id, dl = false) => `${BASE}/warranty_guide.php?id=${id}${dl ? '&dl=1' : ''}&token=${encodeURIComponent(getMediaToken())}`,
   warrantyTour: () => req('warranties.php?action=tour'),
   warrantyTourSeen: () => postJson('warranties.php?action=tour', {}),
   warrantyStep: (id, list, step, done) => req('warranties.php?action=step', {

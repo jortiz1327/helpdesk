@@ -45,6 +45,11 @@ class SecurityHeaders
             "form-action 'self'",
             "object-src 'none'",
         ]);
+        // Un PDF servido inline lo pinta el visor del navegador, que es un plugin: con
+        // object-src 'none' sale en blanco. Para ellos, nada salvo el propio visor.
+        if (str_starts_with((string) $response->headers->get('Content-Type'), 'application/pdf')) {
+            $csp = "default-src 'none'; object-src 'self'; frame-ancestors 'self'";
+        }
         $response->headers->set('Content-Security-Policy', $csp);
 
         return $response;

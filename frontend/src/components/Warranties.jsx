@@ -7,6 +7,7 @@ import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import { FichaDispositivo } from './Devices.jsx'
 import WarrantyDocuments from './WarrantyDocuments.jsx'
+import { GuiasRelacionadas } from './WarrantyGuides.jsx'
 
 /* -------------------------------------------------------------------------
  * GARANTÍAS (Gestión de garantías). Expedientes G-AAAA-NNNN.
@@ -1379,7 +1380,7 @@ function Pasos({ w, listas, puede, onChanged }) {
   )
 }
 
-function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
+function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }) {
   const p = opts?.perms || {}
   const toast = useToast()
   const confirm = useConfirm()
@@ -1525,6 +1526,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
 
         <aside className="wf-side">
           <Pasos w={w} listas={d.steps} puede={!!p.edit} onChanged={cargar} />
+          <GuiasRelacionadas w={w} onGoAll={onGoGuides} />
           <section className="wf-card">
             <header><h3>Datos del expediente</h3></header>
             <dl className="wf-dl">
@@ -1607,7 +1609,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
   )
 }
 
-export default function Warranties({ openId = null, onOpened, onOpenTicket, filtro = null }) {
+export default function Warranties({ openId = null, onOpened, onOpenTicket, onGoGuides, filtro = null }) {
   const [opts, setOpts] = useState(null)
   const [sel, setSel] = useState(openId)
   // Llegar con una garantía concreta (desde la ficha de un ticket o ZKONG).
@@ -1635,7 +1637,7 @@ export default function Warranties({ openId = null, onOpened, onOpenTicket, filt
         {sel
           ? <Ficha key={`${sel}-${reload}`} id={sel} opts={opts} onBack={() => setSel(null)}
               onEdit={(w) => setForm({ ...VACIA, ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '' })}
-              onChanged={() => {}} onOpenTicket={onOpenTicket} />
+              onChanged={() => {}} onOpenTicket={onOpenTicket} onGoGuides={onGoGuides} />
           : <Lista opts={opts} reload={reload} filtro={filtro} onOpen={setSel} onNew={() => setForm({ ...VACIA, received_at: hoy() })} />}
       </div></div>
 

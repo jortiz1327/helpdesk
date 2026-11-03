@@ -32,6 +32,7 @@ import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import CampaignEmailSettings from "./components/CampaignEmailSettings.jsx";
 import Manuals from "./components/Manuals.jsx";
+import WarrantyGuides from "./components/WarrantyGuides.jsx";
 import WarrantyTour, { TourOffer } from "./components/WarrantyTour.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
@@ -699,6 +700,14 @@ const AREAS = [
                         icon: Icon.zkong,
                         perm: "warranties.access",
                         color: "#0d64c0",
+                    },
+                    {
+                        // Documentación operativa (gestionarla: warranties.config).
+                        key: "garantias_guias",
+                        label: "Protocolos y guías",
+                        icon: Icon.file,
+                        perm: "warranties.access",
+                        color: "#12925a",
                     },
                 ],
             },
@@ -1679,9 +1688,11 @@ export default function App() {
                         {view === "zkong_servers" && can("warranties.servers") && <ZkongServers />}
                         {view === "garantias" && can("warranties.access") && (
                             <Warranties openId={garantiaAbierta} onOpened={() => setGarantiaAbierta(null)} filtro={garantiaFiltro}
+                                onGoGuides={() => setView("garantias_guias")}
                                 onOpenTicket={can("helpdesk.access") ? (id) => { setTicketGarantia(id); setView("garantias_tickets"); } : null} />
                         )}
                         {view === "warranty_settings" && can("warranties.config") && <WarrantySettings />}
+                        {view === "garantias_guias" && can("warranties.access") && <WarrantyGuides />}
                         {view === "device_catalog" && can("warranties.access") && <DeviceCatalog />}
                         {view === "garantias_equipo" && can("warranties.access") && (
                             <WarrantyTeam onFilter={(f) => { setGarantiaFiltro({ ...f }); setView("garantias"); }} />
