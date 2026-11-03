@@ -17,6 +17,7 @@ const APARTADO = {
   primeros: [Icon.play, '#2563eb'], garantias: [Icon.shield, '#12925a'], revision: [Icon.tag, '#c27803'],
   documentos: [Icon.doc, '#7c3aed'], zkong: [Icon.zkong, '#0d64c0'], equipo: [Icon.chart, '#e11d48'], config: [Icon.settings, '#64748b'],
 }
+const fechaCorta = (s) => new Date(String(s).replace(' ', 'T')).toLocaleString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 const sinAcentos = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 function ApartadoIc({ section, sm }) {
@@ -88,7 +89,7 @@ function Editor({ a, d, onClose, onSaved }) {
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 760 }}>
-        <div className="modal-head"><h3>{a ? 'Editar artículo' : 'Nuevo artículo'}</h3><button className="x" onClick={onClose}>×</button></div>
+        <div className="modal-head"><h3 className="hc-ed-h"><Icon.pencil /> {a ? 'Editar artículo' : 'Nuevo artículo'}</h3><button className="x" onClick={onClose}>×</button></div>
         <div className="modal-body gd-form">
           <div className="grid2">
             <label className="field"><span className="lbl">Título <em>*</em></span>
@@ -98,14 +99,23 @@ function Editor({ a, d, onClose, onSaved }) {
           </div>
           <label className="field"><span className="lbl">Resumen <span className="hint">(una línea; sale en la lista y en el buscador)</span></span>
             <input value={f.summary || ''} maxLength={300} onChange={set('summary')} placeholder="Para qué sirve y cuándo se usa" /></label>
-          <label className="field"><span className="lbl">Texto <em>*</em></span>
-            <textarea className="hc-body-ed" rows={14} maxLength={20000} value={f.body} onChange={set('body')} /></label>
-          <p className="hc-formato dev-mute">
-            Línea en blanco: párrafo nuevo · <code>## </code>subtítulo · <code>- </code>lista · <code>1. </code>lista numerada · <code>**así**</code> negrita
-          </p>
+          <label className="field"><span className="lbl hc-lbl-f">Texto <em>*</em><span className="hint">Formato: texto con marcas sencillas</span></span>
+            <textarea className="hc-body-ed" rows={9} maxLength={20000} value={f.body} onChange={set('body')} /></label>
+          <div className="hc-formato">
+            <code>Línea en blanco: párrafo</code><i>·</i><code>## subtítulo</code><i>·</i><code>- lista</code><i>·</i><code>1. lista numerada</code><i>·</i><code>**así** negrita</code>
+          </div>
           <div className="field"><span className="lbl">Artículos relacionados <span className="hint">(hasta 8)</span></span>
-            <Select block multiple searchable value={f.related} placeholder="Ninguno" onChange={(v) => setF((s) => ({ ...s, related: v.slice(0, 8) }))}
-              options={otros.map((x) => ({ value: x.key, label: `${x.title} · ${d.sections[x.section]}` }))} /></div>
+            <div className="hc-rels">
+              {f.related.map((k) => {
+                const x = d.articles.find((y) => y.key === k)
+                return x ? <span key={k} className="hc-chip">{x.title}<button type="button" title="Quitar" onClick={() => setF((s) => ({ ...s, related: s.related.filter((y) => y !== k) }))}><Icon.x /></button></span> : null
+              })}
+              {f.related.length < 8 ? (
+                <Select value="" searchable placeholder="+ Añadir artículo…" onChange={(v) => v && setF((s) => ({ ...s, related: [...s.related, v] }))}
+                  options={otros.filter((x) => !f.related.includes(x.key)).map((x) => ({ value: x.key, label: `${x.title} · ${d.sections[x.section]}` }))} />
+              ) : null}
+            </div>
+          </div>
           <label className="wr-check"><input type="checkbox" checked={f.active} onChange={(e) => setF((s) => ({ ...s, active: e.target.checked }))} /> Visible para todos <span className="dev-mute">(si no, solo lo ve quien gestiona la configuración)</span></label>
         </div>
         <div className="modal-foot">
@@ -113,7 +123,7 @@ function Editor({ a, d, onClose, onSaved }) {
           {a && !a.custom && a.edited ? <button className="btn ghost" onClick={quitar}><Icon.refresh /> Texto original</button> : null}
           <span className="spacer" />
           <button className="btn ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn" disabled={busy || !f.title.trim() || !f.body.trim()} onClick={guardar}><Icon.save /> {busy ? 'Guardando…' : 'Guardar'}</button>
+          <button className="btn" disabled={busy || !f.title.trim() || !f.body.trim()} onClick={guardar}><Icon.save /> {busy ? 'Guardando…' : a ? 'Guardar cambios' : 'Guardar'}</button>
         </div>
       </div>
     </div>
@@ -150,6 +160,20 @@ export default function WarrantyHelpCenter({ articulo = null, onOpened }) {
   const ir = (k) => { setAbierto(k); setQ(''); main.current?.scrollTo?.({ top: 0 }) }
   const lista = d?.articles || []
   const pos = a ? lista.indexOf(a) : -1
+  const apartados = (
+    <div className="hc-grid">
+      {porApartado.map(([s, l]) => (
+        <section key={s} className="dev-card hc-sec">
+          <h3><ApartadoIc section={s} /> <span>{d.sections[s]}<small>{l.length} {l.length === 1 ? 'artículo' : 'artículos'}</small></span></h3>
+          <ul>
+            {l.map((x) => (
+              <li key={x.key}><button className={`${x.active ? '' : 'off'}${abierto === x.key ? ' on' : ''}`} onClick={() => ir(x.key)}>{x.title}</button></li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  )
 
   return (
     <>
@@ -165,11 +189,13 @@ export default function WarrantyHelpCenter({ articulo = null, onOpened }) {
           <div className="hc-layout">
             <nav className="dev-card hc-nav" aria-label="Apartados">
               <button className={`hc-nav-home${!a && !q ? ' on' : ''}`} onClick={() => { setAbierto(null); setQ('') }}><Icon.home /> Inicio</button>
-              {porApartado.map(([s, l]) => (
+              {porApartado.map(([s, l], n) => (
                 <div key={s}>
-                  <div className="ws-nav-h">{d.sections[s]}</div>
+                  <div className={`ws-nav-h${a?.section === s ? ' on' : ''}`}>{n + 1}. {d.sections[s]}</div>
                   {l.map((x) => (
-                    <button key={x.key} className={`${abierto === x.key ? 'on' : ''}${x.active ? '' : ' off'}`} onClick={() => ir(x.key)}>{x.title}</button>
+                    <button key={x.key} className={`${abierto === x.key ? 'on' : ''}${x.active ? '' : ' off'}`} onClick={() => ir(x.key)}>
+                      <span>{x.title}</span>{abierto === x.key ? <i /> : null}
+                    </button>
                   ))}
                 </div>
               ))}
@@ -205,39 +231,41 @@ export default function WarrantyHelpCenter({ articulo = null, onOpened }) {
                   </div>
                   <h1>{a.title}</h1>
                   {a.summary ? <p className="hc-lead">{a.summary}</p> : null}
+                  {a.edited && a.updated_at ? <p className="hc-edit-info">Última edición: {fechaCorta(a.updated_at)}{a.updated_by ? ` por ${a.updated_by}` : ''}</p> : null}
+                  <hr className="hc-sep" />
                   <TextoAyuda body={a.body} />
                   {a.related.length ? (
                     <div className="hc-rel">
                       <h4>Artículos relacionados</h4>
-                      <div className="hc-rel-grid">
+                      <div className="hc-rel-list">
                         {a.related.map((k) => porClave[k]).filter(Boolean).map((x) => (
-                          <button key={x.key} className="hc-fila" onClick={() => ir(x.key)}>
-                            <ApartadoIc section={x.section} sm />
-                            <span><b>{x.title}</b><small>{x.summary || d.sections[x.section]}</small></span>
+                          <button key={x.key} className="hc-rel-i" onClick={() => ir(x.key)}>
+                            <ApartadoIc section={x.section} />
+                            <span><b>{x.title}</b><small><em>{d.sections[x.section]} · </em>{x.summary}</small></span>
+                            <Icon.arrowRight />
                           </button>
                         ))}
                       </div>
                     </div>
                   ) : null}
                   <div className="hc-pie">
-                    {pos > 0 ? <button className="hc-paso" onClick={() => ir(lista[pos - 1].key)}><small>Anterior</small><b>{lista[pos - 1].title}</b></button> : <span />}
-                    {pos < lista.length - 1 ? <button className="hc-paso sig" onClick={() => ir(lista[pos + 1].key)}><small>Siguiente</small><b>{lista[pos + 1].title}</b></button> : <span />}
+                    {pos > 0 ? (
+                      <button className="hc-paso" onClick={() => ir(lista[pos - 1].key)}>
+                        <Icon.arrowRight style={{ transform: 'rotate(180deg)' }} />
+                        <span><small>Anterior</small><b>{lista[pos - 1].title}</b></span>
+                      </button>
+                    ) : <span />}
+                    {pos < lista.length - 1 ? (
+                      <button className="hc-paso sig" onClick={() => ir(lista[pos + 1].key)}>
+                        <span><small>Siguiente</small><b>{lista[pos + 1].title}</b></span>
+                        <Icon.arrowRight />
+                      </button>
+                    ) : <span />}
                   </div>
                 </article>
-              ) : (
-                <div className="hc-grid">
-                  {porApartado.map(([s, l]) => (
-                    <section key={s} className="dev-card hc-sec">
-                      <h3><ApartadoIc section={s} /> <span>{d.sections[s]}<small>{l.length} {l.length === 1 ? 'artículo' : 'artículos'}</small></span></h3>
-                      <ul>
-                        {l.map((x) => (
-                          <li key={x.key}><button className={x.active ? '' : 'off'} onClick={() => ir(x.key)}>{x.title}</button></li>
-                        ))}
-                      </ul>
-                    </section>
-                  ))}
-                </div>
-              )}
+              ) : apartados}
+              {/* En móvil no hay índice: debajo del artículo, los apartados. */}
+              {a && !q.trim() ? <div className="hc-movil"><h4>Apartados de ayuda</h4>{apartados}</div> : null}
             </div>
           </div>
         )}

@@ -125,7 +125,8 @@ class WarrantyHelp
     /** Todos (los inactivos solo si $inactivos), en orden de apartado. */
     public static function all(bool $inactivos = false): array
     {
-        $filas = DB::table('warranty_help_articles')->orderBy('sort')->orderBy('id')->get();
+        $filas = DB::table('warranty_help_articles as h')->leftJoin('users as u', 'u.id', '=', 'h.updated_by')
+            ->orderBy('h.sort')->orderBy('h.id')->get(['h.*', 'u.name as updated_by_name']);
         $cambios = $filas->whereNotNull('slug')->keyBy('slug');
         $out = [];
         foreach (self::DEFAULTS as $i => $d) {
@@ -136,7 +137,7 @@ class WarrantyHelp
                 'summary' => $f ? (string) $f->summary : $d['summary'], 'body' => $f->body ?? $d['body'],
                 'related' => $f ? (array) json_decode($f->related ?: '[]', true) : $d['related'],
                 'active' => $f ? (bool) $f->active : true, 'order' => $i,
-                'updated_at' => $f?->updated_at,
+                'updated_at' => $f?->updated_at, 'updated_by' => $f?->updated_by_name,
             ];
         }
         foreach ($filas->whereNull('slug') as $f) {
@@ -144,7 +145,7 @@ class WarrantyHelp
                 'key' => 'a'.$f->id, 'custom' => true, 'edited' => true, 'step' => null,
                 'section' => $f->section, 'title' => $f->title, 'summary' => (string) $f->summary, 'body' => $f->body,
                 'related' => (array) json_decode($f->related ?: '[]', true), 'active' => (bool) $f->active,
-                'order' => 1000 + (int) $f->sort, 'updated_at' => $f->updated_at,
+                'order' => 1000 + (int) $f->sort, 'updated_at' => $f->updated_at, 'updated_by' => $f->updated_by_name,
             ];
         }
         $claves = array_column($out, 'key');
