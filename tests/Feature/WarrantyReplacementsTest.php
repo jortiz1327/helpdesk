@@ -32,7 +32,7 @@ class WarrantyReplacementsTest extends TestCase
         $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
         Warranty::forgetStatuses();
         $u = User::create(['name' => 'Ana', 'email' => 'ana@x.com', 'password' => bcrypt('x'), 'active' => 1]);
-        $u->givePermissionTo(['warranties.access', 'warranties.config']);
+        $u->givePermissionTo([...self::GARANTIAS, 'warranties.config']);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $this->h = ['X-App-Token' => TokenService::make($u)];
         $this->w = Warranty::create(['code' => 'G-2026-0007', 'received_at' => '2026-10-01', 'status' => 'en_curso',

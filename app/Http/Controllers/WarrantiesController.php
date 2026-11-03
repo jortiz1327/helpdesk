@@ -11,6 +11,7 @@ use App\Services\AemePortal;
 use App\Services\TicketService;
 use App\Services\WarrantyAlerts;
 use App\Services\WarrantyLabels;
+use App\Services\WarrantyPermissions;
 use App\Services\WarrantyPhotos;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
@@ -32,6 +33,7 @@ class WarrantiesController extends Controller
 
     public function handle(Request $request)
     {
+        if ($no = WarrantyPermissions::deny($request->user(), 'warranties', (string) $request->query('action', 'list'))) return $no;
         return match ($request->query('action', 'list')) {
             'get'     => $this->get($request),
             'save'    => $this->save($request),
@@ -839,9 +841,6 @@ class WarrantiesController extends Controller
     // Borrar un expediente se lleva su seguimiento e historial: solo el superadmin.
     private function delete(Request $request)
     {
-        if (! $request->user()->isSuperAdmin()) {
-            return response()->json(['ok' => false, 'error' => 'Solo el superadministrador puede borrar garantías'], 403);
-        }
         $id = (int) $request->input('id');
         WarrantyPhotos::purgeFiles(WarrantyItem::where('warranty_id', $id)->pluck('id')->all());
         WarrantyDocuments::purgeFiles($id);
@@ -853,6 +852,8 @@ class WarrantiesController extends Controller
     {
         return response()->json([
             'ok'         => true,
+            // Lo que puede hacer quien pregunta (la interfaz enseña solo esos botones).
+            'perms'      => WarrantyPermissions::of(request()->user()),
             'statuses'   => Warranty::statuses(),
             'status_meta' => Warranty::statusRows(),
             'status_closed' => Warranty::STATUS_CLOSED,
@@ -1050,11 +1051,11 @@ class WarrantiesController extends Controller
         return $r && $r['active'] && $r['warn_days'] ? $r['warn_days'] : self::STALE_DAYS;
     }
 
-    /** Usuarios activos con acceso a garantías: [id => nombre]. */
+    /** Usuarios activos que trabajan las garantías (no los de solo consulta): [id => nombre]. */
     private function agentes()
     {
         return User::where('active', 1)->orderBy('name')->get()
-            ->filter(fn ($u) => $u->can('warranties.access'))
+            ->filter(fn ($u) => $u->can('warranties.edit') || $u->can('warranties.review'))
             ->mapWithKeys(fn ($u) => [$u->id => $u->name]);
     }
 

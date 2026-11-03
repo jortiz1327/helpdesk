@@ -25,7 +25,7 @@ class WarrantyTeamReportTest extends TestCase
     private function agente(string $name): array
     {
         $u = User::create(['name' => $name, 'email' => uniqid() . '@x.com', 'password' => bcrypt('x'), 'active' => 1]);
-        $u->givePermissionTo(['warranties.access']);
+        $u->givePermissionTo([...self::GARANTIAS]);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         return [$u, ['X-App-Token' => TokenService::make($u)]];
     }

@@ -32,7 +32,7 @@ class DeviceCatalogTest extends TestCase
 
     public function test_alta_y_edicion_con_parejas_y_etiquetas_que_siguen_a_su_referencia(): void
     {
-        $h = $this->agente(['warranties.access', 'warranties.config']);
+        $h = $this->agente([...self::GARANTIAS, 'warranties.config']);
         $w = Warranty::create(['code' => 'G-2026-0001', 'received_at' => '2026-10-01', 'status' => 'en_curso']);
         $it = WarrantyItem::create(['warranty_id' => $w->id, 'code' => '8E9749440', 'kind' => 'esl', 'lookup_state' => 'found', 'aeme_ref' => 'AMX99V']);
 
@@ -70,7 +70,7 @@ class DeviceCatalogTest extends TestCase
 
     public function test_una_zkong_con_varias_aeme(): void
     {
-        $h = $this->agente(['warranties.access', 'warranties.config']);
+        $h = $this->agente([...self::GARANTIAS, 'warranties.config']);
         $id = $this->postJson('/api/device_catalog.php?action=save', [
             'size' => '4,2', 'eink_colors' => 'BWRY', 'color' => 'white', 'has_batteries' => false,
             'refs' => [['zkong' => 'ZKX77B-NE4 (White)', 'aeme' => 'AMX77B-W'], ['zkong' => 'ZKX77B-NE4 (White)', 'aeme' => 'AMX77B-W-X']],
@@ -88,7 +88,7 @@ class DeviceCatalogTest extends TestCase
 
     public function test_consultar_si_cambiar_no_sin_configuracion(): void
     {
-        $h = $this->agente(['warranties.access']);
+        $h = $this->agente([...self::GARANTIAS]);
         $this->getJson('/api/device_catalog.php', $h)->assertOk()->assertJsonPath('can_edit', false);
         $this->postJson('/api/device_catalog.php?action=save', ['eink_colors' => 'BW', 'color' => 'white', 'refs' => [['zkong' => 'X', 'aeme' => '']]], $h)->assertStatus(403);
         $this->postJson('/api/device_catalog.php?action=delete', ['id' => 1], $h)->assertStatus(403);

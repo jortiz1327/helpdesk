@@ -26,7 +26,7 @@ class ZkongRmaTest extends TestCase
         $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
     }
 
-    private function agente(array $permisos = ['warranties.access']): array
+    private function agente(array $permisos = [...self::GARANTIAS]): array
     {
         $u = User::create(['name' => 'Ana', 'email' => uniqid() . '@x.com', 'password' => bcrypt('x'), 'active' => 1]);
         $u->givePermissionTo($permisos);

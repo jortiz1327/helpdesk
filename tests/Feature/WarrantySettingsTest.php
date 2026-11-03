@@ -45,9 +45,9 @@ class WarrantySettingsTest extends TestCase
 
     public function test_estados_y_categorias_configurables(): void
     {
-        [, $soloAcceso] = $this->agente(['warranties.access']);
+        [, $soloAcceso] = $this->agente([...self::GARANTIAS]);
         $this->getJson('/api/warranty_settings.php', $soloAcceso)->assertForbidden();
-        [$u, $h] = $this->agente(['warranties.access', 'warranties.config']);
+        [$u, $h] = $this->agente([...self::GARANTIAS, 'warranties.config']);
 
         $cfg = $this->getJson('/api/warranty_settings.php', $h)->assertOk()->json();
         $this->assertContains('falta_stock', collect($cfg['statuses'])->pluck('key')->all());
@@ -106,7 +106,7 @@ class WarrantySettingsTest extends TestCase
 
     public function test_alertas_por_reglas(): void
     {
-        [$u, $h] = $this->agente(['warranties.access', 'warranties.config']);
+        [$u, $h] = $this->agente([...self::GARANTIAS, 'warranties.config']);
         $ana = $u->id;
 
         // Pendiente de cliente desde hace 9 días (aviso a 7, crítico a 14) y con responsable.

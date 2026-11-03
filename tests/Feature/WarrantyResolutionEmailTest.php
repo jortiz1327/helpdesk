@@ -63,7 +63,7 @@ class WarrantyResolutionEmailTest extends TestCase
 
     public function test_ticket_de_whatsapp_se_envia_al_correo_escrito_y_queda_en_la_garantia(): void
     {
-        [, $h] = $this->agente(['warranties.access', 'helpdesk.access', 'tickets.reply']);
+        [, $h] = $this->agente([...self::GARANTIAS, 'helpdesk.access', 'tickets.reply']);
         $w = $this->garantia();
 
         $m = $this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->assertOk()->json();
@@ -87,7 +87,7 @@ class WarrantyResolutionEmailTest extends TestCase
 
     public function test_con_el_informe_adjunto(): void
     {
-        [$u, $h] = $this->agente(['warranties.access', 'helpdesk.access', 'tickets.reply']);
+        [$u, $h] = $this->agente([...self::GARANTIAS, 'helpdesk.access', 'tickets.reply']);
         $w = $this->garantia();
         $this->enviar($w, $h, ['attach_report' => true])->assertStatus(400);   // sin informe todavía
 
@@ -106,7 +106,7 @@ class WarrantyResolutionEmailTest extends TestCase
         $w = $this->garantia();
 
         // Solo garantías, o del Helpdesk sin permiso de responder: puede copiarlo, no enviarlo.
-        foreach ([['warranties.access'], ['warranties.access', 'helpdesk.access']] as $permisos) {
+        foreach ([[...self::GARANTIAS], [...self::GARANTIAS, 'helpdesk.access']] as $permisos) {
             [, $h] = $this->agente($permisos, 'P' . count($permisos));
             $this->assertFalse($this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->json('can_send'));
             $this->enviar($w, $h)->assertForbidden();
@@ -115,7 +115,7 @@ class WarrantyResolutionEmailTest extends TestCase
         // El ticket lo tiene otro agente: igual que en el Helpdesk, no se responde por él.
         [$luis] = $this->agente(['helpdesk.access'], 'Luis');
         DB::table('tickets')->where('id', $w->ticket_id)->update(['assigned_to' => $luis->id]);
-        [, $h] = $this->agente(['warranties.access', 'helpdesk.access', 'tickets.reply']);
+        [, $h] = $this->agente([...self::GARANTIAS, 'helpdesk.access', 'tickets.reply']);
         $this->assertStringContainsString('lo tiene Luis', $this->enviar($w, $h)->assertForbidden()->json('error'));
         $this->assertSame([], $this->enviados);
     }

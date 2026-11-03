@@ -59,11 +59,18 @@ return [
         'forms.manage'       => ['Gestionar formularios',                      'campaigns'],
 
         // --- Gestión de garantías ---
-        'warranties.access'  => ['Acceder a Gestión de garantías (expedientes y Centro de dispositivos)', 'warranties'],
+        // Solo consulta: garantías, dispositivos, clientes, equipo, informes y la pegatina.
+        'warranties.access'  => ['Ver Gestión de garantías (expedientes, dispositivos, clientes e informes)', 'warranties'],
+        'warranties.edit'    => ['Crear y editar garantías (datos, estado, responsable, etiquetas, notas y pasos)', 'warranties'],
+        'warranties.review'  => ['Revisar dispositivos y sus fotos',            'warranties'],
+        'warranties.documents' => ['Documentos: informe, correo de resolución, texto para Finanzas y sustituciones', 'warranties'],
+        'warranties.positions_ticket' => ['Crear el ticket de posiciones de las sustituciones', 'warranties'],
+        'warranties.zkong'   => ['Gestionar las remesas de RMA a ZKONG',       'warranties'],
+        // Borrar garantías. Sin rol: solo superadmin, o se da a mano.
+        'warranties.delete'  => ['Eliminar garantías',                         'warranties'],
         // Usuario y contraseña de los servidores ZKONG. NO se asigna a ningún rol: solo superadmin.
         'warranties.servers' => ['Gestionar los servidores ZKONG',             'warranties'],
-        // Estados, categorías, alertas y plantillas de diagnóstico. Sin rol: se da a mano.
-        'warranties.config'  => ['Configurar garantías (estados, categorías, alertas y plantillas)', 'warranties'],
+        'warranties.config'  => ['Configurar garantías (estados, categorías, plazos, documentos, pasos…)', 'warranties'],
 
         // --- Automatizaciones / bots ---
         'automations.access' => ['Acceder a automatizaciones',                 'automations'],
@@ -137,6 +144,36 @@ return [
                 // (automations.*) se dejan SOLO al superadmin.
                 'analytics.view',
             ],
+        ],
+
+        /*
+         * Gestión de garantías. Un usuario tiene UN rol: el responsable lleva también lo
+         * justo del Helpdesk para los tickets de garantías (responder desde ellos, el
+         * correo de resolución). Borrar garantías y los servidores ZKONG: solo superadmin.
+         */
+        'encargado_garantias' => [
+            'label'       => 'Responsable de garantías',
+            'description' => 'Lleva las garantías de principio a fin: revisión, documentos, remesas a ZKONG, ticket de posiciones y su configuración.',
+            'permissions' => [
+                'warranties.access', 'warranties.edit', 'warranties.review', 'warranties.documents',
+                'warranties.positions_ticket', 'warranties.zkong', 'warranties.config',
+                'helpdesk.access', 'tickets.create', 'tickets.reply', 'tickets.close',
+                'contacts.access',
+            ],
+        ],
+
+        'tecnico_garantias' => [
+            'label'       => 'Técnico de garantías',
+            'description' => 'Recibe y revisa los dispositivos (etiquetas, fotos, resultado) y prepara las remesas a ZKONG. No genera documentos ni toca la configuración.',
+            'permissions' => [
+                'warranties.access', 'warranties.edit', 'warranties.review', 'warranties.zkong',
+            ],
+        ],
+
+        'consulta_garantias' => [
+            'label'       => 'Consulta de garantías',
+            'description' => 'Solo ve las garantías, los dispositivos, los clientes y los informes (p. ej. Finanzas). No cambia nada.',
+            'permissions' => ['warranties.access'],
         ],
     ],
 

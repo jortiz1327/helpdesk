@@ -24,7 +24,7 @@ class WarrantiesTest extends TestCase
         $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
     }
 
-    private function agente(array $permisos = ['warranties.access'], string $name = 'Ana'): array
+    private function agente(array $permisos = [...self::GARANTIAS], string $name = 'Ana'): array
     {
         $u = User::create(['name' => $name, 'email' => uniqid() . '@x.com', 'password' => bcrypt('x'), 'active' => 1]);
         $u->givePermissionTo($permisos);
@@ -51,7 +51,7 @@ class WarrantiesTest extends TestCase
         [, $solo] = $this->agente();
         $this->getJson('/api/warranties.php?action=inbox&tab=todos', $solo)->assertForbidden();
         $this->getJson('/api/warranties.php?action=by_ticket&ticket_id=1', $solo)->assertForbidden();
-        [, $ambos] = $this->agente(['warranties.access', 'helpdesk.access'], 'Pepe');
+        [, $ambos] = $this->agente([...self::GARANTIAS, 'helpdesk.access'], 'Pepe');
         $this->getJson('/api/warranties.php?action=inbox&tab=todos', $ambos)->assertOk();
         $this->getJson('/api/warranties.php?action=by_ticket&ticket_id=1', $ambos)->assertOk();
     }
@@ -69,7 +69,7 @@ class WarrantiesTest extends TestCase
     public function test_editar_deja_historial_legible_y_cerrar_pone_fecha(): void
     {
         [$ana, $h] = $this->agente();
-        [$luis] = $this->agente(['warranties.access'], 'Luis');
+        [$luis] = $this->agente([...self::GARANTIAS], 'Luis');
         $id = $this->crear($h)['id'];
 
         $this->postJson('/api/warranties.php?action=save', [
@@ -143,9 +143,9 @@ class WarrantiesTest extends TestCase
         $foto = DB::table('attachments')->insertGetId(['ticket_id' => $tAjena, 'name' => 'f.jpg', 'path' => 'attachments/x/f.jpg', 'mime' => 'image/jpeg', 'size' => strlen($jpg)]);
 
         // Agente del Helpdesk limitado a su categoría, con garantías; y otro solo de garantías.
-        [$ana, $h] = $this->agente(['warranties.access', 'helpdesk.access']);
+        [$ana, $h] = $this->agente([...self::GARANTIAS, 'helpdesk.access']);
         DB::table('user_ticket_categories')->insert(['user_id' => $ana->id, 'category_id' => $mia]);
-        [, $hl] = $this->agente(['warranties.access'], 'Luis');
+        [, $hl] = $this->agente([...self::GARANTIAS], 'Luis');
 
         $base = ['received_at' => '2026-10-20', 'status' => 'no_iniciado'];
         $this->postJson('/api/warranties.php?action=save', $base + ['ticket_code' => 'TK-MIA'], $h)->assertOk();
@@ -225,7 +225,7 @@ class WarrantiesTest extends TestCase
     public function test_contadores_categoria_y_cambios_en_lote(): void
     {
         [$ana, $h] = $this->agente();
-        [$luis] = $this->agente(['warranties.access'], 'Luis');
+        [$luis] = $this->agente([...self::GARANTIAS], 'Luis');
         [$pepe] = $this->agente(['helpdesk.access'], 'Pepe');
         $a = $this->crear($h, ['responsible_id' => $ana->id]);
         $b = $this->crear($h, ['category' => 'Tiendas']);
@@ -411,7 +411,7 @@ class WarrantiesTest extends TestCase
     {
         config(['database.connections.portal_aeme.host' => '']);
         \Illuminate\Support\Facades\Storage::fake('local');
-        [$u, $h] = $this->agente(['warranties.access', 'helpdesk.access']);
+        [$u, $h] = $this->agente([...self::GARANTIAS, 'helpdesk.access']);
         $this->zkong([
             '8E9749440' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
             '854A49907' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],

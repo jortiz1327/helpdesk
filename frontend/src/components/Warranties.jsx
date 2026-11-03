@@ -369,10 +369,10 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
       </div>
       {hueco && createPortal(<>
         <button className="dev-btn" disabled={!filas.length} onClick={() => exportar(filas)} title="Exportar a CSV lo que se ve"><Icon.download /> Exportar</button>
-        <button className="btn" onClick={onNew}><Icon.plus /> Nueva garantía</button>
+        {opts?.perms?.edit ? <button className="btn" onClick={onNew}><Icon.plus /> Nueva garantía</button> : null}
       </>, hueco)}
 
-      {sel.size > 0 && (
+      {sel.size > 0 && opts?.perms?.edit && (
         <div className="wl-bulk">
           <b>{sel.size} {sel.size === 1 ? 'seleccionada' : 'seleccionadas'}</b>
           <span className="sep" />
@@ -710,7 +710,7 @@ function ResPill({ rv, it, onClick }) {
   const f = pideFotos(rv, it) ? fotosDe(rv, it) : null
   const Ic = ui.ic
   return (
-    <button type="button" className={`wr-res c-${ui.c}`} onClick={onClick} title="Revisar">
+    <button type="button" className={`wr-res c-${ui.c}`} onClick={onClick || undefined} disabled={!onClick} title={onClick ? 'Revisar' : ''}>
       <Ic /> <span>{rv?.resolutions?.[it.resolution]?.label || it.resolution}</span>
       {f ? <em className={f.hay < f.total ? 'falta' : ''}><Icon.image /> {f.hay}/{f.total}</em> : null}
     </button>
@@ -1011,6 +1011,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   const [sel, setSel] = useState(() => new Set())
   const [revisar, setRevisar] = useState(null)     // { items, preset }
   const rv = opts?.review
+  const p = opts?.perms || {}
 
   const anadir = async () => {
     setOcupado('add')
@@ -1078,9 +1079,9 @@ function Productos({ w, items, opts, onReload, onChanged }) {
           {items.length ? <span className="dev-mute"> · {conectadas} conectadas{conAvisos ? ` · ${conAvisos} con avisos` : ''}</span> : null}
         </div>
         <div className="spacer" />
-        {items.length ? <button className="dev-btn" disabled={!!ocupado} onClick={recomprobar}><Icon.refresh /> {ocupado === 'recheck' ? 'Comprobando…' : 'Volver a comprobar'}</button> : null}
+        {items.length && p.edit ? <button className="dev-btn" disabled={!!ocupado} onClick={recomprobar}><Icon.refresh /> {ocupado === 'recheck' ? 'Comprobando…' : 'Volver a comprobar'}</button> : null}
         {items.length ? <button className="dev-btn" onClick={exportar}><Icon.download /> CSV</button> : null}
-        <button className="btn" onClick={() => setPanel((p) => !p)}><Icon.plus /> Añadir etiquetas</button>
+        {p.edit ? <button className="btn" onClick={() => setPanel((x) => !x)}><Icon.plus /> Añadir etiquetas</button> : null}
       </div>
 
       {panel && (
@@ -1127,7 +1128,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
               <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(filtro === k ? '' : k)}>{k} ×{n}</button>
             ))}
           </div>
-          {rv && listado.length > 0 && (
+          {rv && p.review && listado.length > 0 && (
             <label className="wr-selall"><input type="checkbox" checked={todasVisibles} onChange={marcarVisibles} />
               {todasVisibles ? 'Quitar la selección' : `Seleccionar ${listado.length === items.length ? 'todas' : `las ${listado.length} que se ven`}`}</label>
           )}
@@ -1135,16 +1136,16 @@ function Productos({ w, items, opts, onReload, onChanged }) {
           <ul className={`wr-lbls big${rv ? ' rev' : ''}`}>
             {listado.map((i) => (
               <li key={i.id} className={`st-${estadoEtiqueta(i)}${sel.has(i.id) ? ' sel' : ''}`}>
-                {rv ? <input type="checkbox" className="wr-pick" checked={sel.has(i.id)} onChange={() => marcar(i.id)} aria-label={`Seleccionar ${i.code}`} /> : null}
+                {rv && p.review ? <input type="checkbox" className="wr-pick" checked={sel.has(i.id)} onChange={() => marcar(i.id)} aria-label={`Seleccionar ${i.code}`} /> : null}
                 <span className="wr-lbl-code mono"><button className="link" title="Ver ficha e historial" onClick={() => setFicha(i.code)}>{i.code}</button>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}
                   {i.other_warranties?.length ? <button className="wr-rep" onClick={() => setFicha(i.code)}
                     title={`También en: ${i.other_warranties.map((o) => [o.code, fecha(o.received_at), o.client, rv?.resolutions?.[o.resolution]?.label].filter(Boolean).join(' · ')).join('\n')}`}>
                     <Icon.refresh /> En {i.other_warranties.length + 1} garantías</button> : null}
                   <Plazo t={i.term} /></span>
                 <Donde r={i} />
-                <Modelo r={i} onPick={(ref) => cambiarModelo(i, ref)} />
-                {rv ? <ResPill rv={rv} it={i} onClick={() => setRevisar({ items: [i] })} /> : null}
-                <button className="icon-btn" title="Quitar de la garantía" onClick={() => quitar(i)}><Icon.trash /></button>
+                <Modelo r={i} onPick={p.edit ? (ref) => cambiarModelo(i, ref) : null} />
+                {rv ? <ResPill rv={rv} it={i} onClick={p.review ? () => setRevisar({ items: [i] }) : null} /> : null}
+                {p.edit ? <button className="icon-btn" title="Quitar de la garantía" onClick={() => quitar(i)}><Icon.trash /></button> : null}
                 <div className="full"><Avisos list={i.warnings} />{rv ? <ResDetalle rv={rv} it={i} /> : null}</div>
               </li>
             ))}
@@ -1163,7 +1164,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
           {items[0]?.checked_at ? <p className="dev-mute wr-prod-foot">Comprobadas por última vez {fechaHora(items.reduce((a, i) => (i.checked_at > a ? i.checked_at : a), ''))}.</p> : null}
         </>
       )}
-      {!items.length && !panel ? <p className="dev-mute">Todavía no hay etiquetas. Añádelas con su código.</p> : null}
+      {!items.length && !panel ? <p className="dev-mute">Todavía no hay etiquetas.{p.edit ? ' Añádelas con su código.' : ''}</p> : null}
       {ficha && <FichaDispositivo code={ficha} servers={[]} onClose={() => setFicha(null)} onOpen={setFicha} />}
       {revisar && <Revisar w={w} rv={rv} diag={opts?.diagnosis} items={revisar.items} preset={revisar.preset} onClose={() => setRevisar(null)} onSaved={trasRevisar} />}
     </>
@@ -1265,7 +1266,8 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
 
 const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
-function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
+function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
+  const p = opts?.perms || {}
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)
@@ -1354,17 +1356,19 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
           </div>
         </div>
         <div className="wf-acts">
-          <Select value={w.status} onChange={(v) => v !== w.status && guardarCon({ status: v }, `Estado: ${opts?.statuses?.[v] || v}`)} options={estados} />
-          {abierta
-            ? <button className="btn dark" onClick={cerrar}><Icon.lock /> Cerrar</button>
-            : <button className="btn ghost" onClick={() => guardarCon({ status: opts?.status_reopen || 'en_curso' }, 'Garantía reabierta')}><Icon.refresh /> Reabrir</button>}
+          {p.edit ? <>
+            <Select value={w.status} onChange={(v) => v !== w.status && guardarCon({ status: v }, `Estado: ${opts?.statuses?.[v] || v}`)} options={estados} />
+            {abierta
+              ? <button className="btn dark" onClick={cerrar}><Icon.lock /> Cerrar</button>
+              : <button className="btn ghost" onClick={() => guardarCon({ status: opts?.status_reopen || 'en_curso' }, 'Garantía reabierta')}><Icon.refresh /> Reabrir</button>}
+          </> : null}
           {w.ticket_id && fotos !== false ? (
             <button className="dev-btn" onClick={() => setVerFotos(null)} disabled={!fotos?.length} title={fotos && !fotos.length ? 'El cliente no ha mandado imágenes en sus tickets' : 'Lo que ha mandado el cliente por correo, WhatsApp o adjunto'}>
               <Icon.image /> Fotos del cliente{fotos === null ? null : <em className="fc-n">{fotos.filter((x) => x.from === 'cliente').length}</em>}
             </button>
           ) : null}
-          <button className="dev-btn" onClick={() => onEdit(w)}><Icon.pencil /> Editar</button>
-          {isSuper ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
+          {p.edit ? <button className="dev-btn" onClick={() => onEdit(w)}><Icon.pencil /> Editar</button> : null}
+          {p.delete ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
         </div>
       </div>
 
@@ -1374,7 +1378,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
             <header><h3><Icon.doc /> Qué le pasa al cliente</h3>
               {ticket ? <span className="dev-mute wf-orig">Ticket {ticket}{w.ticket_subject ? ` · ${w.ticket_subject}` : ''}</span> : null}
             </header>
-            {w.description ? <p className="wf-desc">{w.description}</p> : <p className="dev-mute wf-desc-none">Sin descripción. <button className="wf-link" onClick={() => onEdit(w)}>Añadirla</button></p>}
+            {w.description ? <p className="wf-desc">{w.description}</p> : <p className="dev-mute wf-desc-none">Sin descripción.{p.edit ? <> <button className="wf-link" onClick={() => onEdit(w)}>Añadirla</button></> : null}</p>}
             {fotos?.some((x) => x.from === 'cliente') ? (
               <div className="fc-tira">
                 {fotos.filter((x) => x.from === 'cliente').slice(0, 6).map((x) => (
@@ -1396,7 +1400,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
             </div>
             <div className="wf-tab-body">
               {tab === 'productos' && <Productos w={w} items={d.items} opts={opts} onReload={cargar} onChanged={onChanged} />}
-              {tab === 'documentos' && <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} onEditWarranty={() => onEdit(w)} onChanged={cargar} onOpenTicket={onOpenTicket} />}
+              {tab === 'documentos' && <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} onEditWarranty={p.edit ? () => onEdit(w) : null} onChanged={cargar} onOpenTicket={onOpenTicket} />}
             </div>
           </section>
         </div>
@@ -1424,7 +1428,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
 
           <section className="wf-card">
             <header><h3><Icon.clock /> Seguimiento e historial</h3></header>
-            <div className="wf-compose">
+            {p.edit ? <div className="wf-compose">
               <textarea ref={notaRef} rows={2} value={nota.body} onChange={(e) => setNota((s) => ({ ...s, body: e.target.value }))}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarNota() }}
                 placeholder="Qué se ha hecho, con quién se ha hablado, qué falta…" />
@@ -1433,7 +1437,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
                   options={Object.entries(opts?.note_types || {}).map(([k, v]) => ({ value: k, label: v }))} />
                 <button className="btn sm" disabled={enviando || !nota.body.trim()} onClick={enviarNota}><Icon.plus /> {enviando ? 'Añadiendo…' : 'Añadir'}</button>
               </div>
-            </div>
+            </div> : null}
             <div className="dc-seg wf-filtro">
               {[['', 'Todo'], ['notas', `Notas (${d.notes.length})`], ['cambios', 'Cambios'], ...(w.ticket_id && w.ticket_visible ? [['cliente', `Cliente (${mensajes.length})`]] : [])].map(([k, l]) => <button key={k} className={hist === k ? 'on' : ''} onClick={() => setHist(k)}>{l}</button>)}
             </div>
@@ -1466,7 +1470,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
   )
 }
 
-export default function Warranties({ isSuper = false, openId = null, onOpened, onOpenTicket, filtro = null }) {
+export default function Warranties({ openId = null, onOpened, onOpenTicket, filtro = null }) {
   const [opts, setOpts] = useState(null)
   const [sel, setSel] = useState(openId)
   // Llegar con una garantía concreta (desde la ficha de un ticket o ZKONG).
@@ -1492,7 +1496,7 @@ export default function Warranties({ isSuper = false, openId = null, onOpened, o
 
       <div className="page-scroll"><div className="page dev-page wr-page">
         {sel
-          ? <Ficha key={`${sel}-${reload}`} id={sel} opts={opts} isSuper={isSuper} onBack={() => setSel(null)}
+          ? <Ficha key={`${sel}-${reload}`} id={sel} opts={opts} onBack={() => setSel(null)}
               onEdit={(w) => setForm({ ...VACIA, ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '' })}
               onChanged={() => {}} onOpenTicket={onOpenTicket} />
           : <Lista opts={opts} reload={reload} filtro={filtro} onOpen={setSel} onNew={() => setForm({ ...VACIA, received_at: hoy() })} />}

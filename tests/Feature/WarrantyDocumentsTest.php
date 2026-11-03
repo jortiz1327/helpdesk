@@ -27,7 +27,7 @@ class WarrantyDocumentsTest extends TestCase
         $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
         Warranty::forgetStatuses();
         $u = User::create(['name' => 'Ana', 'email' => 'ana@x.com', 'password' => bcrypt('x'), 'active' => 1]);
-        $u->givePermissionTo(['warranties.access', 'warranties.config']);
+        $u->givePermissionTo([...self::GARANTIAS, 'warranties.config']);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $this->h = ['X-App-Token' => TokenService::make($u)];
         $this->w = Warranty::create(['code' => 'G-2026-0001', 'received_at' => '2026-10-01', 'status' => 'en_curso', 'client_name' => 'Hoteles Sol', 'project_name' => 'Hotel Mar']);
@@ -107,7 +107,7 @@ class WarrantyDocumentsTest extends TestCase
     public function test_ajustes_solo_con_configuracion_y_sin_tarifa(): void
     {
         $u = User::create(['name' => 'Luis', 'email' => 'luis@x.com', 'password' => bcrypt('x'), 'active' => 1]);
-        $u->givePermissionTo(['warranties.access']);
+        $u->givePermissionTo([...self::GARANTIAS]);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $this->postJson('/api/warranty_settings.php?action=docs_save', [], ['X-App-Token' => TokenService::make($u)])->assertStatus(403);
 

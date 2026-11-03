@@ -23,7 +23,7 @@ class WarrantyClientsTest extends TestCase
         config(['database.connections.portal_aeme.host' => '']);   // sin portal: solo lo de aquí
     }
 
-    private function agente(array $perms = ['warranties.access']): array
+    private function agente(array $perms = [...self::GARANTIAS]): array
     {
         $u = User::create(['name' => 'Ana', 'email' => uniqid() . '@x.com', 'password' => bcrypt('x'), 'active' => 1]);
         $u->givePermissionTo($perms);

@@ -1650,7 +1650,7 @@ export default function App() {
                         )}
                         {view === "zkong_servers" && can("warranties.servers") && <ZkongServers />}
                         {view === "garantias" && can("warranties.access") && (
-                            <Warranties isSuper={!!auth.user?.is_super} openId={garantiaAbierta} onOpened={() => setGarantiaAbierta(null)} filtro={garantiaFiltro}
+                            <Warranties openId={garantiaAbierta} onOpened={() => setGarantiaAbierta(null)} filtro={garantiaFiltro}
                                 onOpenTicket={can("helpdesk.access") ? (id) => { setTicketGarantia(id); setView("garantias_tickets"); } : null} />
                         )}
                         {view === "warranty_settings" && can("warranties.config") && <WarrantySettings />}

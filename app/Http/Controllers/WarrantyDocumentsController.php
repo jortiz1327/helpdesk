@@ -11,6 +11,7 @@ use App\Services\TicketLockService;
 use App\Services\TicketReplyService;
 use App\Services\WarrantyDocuments;
 use App\Services\WarrantyLabels;
+use App\Services\WarrantyPermissions;
 use App\Services\WarrantyReplacements;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class WarrantyDocumentsController extends Controller
 {
     public function handle(Request $request)
     {
+        if ($no = WarrantyPermissions::deny($request->user(), 'docs', (string) $request->query('action', 'list'))) return $no;
         return match ($request->query('action', 'list')) {
             'portal'        => $this->portal($request),
             'portal_drafts' => $this->portalDrafts($request),

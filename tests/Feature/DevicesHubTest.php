@@ -105,12 +105,12 @@ class DevicesHubTest extends TestCase
     public function test_sin_permiso_de_garantias_no_entra_y_los_servidores_son_solo_superadmin(): void
     {
         $this->getJson('/api/devices.php', ['X-App-Token' => $this->token(['helpdesk.access'])])->assertForbidden();
-        $this->getJson('/api/zkong_servers.php', ['X-App-Token' => $this->token(['warranties.access'])])->assertForbidden();
+        $this->getJson('/api/zkong_servers.php', ['X-App-Token' => $this->token([...self::GARANTIAS])])->assertForbidden();
     }
 
     public function test_guardar_servidor_cifra_la_contrasena_y_no_la_devuelve(): void
     {
-        $tok = $this->token(['warranties.access', 'warranties.servers']);
+        $tok = $this->token([...self::GARANTIAS, 'warranties.servers']);
         $this->postJson('/api/zkong_servers.php?action=save', ['name' => 'APP02', 'base_url' => 'ftp://app02.test/zk', 'username' => 'admin', 'password' => 'x'], ['X-App-Token' => $tok])
             ->assertStatus(400);   // solo http(s)
         $this->postJson('/api/zkong_servers.php?action=save', ['name' => 'APP02', 'base_url' => 'https://app02.test/zk/', 'username' => 'admin', 'password' => 'secreta'], ['X-App-Token' => $tok])
@@ -132,7 +132,7 @@ class DevicesHubTest extends TestCase
 
     public function test_si_cambia_la_clave_publica_no_se_envia_la_contrasena(): void
     {
-        $tok = $this->token(['warranties.access', 'warranties.servers']);
+        $tok = $this->token([...self::GARANTIAS, 'warranties.servers']);
         $s = $this->servidor('app02.test');
         $this->postJson('/api/zkong_servers.php?action=test', ['id' => $s->id], ['X-App-Token' => $tok])->assertJson(['ok' => true]);
         $this->assertNotNull($s->fresh()->public_key_sha256);
@@ -155,7 +155,7 @@ class DevicesHubTest extends TestCase
     public function test_lista_de_etiquetas_con_tienda_y_articulo(): void
     {
         $s = $this->servidor('app02.test');
-        $r = $this->getJson("/api/devices.php?action=list&server={$s->id}&kind=esl&page=0&size=25&f=%7B%7D", ['X-App-Token' => $this->token(['warranties.access'])])
+        $r = $this->getJson("/api/devices.php?action=list&server={$s->id}&kind=esl&page=0&size=25&f=%7B%7D", ['X-App-Token' => $this->token([...self::GARANTIAS])])
             ->assertOk()->json();
 
         $this->assertSame(1, $r['total']);
@@ -164,7 +164,7 @@ class DevicesHubTest extends TestCase
         $this->assertSame('APP02', $r['rows'][0]['server']);
 
         // El artículo va aparte (la lista no lo espera).
-        $it = $this->postJson("/api/devices.php?action=items&server={$s->id}", ['items' => [['storeId' => 100, 'barCode' => '805804112']]], ['X-App-Token' => $this->token(['warranties.access'])])
+        $it = $this->postJson("/api/devices.php?action=items&server={$s->id}", ['items' => [['storeId' => 100, 'barCode' => '805804112']]], ['X-App-Token' => $this->token([...self::GARANTIAS])])
             ->assertOk()->json();
         $this->assertSame('Ibuprofeno 600', $it['items']['805804112']['itemTitle']);
         $this->assertCount(1, $this->logins);   // un login; el resto reutiliza el token
@@ -173,7 +173,7 @@ class DevicesHubTest extends TestCase
     public function test_filtros_del_servidor(): void
     {
         $s = $this->servidor('app02.test');
-        $r = $this->getJson("/api/devices.php?action=filters&server={$s->id}&kind=esl", ['X-App-Token' => $this->token(['warranties.access'])])->assertOk()->json();
+        $r = $this->getJson("/api/devices.php?action=filters&server={$s->id}&kind=esl", ['X-App-Token' => $this->token([...self::GARANTIAS])])->assertOk()->json();
         $this->assertSame(['ZKC15S', 'ZKC42V-N'], $r['models']);
         $this->assertSame([['value' => '100', 'label' => 'Tienda Centro', 'sub' => 'Farmacias Sol']], $r['stores']);
     }
@@ -181,7 +181,7 @@ class DevicesHubTest extends TestCase
     public function test_cifras_del_servidor(): void
     {
         $s = $this->servidor('app02.test');
-        $r = $this->getJson("/api/devices.php?action=stats&server={$s->id}&kind=esl", ['X-App-Token' => $this->token(['warranties.access'])])->assertOk()->json();
+        $r = $this->getJson("/api/devices.php?action=stats&server={$s->id}&kind=esl", ['X-App-Token' => $this->token([...self::GARANTIAS])])->assertOk()->json();
         $this->assertSame(1, $r['stats']['total']);
     }
 
@@ -189,7 +189,7 @@ class DevicesHubTest extends TestCase
     {
         $this->servidor('app01.test', 1);
         $this->servidor('app02.test', 2);
-        $r = $this->postJson('/api/devices.php?action=search', ['codes' => "805804112\n999999999"], ['X-App-Token' => $this->token(['warranties.access'])])
+        $r = $this->postJson('/api/devices.php?action=search', ['codes' => "805804112\n999999999"], ['X-App-Token' => $this->token([...self::GARANTIAS])])
             ->assertOk()->json();
 
         $porCodigo = collect($r['results'])->keyBy('code');
@@ -202,7 +202,7 @@ class DevicesHubTest extends TestCase
     {
         $this->servidor('app01.test', 1);
         $this->servidor('app02.test', 2);
-        $tok = $this->token(['warranties.access']);
+        $tok = $this->token([...self::GARANTIAS]);
 
         $r = $this->getJson('/api/devices.php?action=sheet&code=805-804-112', ['X-App-Token' => $tok])->assertOk()->json();
         $this->assertTrue($r['found']);
@@ -219,14 +219,14 @@ class DevicesHubTest extends TestCase
     {
         $this->servidor('app02.test', 1);
         ZkongServer::create(['name' => 'ROTO', 'base_url' => 'https://roto.test/zk', 'username' => 'a', 'password' => 'b', 'active' => true]);
-        $r = $this->postJson('/api/devices.php?action=search', ['codes' => '805804112'], ['X-App-Token' => $this->token(['warranties.access'])])->assertOk()->json();
+        $r = $this->postJson('/api/devices.php?action=search', ['codes' => '805804112'], ['X-App-Token' => $this->token([...self::GARANTIAS])])->assertOk()->json();
         $this->assertSame(['ROTO'], $r['failed']);
         $this->assertCount(1, $r['results'][0]['rows']);
     }
 
     public function test_un_servidor_que_falla_da_su_aviso(): void
     {
-        $tok = $this->token(['warranties.access']);
+        $tok = $this->token([...self::GARANTIAS]);
         ZkongServer::create(['name' => 'ROTO', 'base_url' => 'https://roto.test/zk', 'username' => 'a', 'password' => 'b', 'active' => true]);
         $id = ZkongServer::value('id');
         $this->getJson("/api/devices.php?action=stats&server={$id}&kind=esl", ['X-App-Token' => $tok])
@@ -235,7 +235,7 @@ class DevicesHubTest extends TestCase
 
     public function test_un_fallo_que_no_es_del_servidor_no_sale_al_navegador(): void
     {
-        $tok = $this->token(['warranties.access']);
+        $tok = $this->token([...self::GARANTIAS]);
         $this->mock(\App\Services\Zkong\ZkongDevices::class, fn ($m) => $m->shouldReceive('servers')->andThrow(new \Exception('SQLSTATE[42S02] tabla secreta')));
         $r = $this->getJson('/api/devices.php', ['X-App-Token' => $tok])->assertStatus(500);
         $this->assertStringNotContainsString('SQLSTATE', $r->getContent());

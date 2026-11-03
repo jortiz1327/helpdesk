@@ -236,7 +236,7 @@ function Finanzas({ w, summary, onClose }) {
  */
 const COD_OK = { esl: /^[A-Z0-9]{9}$/, ap: /^[0-9A-F]{12}$/ }
 const limpio = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
-function Sustituciones({ w, onClose, onChanged, onOpenTicket }) {
+function Sustituciones({ w, perms, onClose, onChanged, onOpenTicket }) {
   const toast = useToast()
   const [r, setR] = useState(null)
   const [filas, setFilas] = useState([])
@@ -277,7 +277,7 @@ function Sustituciones({ w, onClose, onChanged, onOpenTicket }) {
     onChanged?.()
     await cargar()
     // En hoteles (Configuración) se pregunta si crear el ticket de posiciones.
-    if (r.asks_ticket && !r.positions_ticket && conNueva.length) setPaso('ticket')
+    if (perms.positions_ticket && r.asks_ticket && !r.positions_ticket && conNueva.length) setPaso('ticket')
   }
 
   const crearTicket = async () => {
@@ -318,10 +318,10 @@ function Sustituciones({ w, onClose, onChanged, onOpenTicket }) {
 
   return (
     <Modal wide title="Sustituciones" onClose={onClose} foot={<>
-      {r?.asks_ticket && !r.positions_ticket && !cambiado && conNueva.length ? <button className="dev-btn" onClick={() => setPaso('ticket')}><Icon.plus /> Ticket de posiciones</button> : null}
+      {perms.positions_ticket && r?.asks_ticket && !r.positions_ticket && !cambiado && conNueva.length ? <button className="dev-btn" onClick={() => setPaso('ticket')}><Icon.plus /> Ticket de posiciones</button> : null}
       <span className="spacer" />
       <button className="btn ghost" onClick={onClose}>{cambiado ? 'Cancelar' : 'Cerrar'}</button>
-      <button className="btn" disabled={!cambiado || filas.some(mala) || ocupado === 'guardar'} onClick={guardar}><Icon.save /> {ocupado === 'guardar' ? 'Guardando…' : 'Guardar'}</button>
+      {perms.documents ? <button className="btn" disabled={!cambiado || filas.some(mala) || ocupado === 'guardar'} onClick={guardar}><Icon.save /> {ocupado === 'guardar' ? 'Guardando…' : 'Guardar'}</button> : null}
     </>}>
       {!r ? <div className="center-load"><div className="spinner" /></div> : !filas.length ? (
         <p className="wd-tip">Ningún dispositivo se sustituye: las soluciones que lo hacen se eligen en Configuración → Texto para Finanzas.</p>
@@ -334,7 +334,7 @@ function Sustituciones({ w, onClose, onChanged, onOpenTicket }) {
               : <b className="mono">{r.positions_ticket.code}</b>} creado.</p>
           ) : null}
           <div className="wd-sus-bar">
-            <button className="dev-btn" disabled={!sinPos || ocupado === 'buscar'} onClick={buscar} title={sinPos ? 'Pregunta a ZKONG a qué artículo está vinculada cada etiqueta sin posición' : 'Todas tienen posición'}><Icon.zkong /> {ocupado === 'buscar' ? 'Buscando…' : 'Buscar posiciones en ZKONG'}</button>
+            {perms.documents ? <button className="dev-btn" disabled={!sinPos || ocupado === 'buscar'} onClick={buscar} title={sinPos ? 'Pregunta a ZKONG a qué artículo está vinculada cada etiqueta sin posición' : 'Todas tienen posición'}><Icon.zkong /> {ocupado === 'buscar' ? 'Buscando…' : 'Buscar posiciones en ZKONG'}</button> : null}
             <span className="dev-mute">{conNueva.length} de {filas.length} con etiqueta nueva</span>
           </div>
           <div className="dev-table-wrap keep">
@@ -344,9 +344,9 @@ function Sustituciones({ w, onClose, onChanged, onOpenTicket }) {
                 {filas.map((f) => (
                   <tr key={f.id}>
                     <td><span className="mono">{f.code}</span><small>{f.product || (f.kind === 'ap' ? 'Antena' : 'Etiqueta')}</small></td>
-                    <td><input value={f.position} maxLength={80} placeholder={f.kind === 'ap' ? '—' : 'SC-02'} onChange={(e) => setF(f.id, { position: e.target.value })} /></td>
-                    <td><input value={f.position_title} maxLength={191} placeholder="Opcional" onChange={(e) => setF(f.id, { position_title: e.target.value })} /></td>
-                    <td><input className={`mono${mala(f) ? ' bad' : ''}`} value={f.replaced_by} maxLength={17} placeholder={f.kind === 'ap' ? 'MAC nueva' : 'Etiqueta nueva'}
+                    <td><input readOnly={!perms.documents} value={f.position} maxLength={80} placeholder={f.kind === 'ap' ? '—' : 'SC-02'} onChange={(e) => setF(f.id, { position: e.target.value })} /></td>
+                    <td><input readOnly={!perms.documents} value={f.position_title} maxLength={191} placeholder="Opcional" onChange={(e) => setF(f.id, { position_title: e.target.value })} /></td>
+                    <td><input readOnly={!perms.documents} className={`mono${mala(f) ? ' bad' : ''}`} value={f.replaced_by} maxLength={17} placeholder={f.kind === 'ap' ? 'MAC nueva' : 'Etiqueta nueva'}
                       onChange={(e) => setF(f.id, { replaced_by: e.target.value })} onBlur={(e) => setF(f.id, { replaced_by: limpio(e.target.value) })}
                       title={mala(f) ? (limpio(f.replaced_by) === f.code ? 'Es la misma' : f.kind === 'ap' ? 'Una MAC de 12 caracteres' : 'Un código de 9 caracteres') : ''} /></td>
                   </tr>
@@ -523,6 +523,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
   if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
 
   const { summary, report, replacements: sus } = d
+  const p = opts.perms || {}
   const revisados = summary.total - summary.pending
   const cerrar = () => setModal(null)
   const editar = onEditWarranty ? () => { cerrar(); onEditWarranty() } : null
@@ -540,20 +541,22 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
       </div>
 
       <div className="wd-acts">
-        <button className="btn sm" disabled={!revisados} title={revisados ? '' : 'Revisa los dispositivos primero'} onClick={() => setModal('preparar')}><Icon.doc /> Preparar presupuestos para el portal</button>
-        <button className="dev-btn" disabled={!revisados} title={revisados ? 'Los presupuestos que hay que crear, para avisar a Finanzas' : 'Revisa los dispositivos primero'} onClick={() => setModal('finanzas')}><Icon.copy /> Texto para Finanzas</button>
-        {sus?.total ? <button className="dev-btn" title="Etiqueta antigua → posición → etiqueta nueva" onClick={() => setModal('sustituciones')}><Icon.swap /> Sustituciones <b className={`wd-cnt${sus.done < sus.total ? ' pend' : ''}`}>{sus.done}/{sus.total}</b></button> : null}
+        {p.documents ? <>
+          <button className="btn sm" disabled={!revisados} title={revisados ? '' : 'Revisa los dispositivos primero'} onClick={() => setModal('preparar')}><Icon.doc /> Preparar presupuestos para el portal</button>
+          <button className="dev-btn" disabled={!revisados} title={revisados ? 'Los presupuestos que hay que crear, para avisar a Finanzas' : 'Revisa los dispositivos primero'} onClick={() => setModal('finanzas')}><Icon.copy /> Texto para Finanzas</button>
+        </> : null}
+        {sus?.total && (p.documents || p.positions_ticket) ? <button className="dev-btn" title="Etiqueta antigua → posición → etiqueta nueva" onClick={() => setModal('sustituciones')}><Icon.swap /> Sustituciones <b className={`wd-cnt${sus.done < sus.total ? ' pend' : ''}`}>{sus.done}/{sus.total}</b></button> : null}
         <span className="spacer" />
         <button className="dev-btn" title="La pegatina para el paquete, en PDF para imprimir" onClick={() => setModal('pegatina')}><Icon.print /> Pegatina del paquete</button>
-        <button className="dev-btn" disabled={!summary.total} title={summary.pending ? 'Se genera con todo revisado' : ''} onClick={() => setModal('informe')}><Icon.file /> {report ? 'Informe de resolución' : 'Generar informe'}</button>
+        {p.documents ? <button className="dev-btn" disabled={!summary.total} title={summary.pending ? 'Se genera con todo revisado' : ''} onClick={() => setModal('informe')}><Icon.file /> {report ? 'Informe de resolución' : 'Generar informe'}</button> : null}
         {report ? <button className="dev-btn" title={`Descargar el informe${report.note ? ` (${report.note.toLowerCase()})` : ''}`} onClick={() => descargar(report.id, toast)}><Icon.download /> <span className="mono">{report.number}</span></button> : null}
-        <button className="dev-btn" onClick={() => setModal('correo')}><Icon.mail /> Correo de resolución</button>
+        {p.documents ? <button className="dev-btn" onClick={() => setModal('correo')}><Icon.mail /> Correo de resolución</button> : null}
       </div>
 
       <Portal w={w} onEditWarranty={editar} />
 
       {modal === 'preparar' && <Preparar w={w} onClose={cerrar} onEditWarranty={editar} />}
-      {modal === 'sustituciones' && <Sustituciones w={w} onClose={cerrar} onChanged={() => { cargar(); onChanged?.() }} onOpenTicket={onOpenTicket} />}
+      {modal === 'sustituciones' && <Sustituciones w={w} perms={p} onClose={cerrar} onChanged={() => { cargar(); onChanged?.() }} onOpenTicket={onOpenTicket} />}
       {modal === 'pegatina' && <Pegatina w={w} onClose={cerrar} />}
       {modal === 'finanzas' && <Finanzas w={w} summary={summary} onClose={cerrar} />}
       {modal === 'informe' && <Informe w={w} summary={summary} actual={report} onClose={cerrar} onDone={() => { cerrar(); cargar() }} />}

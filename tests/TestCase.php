@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
+    /** Quien trabaja las garantías (todo menos borrar, configurar y los servidores ZKONG). */
+    protected const GARANTIAS = ['warranties.access', 'warranties.edit', 'warranties.review', 'warranties.documents',
+        'warranties.positions_ticket', 'warranties.zkong'];
+
     /**
      * RED DE SEGURIDAD: los tests usan `RefreshDatabase`, que BORRA y remigra la BD.
      * Aquí se aborta si la conexión no apunta a una BD de test (nombre acabado en

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\WarrantyItem;
 use App\Models\ZkongBatch;
+use App\Services\WarrantyPermissions;
 use App\Services\WarrantyPhotos;
 use App\Services\ZkongRmaXlsx;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class ZkongRmaController extends Controller
 {
     public function handle(Request $request)
     {
+        if ($no = WarrantyPermissions::deny($request->user(), 'zkong', (string) $request->query('action', 'inbox'))) return $no;
         return match ($request->query('action', 'inbox')) {
             'batches' => $this->batches(),
             'batch'   => $this->batch($request),

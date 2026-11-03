@@ -54,7 +54,7 @@ function Fotos({ it }) {
 const VISIBLES = 5
 const ORDENES = [{ value: 'old', label: 'Más antigua primero' }, { value: 'new', label: 'Más reciente primero' }, { value: 'n', label: 'Más etiquetas primero' }]
 
-function Bandeja({ rv, onOpenWarranty, onBatch }) {
+function Bandeja({ rv, puede, onOpenWarranty, onBatch }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)
@@ -161,11 +161,11 @@ function Bandeja({ rv, onOpenWarranty, onBatch }) {
               <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button>
             </span>
           ) : <span className="dev-mute zk-ayuda">Marca las etiquetas que van juntas</span>}
-          {d.drafts.length > 0 && elegidas.length > 0 && (
+          {puede && d.drafts.length > 0 && elegidas.length > 0 && (
             <Select sm value="" placeholder="Añadir a un borrador…" onChange={(v) => v && meter(v)}
               options={d.drafts.map((b) => ({ value: b.id, label: `Añadir a ${b.code}` }))} />
           )}
-          <button className="btn" disabled={ocupado || !elegidas.length} onClick={() => meter(null)}><Icon.send /> Crear remesa{elegidas.length ? ` con ${elegidas.length}` : ''}</button>
+          {puede ? <button className="btn" disabled={ocupado || !elegidas.length} onClick={() => meter(null)}><Icon.send /> Crear remesa{elegidas.length ? ` con ${elegidas.length}` : ''}</button> : null}
         </div>
 
         <div className="dev-table-wrap keep">
@@ -428,7 +428,7 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
   )
 }
 
-function Remesa({ id, rv, onBack, onOpenWarranty }) {
+function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [d, setD] = useState(null)
@@ -503,13 +503,13 @@ function Remesa({ id, rv, onBack, onOpenWarranty }) {
           <div className="wr-acts">
             <button className="dev-btn" disabled={!items.length} onClick={() => descargar('xlsx', b.id, toast)}><Icon.download /> Excel RMA</button>
             <button className="dev-btn" disabled={!items.length} onClick={() => descargar('zip', b.id, toast)}><Icon.image /> Fotos (ZIP)</button>
-            {borrador && <button className="btn" disabled={ocupado || !items.length} onClick={enviar}><Icon.send /> Registrar envío</button>}
-            {b.status === 'enviada' && <button className="btn" disabled={ocupado} onClick={() => setVentana('recepcion')}><Icon.check /> Registrar recepción</button>}
-            {conRespuesta && <button className="dev-btn" disabled={ocupado} onClick={() => setVentana('editar')}><Icon.pencil /> Envío</button>}
-            {['enviada', 'recibida'].includes(b.status) && <button className="btn ghost zk-anular" disabled={ocupado} onClick={() => setVentana('anular')}>Anular</button>}
-            {conRespuesta && <button className="btn dark" disabled={ocupado} onClick={async () => { if (await confirm({ title: 'Cerrar remesa', message: respondidas < items.length ? `Quedan ${items.length - respondidas} sin respuesta de ZKONG. ¿Cerrar igualmente?` : `¿Cerrar ${b.code}?`, confirmText: 'Cerrar remesa' }) && await accion('close', {}, `${b.code} cerrada`)) cargar() }}><Icon.lock /> Cerrar remesa</button>}
-            {b.status === 'cerrada' && <button className="btn ghost" disabled={ocupado} onClick={async () => { if (await accion('reopen', {}, `${b.code} reabierta`)) cargar() }}><Icon.refresh /> Reabrir</button>}
-            {borrador && <button className="icon-btn" title="Descartar remesa" style={{ color: 'var(--danger)' }} onClick={descartar}><Icon.trash /></button>}
+            {puede && borrador && <button className="btn" disabled={ocupado || !items.length} onClick={enviar}><Icon.send /> Registrar envío</button>}
+            {puede && b.status === 'enviada' && <button className="btn" disabled={ocupado} onClick={() => setVentana('recepcion')}><Icon.check /> Registrar recepción</button>}
+            {puede && conRespuesta && <button className="dev-btn" disabled={ocupado} onClick={() => setVentana('editar')}><Icon.pencil /> Envío</button>}
+            {puede && ['enviada', 'recibida'].includes(b.status) && <button className="btn ghost zk-anular" disabled={ocupado} onClick={() => setVentana('anular')}>Anular</button>}
+            {puede && conRespuesta && <button className="btn dark" disabled={ocupado} onClick={async () => { if (await confirm({ title: 'Cerrar remesa', message: respondidas < items.length ? `Quedan ${items.length - respondidas} sin respuesta de ZKONG. ¿Cerrar igualmente?` : `¿Cerrar ${b.code}?`, confirmText: 'Cerrar remesa' }) && await accion('close', {}, `${b.code} cerrada`)) cargar() }}><Icon.lock /> Cerrar remesa</button>}
+            {puede && b.status === 'cerrada' && <button className="btn ghost" disabled={ocupado} onClick={async () => { if (await accion('reopen', {}, `${b.code} reabierta`)) cargar() }}><Icon.refresh /> Reabrir</button>}
+            {puede && borrador && <button className="icon-btn" title="Descartar remesa" style={{ color: 'var(--danger)' }} onClick={descartar}><Icon.trash /></button>}
           </div>
         </div>
         {b.status === 'anulada' ? (
@@ -540,7 +540,7 @@ function Remesa({ id, rv, onBack, onOpenWarranty }) {
             {Object.entries(porResultado).map(([k, n]) => <Pill key={k} cls={RESULT_CLS[k]}>{rv?.zkong_results?.[k]} · {n}</Pill>)}
           </div>
         )}
-        <textarea className="zk-nota" rows={2} value={nota} onChange={(e) => setNota(e.target.value)} onBlur={guardarNota}
+        <textarea className="zk-nota" rows={2} value={nota} readOnly={!puede} onChange={(e) => setNota(e.target.value)} onBlur={guardarNota}
           placeholder="Notas de la remesa: nº de RMA de ZKONG, contacto, incidencias…" />
       </div>
 
@@ -552,8 +552,8 @@ function Remesa({ id, rv, onBack, onOpenWarranty }) {
           {sel.size > 0 ? (
             <>
               <span className="zk-elegidas"><b>{plural(sel.size, 'elegida', 'elegidas')}</b><button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button></span>
-              {borrador && <button className="dev-btn" disabled={ocupado} onClick={quitar}><Icon.x /> Quitar de la remesa</button>}
-              {conRespuesta && (
+              {puede && borrador && <button className="dev-btn" disabled={ocupado} onClick={quitar}><Icon.x /> Quitar de la remesa</button>}
+              {puede && conRespuesta && (
                 <>
                   <input className="zk-resnota" value={resNota} maxLength={500} onChange={(e) => setResNota(e.target.value)} placeholder="Nota (opcional): nº de abono, motivo del rechazo…" />
                   {Object.entries(rv?.zkong_results || {}).map(([k, l]) => <button key={k} className={`wr-res c-${RESULT_CLS[k]}`} disabled={ocupado} onClick={() => responder(k)}><span>{l}</span></button>)}
@@ -651,10 +651,11 @@ export default function Zkong({ onOpenWarranty }) {
   const [tab, setTab] = useState('bandeja')
   const [remesa, setRemesa] = useState(null)
   const [rv, setRv] = useState(null)
+  const [puede, setPuede] = useState(false)   // warranties.zkong: crear y mover remesas
   const [n, setN] = useState({ bandeja: null, abiertas: null })
   const [reload, setReload] = useState(0)
 
-  useEffect(() => { api.warrantyOptions().then((r) => r.ok && setRv(r.review)) }, [])
+  useEffect(() => { api.warrantyOptions().then((r) => { if (r.ok) { setRv(r.review); setPuede(!!r.perms?.zkong) } }) }, [])
   // Contadores de las pestañas.
   useEffect(() => {
     Promise.all([api.zkongInbox(), api.zkongBatches()]).then(([a, b]) => setN({
@@ -677,9 +678,9 @@ export default function Zkong({ onOpenWarranty }) {
           <button className={tab === 'bandeja' ? 'on' : ''} onClick={() => { setTab('bandeja'); setRemesa(null) }}><Icon.inbox /> Bandeja{n.bandeja ? <em className="zk-n">{n.bandeja}</em> : null}</button>
           <button className={tab === 'remesas' ? 'on' : ''} onClick={() => { setTab('remesas'); setRemesa(null) }}><Icon.list /> Remesas{n.abiertas ? <em className="zk-n">{n.abiertas}</em> : null}</button>
         </div>
-        {tab === 'bandeja' && <Bandeja rv={rv} onOpenWarranty={onOpenWarranty} onBatch={abrirRemesa} />}
+        {tab === 'bandeja' && <Bandeja rv={rv} puede={puede} onOpenWarranty={onOpenWarranty} onBatch={abrirRemesa} />}
         {tab === 'remesas' && (remesa
-          ? <Remesa key={`${remesa}-${reload}`} id={remesa} rv={rv} onBack={() => { setRemesa(null); setReload((x) => x + 1) }} onOpenWarranty={onOpenWarranty} />
+          ? <Remesa key={`${remesa}-${reload}`} id={remesa} rv={rv} puede={puede} onBack={() => { setRemesa(null); setReload((x) => x + 1) }} onOpenWarranty={onOpenWarranty} />
           : <Remesas key={reload} rv={rv} onOpen={setRemesa} onOpenWarranty={onOpenWarranty} />)}
       </div></div>
     </>
