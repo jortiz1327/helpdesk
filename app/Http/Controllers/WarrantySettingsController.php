@@ -7,6 +7,7 @@ use App\Models\WarrantyDocument;
 use App\Models\WarrantyItem;
 use App\Services\WarrantyAlerts;
 use App\Services\WarrantyDocuments;
+use App\Services\WarrantyReplacements;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,7 @@ class WarrantySettingsController extends Controller
             'docs_save'       => $this->docsSave($request),
             'terms_save'      => $this->termsSave($request),
             'finance_save'    => $this->financeSave($request),
+            'replacements_save' => $this->replacementsSave($request),
             default           => $this->get(),
         };
     }
@@ -74,6 +76,8 @@ class WarrantySettingsController extends Controller
             'term_references' => WarrantyTerms::REFERENCES,
             'finance' => WarrantyDocuments::ajuste('finance', WarrantyDocuments::FINANCE_DEFAULTS),
             'finance_groups' => WarrantyDocuments::FINANCE_GROUPS,
+            'replacements' => WarrantyReplacements::settings(),
+            'ticket_categories' => DB::table('ticket_categories')->where('active', true)->orderBy('position')->orderBy('name')->get(['id', 'name']),
             'resolutions' => collect(WarrantyItem::RESOLUTIONS)->except('pendiente')->map(fn ($r) => $r['label']),
         ]);
     }
@@ -124,6 +128,35 @@ class WarrantySettingsController extends Controller
             'replaced' => array_values(array_intersect(array_keys(WarrantyItem::RESOLUTIONS), (array) $request->input('replaced', []))),
             'battery_ref' => $t($request->input('battery_ref'), 40), 'groups' => $grupos]);
         return response()->json(['ok' => true]);
+    }
+
+    /* --- Sustituciones: ticket de posiciones --- */
+
+    private function replacementsSave(Request $request)
+    {
+        $existen = DB::table('warranty_categories')->pluck('name')->mapWithKeys(fn ($n) => [mb_strtolower($n) => $n]);
+        $cats = [];
+        foreach ((array) $request->input('categories', []) as $c) {
+            $nombre = $existen[mb_strtolower(trim((string) $c))] ?? null;
+            if (! $nombre) return $this->error('Esa categoría no existe');
+            $cats[$nombre] = $nombre;
+        }
+        $tc = (int) $request->input('ticket_category_id') ?: null;
+        if ($tc && ! DB::table('ticket_categories')->where('id', $tc)->exists()) return $this->error('Esa categoría de ticket no existe');
+        $asunto = mb_substr(trim((string) $request->input('subject')), 0, 200);
+        if ($asunto === '') return $this->error('Escribe el asunto del ticket');
+        $this->guardar('replacements', ['categories' => array_values($cats), 'ticket_category_id' => $tc, 'subject' => $asunto,
+            'intro' => mb_substr(trim((string) $request->input('intro')), 0, 2000)]);
+        return response()->json(['ok' => true]);
+    }
+
+    /** Una categoría renombrada (o borrada: null) en las que piden el ticket de posiciones. */
+    private function sustitucionesDeCategoria(string $antes, ?string $nuevo): void
+    {
+        $s = WarrantyReplacements::settings();
+        if (! in_array($antes, $s['categories'], true)) return;
+        $s['categories'] = array_values(array_filter(array_map(fn ($c) => $c === $antes ? $nuevo : $c, $s['categories'])));
+        $this->guardar('replacements', $s);
     }
 
     private function guardar(string $key, array $v): void
@@ -212,8 +245,11 @@ class WarrantySettingsController extends Controller
             // Renombrar se lleva las garantías que la tenían.
             if ($antes !== $name) DB::table('warranties')->where('category', $antes)->update(['category' => $name]);
         });
-        // Y sus plazos propios, si tenía.
-        if ($antes !== $name) $this->plazosDeCategoria(fn ($c) => $c['category'] === $antes ? ['category' => $name] + $c : $c);
+        // Y sus plazos propios y el ticket de posiciones, si los tenía.
+        if ($antes !== $name) {
+            $this->plazosDeCategoria(fn ($c) => $c['category'] === $antes ? ['category' => $name] + $c : $c);
+            $this->sustitucionesDeCategoria($antes, $name);
+        }
         return response()->json(['ok' => true, 'id' => $id]);
     }
 
@@ -225,6 +261,7 @@ class WarrantySettingsController extends Controller
         if ($n) return $this->error("Hay {$n} " . ($n === 1 ? 'garantía' : 'garantías') . ' con esta categoría: desactívala en lugar de borrarla');
         DB::table('warranty_categories')->where('id', $c->id)->delete();
         $this->plazosDeCategoria(fn ($x) => $x['category'] === $c->name ? null : $x);
+        $this->sustitucionesDeCategoria($c->name, null);
         return response()->json(['ok' => true]);
     }
 

@@ -1396,7 +1396,7 @@ function Ficha({ id, opts, isSuper, onBack, onEdit, onChanged, onOpenTicket }) {
             </div>
             <div className="wf-tab-body">
               {tab === 'productos' && <Productos w={w} items={d.items} opts={opts} onReload={cargar} onChanged={onChanged} />}
-              {tab === 'documentos' && <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} onEditWarranty={() => onEdit(w)} onChanged={cargar} />}
+              {tab === 'documentos' && <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} onEditWarranty={() => onEdit(w)} onChanged={cargar} onOpenTicket={onOpenTicket} />}
             </div>
           </section>
         </div>

@@ -229,6 +229,138 @@ function Finanzas({ w, summary, onClose }) {
 }
 
 /*
+ * --- Sustituciones: la etiqueta que no se devuelve se cambia por una nueva (la cubramos
+ * nosotros o el cliente). Antigua → posición (su artículo en ZKONG, p. ej. SC-02) → nueva.
+ * En las categorías de Configuración (hoteles) se pregunta si crear el ticket con las
+ * posiciones a nombre del correo del cliente (no se le escribe nada).
+ */
+const COD_OK = { esl: /^[A-Z0-9]{9}$/, ap: /^[0-9A-F]{12}$/ }
+const limpio = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+function Sustituciones({ w, onClose, onChanged, onOpenTicket }) {
+  const toast = useToast()
+  const [r, setR] = useState(null)
+  const [filas, setFilas] = useState([])
+  const [paso, setPaso] = useState('lista')   // 'lista' | 'ticket'
+  const [email, setEmail] = useState('')
+  const [ocupado, setOcupado] = useState('')
+  const cargar = useCallback(() => api.warrantyReplacements(w.id).then((x) => {
+    if (!x.ok) { toast(x.error, 'err'); onClose(); return }
+    setR(x); setEmail(x.email.to || '')
+    setFilas(x.items.map((i) => ({ ...i, position: i.position || '', position_title: i.position_title || '', replaced_by: i.replaced_by || '' })))
+  }), [w.id])
+  useEffect(() => { cargar() }, [cargar])
+  const setF = (id, c) => setFilas((xs) => xs.map((x) => (x.id === id ? { ...x, ...c } : x)))
+  const mala = (f) => f.replaced_by && (!COD_OK[f.kind]?.test(limpio(f.replaced_by)) || limpio(f.replaced_by) === f.code)
+  const cambiado = r && JSON.stringify(filas.map((f) => [f.position, f.position_title, f.replaced_by])) !== JSON.stringify(r.items.map((i) => [i.position || '', i.position_title || '', i.replaced_by || '']))
+  const conNueva = filas.filter((f) => f.replaced_by.trim())
+  const sinPos = filas.filter((f) => f.kind === 'esl' && !f.position.trim()).length
+  const emailOk = EMAIL_OK.test(email.trim())
+
+  const buscar = async () => {
+    setOcupado('buscar')
+    const x = await api.warrantyDocsDo('replacements_lookup', { id: w.id })
+    setOcupado('')
+    if (!x.ok) { toast(x.error, 'err'); return }
+    const fallo = x.failed?.length ? ` (sin respuesta de ${x.failed.join(', ')})` : ''
+    toast(x.found ? `${x.found} ${x.found === 1 ? 'posición encontrada' : 'posiciones encontradas'}${x.missing ? `; ${x.missing} sin artículo vinculado` : ''}${fallo}` : `ZKONG no da posición para estas etiquetas${fallo}`, x.found ? 'ok' : 'warn')
+    // Lo que se estaba escribiendo se respeta: solo se rellenan las posiciones vacías.
+    const y = await api.warrantyReplacements(w.id)
+    if (y.ok) { setR(y); setFilas((xs) => xs.map((f) => { const n = y.items.find((i) => i.id === f.id); return f.position || !n?.position ? f : { ...f, position: n.position, position_title: n.position_title || '' } })) }
+  }
+
+  const guardar = async () => {
+    setOcupado('guardar')
+    const x = await api.warrantyDocsDo('replacements_save', { id: w.id, items: filas.map((f) => ({ id: f.id, position: f.position, position_title: f.position_title, replaced_by: limpio(f.replaced_by) })) })
+    setOcupado('')
+    if (!x.ok) { toast(x.error, 'err'); return }
+    toast('Sustituciones guardadas')
+    onChanged?.()
+    await cargar()
+    // En hoteles (Configuración) se pregunta si crear el ticket de posiciones.
+    if (r.asks_ticket && !r.positions_ticket && conNueva.length) setPaso('ticket')
+  }
+
+  const crearTicket = async () => {
+    setOcupado('ticket')
+    const x = await api.warrantyDocsDo('replacements_ticket', { id: w.id, email: email.trim() })
+    setOcupado('')
+    if (!x.ok) { toast(x.error, 'err'); return }
+    toast(`Ticket ${x.code} creado`)
+    onChanged?.()
+    await cargar()
+    setPaso('lista')
+  }
+
+  if (r && paso === 'ticket') {
+    return (
+      <Modal title="¿Crear el ticket de posiciones?" onClose={onClose} foot={<>
+        <button className="btn ghost" onClick={() => setPaso('lista')}>Ahora no</button>
+        <button className="btn" disabled={!emailOk || ocupado === 'ticket'} onClick={crearTicket}><Icon.plus /> {ocupado === 'ticket' ? 'Creando…' : 'Crear ticket'}</button>
+      </>}>
+        <p className="wd-tip">Es {r.category ? <>de <b>{r.category}</b></> : 'de una categoría'} con posiciones: un ticket a nombre del cliente con las etiquetas nuevas y dónde va cada una, para vincularlas. <b>No se le escribe nada</b>: el ticket queda en el Helpdesk.</p>
+        <div className="wd-mail-row">
+          <span>Cliente</span>
+          <input type="email" list="wd-sus-sug" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@cliente.com" className={email && !emailOk ? 'bad' : ''} autoFocus />
+          <datalist id="wd-sus-sug">{r.email.suggestions.map((s) => <option key={s.email} value={s.email}>{s.label}</option>)}</datalist>
+        </div>
+        {r.email.suggestions.length ? <div className="wd-sug">{r.email.suggestions.filter((s) => s.email !== email.trim().toLowerCase()).map((s) => (
+          <button key={s.email} type="button" onClick={() => setEmail(s.email)} title={s.label}>{s.email} <small>{s.label}</small></button>
+        ))}</div> : null}
+        <table className="dev-table wd-sus-prev">
+          <thead><tr><th>Posición</th><th>Antigua</th><th>Nueva</th></tr></thead>
+          <tbody>{r.items.filter((i) => i.replaced_by).map((i) => (
+            <tr key={i.id}><td>{i.position || '—'}{i.position_title ? <small> {i.position_title}</small> : null}</td><td className="mono">{i.code}</td><td className="mono"><b>{i.replaced_by}</b></td></tr>
+          ))}</tbody>
+        </table>
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal wide title="Sustituciones" onClose={onClose} foot={<>
+      {r?.asks_ticket && !r.positions_ticket && !cambiado && conNueva.length ? <button className="dev-btn" onClick={() => setPaso('ticket')}><Icon.plus /> Ticket de posiciones</button> : null}
+      <span className="spacer" />
+      <button className="btn ghost" onClick={onClose}>{cambiado ? 'Cancelar' : 'Cerrar'}</button>
+      <button className="btn" disabled={!cambiado || filas.some(mala) || ocupado === 'guardar'} onClick={guardar}><Icon.save /> {ocupado === 'guardar' ? 'Guardando…' : 'Guardar'}</button>
+    </>}>
+      {!r ? <div className="center-load"><div className="spinner" /></div> : !filas.length ? (
+        <p className="wd-tip">Ningún dispositivo se sustituye: las soluciones que lo hacen se eligen en Configuración → Texto para Finanzas.</p>
+      ) : (
+        <>
+          <p className="dev-mute wd-tip">Las que no se devuelven y se cambian por nuevas. La posición es el artículo al que estaba vinculada en ZKONG: el cliente vincula ahí la nueva.</p>
+          {r.positions_ticket ? (
+            <p className="wd-ok"><Icon.check /> Ticket de posiciones {r.positions_ticket.visible && onOpenTicket
+              ? <button className="wr-tklink mono" onClick={() => { onClose(); onOpenTicket(r.positions_ticket.id) }}>{r.positions_ticket.code}</button>
+              : <b className="mono">{r.positions_ticket.code}</b>} creado.</p>
+          ) : null}
+          <div className="wd-sus-bar">
+            <button className="dev-btn" disabled={!sinPos || ocupado === 'buscar'} onClick={buscar} title={sinPos ? 'Pregunta a ZKONG a qué artículo está vinculada cada etiqueta sin posición' : 'Todas tienen posición'}><Icon.zkong /> {ocupado === 'buscar' ? 'Buscando…' : 'Buscar posiciones en ZKONG'}</button>
+            <span className="dev-mute">{conNueva.length} de {filas.length} con etiqueta nueva</span>
+          </div>
+          <div className="dev-table-wrap keep">
+            <table className="dev-table wd-sus">
+              <thead><tr><th>Antigua</th><th>Posición</th><th>Descripción</th><th>Nueva</th></tr></thead>
+              <tbody>
+                {filas.map((f) => (
+                  <tr key={f.id}>
+                    <td><span className="mono">{f.code}</span><small>{f.product || (f.kind === 'ap' ? 'Antena' : 'Etiqueta')}</small></td>
+                    <td><input value={f.position} maxLength={80} placeholder={f.kind === 'ap' ? '—' : 'SC-02'} onChange={(e) => setF(f.id, { position: e.target.value })} /></td>
+                    <td><input value={f.position_title} maxLength={191} placeholder="Opcional" onChange={(e) => setF(f.id, { position_title: e.target.value })} /></td>
+                    <td><input className={`mono${mala(f) ? ' bad' : ''}`} value={f.replaced_by} maxLength={17} placeholder={f.kind === 'ap' ? 'MAC nueva' : 'Etiqueta nueva'}
+                      onChange={(e) => setF(f.id, { replaced_by: e.target.value })} onBlur={(e) => setF(f.id, { replaced_by: limpio(e.target.value) })}
+                      title={mala(f) ? (limpio(f.replaced_by) === f.code ? 'Es la misma' : f.kind === 'ap' ? 'Una MAC de 12 caracteres' : 'Un código de 9 caracteres') : ''} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Modal>
+  )
+}
+
+/*
  * --- Pegatina del paquete (la de la app antigua, 105 × 74 mm): se retoca aquí y sale en
  * PDF, suelta o en las posiciones libres de una hoja A4 de 8 (lo que antes se hacía en Publisher).
  */
@@ -380,17 +512,17 @@ function Portal({ w, onEditWarranty }) {
   )
 }
 
-export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty, onChanged }) {
+export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty, onChanged, onOpenTicket }) {
   const toast = useToast()
   const [d, setD] = useState(null)
-  const [modal, setModal] = useState(null)   // 'preparar' | 'finanzas' | 'pegatina' | 'informe' | 'correo'
+  const [modal, setModal] = useState(null)   // 'preparar' | 'finanzas' | 'sustituciones' | 'pegatina' | 'informe' | 'correo'
   const cargar = useCallback(() => api.warrantyDocs(w.id).then((r) => setD(r.ok ? r : { error: r.error })), [w.id])
   useEffect(() => { cargar() }, [cargar])
 
   if (!d || !opts) return <div className="center-load"><div className="spinner" /></div>
   if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
 
-  const { summary, report } = d
+  const { summary, report, replacements: sus } = d
   const revisados = summary.total - summary.pending
   const cerrar = () => setModal(null)
   const editar = onEditWarranty ? () => { cerrar(); onEditWarranty() } : null
@@ -410,6 +542,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
       <div className="wd-acts">
         <button className="btn sm" disabled={!revisados} title={revisados ? '' : 'Revisa los dispositivos primero'} onClick={() => setModal('preparar')}><Icon.doc /> Preparar presupuestos para el portal</button>
         <button className="dev-btn" disabled={!revisados} title={revisados ? 'Los presupuestos que hay que crear, para avisar a Finanzas' : 'Revisa los dispositivos primero'} onClick={() => setModal('finanzas')}><Icon.copy /> Texto para Finanzas</button>
+        {sus?.total ? <button className="dev-btn" title="Etiqueta antigua → posición → etiqueta nueva" onClick={() => setModal('sustituciones')}><Icon.swap /> Sustituciones <b className={`wd-cnt${sus.done < sus.total ? ' pend' : ''}`}>{sus.done}/{sus.total}</b></button> : null}
         <span className="spacer" />
         <button className="dev-btn" title="La pegatina para el paquete, en PDF para imprimir" onClick={() => setModal('pegatina')}><Icon.print /> Pegatina del paquete</button>
         <button className="dev-btn" disabled={!summary.total} title={summary.pending ? 'Se genera con todo revisado' : ''} onClick={() => setModal('informe')}><Icon.file /> {report ? 'Informe de resolución' : 'Generar informe'}</button>
@@ -420,6 +553,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
       <Portal w={w} onEditWarranty={editar} />
 
       {modal === 'preparar' && <Preparar w={w} onClose={cerrar} onEditWarranty={editar} />}
+      {modal === 'sustituciones' && <Sustituciones w={w} onClose={cerrar} onChanged={() => { cargar(); onChanged?.() }} onOpenTicket={onOpenTicket} />}
       {modal === 'pegatina' && <Pegatina w={w} onClose={cerrar} />}
       {modal === 'finanzas' && <Finanzas w={w} summary={summary} onClose={cerrar} />}
       {modal === 'informe' && <Informe w={w} summary={summary} actual={report} onClose={cerrar} onDone={() => { cerrar(); cargar() }} />}

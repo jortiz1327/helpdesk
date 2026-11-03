@@ -408,6 +408,39 @@ function Documentos({ docs, grupos, hacer }) {
   )
 }
 
+/* Sustituciones: en qué categorías se ofrece el ticket de posiciones y cómo sale. */
+function Sustituciones({ cfg, categorias, ticketCats, hacer }) {
+  const [v, setV] = useState(cfg)
+  useEffect(() => setV(cfg), [cfg])
+  const set = (c) => setV((x) => ({ ...x, ...c }))
+  const cambiado = JSON.stringify(v) !== JSON.stringify(cfg)
+  return (
+    <Card title="Sustituciones" sub="Cuando una etiqueta no se devuelve y se cambia por una nueva (las soluciones de Texto para Finanzas), se apunta su posición (el artículo vinculado en ZKONG) y la nueva. En estas categorías se pregunta si crear un ticket con las posiciones a nombre del cliente."
+      foot={(
+        <div className="ws-foot">
+          <span className="dev-mute">El ticket no le escribe nada al cliente: queda en el Helpdesk para vincularlas.</span>
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(cfg)}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado || !v.subject.trim()} onClick={() => hacer('replacements_save', v, 'Sustituciones guardadas')}><Icon.save /> Guardar</button>
+        </div>
+      )}>
+      <div className="ws-body">
+        <div className="ws-sus">
+          <div className="field"><span className="lbl">Preguntar por el ticket en</span>
+            <Select block multiple value={v.categories} placeholder="Ninguna categoría" onChange={(x) => set({ categories: x })}
+              options={categorias.map((c) => ({ value: c.name, label: c.name }))} /></div>
+          <div className="field"><span className="lbl">Categoría del ticket</span>
+            <Select block value={v.ticket_category_id ?? ''} onChange={(x) => set({ ticket_category_id: x ? Number(x) : null })}
+              options={[{ value: '', label: 'Sin categoría (la ponen las reglas)' }, ...ticketCats.map((c) => ({ value: c.id, label: c.name }))]} /></div>
+        </div>
+        <div className="field"><span className="lbl">Asunto</span><input value={v.subject} maxLength={200} onChange={(e) => set({ subject: e.target.value })} /></div>
+        <div className="field"><span className="lbl">Texto antes de la tabla</span><textarea rows={3} maxLength={2000} value={v.intro} onChange={(e) => set({ intro: e.target.value })} /></div>
+        <div className="ws-vars">{[['{codigo}', 'Nº de garantía'], ['{cliente}', 'Cliente'], ['{proyecto}', 'Hotel o tienda'], ['{n}', 'Etiquetas nuevas'], ['{agente}', 'Quien lo crea']].map(([k, l]) => <span key={k} title={l}><code>{k}</code> {l}</span>)}</div>
+        <p className="dev-mute">Debajo va la tabla <b>Posición · Etiqueta antigua · Etiqueta nueva</b>.</p>
+      </div>
+    </Card>
+  )
+}
+
 const SECCIONES = [
   ['Cómo avanza una garantía', [
     ['estados', 'Estados', Icon.list, (d) => d.statuses.filter((s) => s.active).length],
@@ -420,6 +453,7 @@ const SECCIONES = [
     ['plazos', 'Plazos de garantía', Icon.clock, null],
     ['documentos', 'Documentos y correo', Icon.file, null],
     ['finanzas', 'Texto para Finanzas', Icon.copy, null],
+    ['sustituciones', 'Sustituciones', Icon.swap, null],
   ]],
 ]
 const MEMO = 'warranty_settings.section'
@@ -448,7 +482,7 @@ export default function WarrantySettings() {
       <header className="page-head">
         <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Configuración</h1></div>
-        <span className="sub">· Estados, categorías, urgencias, alertas, plantillas, plazos, documentos y texto para Finanzas de Gestión de garantías</span>
+        <span className="sub">· Estados, categorías, urgencias, alertas, plantillas, plazos, documentos, texto para Finanzas y sustituciones de Gestión de garantías</span>
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
         {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
@@ -477,6 +511,7 @@ export default function WarrantySettings() {
               {sec === 'plantillas' && <Plantillas list={d.templates} hacer={hacer} />}
               {sec === 'plazos' && <Plazos terms={d.terms} refs={d.term_references} categorias={d.categories} hacer={hacer} />}
               {sec === 'documentos' && <Documentos docs={d.docs} grupos={d.block_groups} hacer={hacer} />}
+              {sec === 'sustituciones' && <Sustituciones cfg={d.replacements} categorias={d.categories} ticketCats={d.ticket_categories} hacer={hacer} />}
               {sec === 'finanzas' && <Finanzas finance={d.finance} grupos={d.finance_groups} soluciones={d.resolutions} hacer={hacer} />}
             </div>
           </div>

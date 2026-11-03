@@ -10,6 +10,8 @@ use App\Services\PortalDocCheck;
 use App\Services\TicketLockService;
 use App\Services\TicketReplyService;
 use App\Services\WarrantyDocuments;
+use App\Services\WarrantyLabels;
+use App\Services\WarrantyReplacements;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,6 +36,10 @@ class WarrantyDocumentsController extends Controller
             'finance'       => $this->finance($request),
             'sticker_data'  => $this->stickerData($request),
             'sticker'       => $this->sticker($request),
+            'replacements'        => $this->replacements($request),
+            'replacements_lookup' => $this->replacementsLookup($request),
+            'replacements_save'   => $this->replacementsSave($request),
+            'replacements_ticket' => $this->replacementsTicket($request),
             default         => $this->list($request),
         };
     }
@@ -82,7 +88,9 @@ class WarrantyDocumentsController extends Controller
     {
         $w = Warranty::findOrFail((int) $request->query('id'));
         $informe = WarrantyDocument::where('warranty_id', $w->id)->where('kind', 'informe')->latest('id')->first();
+        $sust = WarrantyReplacements::items($w);
         return response()->json(['ok' => true, 'summary' => WarrantyDocuments::summary($w),
+            'replacements' => ['total' => $sust->count(), 'done' => $sust->filter(fn ($i) => $i->replaced_by)->count(), 'ticket' => (bool) $w->positions_ticket_id],
             'report' => $informe ? ['id' => $informe->id, 'number' => $informe->number, 'note' => $informe->note,
                 'updated_at' => $informe->updated_at?->toDateTimeString()] : null]);
     }
@@ -142,7 +150,19 @@ class WarrantyDocumentsController extends Controller
     {
         $w = Warranty::findOrFail((int) $request->query('id'));
         $me = $request->user();
-        // Lo que sale del ticket (correo del contacto, canal) solo si lo ve en el Helpdesk.
+        $motivo = $this->puedeEnviar($w, $me);
+        return response()->json(['ok' => true] + $this->correosCliente($w, $me)
+            + ['can_send' => $motivo === null, 'cannot_send' => $motivo]
+            + WarrantyDocuments::resolutionEmail($w, $me->name));
+    }
+
+    /**
+     * El correo del cliente: el usado antes en la garantía o el del contacto del ticket
+     * (lo del ticket solo si quien pregunta lo ve en el Helpdesk), y los que se pueden
+     * sugerir (también los del cliente en el portal AEME).
+     */
+    private function correosCliente(Warranty $w, $me): array
+    {
         $t = $w->ticketVisibleTo($me) ? DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
             ->where('t.id', $w->ticket_id)->first(['t.code', 't.channel', 'c.email as contact_email']) : null;
 
@@ -151,12 +171,74 @@ class WarrantyDocumentsController extends Controller
         if ($t?->contact_email) $sugerencias[mb_strtolower($t->contact_email)] ??= 'Contacto del ticket';
         foreach ($this->correosPortal($w) as $email => $nombre) $sugerencias[$email] ??= "Portal AEME · {$nombre}";
 
-        $motivo = $this->puedeEnviar($w, $me);
-        return response()->json(['ok' => true, 'to' => $w->customer_email ?: ($t->contact_email ?? null),
-            'suggestions' => collect($sugerencias)->map(fn ($l, $e) => ['email' => $e, 'label' => $l])->values(),
-            'ticket' => $t ? ['code' => $t->code, 'channel' => $t->channel] : null,
-            'can_send' => $motivo === null, 'cannot_send' => $motivo]
-            + WarrantyDocuments::resolutionEmail($w, $me->name));
+        return ['to' => $w->customer_email ?: ($t->contact_email ?? null),
+            'suggestions' => collect($sugerencias)->map(fn ($l, $e) => ['email' => $e, 'label' => $l])->values()->all(),
+            'ticket' => $t ? ['code' => $t->code, 'channel' => $t->channel] : null];
+    }
+
+    /**
+     * Sustituciones: las etiquetas que no se devuelven, su posición (artículo en ZKONG) y la
+     * nueva; si la categoría lo pide, se ofrece el ticket de posiciones al correo del cliente.
+     */
+    private function replacements(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->query('id'));
+        $items = WarrantyReplacements::items($w)->map(fn ($i) => ['id' => $i->id, 'code' => $i->code, 'kind' => $i->kind,
+            'product' => $i->aeme_ref ?: $i->product_name, 'resolution' => $i->resolution, 'coverage' => $i->coverage,
+            'position' => $i->position, 'position_title' => $i->position_title, 'replaced_by' => $i->replaced_by])->values();
+        $t = $w->positions_ticket_id ? DB::table('tickets')->where('id', $w->positions_ticket_id)->first(['id', 'code']) : null;
+        $me = $request->user();
+        return response()->json(['ok' => true, 'items' => $items, 'asks_ticket' => WarrantyReplacements::asksTicket($w),
+            'category' => $w->category, 'positions_ticket' => $t ? ['id' => $t->id, 'code' => $t->code, 'visible' => Warranty::canSeeTicket($me, $t->id)] : null,
+            'email' => $this->correosCliente($w, $me)]);
+    }
+
+    private function replacementsLookup(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        return response()->json(['ok' => true] + WarrantyReplacements::lookup($w, $request->user()->id));
+    }
+
+    // Lo que apunta el agente: posición y etiqueta nueva de cada una (la nueva, código válido).
+    private function replacementsSave(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        $propias = WarrantyReplacements::items($w)->keyBy('id');
+        $filas = (array) $request->input('items', []);
+        $nuevas = [];
+        foreach ($filas as $f) {
+            $i = $propias[(int) ($f['id'] ?? 0)] ?? null;
+            if (! $i) return response()->json(['ok' => false, 'error' => 'Un dispositivo no es de esta garantía o ya no se sustituye'], 400);
+            $nueva = trim((string) ($f['replaced_by'] ?? ''));
+            if ($nueva !== '') {
+                [$ok] = WarrantyLabels::parse([$nueva]);
+                if (! $ok || WarrantyLabels::kindOf($ok[0]) !== $i->kind) {
+                    return response()->json(['ok' => false, 'error' => "«{$nueva}» no es un código de " . ($i->kind === 'ap' ? 'antena (MAC de 12)' : 'etiqueta (9 caracteres)')], 400);
+                }
+                if ($ok[0] === $i->code) return response()->json(['ok' => false, 'error' => "La nueva de {$i->code} no puede ser la misma"], 400);
+                if (in_array($ok[0], $nuevas, true)) return response()->json(['ok' => false, 'error' => "{$ok[0]} está puesta dos veces"], 400);
+                $nuevas[] = $nueva = $ok[0];
+            }
+            $i->fill(['replaced_by' => $nueva ?: null,
+                'position' => mb_substr(trim((string) ($f['position'] ?? '')), 0, 80) ?: null,
+                'position_title' => mb_substr(trim((string) ($f['position_title'] ?? '')), 0, 191) ?: null]);
+        }
+        $cambios = 0;
+        DB::transaction(function () use ($propias, &$cambios) {
+            foreach ($propias as $i) if ($i->isDirty()) { $i->save(); $cambios++; }
+        });
+        if ($cambios) WarrantyDocuments::evento($w->id, $request->user()->id, 'Sustituciones: ' . ($propias->filter(fn ($i) => $i->replaced_by)
+            ->map(fn ($i) => ($i->position ? "{$i->position} " : '') . "{$i->code} → {$i->replaced_by}")->implode(', ') ?: 'sin etiquetas nuevas'));
+        return response()->json(['ok' => true, 'changed' => $cambios]);
+    }
+
+    private function replacementsTicket(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        $email = trim((string) $request->input('email'));
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) return response()->json(['ok' => false, 'error' => 'El correo del cliente no es válido'], 400);
+        $r = WarrantyReplacements::createTicket($w, $email, $request->user());
+        return is_string($r) ? response()->json(['ok' => false, 'error' => $r], 400) : response()->json(['ok' => true] + $r);
     }
 
     /** Por qué este usuario no puede enviar el correo desde el ticket, o null si puede. */

@@ -441,6 +441,8 @@ export const api = {
   warrantyResolutionEmail: (id) => req(`warranty_docs.php?action=email&id=${id}`),
   warrantyFinanceText: (id) => req(`warranty_docs.php?action=finance&id=${id}`),
   // Pegatina del paquete: lo que se propone y el PDF con lo retocado ({ ok, blob }).
+  // Sustituciones: etiqueta antigua → posición → nueva (guardar y ticket con warrantyDocsDo).
+  warrantyReplacements: (id) => req(`warranty_docs.php?action=replacements&id=${id}`),
   warrantyStickerData: (id) => req(`warranty_docs.php?action=sticker_data&id=${id}`),
   warrantySticker: async (payload) => {
     try {
