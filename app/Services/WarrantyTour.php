@@ -29,7 +29,7 @@ class WarrantyTour
         ['id' => 'dispositivos', 'title' => 'Centro de dispositivos', 'text' => 'Busca cualquier etiqueta o antena en los servidores ZKONG: dónde está, cómo está y en qué garantías ha estado.'],
         ['id' => 'catalogo', 'title' => 'Catálogo', 'text' => 'Los modelos de etiqueta, sus pilas y las referencias ZKONG ↔ AEME.'],
         ['id' => 'config', 'title' => 'Configuración', 'text' => 'Estados, categorías, alertas, pasos, plazos, los textos de los documentos y los de este tour.'],
-        ['id' => 'fin', 'title' => 'Eso es todo', 'text' => 'Puedes repetir el tour cuando quieras desde «Tour guiado», en el menú.'],
+        ['id' => 'fin', 'title' => 'Eso es todo', 'text' => 'Puedes repetir el tour cuando quieras desde «Tour guiado», en el menú. Cada apartado está explicado con más detalle en el «Centro de ayuda».'],
     ];
 
     /** Los pasos con lo cambiado en Configuración: [{id, title, text, active}]. */

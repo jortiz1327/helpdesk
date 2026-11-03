@@ -315,7 +315,10 @@ class WarrantiesController extends Controller
             WarrantyTour::markSeen($uid);
             return response()->json(['ok' => true]);
         }
-        $pasos = array_values(array_filter(WarrantyTour::settings(), fn ($s) => $s['active']));
+        // Cada paso, con el artículo del Centro de ayuda que lo explica («Más información»).
+        $ayuda = \App\Services\WarrantyHelp::forTour();
+        $pasos = array_values(array_map(fn ($s) => $s + ['article' => $ayuda[$s['id']] ?? null],
+            array_filter(WarrantyTour::settings(), fn ($s) => $s['active'])));
         return response()->json(['ok' => true, 'steps' => $pasos, 'seen' => WarrantyTour::seen($uid)]);
     }
 

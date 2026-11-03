@@ -66,8 +66,9 @@ export function TourOffer({ onStart }) {
   )
 }
 
-/** El tour. can(perm) · onGo(view, {lista, ficha}) cambia de pantalla · onClose al terminar. */
-export default function WarrantyTour({ can, onGo, onClose }) {
+/** El tour. can(perm) · onGo(view, {lista, ficha}) cambia de pantalla · onClose al terminar
+ *  · onHelp(clave) sale del tour y abre ese artículo del Centro de ayuda. */
+export default function WarrantyTour({ can, onGo, onClose, onHelp }) {
   const [pasos, setPasos] = useState(null)
   const [i, setI] = useState(0)
   const [rect, setRect] = useState(null)       // lo resaltado, en pantalla; null: centrado
@@ -193,6 +194,7 @@ export default function WarrantyTour({ can, onGo, onClose }) {
         </div>
         <h3>{p.title}</h3>
         <p>{p.text}</p>
+        {p.article && onHelp ? <button className="tour-mas" onClick={() => { marcarVisto(); onHelp(p.article) }}>Más información <Icon.arrowRight /></button> : null}
         <div className="tour-f">
           <button className="tour-prev" disabled={i === 0} onClick={() => ir(i - 1)}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> Anterior</button>
           <span className="spacer" />

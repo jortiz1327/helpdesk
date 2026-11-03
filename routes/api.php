@@ -244,6 +244,9 @@ Route::middleware('token')->group(function () {
         ->middleware('can:warranties.access');
     Route::get('warranty_guide.php', [\App\Http\Controllers\WarrantyGuidesController::class, 'file'])
         ->middleware('can:warranties.access');
+    // Centro de ayuda de garantías (cambiar artículos: warranties.config).
+    Route::match(['get', 'post'], 'warranty_help.php', [\App\Http\Controllers\WarrantyHelpController::class, 'handle'])
+        ->middleware('can:warranties.access');
     // ZKONG: bandeja de dispositivos para enviar y remesas de RMA (Excel y fotos).
     Route::match(['get', 'post'], 'zkong_rma.php', [\App\Http\Controllers\ZkongRmaController::class, 'handle'])
         ->middleware('can:warranties.access');

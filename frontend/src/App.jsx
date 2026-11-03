@@ -33,6 +33,7 @@ import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import CampaignEmailSettings from "./components/CampaignEmailSettings.jsx";
 import Manuals from "./components/Manuals.jsx";
 import WarrantyGuides from "./components/WarrantyGuides.jsx";
+import WarrantyHelpCenter from "./components/WarrantyHelpCenter.jsx";
 import WarrantyTour, { TourOffer } from "./components/WarrantyTour.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
@@ -790,6 +791,15 @@ const HELP_GROUP = {
             color: "#8696a0",
         },
         {
+            // Artículos de ayuda de Gestión de garantías (solo en esa área).
+            key: "garantias_ayuda",
+            label: "Centro de ayuda",
+            icon: Icon.info,
+            perm: "warranties.access",
+            hideInAreas: ["helpdesk", "campaigns"],
+            color: "#0891b2",
+        },
+        {
             // No es una pantalla: arranca el tour de Gestión de garantías (solo en esa área).
             key: "tour",
             label: "Tour guiado",
@@ -978,6 +988,7 @@ export default function App() {
     );
     const [railTip, setRailTip] = useState(null); // tooltip fijo del rail colapsado: { label, top, left, color }
     const [tour, setTour] = useState(false);      // tour guiado de garantías en marcha
+    const [ayudaArticulo, setAyudaArticulo] = useState(null);   // artículo a abrir en el Centro de ayuda
     const [theme, setTheme] = useState(
         () => localStorage.getItem("theme") || "light",
     );
@@ -1628,6 +1639,7 @@ export default function App() {
                         <WarrantyTour
                             can={can}
                             onClose={() => setTour(false)}
+                            onHelp={(k) => { setTour(false); setAyudaArticulo(k); setView("garantias_ayuda"); }}
                             onGo={(v, { lista, ficha }) => {
                                 if (ficha) setGarantiaAbierta(ficha);
                                 else if (lista) setGarantiaFiltro({ chip: "open" });
@@ -1693,6 +1705,9 @@ export default function App() {
                         )}
                         {view === "warranty_settings" && can("warranties.config") && <WarrantySettings />}
                         {view === "garantias_guias" && can("warranties.access") && <WarrantyGuides />}
+                        {view === "garantias_ayuda" && can("warranties.access") && (
+                            <WarrantyHelpCenter articulo={ayudaArticulo} onOpened={() => setAyudaArticulo(null)} />
+                        )}
                         {view === "device_catalog" && can("warranties.access") && <DeviceCatalog />}
                         {view === "garantias_equipo" && can("warranties.access") && (
                             <WarrantyTeam onFilter={(f) => { setGarantiaFiltro({ ...f }); setView("garantias"); }} />
