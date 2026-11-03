@@ -129,6 +129,9 @@ export const portal = {
     files.forEach((f) => fd.append('files[]', f))
     return call('warranty-reply', { method: 'POST', form: fd })
   },
+  // Buscador de direcciones (lo pide el servidor a Google o a OpenStreetMap).
+  addressSearch: (q, lang, session) => call('address-search', { query: { q, lang, session } }),
+  addressPlace: (id, lang, session) => call('address-place', { query: { id, lang, session } }),
   // Pegatina («sticker») o informe («report») en PDF. Devuelve { ok, blob }.
   warrantyPdf: async (code, doc) => {
     const headers = {}

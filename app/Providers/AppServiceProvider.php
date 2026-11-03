@@ -3,7 +3,10 @@
 namespace App\Providers;
 
 use App\Models\User;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -46,5 +49,18 @@ class AppServiceProvider extends ServiceProvider
          */
         Gate::define('inbox.access', fn (User $u) => $u->can('campaigns.access') || $u->can('helpdesk.access'));
         Gate::define('inbox.reply',  fn (User $u) => $u->can('campaigns.access') || $u->can('tickets.reply'));
+
+        /*
+         * Freno del PORTAL público por IP: 30/min, que es lo que protege el pedido de código
+         * (manda correos). Las fotos de una garantía (una llamada cada una: 10 etiquetas son
+         * 30) y el buscador de direcciones (una por pausa al escribir) van con pase y llevan
+         * su propio cupo, así que tienen un margen aparte para no tumbar el resto.
+         */
+        RateLimiter::for('portal', function (Request $r) {
+            $action = (string) $r->query('action');
+            if ($action === 'warranty-photo') return Limit::perMinute(300)->by('pf|' . $r->ip());
+            if (str_starts_with($action, 'address-')) return Limit::perMinute(120)->by('pd|' . $r->ip());
+            return Limit::perMinute(30)->by('p|' . $r->ip());
+        });
     }
 }

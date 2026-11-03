@@ -27,6 +27,7 @@ const G = {
   doc: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 3v5h5M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M8 13h8M8 17h5" /></svg>,
   warn: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l10 18H2z" /><path d="M12 10v5M12 18v.5" /></svg>,
   box: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7l9-4 9 4v10l-9 4-9-4z" /><path d="M3 7l9 4 9-4M12 11v10" /></svg>,
+  pin: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>,
   chev: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>,
   // Lo que le pasa a un dispositivo (en el desplegable).
   no_enciende: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v8M7.5 6.5a7 7 0 1 0 9 0" /></svg>,
@@ -458,6 +459,94 @@ function FotoSlot({ tipo, kind, foto, onPick, onRemove }) {
   )
 }
 
+/*
+ * Buscador de direcciones como el de los mapas: escribe calle, hotel o tienda y elige una
+ * sugerencia; rellena la dirección (que sigue editable para piso, puerta…). Si no sale o
+ * se pasa del cupo, se escribe a mano. Una «sesión» por búsqueda (Google la cobra así).
+ */
+function BuscarDireccion({ onPick }) {
+  const { t, lang } = useLang()
+  const [q, setQ] = useState('')
+  const [res, setRes] = useState(null)      // null | [] | [{id, main, secondary, address?}]
+  const [act, setAct] = useState(0)
+  const [abierto, setAbierto] = useState(false)
+  const [cargando, setCargando] = useState(false)
+  const [msg, setMsg] = useState('')
+  const sesion = useRef('')
+  const caja = useRef(null)
+  const ultima = useRef(0)
+
+  useEffect(() => {
+    const txt = q.trim()
+    if (txt.length < 3) { setRes(null); setCargando(false); return }
+    if (!sesion.current) sesion.current = crypto.randomUUID?.() || String(Math.random()).slice(2)
+    const n = ++ultima.current
+    setCargando(true)
+    const h = setTimeout(async () => {
+      const r = await portal.addressSearch(txt, lang, sesion.current)
+      if (n !== ultima.current) return
+      setCargando(false)
+      if (!r.ok) { setRes(null); setMsg(r.error || t('g_addr_fail')); return }
+      setMsg(''); setRes(r.results || []); setAct(0); setAbierto(true)
+    }, 300)
+    return () => clearTimeout(h)
+  }, [q, lang])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e) => { if (!caja.current?.contains(e.target)) setAbierto(false) }
+    document.addEventListener('pointerdown', fuera)
+    return () => document.removeEventListener('pointerdown', fuera)
+  }, [abierto])
+
+  const elegir = async (s) => {
+    setAbierto(false)
+    let dir = s.address
+    if (!dir) {
+      setCargando(true)
+      const r = await portal.addressPlace(s.id, lang, sesion.current)
+      setCargando(false)
+      dir = r.ok ? r.address : [s.main, s.secondary].filter(Boolean).join('\n')
+    }
+    sesion.current = ''
+    setQ(''); setRes(null)
+    onPick(dir)
+  }
+
+  const tecla = (e) => {
+    if (!abierto || !res?.length) { if (e.key === 'ArrowDown' && res?.length) { e.preventDefault(); setAbierto(true) } return }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setAct((a) => (a + 1) % res.length) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setAct((a) => (a - 1 + res.length) % res.length) }
+    else if (e.key === 'Enter') { e.preventDefault(); elegir(res[act]) }
+    else if (e.key === 'Escape') { e.preventDefault(); setAbierto(false) }
+  }
+
+  const lista = abierto && res
+  return (
+    <div className={`gw-dir ${lista ? 'on' : ''}`} ref={caja}>
+      <label className="gw-search gw-dir-q">{I.mag}
+        <input value={q} onChange={(e) => { setQ(e.target.value); setMsg('') }} onKeyDown={tecla} onFocus={() => res && setAbierto(true)}
+          placeholder={t('g_addr_search_ph')} autoComplete="off" role="combobox" aria-expanded={!!lista} aria-autocomplete="list"
+          aria-label={t('g_addr_search_ph')} />
+        {cargando && <span className="gw-dir-spin" aria-hidden="true" />}
+      </label>
+      {lista && (
+        <ul className="gw-dd-l gw-dir-l" role="listbox">
+          {res.length === 0 && <li className="gw-dir-nada">{t('g_addr_none')}</li>}
+          {res.map((s, i) => (
+            <li key={s.id + i} role="option" aria-selected={i === act} className={i === act ? 'act' : ''}
+              onPointerEnter={() => setAct(i)} onPointerDown={(e) => e.preventDefault()} onClick={() => elegir(s)}>
+              <span className="gw-dd-ic">{G.pin}</span>
+              <span className="gw-dd-t"><b>{s.main}</b>{s.secondary && <small>{s.secondary}</small>}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {msg && <span className="hint gw-dir-msg">{msg}</span>}
+    </div>
+  )
+}
+
 export function SolicitarGarantia({ go, onDone, onExpire }) {
   const { t } = useLang()
   const [paso, setPaso] = useState(1)
@@ -697,10 +786,11 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
             </div>
             <label className="f"><span className="lab">{t('your_email')}</span>
               <input className="inp" value={email} disabled /></label>
-            <label className="f"><span className="lab">{t('g_address')}</span>
-              <textarea className="inp" rows={3} value={dir} onChange={(e) => setDir(e.target.value)} autoComplete="street-address"
+            <div className="f"><span className="lab">{t('g_address')}</span>
+              <BuscarDireccion onPick={setDir} />
+              <textarea className="inp" rows={4} value={dir} aria-label={t('g_address')} onChange={(e) => setDir(e.target.value)} autoComplete="street-address"
                 placeholder={t('g_address_ph')} />
-              <span className="hint">{t('g_address_hint')}</span></label>
+              <span className="hint">{t('g_address_hint')}</span></div>
           </>
         )}
 

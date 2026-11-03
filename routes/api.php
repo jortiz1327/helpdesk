@@ -66,7 +66,7 @@ Route::match(['get', 'post'], 'webhook.php', [WebhookController::class, 'handle'
  * código, que es lo que manda correos.
  */
 Route::match(['get', 'post'], 'portal.php', [\App\Http\Controllers\PortalController::class, 'handle'])
-    ->middleware('throttle:30,1');
+    ->middleware('throttle:portal');   // 30/min; fotos y direcciones aparte (AppServiceProvider)
 // Adjuntos del portal: por URL FIRMADA (la firma es la auth, sin pase en la URL).
 Route::get('portal_file/{id}', [\App\Http\Controllers\PortalController::class, 'file'])
     ->middleware('signed:relative')->name('portal.file')->whereNumber('id');

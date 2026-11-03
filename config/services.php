@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    // Buscador de direcciones del portal (garantías). Con clave, Google Places (la mejor
+    // en cualquier país); sin ella, Photon (OpenStreetMap, gratis). La clave solo la usa
+    // el servidor: el navegador nunca la ve.
+    'places' => [
+        'google_key' => env('GOOGLE_PLACES_KEY'),
+        'photon_url' => env('PHOTON_URL', 'https://photon.komoot.io/api/'),
+    ],
+
 ];

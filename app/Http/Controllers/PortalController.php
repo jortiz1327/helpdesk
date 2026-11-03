@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AddressSearch;
 use App\Services\PortalService;
 use App\Services\PortalWarranties;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * PORTAL PÚBLICO. Rutas SIN token de agente: la identidad es el correo del cliente
@@ -60,6 +62,9 @@ class PortalController extends Controller
             'warranty-photo'    => $this->conPase($request, fn ($email) => $this->fotoGarantia($request, $email)),
             'warranty-reply'    => $this->conPase($request, fn ($email) => $this->responderGarantia($request, $email)),
             'warranty-pdf'      => $this->conPase($request, fn ($email) => $this->pdfGarantia($request, $email)),
+            // Buscador de direcciones (con pase y con límite: cada búsqueda puede costar).
+            'address-search'    => $this->conPase($request, fn ($email) => $this->buscarDireccion($request, $email)),
+            'address-place'     => $this->conPase($request, fn ($email) => $this->direccion($request, $email)),
             // Salir: anula el pase de este navegador. Siempre «ok» (salir dos veces no falla).
             'logout'       => $request->isMethod('post')
                                 ? tap(response()->json(['ok' => true]), fn () => $this->portal->cerrarSesion($request->header('X-Portal-Token') ?: $request->bearerToken()))
@@ -117,6 +122,31 @@ class PortalController extends Controller
             'Content-Type'        => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $f[1] . '"',
         ]);
+    }
+
+    /** ¿Le quedan búsquedas de direcciones? 60 por minuto y 400 al día por correo. */
+    private function cupoDirecciones(string $email): bool
+    {
+        $k = 'addr:' . sha1(mb_strtolower($email));
+        if (RateLimiter::tooManyAttempts($k . ':m', 60) || RateLimiter::tooManyAttempts($k . ':d', 400)) return false;
+        RateLimiter::hit($k . ':m', 60);
+        RateLimiter::hit($k . ':d', 86400);
+        return true;
+    }
+
+    protected function buscarDireccion(Request $request, string $email)
+    {
+        if (!$this->cupoDirecciones($email)) return response()->json(['ok' => false, 'error' => 'Demasiadas búsquedas: escribe la dirección a mano'], 429);
+        $s = app(AddressSearch::class);
+        return response()->json(['ok' => true, 'provider' => $s->provider(),
+            'results' => $s->search((string) $request->query('q'), (string) $request->query('lang'), (string) $request->query('session'))]);
+    }
+
+    protected function direccion(Request $request, string $email)
+    {
+        if (!$this->cupoDirecciones($email)) return response()->json(['ok' => false, 'error' => 'Demasiadas búsquedas: escribe la dirección a mano'], 429);
+        $a = app(AddressSearch::class)->place((string) $request->query('id'), (string) $request->query('lang'), (string) $request->query('session'));
+        return $a ? response()->json(['ok' => true, 'address' => $a]) : response()->json(['ok' => false, 'error' => 'No se encontró esa dirección'], 404);
     }
 
     /** Envuelve una acción que exige PASE completo del correo (código): o 401. */
