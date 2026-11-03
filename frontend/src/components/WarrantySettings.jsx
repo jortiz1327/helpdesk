@@ -408,6 +408,73 @@ function Documentos({ docs, grupos, hacer }) {
   )
 }
 
+/*
+ * Pasos por tipo de cliente: listas que se marcan en cada garantía. Una vale para todas,
+ * para unas categorías (Hoteles) o para clientes cuyo nombre o proyecto contiene un texto
+ * (Expofarm). El id de cada paso se conserva al cambiar su texto (lo marcado no se pierde).
+ */
+const nuevoId = (pre) => `${pre}${Math.random().toString(36).slice(2, 10)}`
+function PasosCliente({ lists, categorias, hacer }) {
+  const [v, setV] = useState(lists)
+  useEffect(() => setV(lists), [lists])
+  const cambiado = JSON.stringify(v) !== JSON.stringify(lists)
+  const setL = (i, c) => setV((xs) => xs.map((x, j) => (j === i ? { ...x, ...c } : x)))
+  const mover = (i, d) => setV((xs) => { const ys = [...xs]; [ys[i], ys[i + d]] = [ys[i + d], ys[i]]; return ys })
+  const nueva = () => setV((xs) => [...xs, { id: nuevoId('l'), name: '', active: true, all: false, categories: [], clients: [], steps: [{ id: nuevoId('s'), text: '' }] }])
+  return (
+    <Card title="Pasos por tipo de cliente" sub="Listas de pasos que se marcan en cada garantía (queda quién y cuándo). A una garantía le tocan todas las listas que coinciden con ella, en este orden."
+      foot={(
+        <div className="ws-foot">
+          <span className="dev-mute">Marcar pasos pide poder editar garantías.</span>
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(lists)}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado} onClick={() => hacer('steps_save', { lists: v }, 'Pasos guardados')}><Icon.save /> Guardar</button>
+        </div>
+      )}>
+      <div className="ws-body">
+        {!v.length ? <p className="dev-mute">Sin listas: las garantías no tienen pasos.</p> : null}
+        <div className="ws-pasos">
+          {v.map((l, i) => (
+            <div key={l.id} className={`ws-pl${l.active ? '' : ' off'}`}>
+              <div className="ws-pl-h">
+                <input className="ws-pl-name" value={l.name} maxLength={60} placeholder="Nombre de la lista (p. ej. Expofarm)" onChange={(e) => setL(i, { name: e.target.value })} />
+                <label className="wr-check"><input type="checkbox" checked={!!l.active} onChange={(e) => setL(i, { active: e.target.checked })} /> Activa</label>
+                <button className="icon-btn" disabled={!i} title="Subir" onClick={() => mover(i, -1)}><Icon.chevron style={{ transform: 'rotate(180deg)' }} /></button>
+                <button className="icon-btn" disabled={i === v.length - 1} title="Bajar" onClick={() => mover(i, 1)}><Icon.chevron /></button>
+                <Txt danger onClick={() => setV((xs) => xs.filter((_, j) => j !== i))}>Quitar</Txt>
+              </div>
+              <div className="ws-pl-a">
+                <div className="dc-seg">
+                  <button className={l.all ? 'on' : ''} onClick={() => setL(i, { all: true })}>Todas las garantías</button>
+                  <button className={l.all ? '' : 'on'} onClick={() => setL(i, { all: false })}>Solo algunas</button>
+                </div>
+                {!l.all ? (
+                  <div className="ws-pl-q">
+                    <div className="field"><span className="lbl">Categorías</span>
+                      <Select block multiple value={l.categories} placeholder="Ninguna" onChange={(x) => setL(i, { categories: x })}
+                        options={categorias.map((c) => ({ value: c.name, label: c.name }))} /></div>
+                    <div className="field"><span className="lbl">Clientes que contienen</span>
+                      <input value={(l.clients || []).join(', ')} placeholder="Expofarm, …" onChange={(e) => setL(i, { clients: e.target.value.split(',').map((x) => x.trimStart()) })} /></div>
+                  </div>
+                ) : null}
+              </div>
+              <ol className="ws-pl-s">
+                {l.steps.map((s, k) => (
+                  <li key={s.id}><div className="ws-pl-row">
+                    <input value={s.text} maxLength={160} placeholder="Qué hay que hacer" onChange={(e) => setL(i, { steps: l.steps.map((x, j) => (j === k ? { ...x, text: e.target.value } : x)) })} />
+                    <button className="icon-btn" title="Quitar el paso" onClick={() => setL(i, { steps: l.steps.filter((_, j) => j !== k) })}>✕</button>
+                  </div></li>
+                ))}
+              </ol>
+              <button className="wf-link" onClick={() => setL(i, { steps: [...l.steps, { id: nuevoId('s'), text: '' }] })}><Icon.plus /> Añadir paso</button>
+            </div>
+          ))}
+        </div>
+        <button className="dev-btn" onClick={nueva}><Icon.plus /> Nueva lista</button>
+      </div>
+    </Card>
+  )
+}
+
 /* Sustituciones: en qué categorías se ofrece el ticket de posiciones y cómo sale. */
 function Sustituciones({ cfg, categorias, ticketCats, hacer }) {
   const [v, setV] = useState(cfg)
@@ -447,6 +514,7 @@ const SECCIONES = [
     ['categorias', 'Categorías', Icon.tag, (d) => d.categories.filter((c) => c.active).length],
     ['urgencias', 'Urgencias', Icon.bolt, (d) => d.urgencies.length],
     ['alertas', 'Alertas', Icon.bell, (d) => d.alerts.filter((r) => r.active).length],
+    ['pasos', 'Pasos por tipo de cliente', Icon.check, (d) => d.checklists.filter((l) => l.active).length],
   ]],
   ['Revisión y documentos', [
     ['plantillas', 'Plantillas de diagnóstico', Icon.doc, (d) => d.templates.filter((t) => t.active).length],
@@ -482,7 +550,7 @@ export default function WarrantySettings() {
       <header className="page-head">
         <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
         <div><h1>Configuración</h1></div>
-        <span className="sub">· Estados, categorías, urgencias, alertas, plantillas, plazos, documentos, texto para Finanzas y sustituciones de Gestión de garantías</span>
+        <span className="sub">· Estados, categorías, urgencias, alertas, pasos, plantillas, plazos, documentos, texto para Finanzas y sustituciones de Gestión de garantías</span>
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
         {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
@@ -511,6 +579,7 @@ export default function WarrantySettings() {
               {sec === 'plantillas' && <Plantillas list={d.templates} hacer={hacer} />}
               {sec === 'plazos' && <Plazos terms={d.terms} refs={d.term_references} categorias={d.categories} hacer={hacer} />}
               {sec === 'documentos' && <Documentos docs={d.docs} grupos={d.block_groups} hacer={hacer} />}
+              {sec === 'pasos' && <PasosCliente lists={d.checklists} categorias={d.categories} hacer={hacer} />}
               {sec === 'sustituciones' && <Sustituciones cfg={d.replacements} categorias={d.categories} ticketCats={d.ticket_categories} hacer={hacer} />}
               {sec === 'finanzas' && <Finanzas finance={d.finance} grupos={d.finance_groups} soluciones={d.resolutions} hacer={hacer} />}
             </div>

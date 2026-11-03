@@ -13,6 +13,7 @@ use App\Services\WarrantyAlerts;
 use App\Services\WarrantyLabels;
 use App\Services\WarrantyPermissions;
 use App\Services\WarrantyPhotos;
+use App\Services\WarrantySteps;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +59,7 @@ class WarrantiesController extends Controller
             'ticket_images'     => $this->ticketImages($request),
             'team'              => $this->team($request),
             'report'            => $this->report($request),
+            'step'              => $this->step($request),
             default   => $this->list($request),
         };
     }
@@ -276,7 +278,17 @@ class WarrantiesController extends Controller
             'ticket_subject'  => $w->ticketVisibleTo($request->user()) ? $w->ticket_subject : null,
             'ticket_visible'  => $w->ticketVisibleTo($request->user()),
             'created_by_name' => $w->created_by_name,
-        ], 'notes' => $notes, 'events' => $events, 'messages' => $mensajes, 'items' => $this->items($w->id)]);
+        ], 'notes' => $notes, 'events' => $events, 'messages' => $mensajes, 'items' => $this->items($w->id),
+            'steps' => WarrantySteps::forWarranty($w)]);
+    }
+
+    // Marca o desmarca un paso de las listas por tipo de cliente.
+    private function step(Request $request)
+    {
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        $error = WarrantySteps::toggle($w, (string) $request->input('list'), (string) $request->input('step'), $request->boolean('done'), $request->user()->id);
+        return $error ? response()->json(['ok' => false, 'error' => $error], 400)
+            : response()->json(['ok' => true, 'steps' => WarrantySteps::forWarranty($w)]);
     }
 
     /** Un mensaje del cliente en una línea corta: el texto sin HTML o qué ha mandado. */

@@ -8,6 +8,7 @@ use App\Models\WarrantyItem;
 use App\Services\WarrantyAlerts;
 use App\Services\WarrantyDocuments;
 use App\Services\WarrantyReplacements;
+use App\Services\WarrantySteps;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,7 @@ class WarrantySettingsController extends Controller
             'terms_save'      => $this->termsSave($request),
             'finance_save'    => $this->financeSave($request),
             'replacements_save' => $this->replacementsSave($request),
+            'steps_save'      => $this->stepsSave($request),
             default           => $this->get(),
         };
     }
@@ -77,6 +79,7 @@ class WarrantySettingsController extends Controller
             'finance' => WarrantyDocuments::ajuste('finance', WarrantyDocuments::FINANCE_DEFAULTS),
             'finance_groups' => WarrantyDocuments::FINANCE_GROUPS,
             'replacements' => WarrantyReplacements::settings(),
+            'checklists' => WarrantySteps::settings(),
             'ticket_categories' => DB::table('ticket_categories')->where('active', true)->orderBy('position')->orderBy('name')->get(['id', 'name']),
             'resolutions' => collect(WarrantyItem::RESOLUTIONS)->except('pendiente')->map(fn ($r) => $r['label']),
         ]);
@@ -150,6 +153,16 @@ class WarrantySettingsController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /* --- Pasos por tipo de cliente --- */
+
+    private function stepsSave(Request $request)
+    {
+        [$listas, $error] = WarrantySteps::clean((array) $request->input('lists', []), DB::table('warranty_categories')->pluck('name')->all());
+        if ($error) return $this->error($error);
+        $this->guardar('checklists', ['lists' => $listas]);
+        return response()->json(['ok' => true]);
+    }
+
     /** Una categoría renombrada (o borrada: null) en las que piden el ticket de posiciones. */
     private function sustitucionesDeCategoria(string $antes, ?string $nuevo): void
     {
@@ -157,6 +170,17 @@ class WarrantySettingsController extends Controller
         if (! in_array($antes, $s['categories'], true)) return;
         $s['categories'] = array_values(array_filter(array_map(fn ($c) => $c === $antes ? $nuevo : $c, $s['categories'])));
         $this->guardar('replacements', $s);
+    }
+
+    /** Y en las listas de pasos que la usan. */
+    private function pasosDeCategoria(string $antes, ?string $nuevo): void
+    {
+        $listas = WarrantySteps::settings();
+        if (! collect($listas)->contains(fn ($l) => in_array($antes, $l['categories'] ?? [], true))) return;
+        foreach ($listas as &$l) {
+            $l['categories'] = array_values(array_filter(array_map(fn ($c) => $c === $antes ? $nuevo : $c, $l['categories'] ?? [])));
+        }
+        $this->guardar('checklists', ['lists' => $listas]);
     }
 
     private function guardar(string $key, array $v): void
@@ -249,6 +273,7 @@ class WarrantySettingsController extends Controller
         if ($antes !== $name) {
             $this->plazosDeCategoria(fn ($c) => $c['category'] === $antes ? ['category' => $name] + $c : $c);
             $this->sustitucionesDeCategoria($antes, $name);
+            $this->pasosDeCategoria($antes, $name);
         }
         return response()->json(['ok' => true, 'id' => $id]);
     }
@@ -262,6 +287,7 @@ class WarrantySettingsController extends Controller
         DB::table('warranty_categories')->where('id', $c->id)->delete();
         $this->plazosDeCategoria(fn ($x) => $x['category'] === $c->name ? null : $x);
         $this->sustitucionesDeCategoria($c->name, null);
+        $this->pasosDeCategoria($c->name, null);
         return response()->json(['ok' => true]);
     }
 

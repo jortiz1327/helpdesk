@@ -420,6 +420,10 @@ export const api = {
   saveWarranty: (payload) => req('warranties.php?action=save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
+  // Pasos por tipo de cliente: marcar o desmarcar uno.
+  warrantyStep: (id, list, step, done) => req('warranties.php?action=step', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, list, step, done }),
+  }),
   addWarrantyNote: (id, type, body) => req('warranties.php?action=note', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, type, body }),
   }),

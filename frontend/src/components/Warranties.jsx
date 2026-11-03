@@ -1264,7 +1264,47 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
   )
 }
 
-const CAMPOS = { created: 'Garantía creada', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', steps: 'Pasos', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+
+/* Pasos por tipo de cliente (Configuración): los de todas y los de su categoría o cliente. */
+function Pasos({ w, listas, puede, onChanged }) {
+  const toast = useToast()
+  const [ls, setLs] = useState(listas)
+  const [ocupado, setOcupado] = useState('')
+  useEffect(() => setLs(listas), [listas])
+  if (!ls?.length) return null
+  const total = ls.reduce((a, l) => a + l.steps.length, 0)
+  const hechos = ls.reduce((a, l) => a + l.steps.filter((s) => s.done_at).length, 0)
+  const marcar = async (l, s) => {
+    setOcupado(`${l.id}|${s.id}`)
+    const r = await api.warrantyStep(w.id, l.id, s.id, !s.done_at)
+    setOcupado('')
+    if (!r.ok) { toast(r.error || 'No se pudo guardar', 'err'); return }
+    setLs(r.steps)
+    onChanged?.()
+  }
+  return (
+    <section className="wf-card wf-pasos">
+      <header><h3><Icon.check /> Pasos</h3><span className={`wf-pasos-n${hechos === total ? ' ok' : ''}`}>{hechos}/{total}</span></header>
+      {ls.map((l) => (
+        <div key={l.id} className="wf-pasos-l">
+          {ls.length > 1 ? <h4>{l.name}</h4> : null}
+          <ul>
+            {l.steps.map((s) => (
+              <li key={s.id} className={s.done_at ? 'done' : ''}>
+                <label className="wr-check">
+                  <input type="checkbox" checked={!!s.done_at} disabled={!puede || ocupado === `${l.id}|${s.id}`} onChange={() => marcar(l, s)} />
+                  <span>{s.text}</span>
+                </label>
+                {s.done_at ? <small>{s.done_by || 'Alguien'} · {fechaHora(s.done_at)}</small> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  )
+}
 
 function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
   const p = opts?.perms || {}
@@ -1406,6 +1446,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket }) {
         </div>
 
         <aside className="wf-side">
+          <Pasos w={w} listas={d.steps} puede={!!p.edit} onChanged={cargar} />
           <section className="wf-card">
             <header><h3>Datos del expediente</h3></header>
             <dl className="wf-dl">

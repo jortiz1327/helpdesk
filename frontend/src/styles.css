@@ -5670,3 +5670,34 @@ button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); 
 .ws-panel .ws-body > .field, .ws-sus .field { margin-bottom: 12px; }
 .ws-panel .ws-body > .field input, .ws-panel .ws-body > .field textarea { padding: 8px 11px; font-size: 13px; }
 @media (max-width: 900px) { .ws-sus { grid-template-columns: minmax(0, 1fr); } }
+
+/* Pasos por tipo de cliente (ficha de la garantía) */
+.wf-pasos header { display: flex; align-items: center; justify-content: space-between; }
+.wf-pasos-n { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: var(--panel-2); color: var(--ink-2); }
+.wf-pasos-n.ok { background: color-mix(in srgb, var(--ok, #16a34a) 14%, transparent); color: var(--ok, #15803d); }
+.wf-pasos-l h4 { margin: 10px 0 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+.wf-pasos-l ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wf-pasos-l li .wr-check { align-items: flex-start; font-size: 13px; line-height: 1.35; }
+.wf-pasos-l li .wr-check input { margin-top: 2px; accent-color: var(--primary); }
+.wf-pasos-l li.done .wr-check span { color: var(--ink-3); text-decoration: line-through; }
+.wf-pasos-l li small { display: block; margin-left: 24px; font-size: 11px; color: var(--ink-3); }
+
+/* Configuración: pasos por tipo de cliente */
+.ws-pasos { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.ws-pl { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.ws-pl.off { opacity: .6; }
+.ws-pl-h { display: flex; align-items: center; gap: 10px; }
+.ws-pl-h .icon-btn svg { width: 16px; height: 16px; }
+.ws-pl input:not([type=checkbox]) { box-sizing: border-box; width: 100%; padding: 8px 11px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
+.ws-pl input:not([type=checkbox]):focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent); }
+.ws-pl input::placeholder { color: var(--ink-3); }
+.ws-pl-h .ws-pl-name { flex: 1; font-weight: 600; }
+.ws-pl-a { margin: 10px 0; }
+.ws-pl-q { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px; margin-top: 10px; }
+.ws-pl-q .field { margin: 0; }
+.ws-pl-s { margin: 0 0 6px; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--ink-3); }
+.ws-pl-row { display: flex; align-items: center; gap: 6px; }
+.ws-pl-row input:not([type=checkbox]) { flex: 1; min-width: 0; }
+.ws-pl-row .icon-btn { flex: none; }
+.ws-pl .wf-link svg { width: 14px; height: 14px; fill: currentColor; vertical-align: -2px; }
+@media (max-width: 900px) { .ws-pl-q { grid-template-columns: minmax(0, 1fr); } }
