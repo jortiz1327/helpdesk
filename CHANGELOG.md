@@ -3,6 +3,13 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.16] — 2026-11-04
+
+### Arreglos
+
+- Responder con solo un adjunto (sin texto): el botón de enviar seguía apagado porque el editor
+  no avisaba al adjuntar o quitar un archivo. El servidor ya lo admitía.
+
 ## [1.5.15] — 2026-11-02
 
 ### Mejoras

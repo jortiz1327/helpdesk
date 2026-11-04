@@ -120,10 +120,19 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.15";
+const APP_VERSION = "1.5.16";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.16",
+        date: "4 nov 2026",
+        resumen: "Ya se puede enviar solo una foto o un archivo, sin escribir texto.",
+        mejoras: [],
+        arreglos: [
+            "Al responder, con solo un adjunto el botón de enviar se quedaba apagado hasta escribir algo. Ahora se puede enviar la foto sola (WhatsApp y correo).",
+        ],
+    },
     {
         version: "1.5.15",
         date: "2 nov 2026",
