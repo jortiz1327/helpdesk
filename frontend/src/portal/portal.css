@@ -427,6 +427,7 @@
   .linkbtn{display:block;width:100%;text-align:center;margin-top:12px;border:0;background:none;
     color:var(--brand);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;padding:6px}
   .linkbtn:hover{text-decoration:underline}
+  .linkbtn svg{width:15px;height:15px;vertical-align:-3px;margin-left:2px}
   .linkbtn:disabled{color:var(--ink-3);cursor:default;text-decoration:none}
   /* ===== HERO del ticket: el estado manda ===== */
   /* Acento por fase — se lee de un vistazo qué pasa con la incidencia. */
