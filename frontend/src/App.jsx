@@ -120,10 +120,20 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.16";
+const APP_VERSION = "1.5.17";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.17",
+        date: "4 nov 2026",
+        resumen: "Los correos muy largos ya entran y no se repite el aviso de ticket asignado.",
+        mejoras: [],
+        arreglos: [
+            "Un correo muy largo (con todo el hilo de respuestas) no llegaba a convertirse en ticket. Ahora entra entero.",
+            "Mientras fallaba, el agente recibía el aviso «Se te ha asignado» varias veces. Ahora solo llega uno, cuando el ticket ya está creado.",
+        ],
+    },
     {
         version: "1.5.16",
         date: "4 nov 2026",

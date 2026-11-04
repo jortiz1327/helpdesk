@@ -3,6 +3,18 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.17] — 2026-11-04
+
+### Arreglos
+
+- Correos muy largos (Outlook con todo el hilo citado) no entraban: el cuerpo pasaba de los 64 KB
+  de la columna `messages.body` («Data too long»), el correo se reintentaba 5 veces y acababa en
+  cuarentena sin ticket. La columna pasa a MEDIUMTEXT (16 MB) y un cuerpo de más de 15 MB se guarda
+  recortado en texto en vez de fallar.
+- En cada uno de esos reintentos el agente recibía otro «Se te ha asignado el ticket» (correo y
+  campana) de un ticket que luego se borraba. Ahora el aviso de asignación de un ticket que entra por
+  correo sale solo cuando el ticket y su mensaje quedan guardados.
+
 ## [1.5.16] — 2026-11-04
 
 ### Arreglos

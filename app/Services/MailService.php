@@ -38,6 +38,8 @@ class MailService
 
     /** Fallos seguidos sobre el MISMO correo antes de saltarlo (evita bloquear el buzón). */
     public const MAX_MAIL_ATTEMPTS = 5;
+    /** Tamaño máximo del cuerpo guardado (bajo los 16 MB de MEDIUMTEXT, con margen). */
+    public const MAX_BODY_BYTES = 15_000_000;
 
     /** Anti-bucle: más de LOOP_MAX tickets del mismo remitente en LOOP_VENTANA_MIN min = bucle. */
     private const LOOP_MAX = 10;
@@ -491,15 +493,23 @@ class MailService
                 $this->avisarBucle($acc, $email, $recientes);
                 return ['ticket_nuevo' => false, 'mensaje' => false, 'adjuntos' => 0];
             }
-            // notify:false → el acuse se manda ABAJO, solo si el mensaje se guarda bien.
-            $ticketId  = $this->tickets->create([
-                'contact_id' => $contactId,
-                'channel'    => 'email',
-                'subject'    => $subject !== '' ? $subject : 'Sin asunto',
-                // Contexto para las reglas automáticas (asignar/categorizar solo).
-                'body'       => HtmlSanitizer::toText($rawHtml) ?: trim((string) $message->getTextBody()),
-                'email'      => $email,
-            ], notify: false);
+            // notify:false → el acuse se manda ABAJO, solo si el mensaje se guarda bien. Lo
+            // mismo el aviso de asignación (reglas/turno): si el alta se revierte y el correo
+            // se reintenta, el agente no recibe un «Se te ha asignado» por cada intento.
+            TicketService::aplazarAvisos();
+            try {
+                $ticketId  = $this->tickets->create([
+                    'contact_id' => $contactId,
+                    'channel'    => 'email',
+                    'subject'    => $subject !== '' ? $subject : 'Sin asunto',
+                    // Contexto para las reglas automáticas (asignar/categorizar solo).
+                    'body'       => HtmlSanitizer::toText($rawHtml) ?: trim((string) $message->getTextBody()),
+                    'email'      => $email,
+                ], notify: false);
+            } catch (\Throwable $e) {
+                TicketService::soltarAvisos(false);
+                throw $e;
+            }
             $ticketNew = true;
         }
 
@@ -568,6 +578,16 @@ class MailService
         }
         if ($body === '' && $subject !== '') $body = $subject;
 
+        // Tope de tamaño (la columna es MEDIUMTEXT, 16 MB): un correo desmesurado se guarda
+        // como texto y recortado, en vez de fallar siempre y acabar en cuarentena sin ticket.
+        if (strlen($body) > self::MAX_BODY_BYTES) {
+            $texto = $isHtml ? HtmlSanitizer::toText($body) : $body;
+            $isHtml = false;
+            $body = strlen($texto) > self::MAX_BODY_BYTES
+                ? mb_strcut($texto, 0, self::MAX_BODY_BYTES, 'UTF-8') . "\n\n[… mensaje recortado: era demasiado largo]"
+                : $texto;
+        }
+
         // Resumen de bandeja SIEMPRE en texto (aunque el cuerpo sea HTML).
         $preview = $isHtml ? HtmlSanitizer::toText($body) : $body;
 
@@ -598,7 +618,9 @@ class MailService
         } catch (\Throwable $e) {
             // El mensaje no se pudo guardar: revertir el ticket recién creado (si lo era) para
             // no dejarlo huérfano, y propagar el fallo (irá a reintento/cuarentena por UID).
+            if ($ticketNew) TicketService::soltarAvisos(false);   // nadie se entera de un alta revertida
             if ($ticketNew && $ticketId) {
+                DB::table('notifications')->where('ticket_id', $ticketId)->delete();
                 DB::table('attachments')->where('ticket_id', $ticketId)->delete();
                 DB::table('messages')->where('ticket_id', $ticketId)->delete();
                 DB::table('ticket_events')->where('ticket_id', $ticketId)->delete();
@@ -610,6 +632,7 @@ class MailService
         // Acuse de recibo SOLO ahora, con ticket + mensaje ya guardados (antes iba dentro de
         // create(); un ticket que luego se revierte no debe avisar al cliente).
         if ($ticketNew) {
+            TicketService::soltarAvisos(true);   // ahora sí: «Se te ha asignado» al agente
             try { app(\App\Services\NotifyService::class)->ticket('ticket_created', $ticketId); }
             catch (\Throwable $e) { Log::warning('MailService: acuse falló', ['ticket' => $ticketId, 'error' => $e->getMessage()]); }
         } else {
