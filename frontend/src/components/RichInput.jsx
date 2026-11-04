@@ -91,6 +91,11 @@ const RichInput = forwardRef(function RichInput({
   const [at, setAt] = useState(null)         // menú de menciones «@»: { query, index } o null
   const [enlace, setEnlace] = useState(null) // diálogo de enlace (ver abrirEnlace)
 
+  // Adjuntar o quitar un archivo también cambia lo que hay que enviar: se avisa al padre
+  // (si no, con solo una foto y sin texto el botón de enviar seguía apagado).
+  const filesIni = useRef(true)
+  useEffect(() => { if (filesIni.current) { filesIni.current = false; return } onChange?.() }, [files])   // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { if (canned) api.cannedForComposer().then((d) => setCannedList(d.canned || [])) }, [canned])
 
   useImperativeHandle(ref, () => ({
