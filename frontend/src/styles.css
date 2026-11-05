@@ -2667,6 +2667,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
   background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); color: #e8a33d; }
 .tk-locked svg { width: 16px; height: 16px; fill: currentColor; flex: 0 0 16px; }
 :root[data-theme="light"] .tk-locked { background: #fff8ec; border-color: #f5c877; color: #92600c; }
+/* Lo tengo yo: discreto, una línea sobre el editor con la cuenta atrás. */
+.tk-lock-mine { display: flex; align-items: center; gap: 7px; margin: 0 20px 8px; font-size: 12px; color: var(--ink-2); }
+.tk-lock-mine svg { width: 13px; height: 13px; fill: currentColor; flex: 0 0 13px; opacity: .8; }
+.tk-cuenta { font-variant-numeric: tabular-nums; font-weight: 700; }
 
 /* --- Pestaña «Del cliente»: sus otros tickets --- */
 .tkm-client-h { display: flex; align-items: baseline; gap: 10px; padding: 4px 2px 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }

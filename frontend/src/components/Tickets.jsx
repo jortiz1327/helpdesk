@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react'
 import { api, mediaUrl } from '../api.js'
 import { parseDate, fmtDate, fmtTime, fmtDiaLegible, fmtDateShort, dayLabel, fmtTel, nombreContacto } from '../util.js'
 import WaAudio from './WaAudio.jsx'
@@ -1187,9 +1187,11 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                     const sleeping = t.snoozed_at && (Number(t.snooze_wake_on_reply)
                       || (t.snoozed_until && parseDate(t.snoozed_until) > new Date()))
                     // Presencia: otro agente lo tiene abierto AHORA (bloqueo vigente).
+                    // Vigente = ha latido hace menos de lock_lease s (no los minutos de inactividad).
                     const lockMin = meta?.lock_minutes || 0
+                    const lease = (meta?.lock_lease || 90) * 1000
                     const viewing = (lockMin > 0 && t.locked_by && Number(t.locked_by) !== Number(user?.id)
-                      && t.locked_at && (Date.now() - parseDate(t.locked_at).getTime()) < lockMin * 60000)
+                      && t.locked_at && (Date.now() - parseDate(t.locked_at).getTime()) < lease)
                       ? t.locked_name : null
                     return (
                       <tr key={t.id} className={`tk-row ${waiting ? 'wait' : ''} ${sleeping ? 'sleeping' : ''} ${esInterno(t.contact_email) ? 'internal' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
@@ -1579,6 +1581,21 @@ function ModalFusion({ id, preselect = null, meta, onClose, onDone }) {
   )
 }
 
+/* Cuenta atrás m:ss del bloqueo. `hasta` = instante (ms) o función que lo da (la del dueño
+   se mueve con cada tecla/ratón). Se repinta solo este trozo cada segundo, no el modal. */
+function CuentaAtras({ hasta, onCero, formato }) {
+  const [, setTic] = useState(0)
+  useEffect(() => { const iv = setInterval(() => setTic((n) => n + 1), 1000); return () => clearInterval(iv) }, [])
+  const ms = Math.max(0, (typeof hasta === 'function' ? hasta() : hasta) - Date.now())
+  const avisado = useRef(null)
+  useEffect(() => {
+    if (ms === 0 && onCero && avisado.current !== hasta) { avisado.current = hasta; onCero() }
+  })
+  const s = Math.ceil(ms / 1000)
+  const reloj = <b className="tk-cuenta">{Math.floor(s / 60)}:{String(s % 60).padStart(2, '0')}</b>
+  return formato ? formato(reloj, ms === 0) : reloj
+}
+
 function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -1669,33 +1686,66 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
      el id ANTERIOR, que es justo el que hay que soltar. */
   useEffect(() => () => { api.unlockTicket(id) }, [id])
 
-  /* LATIDO del candado: el bloqueo caduca solo a los pocos minutos; sin renovarlo, un
-     agente que tarda en redactar una respuesta larga lo perdería a media escritura y
-     otro podría colarse. Mientras el candado sea NUESTRO, la pestaña esté visible y el
-     agente siga activo (ha tecleado/clicado dentro del TTL), se renueva antes de que
-     caduque. Si deja de tocar nada durante todo el TTL —se fue—, se deja caducar solo. */
+  /* LATIDO del candado: el servidor lo da por libre si no late en `lease` segundos (90).
+     Mientras el candado sea NUESTRO y el agente siga activo (tecla, clic, ratón o rueda en
+     los últimos `minutes`), se renueva cada tercio de lease —también con la pestaña en 2º
+     plano, para consultar algo y volver sin perderlo—. Si no toca nada en esos minutos
+     (se fue y dejó el PC), deja de latir y en minuto y medio queda libre para los demás.
+     Al cerrar la pestaña o el navegador se suelta en el acto (pagehide + keepalive). */
   const lockMine = d?.lock?.mine
   const lockMin = d?.lock?.minutes
+  const lockLease = d?.lock?.lease || 90
+  const tkCerrado = ['resuelto', 'cerrado'].includes(d?.ticket?.status)
+  // Última actividad del agente en esta ventana: la usan el latido y su cuenta atrás.
+  const ultimaRef = useRef(Date.now())
   useEffect(() => {
-    if (!lockMine || !lockMin) return
-    const ttl = lockMin * 60 * 1000
-    let ultima = Date.now()
-    const marca = () => { ultima = Date.now() }
-    window.addEventListener('keydown', marca)
-    window.addEventListener('pointerdown', marca)
-    const iv = setInterval(() => {
-      if (document.visibilityState !== 'visible') return   // en 2º plano: no renovar
-      if (Date.now() - ultima > ttl) return                // sin actividad: dejar caducar
-      api.heartbeatTicket(id).then((r) => {
+    if (!lockMine || !lockMin || tkCerrado) return
+    const inactivo = lockMin * 60 * 1000
+    const cada = Math.max(15000, Math.floor(lockLease * 1000 / 3))
+    let ultimoLatido = 0
+    let soltado = false
+    const latir = () => {
+      ultimoLatido = Date.now()
+      const idle = Math.round((Date.now() - ultimaRef.current) / 1000)
+      api.heartbeatTicket(id, idle).then((r) => {
         if (r?.ok && r.lock) setD((prev) => (prev ? { ...prev, lock: r.lock } : prev))
       }).catch(() => {})
-    }, Math.max(20000, Math.floor(ttl / 2)))
+    }
+    const marca = () => {
+      ultimaRef.current = Date.now()
+      if (soltado) { soltado = false; latir() }   // ha vuelto: lo retoma (si nadie lo ha cogido)
+    }
+    const EVENTOS = ['keydown', 'pointerdown', 'pointermove', 'wheel', 'touchstart']
+    EVENTOS.forEach((ev) => window.addEventListener(ev, marca, { passive: true }))
+    // Cada 5 s: agotados los minutos sin actividad, se suelta YA (la cuenta atrás llega a 0
+    // y los demás entran); si no, se late cuando toca.
+    const tic = () => {
+      if (Date.now() - ultimaRef.current >= inactivo) {
+        if (!soltado) { soltado = true; api.unlockTicket(id) }
+        return
+      }
+      if (Date.now() - ultimoLatido >= cada) latir()
+    }
+    const iv = setInterval(tic, 5000)
+    // Al volver a la pestaña, renovar ya: el navegador frena los temporizadores en 2º plano.
+    const alVolver = () => { if (document.visibilityState === 'visible') { marca(); latir() } }
+    document.addEventListener('visibilitychange', alVolver)
+    // Cerrar la pestaña/el navegador o recargar no desmonta React: se suelta aquí.
+    const alSalir = () => { api.unlockTicket(id, true) }
+    window.addEventListener('pagehide', alSalir)
     return () => {
       clearInterval(iv)
-      window.removeEventListener('keydown', marca)
-      window.removeEventListener('pointerdown', marca)
+      EVENTOS.forEach((ev) => window.removeEventListener(ev, marca))
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('pagehide', alSalir)
     }
-  }, [id, lockMine, lockMin])
+  }, [id, lockMine, lockMin, lockLease, tkCerrado])
+
+  // Cuenta atrás de quien lo tiene OTRO: el servidor dice cuántos segundos le quedan.
+  const lockHasta = useMemo(
+    () => (d?.lock && !d.lock.mine && d.lock.remaining != null ? Date.now() + d.lock.remaining * 1000 : null),
+    [d?.lock],
+  )
 
   /*
    * Tickets del MISMO cliente. Se buscan por su CORREO, no por la ficha de
@@ -2377,8 +2427,21 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
               {view === 'chat' && d.lock && !d.lock.mine && (
                 <div className="tk-locked">
                   <Icon.lock />
-                  <span><b>{d.lock.user_name || 'Otro agente'}</b> está atendiendo este ticket ahora mismo.
-                    Se liberará solo en unos minutos si deja de mirarlo.</span>
+                  <span><b>{d.lock.user_name || 'Otro agente'}</b> está atendiendo este ticket ahora mismo.{' '}
+                    {lockHasta
+                      ? <>Se libera en <CuentaAtras hasta={lockHasta} onCero={() => setTimeout(() => load(true), 6000)} /> si no lo toca.</>
+                      : 'Se liberará solo en unos minutos si deja de mirarlo.'}</span>
+                </div>
+              )}
+
+              {/* Lo tengo yo: cuánto falta para soltarlo si no toco nada (vuelve a 5:00 al tocar). */}
+              {view === 'chat' && d.lock?.mine && d.lock.minutes > 0 && !tkCerrado && !t.merged_into_id && (
+                <div className="tk-lock-mine" title="Mientras lo tienes abierto, nadie más puede responder">
+                  <Icon.lock />
+                  <span><CuentaAtras hasta={() => ultimaRef.current + d.lock.minutes * 60000}
+                    formato={(reloj, cero) => (cero
+                      ? 'Lo has soltado por inactividad: mueve el ratón o escribe para retomarlo'
+                      : <>Lo tienes tú · se libera en {reloj} si no tocas nada</>)} /></span>
                 </div>
               )}
 

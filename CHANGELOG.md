@@ -3,6 +3,24 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.18] — 2026-11-05
+
+### Arreglos
+
+- Un ticket abierto en un PC sin nadie delante, o en un navegador ya cerrado, seguía «tomado»
+  para los demás (TK-2611-0037, toda la tarde). Ahora el bloqueo vive 90 s y la ventana del ticket
+  lo renueva cada 30 s mientras el agente esté activo. Se suelta al cerrar el ticket, la pestaña
+  o el navegador, y si se deja abierto sin tocar nada durante los minutos configurados.
+  En Configuración el campo pasa a llamarse «Minutos sin actividad».
+- El latido ya no «toma» un ticket resuelto o cerrado.
+
+### Mejoras
+
+- Cuenta atrás del bloqueo. Quien tiene el ticket ve «Lo tienes tú · se libera en 4:59 si no
+  tocas nada», que vuelve al máximo al tocar algo; al llegar a 0 lo suelta y lo retoma al volver.
+  Los demás ven «Robert está atendiendo este ticket ahora mismo. Se libera en 3:12 si no lo toca».
+  Nueva columna `tickets.locked_active_at`.
+
 ## [1.5.17] — 2026-11-04
 
 ### Arreglos
