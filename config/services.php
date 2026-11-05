@@ -37,6 +37,14 @@ return [
 
     // Avisos al cliente cuando su garantía cambia de fase. Solo salen en producción, para
     // que en local o en pruebas nunca le llegue un correo de verdad a un cliente.
+    // Producto de cada garantía en el cloud de ZKONG (plantilla default / almacen).
+    // server: nombre (o id) del servidor ZKONG configurado; store_id: la tienda del almacén.
+    // Sin tienda no se manda nada.
+    'warranty_cloud' => [
+        'server'   => env('WARRANTY_CLOUD_SERVER', 'APP02'),
+        'store_id' => env('WARRANTY_CLOUD_STORE_ID'),
+    ],
+
     'warranty_notices' => [
         'send' => (bool) env('WARRANTY_NOTICES_SEND', env('APP_ENV') === 'production'),
     ],

@@ -38,6 +38,8 @@ class Warranty extends Model
     {
         static::created(fn (self $w) => \App\Services\WarrantyClientNotices::queue($w, true));
         static::updated(fn (self $w) => $w->wasChanged('status') ? \App\Services\WarrantyClientNotices::queue($w, false) : null);
+        // Y su producto en el cloud (la etiqueta del almacén), con cualquier cambio.
+        static::saved(fn (self $w) => \App\Services\WarrantyCloudItem::queue($w->id));
     }
 
     /** Todos los estados, en orden: [key => {label, color, closed, active, system}]. */

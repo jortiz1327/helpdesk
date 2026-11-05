@@ -431,6 +431,7 @@ class PortalWarranties
             'shipped_on' => $fecha->toDateString(), 'carrier' => $carrier, 'tracking' => $tracking,
             'packages' => $bultos, 'units' => $uds, 'note' => $nota, 'created_at' => now(), 'updated_at' => now(),
         ]);
+        WarrantyCloudItem::queue($w?->id);   // la fecha de envío va en su producto del cloud
 
         $lineas = array_filter([
             '📦 Envío avisado desde el portal',

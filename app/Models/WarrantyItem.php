@@ -12,6 +12,13 @@ class WarrantyItem extends Model
 {
     protected $guarded = ['id'];
 
+    // Los productos y la fecha de revisión van en el producto del cloud de la garantía.
+    protected static function booted(): void
+    {
+        static::saved(fn (self $i) => \App\Services\WarrantyCloudItem::queue($i->warranty_id));
+        static::deleted(fn (self $i) => \App\Services\WarrantyCloudItem::queue($i->warranty_id));
+    }
+
     protected $casts = [
         'online'          => 'boolean',
         'model_manual'    => 'boolean',
