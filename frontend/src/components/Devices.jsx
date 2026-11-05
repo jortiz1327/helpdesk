@@ -202,7 +202,7 @@ function Acciones({ server, r }) {
     if (!(await confirm({
       title: `Reiniciar la etiqueta ${r.barCode}`,
       message: `Se manda la orden a ${r.server || 'su servidor'}${r.storeName ? ` (tienda ${r.storeName})` : ''}. La etiqueta se reinicia en su próxima conexión.`,
-      confirmText: 'Reiniciar', danger: true,
+      confirmText: 'Reiniciar', danger: true, icon: Icon.power,
     }))) return
     mandar('esl_reboot', 'Orden de reinicio enviada')
   }

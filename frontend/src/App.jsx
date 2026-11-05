@@ -108,7 +108,8 @@ function ConfirmDialog({ opts, onClose }) {
         >
             <div className="modal confirm-box">
                 <div className={`confirm-ico ${opts.danger ? "danger" : ""}`}>
-                    {opts.danger ? <Icon.trash /> : <Icon.warn />}
+                    {/* icon: un componente de icono propio (si no, papelera o aviso) */}
+                    {opts.icon ? <opts.icon /> : opts.danger ? <Icon.trash /> : <Icon.warn />}
                 </div>
                 <h3>{opts.title || "¿Confirmar?"}</h3>
                 {opts.message && <p>{opts.message}</p>}
