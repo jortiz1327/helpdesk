@@ -1315,6 +1315,39 @@ function DiceCliente({ grupos, total }) {
   )
 }
 
+/* Las fotos de la etiqueta dentro de su tarjeta: la frontal grande (es la que lleva el
+   código) y al lado las demás que haya, en el orden del tipo. Clic: se abre en grande. */
+const CORTO_FOTO = { front: 'Frontal', back: 'Trasera', back_batteries: 'Con pilas', back_no_batteries: 'Sin pilas' }
+function FotosCarta({ i, rv }) {
+  const fotos = i.photos || []
+  if (!fotos.length) return null
+  const tipos = tiposFoto(rv, i)
+  const orden = tipos.map(([t]) => t)
+  const etiqueta = (t) => tipos.find(([k]) => k === t)?.[1] || t
+  const vistas = [...fotos].sort((a, b) => {
+    const ia = orden.indexOf(a.type), ib = orden.indexOf(b.type)
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+  })
+  const principal = vistas.find((f) => fotoConCodigo(i, f.type)) || vistas[0]
+  const resto = vistas.filter((f) => f !== principal)
+  const delCliente = fotos.every((f) => f.source)
+  const Foto = ({ f, big }) => (
+    <a className={`wr-cf${big ? ' big' : ''}`} href={api.warrantyPhotoUrl(f.id)} target="_blank" rel="noreferrer" title={`${etiqueta(f.type)}: ver en grande`}>
+      <img src={api.warrantyPhotoUrl(f.id)} alt={`${etiqueta(f.type)} de ${i.code}`} loading="lazy" />
+      <span>{CORTO_FOTO[f.type] || etiqueta(f.type)}</span>
+    </a>
+  )
+  return (
+    <div className="wr-card-fotos">
+      <Foto f={principal} big />
+      <div className="wr-cf-side">
+        <small className="wr-cf-t"><Icon.image /> {delCliente ? 'Fotos del cliente' : 'Fotos'} · {fotos.length}{tipos.length ? `/${tipos.length}` : ''}</small>
+        {resto.length ? <div className="wr-cf-rest">{resto.map((f) => <Foto key={f.id} f={f} />)}</div> : null}
+      </div>
+    </div>
+  )
+}
+
 function EtiquetaCarta({ i, rv, p, sel, propio, onSel, onFicha, onRevisar, onPilas, onModelo, onQuitar }) {
   const ui = RES_UI[i.resolution] || RES_UI.pendiente
   return (
@@ -1329,6 +1362,7 @@ function EtiquetaCarta({ i, rv, p, sel, propio, onSel, onFicha, onRevisar, onPil
       </div>
       <div className="wr-card-st">{rv ? <EstadoRev rv={rv} it={i} /> : null}<AccionRev it={i} onRevisar={onRevisar} sm /></div>
       {propio ? <blockquote className="wr-dice" title="Lo que contó el cliente de esta etiqueta"><Dicho texto={propio} /></blockquote> : null}
+      <FotosCarta i={i} rv={rv} />
       <dl className="wr-card-dl">
         <div><dt>Producto</dt><dd><Modelo r={i} onPick={onModelo} /></dd></div>
         <div><dt>Cloud</dt><dd><Donde r={i} /></dd></div>
@@ -2348,7 +2382,8 @@ export default function Warranties({ openId = null, onOpened, onOpenTicket, onGo
   // Llegar con una garantía concreta (desde la ficha de un ticket o ZKONG).
   useEffect(() => { if (openId) { setSel(openId); onOpened?.() } }, [openId])
   // Llegar con la lista filtrada (desde Equipo).
-  useEffect(() => { if (filtro) setSel(null) }, [filtro])
+  // (Al entrar con una garantía, manda la garantía: un filtro de antes no la cierra.)
+  useEffect(() => { if (filtro && !openId) setSel(null) }, [filtro])
   const [form, setForm] = useState(null)
   const [reload, setReload] = useState(0)
   const refrescar = () => setReload((n) => n + 1)

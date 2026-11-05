@@ -51,7 +51,7 @@ class WarrantyTourTest extends TestCase
 
         $guardar([
             ['id' => 'pasos', 'title' => 'Checklist', 'text' => 'Lo que hay que hacer.', 'active' => true],
-            ['id' => 'informes', 'title' => 'Informes', 'text' => WarrantyTour::DEFAULTS[10]['text'], 'active' => false],
+            ['id' => 'informes', 'title' => 'Informes', 'text' => collect(WarrantyTour::DEFAULTS)->firstWhere('id', 'informes')['text'], 'active' => false],
             ['id' => 'inventado', 'title' => 'No', 'text' => 'No'],
         ])->assertOk();
         $pasos = collect($this->getJson('/api/warranties.php?action=tour', $this->h)->json('steps'))->keyBy('id');
@@ -62,6 +62,6 @@ class WarrantyTourTest extends TestCase
 
         // Volver a los de serie.
         $guardar([])->assertOk();
-        $this->assertSame(WarrantyTour::DEFAULTS[7]['title'], collect($this->getJson('/api/warranties.php?action=tour', $this->h)->json('steps'))->firstWhere('id', 'pasos')['title']);
+        $this->assertSame(collect(WarrantyTour::DEFAULTS)->firstWhere('id', 'pasos')['title'], collect($this->getJson('/api/warranties.php?action=tour', $this->h)->json('steps'))->firstWhere('id', 'pasos')['title']);
     }
 }

@@ -11,14 +11,21 @@ use Illuminate\Support\Facades\DB;
  */
 class WarrantyTour
 {
+    /*
+     * Por apartados: el primer paso de cada uno lo señala en el menú y los siguientes
+     * enseñan lo de esa pantalla (el apartado de cada paso lo decide la interfaz; con más
+     * de un paso, el tour ofrece «Saltar apartado»).
+     */
     public const DEFAULTS = [
-        ['id' => 'inicio', 'title' => 'Gestión de garantías', 'text' => 'Te enseñamos cada apartado en un par de minutos. Avanza con «Siguiente» o con las flechas del teclado, y cierra cuando quieras con Esc.'],
+        ['id' => 'inicio', 'title' => 'Gestión de garantías', 'text' => 'Te enseñamos cada apartado en un par de minutos. Avanza con «Siguiente» o con las flechas del teclado; si ya conoces un apartado, «Saltar apartado» pasa al siguiente. Sal cuando quieras con Esc.'],
         ['id' => 'tickets', 'title' => 'Tickets de garantías', 'text' => 'Los tickets de soporte de la categoría Garantías. Desde cada uno se abre la garantía con los datos del cliente, y quedan enlazados.'],
         ['id' => 'garantias', 'title' => 'Garantías', 'text' => 'Todos los expedientes de garantía: aquí se crean, se buscan y se abren.'],
         ['id' => 'filtros', 'title' => 'Buscar y filtrar', 'text' => 'Busca por expediente, cliente, proyecto o ticket. Las pestañas separan las abiertas, las tuyas, las pendientes de ZKONG y las cerradas; en «Más filtros» están las que tienen alertas, las críticas, las que no tienen responsable…'],
-        ['id' => 'acciones', 'title' => 'Nueva garantía y exportar', 'text' => '«Nueva garantía» pide los datos y las etiquetas, que se comprueban en ZKONG al momento. «Exportar» descarga en CSV lo que estás viendo.'],
-        ['id' => 'ficha', 'title' => 'La ficha de una garantía', 'text' => 'Arriba, el estado, la urgencia, las alertas y el responsable. Desde aquí se cambia el estado, se cierra o se editan los datos. (Es una garantía de ejemplo: el tour no cambia nada).'],
-        ['id' => 'etiquetas', 'title' => 'Etiquetas y documentos', 'text' => 'En Etiquetas se revisa cada dispositivo: avería, fotos y quién paga. En Documentos están el informe, el texto para Finanzas, el correo de resolución, la pegatina del paquete y las sustituciones.'],
+        ['id' => 'acciones', 'title' => 'Nueva garantía y exportar', 'text' => '«Nueva garantía» pide los datos y las etiquetas, que se comprueban en el Cloud al momento. «Exportar» descarga en CSV lo que estás viendo.'],
+        ['id' => 'ficha', 'title' => 'La ficha de una garantía', 'text' => 'Arriba, el expediente con su estado, urgencia y alertas, y el cliente. «Conversación» abre el ticket, «Fotos del cliente» lo que ha mandado y el menú «⋯» edita o borra la garantía. (Es una garantía de ejemplo: el tour no cambia nada).'],
+        ['id' => 'datos', 'title' => 'De un vistazo', 'text' => 'El estado (se cambia aquí mismo, y se cierra o se reabre), el responsable, cuántas etiquetas están revisadas, los días que lleva abierta y la última actividad.'],
+        ['id' => 'recorrido', 'title' => 'Recorrido', 'text' => 'Por qué fases ha pasado la garantía y cuántos días ha estado en cada una. La fase actual se marca y se avisa si lleva demasiado tiempo en ella.'],
+        ['id' => 'etiquetas', 'title' => 'Etiquetas y documentos', 'text' => 'En Etiquetas se revisa cada dispositivo: cada tarjeta trae lo que contó el cliente y sus fotos (la frontal, con el código, en grande), el producto, el estado en el Cloud y el plazo. Añade etiquetas a mano o pegando una columna de Excel. En Documentos están el informe, el texto para Finanzas, el correo de resolución y la pegatina del paquete.'],
         ['id' => 'pasos', 'title' => 'Pasos', 'text' => 'Lo que hay que hacer con esta garantía según el tipo de cliente. Se marcan al hacerlos y queda quién y cuándo.'],
         ['id' => 'historial', 'title' => 'Seguimiento e historial', 'text' => 'Las notas del equipo, cada cambio y lo que escribe el cliente en el ticket, en una sola línea de tiempo.'],
         ['id' => 'equipo', 'title' => 'Equipo', 'text' => 'La carga de cada responsable: abiertas, críticas y sin actividad. Pulsa un número para ver esas garantías en la lista.'],
@@ -26,10 +33,11 @@ class WarrantyTour
         ['id' => 'clientes', 'title' => 'Clientes y proyectos', 'text' => 'Las garantías de cada cliente y sus datos del portal AEME, solo para consultar.'],
         ['id' => 'zkong', 'title' => 'ZKONG', 'text' => 'La bandeja de lo que hay que mandar a ZKONG y las remesas de RMA: se crean, se envían, se reciben y se cierran.'],
         ['id' => 'guias', 'title' => 'Protocolos y guías', 'text' => 'La documentación de cómo se trabaja: procedimientos, condiciones de garantía, guías técnicas y plantillas. En la ficha de cada garantía salen los documentos de su cliente o categoría.'],
-        ['id' => 'dispositivos', 'title' => 'Centro de dispositivos', 'text' => 'Busca cualquier etiqueta o antena en los servidores ZKONG: dónde está, cómo está y en qué garantías ha estado.'],
-        ['id' => 'catalogo', 'title' => 'Catálogo', 'text' => 'Los modelos de etiqueta, sus pilas y las referencias ZKONG ↔ AEME.'],
+        ['id' => 'dispositivos', 'title' => 'Centro de dispositivos', 'text' => 'Busca cualquier etiqueta o antena en el Cloud: dónde está, cómo está y en qué garantías ha estado.'],
+        ['id' => 'catalogo', 'title' => 'Catálogo', 'text' => 'Los modelos de etiqueta, sus pilas y las referencias del Cloud ↔ AEME.'],
         ['id' => 'config', 'title' => 'Configuración', 'text' => 'Estados, categorías, alertas, pasos, plazos, los textos de los documentos y los de este tour.'],
-        ['id' => 'fin', 'title' => 'Eso es todo', 'text' => 'Puedes repetir el tour cuando quieras desde «Tour guiado», en el menú. Cada apartado está explicado con más detalle en el «Centro de ayuda».'],
+        ['id' => 'ayuda', 'title' => 'Centro de ayuda', 'text' => 'Cada apartado explicado con más detalle, con búsqueda. En los pasos del tour que lo tienen, «Más información» te lleva a su artículo.'],
+        ['id' => 'fin', 'title' => 'Eso es todo', 'text' => 'Puedes repetir el tour cuando quieras desde «Tour guiado», en el menú.'],
     ];
 
     /** Los pasos con lo cambiado en Configuración: [{id, title, text, active}]. */

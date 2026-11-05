@@ -6570,3 +6570,35 @@ table, .dev-table,
 .x svg.ic-x, .dev-x svg.ic-x, .ver-modal-x svg.ic-x { width: 18px; height: 18px; }
 .kw-chip button svg.ic-x, .nd-del svg.ic-x, .tkv-save-no svg.ic-x, .tkv-x svg.ic-x { width: 13px; height: 13px; }
 .dev-x { display: inline-grid; place-items: center; }
+
+/* Fotos de la etiqueta en su tarjeta: la frontal grande y las demás al lado. */
+.wr-card-fotos { display: flex; gap: 10px; align-items: flex-start; margin: 2px 0 10px; }
+.wr-cf { position: relative; display: block; width: 64px; height: 64px; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--line); background: var(--panel-2); flex: none; }
+.wr-cf.big { width: 132px; height: 132px; border-radius: 10px; }
+.wr-cf img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .2s ease; }
+.wr-cf:hover img { transform: scale(1.04); }
+.wr-cf:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.wr-cf span { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 6px; font-size: 10.5px; line-height: 1.25; color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .72)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wr-cf.big span { font-size: 11.5px; padding: 5px 8px; }
+.wr-cf-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.wr-cf-t { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.wr-cf-t svg { width: 14px; height: 14px; }
+.wr-cf-rest { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .wr-cf img { transition: none; } }
+
+/* Tour: apartado, «Saltar apartado» y «Cargando…» mientras llega la pantalla del paso. */
+.tour-body { animation: fade .2s ease-out; }
+.tour-sec { display: block; margin: 8px 18px -2px; font-size: 11.5px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
+.tour-f { min-height: 57px; box-sizing: border-box; }
+.tour-skip { display: inline-flex; align-items: center; gap: 2px; border: 0; background: none; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 8px; border-radius: 8px; white-space: nowrap; }
+.tour-skip:hover { background: var(--hover); color: var(--ink); }
+.tour-skip:focus-visible, .tour-prev:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.tour-skip svg { width: 16px; height: 16px; fill: currentColor; }
+.tour-load { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); padding: 7px 4px; }
+@media (prefers-reduced-motion: reduce) { .tour-body { animation: none; } }
+.tour-pop { width: 372px; }
+.tour-f { gap: 4px; flex-wrap: wrap; }
+.tour-f .btn { margin-left: 4px; }
+@media (max-width: 420px) { .tour-prev { padding-inline: 2px; } .tour-skip { padding-inline: 6px; } }
