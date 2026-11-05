@@ -23,6 +23,8 @@ class DevicesHubTest extends TestCase
     private string $privada = '';
     private array $logins = [];
     private ?string $otraClave = null;   // si se pone, el servidor da esta clave pública
+    private array $ordenes = [];         // órdenes a etiquetas que llegaron al servidor
+    private bool $forzarFalla = false;
 
     protected function setUp(): void
     {
@@ -61,7 +63,7 @@ class DevicesHubTest extends TestCase
                     ]],
                 ]]]);
             }
-            if (str_contains($url, '/pricetag/adminEsl')) {
+            if (str_contains($url, '/pricetag/adminEsl?')) {
                 // La etiqueta 805804112 vive en los dos servidores, pero solo conectada en app02.
                 $code = $request->data()['barCode'] ?? null;
                 $rows = [];
@@ -74,6 +76,19 @@ class DevicesHubTest extends TestCase
             }
             if (str_contains($url, '/erp/esl/list') && ($request['priceTagCode'] ?? null) === '805804112') {
                 return Http::response(['success' => true, 'code' => 10000, 'data' => ['list' => [['priceTagCode' => '805804112', 'itemTitle' => 'Ibuprofeno 600', 'itemBarCode' => '8470001']]]]);
+            }
+            // Órdenes a etiquetas: se apuntan para comprobar qué se mandó.
+            foreach (['/pricetag/adminEslReboot', '/bind/updateForceByBarCodes', '/pricetag/upgradeInfo/', '/pricetag/upgrade'] as $ruta) {
+                if (str_ends_with(parse_url($url, PHP_URL_PATH), $ruta)) {
+                    $this->ordenes[] = [$ruta, $request->data()];
+                    if ($ruta === '/bind/updateForceByBarCodes' && $this->forzarFalla) {
+                        return Http::response(['success' => false, 'code' => 10003, 'message' => 'sin permiso']);
+                    }
+                    $data = $ruta === '/pricetag/upgradeInfo/' ? [['versionList' => [
+                        ['softVersion' => '2.3.10', 'actual_path' => 'fw/ZKC42V-N/2.3.10.bin', 'model' => 'ZKC42V-N', 'num' => 1],
+                    ]]] : null;
+                    return Http::response(['success' => true, 'code' => 10000, 'data' => $data]);
+                }
             }
             if (str_contains($url, '/apStation/adminAp')) {
                 return Http::response(['success' => true, 'code' => 10000, 'data' => ['rows' => [], 'total' => 0]]);
@@ -250,6 +265,63 @@ class DevicesHubTest extends TestCase
         $id = ZkongServer::value('id');
         $this->getJson("/api/devices.php?action=stats&server={$id}&kind=esl", ['X-App-Token' => $tok])
             ->assertStatus(502)->assertJsonFragment(['error' => 'Respuesta inesperada de ROTO (HTTP 502).']);
+    }
+
+    public function test_las_ordenes_a_etiquetas_piden_su_permiso_y_post(): void
+    {
+        $s = $this->servidor('app02.test');
+        $url = "/api/devices.php?action=esl_reboot&server={$s->id}";
+        $this->postJson($url, ['code' => '805804112'], ['X-App-Token' => $this->token([...self::GARANTIAS])])->assertForbidden();
+        $tok = ['X-App-Token' => $this->token([...self::GARANTIAS, 'warranties.devices'])];
+        $this->getJson($url . '&code=805804112', $tok)->assertStatus(405);
+        $this->assertSame([], $this->ordenes);
+    }
+
+    public function test_reiniciar_y_forzar_van_a_la_etiqueta_del_servidor_y_se_apuntan(): void
+    {
+        $s = $this->servidor('app02.test');
+        $tok = ['X-App-Token' => $this->token([...self::GARANTIAS, 'warranties.devices'])];
+
+        $this->postJson("/api/devices.php?action=esl_reboot&server={$s->id}", ['code' => '805-804-112'], $tok)->assertOk()->assertJson(['ok' => true]);
+        $this->postJson("/api/devices.php?action=esl_force&server={$s->id}", ['code' => '805804112'], $tok)->assertOk()->assertJson(['ok' => true]);
+        $this->assertSame([
+            ['/pricetag/adminEslReboot', [1]],
+            ['/bind/updateForceByBarCodes', ['storeId' => '100', 'barCodeList' => ['805804112']]],
+        ], $this->ordenes);
+        $this->assertSame(2, \App\Models\ActivityLog::where('subject', '805804112')->count());
+
+        // Una etiqueta que no está en ese servidor: no se manda nada.
+        $this->postJson("/api/devices.php?action=esl_reboot&server={$s->id}", ['code' => '999999999'], $tok)->assertStatus(502);
+        $this->assertCount(2, $this->ordenes);
+    }
+
+    public function test_si_zkong_no_deja_forzar_se_explica(): void
+    {
+        $s = $this->servidor('app02.test');
+        $this->forzarFalla = true;
+        $r = $this->postJson("/api/devices.php?action=esl_force&server={$s->id}", ['code' => '805804112'], ['X-App-Token' => $this->token([...self::GARANTIAS, 'warranties.devices'])])
+            ->assertStatus(502);
+        $this->assertStringContainsString('no ha dejado forzar', $r->json('error'));
+        $this->assertSame(0, \App\Models\ActivityLog::count());
+    }
+
+    public function test_firmware_primero_las_versiones_y_solo_una_de_ellas(): void
+    {
+        $s = $this->servidor('app02.test');
+        $tok = ['X-App-Token' => $this->token([...self::GARANTIAS, 'warranties.devices'])];
+
+        $r = $this->postJson("/api/devices.php?action=esl_firmwares&server={$s->id}", ['code' => '805804112'], $tok)->assertOk()->json();
+        $this->assertSame('2.2.50', $r['current']);
+        $this->assertSame('2.3.10', $r['versions'][0]['version']);
+
+        $this->postJson("/api/devices.php?action=esl_upgrade&server={$s->id}", ['code' => '805804112', 'path' => 'fw/otro.bin'], $tok)->assertStatus(502);
+        $this->assertNotContains('/pricetag/upgrade', array_column($this->ordenes, 0));
+
+        $this->postJson("/api/devices.php?action=esl_upgrade&server={$s->id}", ['code' => '805804112', 'path' => 'fw/ZKC42V-N/2.3.10.bin'], $tok)->assertOk();
+        $this->assertSame(['/pricetag/upgrade', [
+            'idList' => [1],
+            'upgradeInfoList' => [['model' => 'ZKC42V-N', 'modelVersion' => 'ZKC42V-N/2.2.50', 'actual_path' => 'fw/ZKC42V-N/2.3.10.bin']],
+        ]], end($this->ordenes));
     }
 
     public function test_un_fallo_que_no_es_del_servidor_no_sale_al_navegador(): void

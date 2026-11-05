@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\DeviceSighting;
 use App\Models\Warranty;
 use App\Models\WarrantyItem;
 use App\Models\ZkongBatch;
 use App\Models\ZkongServer;
 use App\Services\Zkong\ZkongDevices;
+use App\Services\Zkong\ZkongEslActions;
 use App\Services\Zkong\ZkongException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -15,14 +17,14 @@ use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
- * Centro de dispositivos (Gestión de garantías). Solo consulta: listas de etiquetas y
- * antenas por servidor, búsqueda de códigos en todos los servidores y ficha con historial
- * y con las garantías en las que ha estado cada código.
- * Requiere warranties.access (ruta).
+ * Centro de dispositivos (Gestión de garantías): listas de etiquetas y antenas por
+ * servidor, búsqueda de códigos en todos los servidores y ficha con historial y con las
+ * garantías en las que ha estado cada código. Requiere warranties.access (ruta).
+ * Las órdenes a una etiqueta (esl_*) piden además warranties.devices.
  */
 class DevicesController extends Controller
 {
-    public function __construct(private ZkongDevices $devices)
+    public function __construct(private ZkongDevices $devices, private ZkongEslActions $actions)
     {
     }
 
@@ -36,6 +38,7 @@ class DevicesController extends Controller
                 'stats'   => response()->json(['ok' => true, 'stats' => $this->devices->stats($this->server($request), $this->kind($request))]),
                 'search'  => $this->search($request),
                 'sheet'   => $this->sheet($request),
+                'esl_force', 'esl_reboot', 'esl_firmwares', 'esl_upgrade' => $this->accion($request),
                 default   => $this->servers(),
             };
         } catch (ModelNotFoundException) {
@@ -121,6 +124,55 @@ class DevicesController extends Controller
         }
         $r = $this->devices->sheet($code, $request->user()?->id);
         return response()->json(['ok' => true] + $r + ['warranties' => $this->garantias([$r['code']])[$r['code']] ?? []]);
+    }
+
+    /**
+     * Órdenes a una etiqueta (menú «Acciones»). Necesitan warranties.devices y POST; la
+     * etiqueta se busca por su código en el servidor elegido. Cada orden queda en el registro.
+     */
+    private function accion(Request $request)
+    {
+        if (! $request->user()?->can('warranties.devices')) {
+            return response()->json(['ok' => false, 'error' => 'No tienes permiso para dar órdenes a las etiquetas'], 403);
+        }
+        if (! $request->isMethod('post')) {
+            return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        }
+        $s = $this->server($request);
+        $row = $this->actions->find($s, (string) $request->input('code', ''));
+        $code = (string) $row['barCode'];
+
+        switch ($request->query('action')) {
+            case 'esl_firmwares':
+                return response()->json(['ok' => true, 'current' => $row['softVersion'] ?? null, 'model' => $row['model'] ?? null,
+                    'versions' => $this->actions->firmwares($s, $row)]);
+            case 'esl_reboot':
+                $this->actions->reboot($s, $row);
+                $this->apuntar($request, "Reinició la etiqueta {$code} ({$s->name})", $code);
+                return response()->json(['ok' => true, 'message' => 'Orden de reinicio enviada. La etiqueta se reinicia en su próxima conexión.']);
+            case 'esl_force':
+                $this->actions->force($s, $row);
+                $this->apuntar($request, "Forzó la actualización de la etiqueta {$code} ({$s->name})", $code);
+                return response()->json(['ok' => true, 'message' => 'Orden enviada. La etiqueta se actualiza en su próxima conexión.']);
+            default:   // esl_upgrade
+                $path = trim((string) $request->input('path', ''));
+                if ($path === '') {
+                    return response()->json(['ok' => false, 'error' => 'Elige la versión de firmware'], 400);
+                }
+                $v = $this->actions->upgrade($s, $row, $path);
+                $this->apuntar($request, "Mandó actualizar el firmware de la etiqueta {$code} a {$v['version']} ({$s->name})", $code);
+                return response()->json(['ok' => true, 'message' => "Actualización a {$v['version']} enviada. Tarda unos minutos y la etiqueta sale «Actualizando» mientras tanto."]);
+        }
+    }
+
+    private function apuntar(Request $request, string $summary, string $code): void
+    {
+        $u = $request->user();
+        ActivityLog::create([
+            'user_id' => $u->id, 'user_name' => $u->name ?: $u->email, 'section' => 'Garantías',
+            'action' => (string) $request->query('action'), 'summary' => mb_substr($summary, 0, 300),
+            'subject' => $code, 'method' => 'POST', 'ip' => $request->ip(), 'created_at' => now(),
+        ]);
     }
 
     private function server(Request $request): ZkongServer

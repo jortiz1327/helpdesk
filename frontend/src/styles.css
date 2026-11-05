@@ -4234,6 +4234,39 @@ button.dev-code:hover { text-decoration: underline; }
 .dev-mcard-s { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dev-mcard-s svg, .dev-mcard-f svg { width: 13px; height: 13px; fill: var(--ink-3); flex-shrink: 0; }
 .dev-mcard-f { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink-3); }
+.dev-mcard-a { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+/* Acciones de una etiqueta (menú por fila) */
+.dev-btn.sm { height: 30px; padding: 0 11px; font-size: 12.5px; border-radius: 8px; gap: 5px; }
+.dev-btn.sm svg { width: 14px; height: 14px; }
+.dev-btn .spinner.sm { width: 12px; height: 12px; }
+.dev-acc-btn.on { border-color: var(--primary); background: var(--primary-soft); }
+/* Columna fija a la derecha: fondo opaco con el tinte de la fila encima. */
+.dev-table th.c-acc, .dev-table td.c-acc { position: sticky; right: 0; width: 1%; box-shadow: -1px 0 0 var(--line); }
+.dev-table th.c-acc { z-index: 3; }
+.dev-table td.c-acc { z-index: 1; background: var(--panel); }
+.dev-table tbody tr:hover td.c-acc { background: linear-gradient(var(--hover), var(--hover)), var(--panel); }
+.dev-table tr.is-off td.c-acc { --t: color-mix(in srgb, var(--danger) 4%, transparent); background: linear-gradient(var(--t), var(--t)), var(--panel); }
+.dev-table tr.is-off:hover td.c-acc { --t: color-mix(in srgb, var(--danger) 8%, transparent); }
+.dev-acc { display: flex; gap: 6px; justify-content: flex-end; }
+.dev-acc-menu { position: fixed; z-index: 120; width: 300px; max-width: calc(100vw - 16px); background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; animation: drop 0.14s ease; }
+.dev-acc-h { padding: 8px 10px 9px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
+.dev-acc-h b { color: var(--ink); font-family: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace; }
+.dev-acc-menu > button { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 8px; text-align: left; color: var(--ink); }
+.dev-acc-menu > button:hover, .dev-acc-menu > button:focus-visible { background: var(--hover); outline: 0; }
+.dev-acc-menu > button svg { width: 17px; height: 17px; fill: var(--ink-2); flex: none; margin-top: 1px; }
+.dev-acc-menu > button span { display: flex; flex-direction: column; gap: 2px; }
+.dev-acc-menu > button b { font-size: 13.5px; font-weight: 600; }
+.dev-acc-menu > button small { font-size: 12px; color: var(--ink-3); }
+.dev-acc-menu > button.bad, .dev-acc-menu > button.bad svg { color: var(--danger); fill: var(--danger); }
+.dev-fw { max-width: 440px; padding: 24px; }
+.dev-fw h3 { margin: 0 0 6px; }
+.dev-fw-list { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 4px; max-height: 300px; overflow: auto; }
+.dev-fw-list label { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.dev-fw-list label.on { border-color: var(--primary); background: var(--primary-soft); }
+.dev-fw-list label.off { opacity: 0.55; cursor: default; }
+.dev-fw-list label span { display: flex; flex-direction: column; }
+.dev-fw-list label small { font-size: 12px; color: var(--ink-3); }
 .dev-mcard-f span { display: inline-flex; align-items: center; gap: 4px; }
 .dev-mcard-f .bad { color: var(--danger); } .dev-mcard-f .bad svg { fill: var(--danger); }
 

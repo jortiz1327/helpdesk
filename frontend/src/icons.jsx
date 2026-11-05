@@ -59,7 +59,8 @@ export const Icon = {
   catalog: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M19 6h-2a3 3 0 0 0-6 0H9a3 3 0 0 0-6 0H2v2h1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8h1V6h-3zm-7-1a1 1 0 0 1 1 1h-2a1 1 0 0 1 1-1z" /></svg>,
   upload: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M19 13a1 1 0 0 0-1 1v3H6v-3a1 1 0 0 0-2 0v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1zM12 3l-5 5h3v6h4V8h3l-5-5z" /></svg>,
   kanban: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M4 3h5a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm11 0h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /></svg>,
-  refresh: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M17.65 6.35A8 8 0 1 0 19.3 14h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" /></svg>,
+  power: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M11 3h2v10h-2zM16.56 5.44l-1.45 1.45A5.97 5.97 0 0 1 18 12a6 6 0 0 1-12 0c0-2.17 1.16-4.06 2.88-5.12L7.44 5.44A7.96 7.96 0 0 0 4 12a8 8 0 0 0 16 0c0-2.72-1.36-5.12-3.44-6.56z" /></svg>,
+  refresh: (p) =><svg viewBox="0 0 24 24" {...p}><path d="M17.65 6.35A8 8 0 1 0 19.3 14h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" /></svg>,
   // Ticket: la entidad núcleo del sistema. Muescas laterales + perforación central.
   ticket: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M22 10V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v4a2 2 0 0 1 0 4v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 1 0-4zm-9 7.5h-2v-2h2v2zm0-4.5h-2v-2h2v2zm0-4.5h-2v-2h2v2z" /></svg>,
   // Globo: canal WEB (el portal del cliente)

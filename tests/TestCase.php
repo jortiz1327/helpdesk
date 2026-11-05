@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
-    /** Quien trabaja las garantías (todo menos borrar, configurar y los servidores ZKONG). */
+    /** Quien trabaja las garantías (todo menos borrar, configurar, las órdenes a etiquetas y los servidores ZKONG). */
     protected const GARANTIAS = ['warranties.access', 'warranties.edit', 'warranties.review', 'warranties.documents',
         'warranties.positions_ticket', 'warranties.zkong'];
 

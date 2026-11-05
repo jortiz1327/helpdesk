@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../api.js'
 import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
+import { useToast, useConfirm } from '../App.jsx'
 
 /* -------------------------------------------------------------------------
- * CENTRO DE DISPOSITIVOS (Gestión de garantías). Solo consulta.
+ * CENTRO DE DISPOSITIVOS (Gestión de garantías). Consulta y, con warranties.devices,
+ * el menú «Acciones» de cada etiqueta (forzar, firmware, reiniciar).
  *
  * Arriba: el servidor que se consulta y los tres modos (Etiquetas, Antenas, Buscar).
  * Etiquetas y Antenas: cifras del servidor (también filtran al pincharlas) y una
@@ -149,6 +152,141 @@ function Celda({ kind, k, r, onOpen, items }) {
   }
 }
 
+/* --- Acciones sobre una etiqueta (solo con warranties.devices) ---
+ * Forzar y reiniciar mandan la orden al servidor de la lista; el firmware pide antes la
+ * versión. El menú va en un portal con posición fija: dentro de la tabla (que hace scroll
+ * y tiene la cabecera fija) se cortaría. */
+function Acciones({ server, r }) {
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [pos, setPos] = useState(null)          // {top, right} con el menú abierto
+  const [busy, setBusy] = useState(false)
+  const [firmware, setFirmware] = useState(false)
+  const btn = useRef(null)
+  const menu = useRef(null)
+
+  useEffect(() => {
+    if (!pos) return
+    const cerrar = (e) => { if (!menu.current?.contains(e.target) && !btn.current?.contains(e.target)) setPos(null) }
+    const tecla = (e) => { if (e.key === 'Escape') setPos(null) }
+    const fuera = () => setPos(null)
+    document.addEventListener('mousedown', cerrar)
+    document.addEventListener('keydown', tecla)
+    window.addEventListener('scroll', fuera, true)
+    window.addEventListener('resize', fuera)
+    return () => {
+      document.removeEventListener('mousedown', cerrar)
+      document.removeEventListener('keydown', tecla)
+      window.removeEventListener('scroll', fuera, true)
+      window.removeEventListener('resize', fuera)
+    }
+  }, [pos])
+
+  const abrir = () => {
+    if (pos) { setPos(null); return }
+    const b = btn.current.getBoundingClientRect()
+    const right = Math.max(8, window.innerWidth - b.right)
+    // Si abajo no cabe (~200 px), se abre hacia arriba.
+    setPos(b.bottom + 200 > window.innerHeight ? { bottom: window.innerHeight - b.top + 4, right } : { top: b.bottom + 4, right })
+  }
+
+  const mandar = async (action, ok) => {
+    setBusy(true)
+    const res = await api.deviceAction(server, action, r.barCode)
+    setBusy(false)
+    toast(res.ok ? res.message || ok : res.error || 'El servidor no ha aceptado la orden', res.ok ? undefined : 'err')
+  }
+
+  const reiniciar = async () => {
+    setPos(null)
+    if (!(await confirm({
+      title: `Reiniciar la etiqueta ${r.barCode}`,
+      message: `Se manda la orden a ${r.server || 'su servidor'}${r.storeName ? ` (tienda ${r.storeName})` : ''}. La etiqueta se reinicia en su próxima conexión.`,
+      confirmText: 'Reiniciar', danger: true,
+    }))) return
+    mandar('esl_reboot', 'Orden de reinicio enviada')
+  }
+
+  return (
+    <>
+      <button ref={btn} className={`dev-btn sm dev-acc-btn ${pos ? 'on' : ''}`} disabled={busy} onClick={abrir} aria-haspopup="menu" aria-expanded={!!pos}>
+        {busy ? <span className="spinner sm" /> : null}Acciones <Icon.chevron />
+      </button>
+      {pos && createPortal(
+        <div ref={menu} className="dev-acc-menu" role="menu" style={pos}>
+          <div className="dev-acc-h">Etiqueta <b>{r.barCode}</b></div>
+          <button role="menuitem" onClick={() => { setPos(null); mandar('esl_force', 'Orden enviada') }}>
+            <Icon.refresh /><span><b>Forzar actualización</b><small>Pide a la etiqueta que se actualice ahora.</small></span>
+          </button>
+          <button role="menuitem" onClick={() => { setPos(null); setFirmware(true) }}>
+            <Icon.upload /><span><b>Actualizar firmware</b><small>Primero se elige la versión.</small></span>
+          </button>
+          <button role="menuitem" className="bad" onClick={reiniciar}>
+            <Icon.power /><span><b>Reiniciar</b><small>Pide confirmación antes de enviarlo.</small></span>
+          </button>
+        </div>,
+        document.body,
+      )}
+      {firmware && createPortal(<Firmware server={server} r={r} onClose={() => setFirmware(false)} />, document.body)}
+    </>
+  )
+}
+
+/* Elegir la versión de firmware (las que ZKONG ofrece para esa etiqueta) y mandarla. */
+function Firmware({ server, r, onClose }) {
+  const toast = useToast()
+  const [info, setInfo] = useState(null)        // {current, versions} | {error}
+  const [path, setPath] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    api.deviceAction(server, 'esl_firmwares', r.barCode).then((res) => {
+      setInfo(res.ok ? res : { error: res.error || 'No se pudieron leer las versiones' })
+      const otras = res.ok ? (res.versions || []).filter((v) => v.version !== res.current) : []
+      if (otras.length === 1) setPath(otras[0].path)
+    })
+  }, [server, r.barCode])
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape' && !busy) onClose() }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [busy, onClose])
+
+  const enviar = async () => {
+    if (!path || busy) return
+    setBusy(true)
+    const res = await api.deviceAction(server, 'esl_upgrade', r.barCode, { path })
+    setBusy(false)
+    if (res.ok) { toast(res.message || 'Actualización enviada'); onClose() } else toast(res.error || 'El servidor no ha aceptado la orden', 'err')
+  }
+
+  return (
+    <div className="modal-bg" onClick={(e) => !busy && e.target.classList.contains('modal-bg') && onClose()}>
+      <div className="modal dev-fw">
+        <h3>Actualizar firmware</h3>
+        <p className="dev-mute">Etiqueta <b className="dev-mono">{r.barCode}</b>{r.model ? <> · {r.model}</> : null} · ahora con <b className="dev-mono">{info?.current || r.softVersion || '—'}</b></p>
+        {info === null ? <div className="center-load"><div className="spinner" /></div>
+          : info.error ? <div className="dev-error in"><Icon.warn /> {info.error}</div>
+          : !info.versions.length ? <p className="dev-mute">ZKONG no ofrece ninguna versión para esta etiqueta.</p>
+          : (
+            <div className="dev-fw-list" role="radiogroup">
+              {info.versions.map((v) => (
+                <label key={v.path} className={`${path === v.path ? 'on' : ''} ${v.version === info.current ? 'off' : ''}`}>
+                  <input type="radio" name="fw" checked={path === v.path} disabled={v.version === info.current} onChange={() => setPath(v.path)} />
+                  <span><b className="dev-mono">{v.version}</b>{v.version === info.current ? <small>La que tiene ahora</small> : v.model ? <small>{v.model}</small> : null}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        <div className="confirm-actions">
+          <button className="btn ghost" disabled={busy} onClick={onClose}>Cancelar</button>
+          <button className="btn" disabled={!path || busy} onClick={enviar}>{busy ? 'Enviando…' : 'Actualizar'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* Cifras del servidor. Pinchar una filtra la lista por ella (y otra vez la quita). */
 function Cifras({ kind, stats, f, onPick }) {
   const tiles = kind === 'ap'
@@ -202,7 +340,7 @@ function Paginas({ page, paginas, onGo, disabled }) {
 }
 
 /* Tarjeta de un dispositivo para el móvil (la tabla no cabe). */
-function Tarjeta({ kind, r, items, onOpen }) {
+function Tarjeta({ kind, r, items, onOpen, acciones = null }) {
   const code = kind === 'ap' ? r.mac : r.barCode
   const [, cls] = estadoDe(kind, r)
   return (
@@ -220,12 +358,13 @@ function Tarjeta({ kind, r, items, onOpen }) {
         <span>{kind === 'ap' ? `${num(r.eslCount)} etiquetas` : r.softVersion || '—'}</span>
         <span className={cls === 'off' ? 'bad' : ''}><Icon.clock /> {hace(kind === 'ap' ? r.offLineTime : r.lastCommuTime)}</span>
       </div>
+      {acciones && <div className="dev-mcard-a">{acciones}</div>}
     </div>
   )
 }
 
 /* --- Lista de un servidor (etiquetas o antenas) --- */
-function Lista({ kind, server, stats, onOpen }) {
+function Lista({ kind, server, stats, onOpen, canActions = false }) {
   const [opts, setOpts] = useState(null)        // { stores, models, versions }
   const [f, setF] = useState(VACIO)
   const [codeLive, setCodeLive] = useState('')
@@ -283,6 +422,7 @@ function Lista({ kind, server, stats, onOpen }) {
   const filas = data?.rows?.map((r) => (kind === 'esl' && items[r.barCode] ? { ...r, ...items[r.barCode] } : r)) || []
   const nombre = kind === 'ap' ? 'antenas' : 'etiquetas'
   const caido = (r) => estadoDe(kind, r)[1] === 'off'
+  const conAcciones = canActions && kind === 'esl'
 
   return (
     <>
@@ -309,13 +449,19 @@ function Lista({ kind, server, stats, onOpen }) {
           <>
             <div className="dev-table-wrap">
               <table className="dev-table">
-                <thead><tr>{COLS[kind].map(([k, l]) => <th key={k} className={`c-${k}`}>{l}</th>)}</tr></thead>
+                <thead><tr>{COLS[kind].map(([k, l]) => <th key={k} className={`c-${k}`}>{l}</th>)}{conAcciones && <th className="c-acc" />}</tr></thead>
                 <tbody>
                   {data === null
-                    ? Array.from({ length: 8 }, (_, i) => <tr key={i}>{COLS[kind].map(([k]) => <td key={k}><span className="dev-skel" /></td>)}</tr>)
+                    ? Array.from({ length: 8 }, (_, i) => <tr key={i}>{COLS[kind].map(([k]) => <td key={k}><span className="dev-skel" /></td>)}{conAcciones && <td />}</tr>)
                     : filas.map((r, i) => (
                       <tr key={(r.id ?? '') + '-' + i} className={caido(r) ? 'is-off' : ''}>
                         {COLS[kind].map(([k]) => <td key={k} className={`c-${k}`}><Celda kind={kind} k={k} r={r} onOpen={onOpen} items={kind === 'esl' ? items : null} /></td>)}
+                        {conAcciones && (
+                          <td className="c-acc"><div className="dev-acc">
+                            <button className="dev-btn sm" onClick={() => onOpen(r.barCode)}>Ver</button>
+                            <Acciones server={server} r={r} />
+                          </div></td>
+                        )}
                       </tr>
                     ))}
                 </tbody>
@@ -323,7 +469,7 @@ function Lista({ kind, server, stats, onOpen }) {
             </div>
             <div className="dev-mlist">
               {data === null ? <div className="center-load"><div className="spinner" /></div>
-                : filas.map((r, i) => <Tarjeta key={(r.id ?? '') + '-' + i} kind={kind} r={r} items={items} onOpen={onOpen} />)}
+                : filas.map((r, i) => <Tarjeta key={(r.id ?? '') + '-' + i} kind={kind} r={r} items={items} onOpen={onOpen} acciones={conAcciones ? <Acciones server={server} r={r} /> : null} />)}
             </div>
             {data && !filas.length && (
               <div className="act-empty"><Icon.search style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} /><p>{filtrando ? 'Ningún dispositivo coincide con el filtro.' : 'Este servidor no tiene dispositivos.'}</p></div>
@@ -652,7 +798,7 @@ function Cabecera({ tab, setTab, servers, server, elegir, stats }) {
   )
 }
 
-export default function Devices({ canServers = false, onGoServers, onOpenWarranty }) {
+export default function Devices({ canServers = false, canActions = false, onGoServers, onOpenWarranty }) {
   const [tab, setTab] = useState('esl')
   const [servers, setServers] = useState(null)
   const [server, setServer] = useState(null)
@@ -701,7 +847,7 @@ export default function Devices({ canServers = false, onGoServers, onOpenWarrant
             <>
               <Cabecera tab={tab} setTab={setTab} servers={servers} server={server} elegir={elegir} stats={stats} />
               {tab === 'search' ? <Buscar servers={servers} onOpen={setFicha} onOpenWarranty={onOpenWarranty} />
-                : <Lista key={tab} kind={tab} server={server} stats={stats[tab] || null} onOpen={setFicha} />}
+                : <Lista key={tab} kind={tab} server={server} stats={stats[tab] || null} onOpen={setFicha} canActions={canActions} />}
             </>
           )}
       </div></div>

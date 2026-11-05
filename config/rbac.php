@@ -66,6 +66,8 @@ return [
         'warranties.documents' => ['Documentos: informe, correo de resolución, texto para Finanzas y sustituciones', 'warranties'],
         'warranties.positions_ticket' => ['Crear el ticket de posiciones de las sustituciones', 'warranties'],
         'warranties.zkong'   => ['Gestionar las remesas de RMA a ZKONG',       'warranties'],
+        // Órdenes a las etiquetas desde el Centro de dispositivos (cambian cosas en ZKONG).
+        'warranties.devices' => ['Acciones sobre etiquetas en ZKONG: forzar actualización, firmware y reiniciar', 'warranties'],
         // Borrar garantías. Sin rol: solo superadmin, o se da a mano.
         'warranties.delete'  => ['Eliminar garantías',                         'warranties'],
         // Usuario y contraseña de los servidores ZKONG. NO se asigna a ningún rol: solo superadmin.
@@ -156,7 +158,7 @@ return [
             'description' => 'Lleva las garantías de principio a fin: revisión, documentos, remesas a ZKONG, ticket de posiciones y su configuración.',
             'permissions' => [
                 'warranties.access', 'warranties.edit', 'warranties.review', 'warranties.documents',
-                'warranties.positions_ticket', 'warranties.zkong', 'warranties.config',
+                'warranties.positions_ticket', 'warranties.zkong', 'warranties.devices', 'warranties.config',
                 'helpdesk.access', 'tickets.create', 'tickets.reply', 'tickets.close',
                 'contacts.access',
             ],
@@ -166,7 +168,7 @@ return [
             'label'       => 'Técnico de garantías',
             'description' => 'Recibe y revisa los dispositivos (etiquetas, fotos, resultado) y prepara las remesas a ZKONG. No genera documentos ni toca la configuración.',
             'permissions' => [
-                'warranties.access', 'warranties.edit', 'warranties.review', 'warranties.zkong',
+                'warranties.access', 'warranties.edit', 'warranties.review', 'warranties.zkong', 'warranties.devices',
             ],
         ],
 

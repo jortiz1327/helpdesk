@@ -382,6 +382,10 @@ export const api = {
   deviceSearch: (codes) => req('devices.php?action=search', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codes }), timeout: 120000,
   }),
+  // Órdenes a una etiqueta: esl_force | esl_reboot | esl_firmwares | esl_upgrade (con path).
+  deviceAction: (server, action, code, extra = {}) => req(`devices.php?action=${action}&server=${server}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, ...extra }), timeout: 60000,
+  }),
   deviceSheet: (code) => req(`devices.php?action=sheet&code=${encodeURIComponent(code)}`, { timeout: 90000 }),
   zkongServers: () => req('zkong_servers.php'),
   saveZkongServer: (payload) => req('zkong_servers.php?action=save', {
