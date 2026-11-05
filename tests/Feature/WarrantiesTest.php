@@ -363,6 +363,34 @@ class WarrantiesTest extends TestCase
         \Illuminate\Support\Facades\Cache::flush();
     }
 
+    /** Pegar desde Excel: una columna con el código y otra con el problema rellena «lo que dice el cliente». */
+    public function test_lista_pegada_de_excel_con_codigo_y_problema(): void
+    {
+        config(['database.connections.portal_aeme.host' => '']);
+        [, $h] = $this->agente();
+        $this->zkong([
+            '8E9749440' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
+            '854A49907' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
+            '806301480' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true],
+            'A0A3B85B5F7F' => ['APP02', 'Sol Centro', null, true],
+        ]);
+        $excel = "Código\tProblema\n8E9749440\tPantalla rota\n854A49907\t\"No enciende, parpadea\"\n806301480\nA0:A3:B8:5B:5F:7F - sin conexión\n";
+
+        $r = $this->postJson('/api/warranties.php?action=labels_check', ['codes' => $excel, 'project_name' => 'Sol Centro'], $h)->assertOk()->json();
+        $this->assertSame([], $r['invalid']);   // la cabecera no cuenta como código malo
+        $this->assertSame(['8E9749440' => 'Pantalla rota', '854A49907' => 'No enciende, parpadea', '806301480' => null, 'A0A3B85B5F7F' => 'sin conexión'],
+            collect($r['results'])->pluck('issue', 'code')->all());
+
+        // En el alta y al añadir a una garantía que ya existe.
+        $w = $this->crear($h, ['labels' => $excel]);
+        $items = collect($this->getJson("/api/warranties.php?action=get&id={$w['id']}", $h)->json('items'))->pluck('reported_issue', 'code');
+        $this->assertSame(['8E9749440' => 'Pantalla rota', '854A49907' => 'No enciende, parpadea', '806301480' => null, 'A0A3B85B5F7F' => 'sin conexión'], $items->all());
+
+        $this->zkong(['8E9749441' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true]]);
+        $this->postJson('/api/warranties.php?action=labels_add', ['id' => $w['id'], 'codes' => "8E9749441;  se ve rojiza  "], $h)->assertOk()->assertJsonPath('added.0', '8E9749441');
+        $this->assertSame('se ve rojiza', DB::table('warranty_items')->where('code', '8E9749441')->value('reported_issue'));
+    }
+
     /** La ficha diagnostica con la batería y la señal que da ZKONG: se guardan con cada etiqueta. */
     public function test_la_bateria_y_la_senal_de_zkong_se_guardan_con_la_etiqueta(): void
     {
@@ -397,8 +425,9 @@ class WarrantiesTest extends TestCase
             '854A49907' => ['APP02', 'Mis Chuches', 'ZKC99X-NE4', false, 60],
         ]);
 
-        $r = $this->postJson('/api/warranties.php?action=labels_check', ['codes' => "8e9749440\n854A49907, ZZZZZZZZ9  malo", 'client_name' => 'Hoteles Sol', 'project_name' => 'Sol Centro'], $h)->assertOk()->json();
-        $this->assertSame(['MALO'], $r['invalid']);
+        $r = $this->postJson('/api/warranties.php?action=labels_check', ['codes' => "8e9749440\n854A49907, ZZZZZZZZ9  8E974944", 'client_name' => 'Hoteles Sol', 'project_name' => 'Sol Centro'], $h)->assertOk()->json();
+        $this->assertSame(['8E974944'], $r['invalid']);   // mal copiado: no válido, no «problema»
+        $this->assertNull($r['results'][0]['issue']);
         $res = collect($r['results'])->keyBy('code');
         $this->assertSame('AMC26V', $res['8E9749440']['aeme_ref']);           // del modelo del servidor sale el producto
         $this->assertSame([], $res['8E9749440']['warnings']);

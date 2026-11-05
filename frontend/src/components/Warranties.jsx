@@ -678,6 +678,15 @@ function agruparAvisos(res) {
 }
 const fmtDiaCorto = (s) => { const [y, m, d] = String(s).slice(0, 10).split('-'); return d && m && y ? `${d}/${m}/${y}` : s }
 
+/* Códigos de una lista pegada (también de Excel: código y problema por fila). Lo mismo que
+   WarrantyLabels::parseList en el servidor: el código lleva alguna cifra; el resto es texto. */
+const normCodigo = (t) => t.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+const esCodigo = (t) => { const c = normCodigo(t); return /\d/.test(c) && (/^[A-Z0-9]{9}$/.test(c) || /^[0-9A-F]{12}$/.test(c)) }
+const pareceCodigo = (t) => { const c = normCodigo(t); return c.length >= 6 && c.length <= 20 && /\d/.test(c) }   // mal copiado
+const trozos = (l) => l.split(/[\s,;]+/).filter(Boolean)
+const codigosDe = (linea) => trozos(linea).filter(esCodigo).map(normCodigo)
+const contarCodigos = (texto) => new Set(texto.split(/\r?\n/).flatMap(codigosDe)).size
+
 /* Caja para pegar códigos y comprobarlos. El estado (texto, resultados, modelos
    elegidos a mano) lo guarda quien la usa: value / onChange. */
 function Comprobador({ contexto, value, onChange, autoFocus, split }) {
@@ -686,7 +695,8 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
   const [filtro, setFiltro] = useState('')   // en dos columnas: todas | bad | warn | ok
   const v = value
   const set = (cambios) => onChange({ ...v, ...cambios })
-  const lineas = v.text.split(/[\s,;]+/).filter(Boolean).length
+  const lineas = contarCodigos(v.text)
+  const conTexto = v.text.split(/\r?\n/).some((l) => codigosDe(l).length && trozos(l).some((t) => !esCodigo(t) && !pareceCodigo(t)))
   const comprobado = v.results && v.checked === v.text
   const hayFallos = comprobado && v.results.some((r) => r.lookup_state !== 'found')
 
@@ -704,10 +714,15 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
   res.forEach((r) => { cuenta[r.already ? 'bad' : estadoEtiqueta(r)]++ })
 
   // Quita códigos de la lista sin tener que volver a comprobar el resto.
-  const norm = (t) => t.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
   const quitar = (codes) => {
     const fuera = new Set(codes)
-    const texto = v.text.split(/\r?\n/).map((l) => l.split(/[\s,;]+/).filter((t) => t && !fuera.has(norm(t))).join(' ')).filter((l) => l.trim()).join('\n')
+    // Una fila con su problema (Excel) se quita entera; una de solo códigos, código a código.
+    const texto = v.text.split(/\r?\n/).map((l) => {
+      const cs = codigosDe(l)
+      if (!cs.some((c) => fuera.has(c))) return l
+      if (trozos(l).every(esCodigo)) return trozos(l).filter((t) => !fuera.has(normCodigo(t))).join(' ')
+      return cs.every((c) => fuera.has(c)) ? '' : l
+    }).filter((l) => l.trim()).join('\n')
     set({ text: texto, checked: comprobado ? texto : v.checked, results: v.results ? v.results.filter((r) => !fuera.has(r.code)) : v.results, invalid: (v.invalid || []).filter((c) => !fuera.has(c)) })
   }
   const estado = (r) => (r.already ? 'bad' : estadoEtiqueta(r))
@@ -721,13 +736,13 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
     return (
       <div className="wr-cs">
         <div className="wr-cs-in">
-          <span className="lbl">Códigos <span className="hint">— uno por línea: etiqueta (9) o MAC de antena (12)</span></span>
+          <span className="lbl">Códigos <span className="hint">— uno por línea: etiqueta (9) o MAC de antena (12). Desde Excel, pega el código y el problema: se rellena lo que dice el cliente</span></span>
           <textarea className="mono" value={v.text} autoFocus={autoFocus} onChange={(e) => set({ text: e.target.value })}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) comprobar() }}
-            placeholder={'806301480\n806301834\nA0A3B85B5F7F'} />
+            placeholder={'806301480\tPantalla rota\n806301834\tNo enciende\nA0A3B85B5F7F'} />
           {comprobado && v.invalid?.length ? <p className="wr-comp-bad">No son etiquetas ni antenas: <span className="mono">{v.invalid.join(', ')}</span></p> : null}
           <div className="wr-cs-f">
-            <span className="dev-mute">{lineas ? `${lineas} ${lineas === 1 ? 'código' : 'códigos'}` : 'Ctrl+Enter para comprobar'}</span>
+            <span className="dev-mute">{lineas ? `${lineas} ${lineas === 1 ? 'código' : 'códigos'}${conTexto ? ' con su problema' : ''}` : 'Ctrl+Enter para comprobar'}</span>
             <button type="button" className={comprobado && !hayFallos ? 'btn ghost' : 'btn'} disabled={cargando || !lineas || (comprobado && !hayFallos)} onClick={comprobar}>
               {hayFallos && !cargando ? <Icon.refresh /> : <Icon.search />} {cargando ? 'Buscando…' : hayFallos ? 'Volver a comprobar' : comprobado ? 'Comprobadas' : 'Comprobar'}
             </button>
@@ -759,6 +774,7 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
                     <Donde r={r} />
                     {r.already ? <span className="wr-st bad">Ya está en esta garantía</span> : <Modelo r={r} onPick={r.blocked ? null : (ref, m) => elegir(r.code, ref, m)} />}
                     <button type="button" className="icon-btn sm" title="Quitar de la lista" onClick={() => quitar([r.code])}><Icon.x /></button>
+                    {r.issue ? <p className="wr-cs-issue" title="Lo que dice el cliente (de la lista pegada)"><Icon.quote /> {r.issue}</p> : null}
                     {(() => {
                       const propios = (r.warnings || []).filter((a) => !agrupado(r.code, a))
                       return propios.length ? <p className="wr-cs-av">{propios.map((a, i) => <span key={i} className={`t-${a.tone}`}>{a.text}</span>)}</p> : null
@@ -779,9 +795,9 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
       <textarea rows={4} className="mono" value={v.text} autoFocus={autoFocus}
         onChange={(e) => set({ text: e.target.value })}
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) comprobar() }}
-        placeholder={'Pega los códigos, uno por línea: etiquetas (9 caracteres) o MAC de antenas\n8E9749440\nA0A3B85B5F7F'} />
+        placeholder={'Pega los códigos, uno por línea: etiquetas (9 caracteres) o MAC de antenas.\nDesde Excel puedes pegar el código y el problema:\n8E9749440\tPantalla rota\nA0A3B85B5F7F'} />
       <div className="wr-comp-f">
-        <span className="dev-mute">{lineas ? `${lineas} ${lineas === 1 ? 'código' : 'códigos'}` : 'Etiquetas: código de 9 caracteres · Antenas: su MAC'}{comprobado ? '' : lineas ? ' · sin comprobar' : ''}</span>
+        <span className="dev-mute">{lineas ? `${lineas} ${lineas === 1 ? 'código' : 'códigos'}${conTexto ? ' con su problema' : ''}` : 'Etiquetas: código de 9 caracteres · Antenas: su MAC · desde Excel, con el problema al lado'}{comprobado ? '' : lineas ? ' · sin comprobar' : ''}</span>
         <button type="button" className="dev-btn" disabled={cargando || !lineas || (comprobado && !hayFallos)} onClick={comprobar}>
           {hayFallos && !cargando ? <Icon.refresh /> : <Icon.search />} {cargando ? 'Buscando en los servidores…' : hayFallos ? 'Volver a comprobar' : comprobado ? 'Comprobadas' : 'Comprobar'}
         </button>
@@ -802,6 +818,7 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
                   <span className="wr-lbl-code mono">{r.code}{r.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</span>
                   <Donde r={r} />
                   {r.already ? <span className="wr-st bad">Ya está en esta garantía</span> : <Modelo r={r} onPick={r.blocked ? null : (ref, m) => elegir(r.code, ref, m)} />}
+                  {r.issue ? <p className="full wr-cs-issue"><Icon.quote /> {r.issue}</p> : null}
                   <div className="full"><Avisos list={r.warnings} /></div>
                 </li>
               )
@@ -2002,6 +2019,12 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, 
             <b className={stale ? 'wf-warn' : ''}>{haceDias(diasSin)}</b>
           </div>
           {ticket ? <div className="wf-fact"><span>Ticket</span><b>{ticket}</b></div> : null}
+          {w.rating ? (
+            <div className="wf-fact" title={w.rating.comment ? `“${w.rating.comment}”` : 'Sin comentario'}>
+              <span>Encuesta del cliente</span>
+              <b className={`wf-rate r${w.rating.score}`}><i>{w.rating.score}</i>{w.rating.label}{w.rating.comment ? <Icon.chat /> : null}</b>
+            </div>
+          ) : null}
         </div>
 
         {siguiente ? (

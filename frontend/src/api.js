@@ -455,6 +455,7 @@ export const api = {
   warrantyReport: (params) => req('warranties.php?action=report&' + new URLSearchParams(params).toString()),
   warrantyFailures: (params) => req('warranties.php?action=failures&' + new URLSearchParams(params).toString()),
   warrantyPhases: (params) => req('warranties.php?action=phases&' + new URLSearchParams(params).toString()),
+  warrantySurveyStats: (params) => req('warranties.php?action=survey_stats&' + new URLSearchParams(params).toString()),
   warrantyPortalStats: (params) => req('warranties.php?action=portal_stats&' + new URLSearchParams(params).toString()),
   // Clientes y proyectos (solo consulta). key = «p:<cliente del portal>» o «n:<nombre>».
   warrantyClients: () => req('warranty_clients.php'),

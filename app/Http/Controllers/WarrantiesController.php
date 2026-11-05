@@ -66,6 +66,7 @@ class WarrantiesController extends Controller
             'failures'          => $this->failures($request),
             'portal_stats'      => $this->portalStats($request),
             'phases'            => $this->phases($request),
+            'survey_stats'      => $this->surveyStats($request),
             'step'              => $this->step($request),
             'cloud_label'       => $this->cloudLabel($request),
             'tour'              => $this->tour($request),
@@ -297,6 +298,7 @@ class WarrantiesController extends Controller
         return response()->json(['ok' => true, 'warranty' => $this->row($w) + [
             'alerts'          => $this->alertas()->alerts([$w])[$w->id] ?? [],
             'status_changed_at' => $w->status_changed_at?->toDateTimeString(),
+            'rating'          => \App\Services\WarrantySurvey::forWarranty($w->id),
             'description'     => $w->description,
             // El asunto es del Helpdesk: solo para quien puede ver ese ticket.
             'ticket_subject'  => $w->ticketVisibleTo($request->user()) ? $w->ticket_subject : null,
@@ -473,7 +475,7 @@ class WarrantiesController extends Controller
     // Comprueba los códigos pegados sin guardar nada (en el alta y al añadir a una garantía).
     private function labelsCheck(Request $request)
     {
-        [$codes, $invalid] = WarrantyLabels::parse((string) $request->input('codes', ''));
+        [$codes, $invalid, $problemas] = WarrantyLabels::parseList((string) $request->input('codes', ''));
         if (count($codes) > WarrantyLabels::MAX) {
             return response()->json(['ok' => false, 'error' => 'Como mucho ' . WarrantyLabels::MAX . ' etiquetas de una vez'], 400);
         }
@@ -486,6 +488,7 @@ class WarrantiesController extends Controller
         foreach ($results as &$r) {
             $r['already'] = in_array($r['code'], $ya, true);
             $r['model_label'] = $r['aeme_ref'];
+            $r['issue'] = $problemas[$r['code']] ?? null;   // lo pegado al lado del código (Excel)
         }
         return response()->json(['ok' => true, 'results' => $results, 'invalid' => $invalid]);
     }
@@ -493,22 +496,27 @@ class WarrantiesController extends Controller
     private function labelsAdd(Request $request)
     {
         $w = Warranty::findOrFail((int) $request->input('id'));
-        [$codes] = WarrantyLabels::parse((string) $request->input('codes', ''));
+        [$codes, , $problemas] = WarrantyLabels::parseList((string) $request->input('codes', ''));
         if (! $codes) {
             return response()->json(['ok' => false, 'error' => 'Escribe al menos un código: etiqueta (9 letras o números) o MAC de antena (12)'], 400);
         }
         if (count($codes) > WarrantyLabels::MAX) {
             return response()->json(['ok' => false, 'error' => 'Como mucho ' . WarrantyLabels::MAX . ' etiquetas de una vez'], 400);
         }
-        $r = $this->anadirEtiquetas($w, $codes, (array) $request->input('manual', []), $request->user()->id);
+        $r = $this->anadirEtiquetas($w, $codes, (array) $request->input('manual', []), $request->user()->id, $problemas);
         return response()->json(['ok' => true] + $r);
     }
 
-    private function anadirEtiquetas(Warranty $w, array $codes, array $manual, int $userId): array
+    private function anadirEtiquetas(Warranty $w, array $codes, array $manual, int $userId, array $problemas = []): array
     {
         $r = $this->labels()->add($w, $codes, $manual, $userId);
         if ($r['added']) {
             $this->evento($w->id, $userId, 'items', null, '+' . count($r['added']) . ': ' . $this->lista($r['added']));
+            // El problema pegado con cada código (de una lista de Excel) es lo que dice el
+            // cliente; va antes que el del formulario del portal, que solo rellena lo vacío.
+            foreach (array_intersect_key($problemas, array_flip($r['added'])) as $code => $texto) {
+                WarrantyItem::where('warranty_id', $w->id)->where('code', $code)->update(['reported_issue' => $texto]);
+            }
             $w->forceFill(['last_activity_at' => now()])->save();
             // Si el ticket vino del formulario de garantías del portal: el fallo que contó
             // el cliente y sus fotos pasan solos a cada dispositivo.
@@ -926,8 +934,8 @@ class WarrantiesController extends Controller
         // En el alta llegan las etiquetas ya comprobadas en el formulario.
         $etiquetas = ['added' => [], 'skipped' => []];
         if (! $id && trim((string) $request->input('labels', '')) !== '') {
-            [$codes] = WarrantyLabels::parse((string) $request->input('labels'));
-            $etiquetas = $this->anadirEtiquetas($w, array_slice($codes, 0, WarrantyLabels::MAX), (array) $request->input('manual', []), $me->id);
+            [$codes, , $problemas] = WarrantyLabels::parseList((string) $request->input('labels'));
+            $etiquetas = $this->anadirEtiquetas($w, array_slice($codes, 0, WarrantyLabels::MAX), (array) $request->input('manual', []), $me->id, $problemas);
         }
 
         return response()->json(['ok' => true, 'id' => $w->id, 'code' => $w->code] + $etiquetas);
@@ -1071,6 +1079,13 @@ class WarrantiesController extends Controller
     {
         $d = fn ($k) => $this->esFecha($v = (string) $request->query($k, '')) ? $v : null;
         return response()->json(['ok' => true] + \App\Services\WarrantyPhases::report($d('from'), $d('to')));
+    }
+
+    /** Estadísticas: la encuesta del correo de resolución. */
+    private function surveyStats(Request $request)
+    {
+        $d = fn ($k) => $this->esFecha($v = (string) $request->query($k, '')) ? $v : null;
+        return response()->json(['ok' => true] + \App\Services\WarrantySurvey::report($d('from'), $d('to')));
     }
 
     /** Estadísticas: presupuestos, envíos y facturas de los proyectos de garantía del portal. */

@@ -6380,3 +6380,26 @@ button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); 
   .st-fase.h { display: none; }
 }
 .wf-fact-since { display: block; margin-top: 3px; font-size: 11.5px; color: var(--ink-3); }
+
+/* Encuesta al cerrar: notas del 1 al 5 */
+.r1 { --r: #dc2626; } .r2 { --r: #ea580c; } .r3 { --r: #ca8a04; } .r4 { --r: #65a30d; } .r5 { --r: #16a34a; }
+.st-hero-main.ok { background: radial-gradient(120% 140% at 0% 0%, #22c55e 0%, #15803d 45%, #052e16 100%); box-shadow: 0 10px 30px -12px rgba(21, 128, 61, .55); }
+.st-hero-main .v small { font-size: .4em; font-weight: 700; opacity: .8; }
+.st-quotes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.st-quotes li { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card, #fff); }
+.st-quotes p { margin: 0 0 6px; font-size: 14px; line-height: 1.5; font-style: italic; }
+.st-quotes small { font-size: 12px; color: var(--ink-3); }
+.st-q-n, .wf-rate i, .wd-survey-n i { flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--r); color: #fff; font-style: normal; font-weight: 800; font-size: 14px; }
+.wf-rate { display: inline-flex; align-items: center; gap: 7px; }
+.wf-rate i { width: 24px; height: 24px; font-size: 12.5px; }
+.wf-rate svg { width: 14px; height: 14px; fill: var(--ink-3); }
+.wd-survey { display: flex; align-items: center; gap: 12px; margin: 10px 0 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 12px; cursor: pointer; font-size: 13px; color: var(--ink-2); }
+.wd-survey.on { border-style: solid; border-color: color-mix(in srgb, var(--primary) 40%, transparent); background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.wd-survey > span:first-of-type { flex: 1; }
+.wd-survey em { display: block; margin-top: 2px; font-style: normal; color: var(--ink-3); }
+.wd-survey-n { display: flex; gap: 4px; }
+.wd-survey-n i { width: 24px; height: 24px; font-size: 12px; }
+.wd-survey:not(.on) .wd-survey-n { opacity: .4; }
+.wr-cs-issue { grid-column: 2 / -1; margin: 0; display: flex; align-items: flex-start; gap: 5px; font-size: 12px; font-weight: 600; font-style: italic; color: var(--ink-2, #334155); }
+.wr-cs-issue svg { flex: none; width: 13px; height: 13px; margin-top: 1px; fill: var(--ink-3); }
+.wr-lbls .wr-cs-issue { grid-column: 1 / -1; }

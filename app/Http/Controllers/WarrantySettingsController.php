@@ -82,6 +82,7 @@ class WarrantySettingsController extends Controller
                 'company'           => WarrantyDocument::setting('company'),
                 'resolution_email'  => WarrantyDocument::setting('resolution_email'),
                 'resolution_blocks' => WarrantyDocuments::ajuste('resolution_blocks', WarrantyDocuments::BLOCK_DEFAULTS),
+                'survey'            => \App\Services\WarrantySurvey::settings(),
             ],
             'block_groups' => WarrantyDocuments::BLOCK_GROUPS,
             'terms' => WarrantyTerms::settings(),
@@ -450,6 +451,7 @@ class WarrantySettingsController extends Controller
                 $valores['resolution_blocks'][$k] = ['active' => ! empty($b[$k]['active']), 'text' => $t($b[$k]['text'] ?? '', 3000)];
             }
         }
+        if ($request->has('survey')) $valores['survey'] = \App\Services\WarrantySurvey::clean((array) $request->input('survey', []));
         foreach ($valores as $k => $v) {
             DB::table('warranty_settings')->updateOrInsert(['key' => $k], ['value' => json_encode($v), 'updated_at' => now()]);
         }

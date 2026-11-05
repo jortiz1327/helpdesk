@@ -149,20 +149,23 @@ function Correo({ w, informe, onClose, onSent }) {
   const confirm = useConfirm()
   const [m, setM] = useState(null)
   const [adjuntar, setAdjuntar] = useState(!!informe)
+  const [encuesta, setEncuesta] = useState(null)   // null: lo que diga Configuración
   const [enviando, setEnviando] = useState(false)
   useEffect(() => { api.warrantyResolutionEmail(w.id).then((r) => (r.ok ? setM({ ...r, to: r.to || '' }) : (toast(r.error, 'err'), onClose()))) }, [w.id])
   const copiar = async (t, que) => { try { await navigator.clipboard.writeText(t); toast(`${que} copiado`) } catch { toast('No se pudo copiar', 'err') } }
   const correoOk = EMAIL_OK.test((m?.to || '').trim())
   const porWhatsApp = m?.ticket?.channel === 'whatsapp'
+  // Encuesta: de serie, si está activa en Configuración y el cliente aún no ha contestado.
+  const conEncuesta = encuesta ?? (!!m?.survey && !m?.rated)
 
   const enviar = async () => {
-    const extra = adjuntar && informe ? ` con el informe ${informe.number}` : ''
+    const extra = (adjuntar && informe ? ` con el informe ${informe.number}` : '') + (conEncuesta ? (adjuntar && informe ? ' y la encuesta' : ' con la encuesta') : '')
     const to = m.to.trim()
     const otro = !(m.suggestions || []).some((s) => s.email === to.toLowerCase())
     const aviso = otro ? ` Ojo: ${to} no es ningún correo conocido de este cliente (ni del ticket, ni del portal, ni usado antes en la garantía).` : ''
     if (!(await confirm({ title: 'Enviar correo de resolución', message: `¿Enviar a ${to}${extra}? Saldrá como respuesta del ticket ${m.ticket.code} y quedará en la conversación con el cliente.${aviso}`, confirmText: 'Enviar', danger: otro }))) return
     setEnviando(true)
-    const r = await api.warrantyDocsDo('send_email', { id: w.id, to, subject: m.subject, body: m.body, attach_report: adjuntar && !!informe, confirm_other: otro })
+    const r = await api.warrantyDocsDo('send_email', { id: w.id, to, subject: m.subject, body: m.body, attach_report: adjuntar && !!informe, survey: conEncuesta, confirm_other: otro })
     setEnviando(false)
     if (!r.ok) { toast(r.error || 'No se pudo enviar', 'err'); return }
     toast(`Correo enviado desde ${r.ticket}`)
@@ -199,6 +202,14 @@ function Correo({ w, informe, onClose, onSent }) {
           ) : null}
           <div className="wd-mail-row"><span>Asunto</span><input value={m.subject} onChange={(e) => setM({ ...m, subject: e.target.value })} /><button className="dev-btn" onClick={() => copiar(m.subject, 'Asunto')}><Icon.copy /> Copiar</button></div>
           <textarea className="wd-mail-body" rows={12} value={m.body} onChange={(e) => setM({ ...m, body: e.target.value })} />
+          {m.can_send ? (
+            <label className={`wd-survey${conEncuesta ? ' on' : ''}`}>
+              <input type="checkbox" checked={conEncuesta} onChange={(e) => setEncuesta(e.target.checked)} />
+              <span><b>Añadir la encuesta al pie</b> · una pregunta de 1 a 5 para saber qué tal le ha ido al cliente.
+                {m.rated ? <em> Ya contestó: {m.rated.score} de 5 ({m.rated.label}).</em> : null}</span>
+              <span className="wd-survey-n" aria-hidden="true">{[1, 2, 3, 4, 5].map((n) => <i key={n} className={`r${n}`}>{n}</i>)}</span>
+            </label>
+          ) : null}
           <div className="wd-mail-f">
             <button className="dev-btn" onClick={() => copiar(m.body, 'Texto')}><Icon.copy /> Copiar el texto</button>
             <span className="spacer" />

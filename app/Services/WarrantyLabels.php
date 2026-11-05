@@ -45,7 +45,8 @@ class WarrantyLabels
      */
     public static function parse(string|array $input): array
     {
-        $tokens = is_array($input) ? $input : (preg_split('/[\s,;]+/', $input) ?: []);
+        if (is_string($input)) return array_slice(self::parseList($input), 0, 2);
+        $tokens = $input;
         $ok = $bad = [];
         foreach ($tokens as $t) {
             if (! is_scalar($t)) continue;   // lo que llega de fuera puede traer listas dentro
@@ -60,6 +61,81 @@ class WarrantyLabels
             }
         }
         return [$ok, $bad];
+    }
+
+    private static function limpio(string $t): string
+    {
+        return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $t));
+    }
+
+    /** ¿Parece un código (mal copiado)? 6 a 20 letras y números, con alguna cifra. */
+    private static function intento(string $t): bool
+    {
+        $c = self::limpio($t);
+        return strlen($c) >= 6 && strlen($c) <= 20 && (bool) preg_match('/\d/', $c);
+    }
+
+    /** ¿Es un código de etiqueta o de antena? Devuelve el código limpio o null. */
+    private static function codigo(string $t): ?string
+    {
+        $c = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $t));
+        // Con alguna cifra: si no, «pantallas» o «parpadean» (9 letras) pasarían por etiqueta.
+        return preg_match('/\d/', $c) && (preg_match(self::PATTERN, $c) || preg_match(self::AP_PATTERN, $c)) ? $c : null;
+    }
+
+    /**
+     * Lo pegado, también desde Excel (una columna con el código y otra con el problema) →
+     * [válidos, no válidos, [código => problema]].
+     *   · Una línea solo con códigos (separados por espacios, comas…): todos, sin problema.
+     *   · Con código y texto (tabulador, «806301480 - pantalla rota», «…; no enciende»): el
+     *     texto es el problema de los códigos de esa línea.
+     *   · Sin ningún código (la cabecera «Código | Problema»): se ignora, salvo lo que parezca
+     *     un código mal copiado (6 a 20 letras y números con alguna cifra), que sale como no válido.
+     */
+    public static function parseList(string $text): array
+    {
+        $ok = $bad = $issues = [];
+        foreach (preg_split('/\R/u', $text) ?: [] as $linea) {
+            if (trim($linea) === '') continue;
+            $celdas = array_map(fn ($c) => trim($c, " \t\"'"), explode("\t", $linea));
+            $deLinea = [];
+            $textos = [];
+            foreach ($celdas as $celda) {
+                $resto = $celda;
+                $tokens = preg_split('/[\s,;]+/u', $celda, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                $codigos = [];
+                foreach ($tokens as $t) {
+                    if ($c = self::codigo($t)) {
+                        $codigos[] = $c;
+                        $resto = preg_replace('/' . preg_quote($t, '/') . '/u', ' ', $resto, 1);
+                    }
+                }
+                $deLinea = [...$deLinea, ...$codigos];
+                // Lo que no es código: si todo parece un código mal copiado, es eso (no
+                // válido); si hay texto, es el problema.
+                $otros = array_values(array_filter($tokens, fn ($t) => ! self::codigo($t)));
+                if (! $otros) continue;
+                if (! array_filter($otros, fn ($t) => ! self::intento($t))) {
+                    foreach ($otros as $t) in_array($c = self::limpio($t), $bad, true) || $bad[] = $c;
+                    continue;
+                }
+                $textos[] = $resto;
+            }
+            if (! $deLinea) {
+                // Sin códigos (la cabecera…): solo cuenta lo que parezca un código mal copiado.
+                foreach (preg_split('/[\s,;]+/u', $linea, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $t) {
+                    if (self::intento($t) && ! in_array($c = self::limpio($t), $bad, true)) $bad[] = $c;
+                }
+                continue;
+            }
+            $problema = trim(preg_replace('/\s+/u', ' ', implode(' · ', array_filter(array_map(
+                fn ($t) => trim(preg_replace('/^[\s\-–—:|·,;.]+|[\s\-–—:|·,;]+$/u', '', $t)), $textos), fn ($t) => $t !== ''))));
+            foreach ($deLinea as $c) {
+                in_array($c, $ok, true) || $ok[] = $c;
+                if ($problema !== '' && ! isset($issues[$c])) $issues[$c] = mb_substr($problema, 0, 300);
+            }
+        }
+        return [$ok, $bad, $issues];
     }
 
     /**

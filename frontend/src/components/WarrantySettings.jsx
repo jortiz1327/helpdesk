@@ -385,6 +385,12 @@ function Documentos({ docs, grupos, hacer }) {
           {campo('resolution_email', 'subject', 'Asunto', { max: 200 })}
           {campo('resolution_email', 'body', 'Texto', { rows: 11, max: 5000 })}
           <div className="ws-vars">{VARIABLES.map(([k, l]) => <span key={k} title={l}><code>{k}</code> {l}</span>)}</div>
+          <h4 className="ws-sub">Encuesta al pie del correo</h4>
+          <label className="wr-check"><input type="checkbox" checked={v.survey?.active !== false} onChange={(e) => set('survey', { active: e.target.checked })} /> Proponerla de serie al enviar el correo de resolución (se puede quitar en cada envío)</label>
+          {campo('survey', 'question', 'Pregunta', { max: 160 })}
+          {campo('survey', 'intro', 'Texto debajo de la pregunta', { rows: 2, max: 400 })}
+          {campo('survey', 'thanks', 'Agradecimiento (al contestar)', { rows: 2, max: 300 })}
+          <p className="dev-mute">El cliente pulsa un número del 1 al 5 en el correo y lo confirma en una página nuestra, donde puede dejar un comentario. Las respuestas salen en la ficha y en Estadísticas → Satisfacción.</p>
         </div>
       </div>
       <div className="ws-body">

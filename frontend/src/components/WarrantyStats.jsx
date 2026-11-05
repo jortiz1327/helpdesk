@@ -7,12 +7,13 @@ import DateRange from './DateRange.jsx'
 import { WarrantyReports } from './WarrantyTeam.jsx'
 
 /* -------------------------------------------------------------------------
- * ESTADÍSTICAS de Gestión de garantías, en cuatro pestañas:
+ * ESTADÍSTICAS de Gestión de garantías, en cinco pestañas:
  *   · Fallos de dispositivos: lo repuesto en los albaranes de los proyectos de garantía del
  *     portal, por modelo, año de venta (el lote aproximado), cliente y mes, frente a lo
  *     vendido en sus facturas.
  *   · Presupuestos y envíos: los documentos de los proyectos de garantía del portal.
  *   · Tiempo por fase: días de cada garantía en su estado, media por fase y atascadas.
+ *   · Satisfacción: la encuesta de 1 a 5 del correo de resolución.
  *   · Expedientes: el informe de garantías de siempre.
  * Gráficos en SVG/HTML propios; el color dice la categoría y siempre va con su texto.
  * ---------------------------------------------------------------------- */
@@ -449,6 +450,69 @@ function Fases({ desde, hasta, onOpenWarranty }) {
   )
 }
 
+/* ---------- Pestaña: satisfacción (la encuesta del correo de resolución) ---------- */
+function Satisfaccion({ desde, hasta, onOpenWarranty }) {
+  const [d, setD] = useState(null)
+  const [tip, nodoTip] = useTip()
+
+  useEffect(() => {
+    let vivo = true
+    setD((x) => (x && !x.error ? { ...x, busy: true } : null))
+    api.warrantySurveyStats({ from: desde, to: hasta }).then((r) => { if (vivo) setD(r.ok ? r : { error: r.error || 'No se pudo cargar' }) })
+    return () => { vivo = false }
+  }, [desde, hasta])
+
+  if (!d) return <div className="center-load"><div className="spinner" /></div>
+  if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
+  const k = d.kpis
+  const series = d.scores.map((s) => [`s${s.score}`, `${s.score} · ${s.label}`, s.color]).reverse()
+
+  return (
+    <div className={`st-body${d.busy ? ' busy' : ''}`}>
+      <div className="st-hero">
+        <div className="st-hero-main ok">
+          <span className="k">Nota media</span>
+          <b className="v">{k.avg == null ? '—' : k.avg.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}<small> / 5</small></b>
+          <span className="h">{k.answers ? <>de <b>{num(k.answers)}</b> {k.answers === 1 ? 'respuesta' : 'respuestas'} a la encuesta del correo de resolución</> : 'Aún no ha contestado nadie la encuesta'}</span>
+        </div>
+        <div className="st-kpis">
+          <Kpi k="Contentos" v={pct(k.happy)} tone={k.happy >= 0.8 ? 'ok' : ''} h="Ponen un 4 o un 5" />
+          <Kpi k="Respuestas" v={num(k.answers)} h={k.sent ? `De ${num(k.sent)} correos con la encuesta · ${pct(k.rate)} contesta` : 'Sin correos con la encuesta en el periodo'} spark={d.months.map((m) => m.n)} />
+          <Kpi k="Descontentos" v={num(k.unhappy)} tone={k.unhappy ? 'bad' : 'ok'} h="Ponen un 1 o un 2: merece la pena llamarles" />
+        </div>
+      </div>
+
+      <div className="st-grid g-21">
+        <Tarjeta title="Respuestas por mes" sub="Cuántos contestan y qué nota ponen">
+          <Columnas data={d.months} series={series} tip={tip} extra={(m) => <span className="st-tip-tot">Media <em>{num(m.avg)}</em></span>} />
+          <Leyenda items={series.map(([, l, c]) => [l, c]).reverse()} />
+        </Tarjeta>
+        <Tarjeta title="Reparto de notas" sub="De 1 (nada contento) a 5 (encantado)">
+          <Barras data={[...d.scores].reverse().map((s) => ({ label: `${s.score} · ${s.label}`, n: s.n, color: s.color, sub: k.answers ? pct(s.n / k.answers) : null }))} tip={tip} />
+        </Tarjeta>
+      </div>
+
+      <Tarjeta title="Lo que nos dicen" sub="Los comentarios de la encuesta, del más reciente al más antiguo">
+        {d.comments.length ? (
+          <ul className="st-quotes">
+            {d.comments.map((c) => (
+              <li key={`${c.id}${c.at}`}>
+                <i className={`st-q-n r${c.score}`}>{c.score}</i>
+                <div>
+                  <p>“{c.comment}”</p>
+                  <small>{onOpenWarranty ? <button className="st-link" onClick={() => onOpenWarranty(c.id)}>{c.code}</button> : <b>{c.code}</b>}
+                    {c.client ? ` · ${c.client}` : ''} · {c.at.split('-').reverse().join('/')}</small>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : <Vacio text="Todavía no hay comentarios." />}
+      </Tarjeta>
+      {nodoTip}
+    </div>
+  )
+}
+
 /* ---------- Pestaña: presupuestos y envíos del portal ---------- */
 function Portal({ desde, hasta }) {
   const [d, setD] = useState(null)
@@ -584,6 +648,7 @@ const TABS = [
   ['fallos', 'Fallos de dispositivos', Icon.warn],
   ['portal', 'Presupuestos y envíos', Icon.truck],
   ['fases', 'Tiempo por fase', Icon.clock],
+  ['encuesta', 'Satisfacción', Icon.star],
   ['expedientes', 'Expedientes', Icon.shield],
 ]
 const TAB_KEY = 'st_tab'
@@ -619,10 +684,11 @@ export default function WarrantyStats({ onOpenWarranty }) {
         <div className="st-period">
           <div className="st-seg">{RANGOS.map((r) => <button key={r[0]} className={rango === r[0] ? 'on' : ''} onClick={() => { setRango(r[0]); setFechas(r[2]()) }}>{r[1]}</button>)}</div>
           <DateRange from={desde} to={hasta} onChange={(a, b) => { setRango(''); setFechas([a, b]) }} />
-          <span className="st-period-t">{tab === 'fallos' ? 'Por la fecha de envío del albarán' : tab === 'fases' ? 'Medias por la fecha en que terminó cada estado; «ahora», siempre hoy' : 'Por la fecha del presupuesto'}</span>
+          <span className="st-period-t">{tab === 'fallos' ? 'Por la fecha de envío del albarán' : tab === 'fases' ? 'Medias por la fecha en que terminó cada estado; «ahora», siempre hoy' : tab === 'encuesta' ? 'Por la fecha de la respuesta' : 'Por la fecha del presupuesto'}</span>
         </div>
         {tab === 'fallos' ? <Fallos desde={desde} hasta={hasta} />
           : tab === 'fases' ? <Fases desde={desde} hasta={hasta} onOpenWarranty={onOpenWarranty} />
+          : tab === 'encuesta' ? <Satisfaccion desde={desde} hasta={hasta} onOpenWarranty={onOpenWarranty} />
           : <Portal desde={desde} hasta={hasta} />}
       </div></div>
     </>

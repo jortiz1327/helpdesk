@@ -74,6 +74,9 @@ Route::get('portal_file/{id}', [\App\Http\Controllers\PortalController::class, '
 // Valoración (CSAT) por URL FIRMADA (desde las estrellas del correo, sin login).
 Route::match(['get', 'post'], 'portal_rate/{ticket}', [\App\Http\Controllers\PortalController::class, 'ratePage'])
     ->middleware('signed:relative')->name('portal.rate')->whereNumber('ticket');
+// Encuesta de la garantía (desde el correo de resolución), también por URL FIRMADA.
+Route::match(['get', 'post'], 'garantia_valorar/{warranty}', [\App\Http\Controllers\WarrantyRatingController::class, 'page'])
+    ->middleware(['signed:relative', 'throttle:30,1'])->name('warranty.rate')->whereNumber('warranty');
 
 // --- Imágenes en línea del editor: servir por URL FIRMADA (sin token, la firma es la auth) ---
 Route::get('inline/{id}', [InlineImageController::class, 'serve'])

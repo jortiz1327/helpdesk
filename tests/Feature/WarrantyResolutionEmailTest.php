@@ -89,6 +89,45 @@ class WarrantyResolutionEmailTest extends TestCase
         $this->enviar($w, $h, ['confirm_other' => false])->assertOk();
     }
 
+    public function test_encuesta_al_pie_y_solo_guarda_el_clic(): void
+    {
+        [, $h] = $this->agente([...self::GARANTIAS, 'helpdesk.access', 'tickets.reply']);
+        $w = $this->garantia();
+        $this->assertTrue($this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->json('survey'));
+
+        $this->enviar($w, $h, ['survey' => true])->assertOk();
+        $html = $this->enviados[0]['html'];
+        preg_match_all('#href="([^"]*garantia_valorar/' . $w->id . '[^"]*)"#', $html, $m);
+        $this->assertCount(5, $m[1]);
+        $this->assertStringContainsString('¿Qué tal ha ido tu garantía con nosotros?', $html);
+        $this->assertSame(1, DB::table('warranty_events')->where('warranty_id', $w->id)->where('to_value', 'like', '%(con la encuesta)')->count());
+
+        // El enlace del 4: abrirlo (como hacen los antivirus del correo) NO vota.
+        $url = html_entity_decode(collect($m[1])->first(fn ($u) => str_contains($u, 'score=4')));
+        $ruta = parse_url($url, PHP_URL_PATH) . '?' . parse_url($url, PHP_URL_QUERY);
+        $pagina = $this->get($ruta)->assertOk()->getContent();
+        $this->assertSame(0, DB::table('warranty_ratings')->count());
+        $this->assertStringContainsString('Pulsa otra vez el 4', $pagina);
+
+        // El clic en la página sí; y luego el comentario.
+        preg_match('#action="([^"]+)"#', $pagina, $a);
+        $accion = html_entity_decode($a[1]);
+        $this->post($accion, ['score' => 4])->assertOk()->assertSee('¡Muchas gracias!', false);
+        $this->post($accion, ['comment' => 'Muy rápidos, gracias'])->assertOk()->assertSee('Comentario recibido', false);
+        $this->assertSame([4, 'Muy rápidos, gracias'], [(int) DB::table('warranty_ratings')->value('score'), DB::table('warranty_ratings')->value('comment')]);
+        $this->assertSame(1, DB::table('warranty_events')->where('warranty_id', $w->id)->where('to_value', 'like', 'El cliente valoró la garantía%4 de 5%')->count());
+
+        // La ficha lo enseña, y el siguiente correo ya no la propone de serie.
+        $this->assertSame(4, $this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->json('warranty.rating.score'));
+        $this->assertSame(4, $this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->json('rated.score'));
+        $this->assertSame(1, $this->getJson('/api/warranties.php?action=survey_stats', $h)->json('kpis.answers'));
+
+        // Sin firma, o con la firma de otra garantía, nada.
+        $this->post("/api/garantia_valorar/{$w->id}", ['score' => 1])->assertStatus(403);
+        $this->post(str_replace("garantia_valorar/{$w->id}", 'garantia_valorar/999', $accion), ['score' => 1])->assertStatus(403);
+        $this->assertSame(4, (int) DB::table('warranty_ratings')->value('score'));
+    }
+
     public function test_con_el_informe_adjunto(): void
     {
         [$u, $h] = $this->agente([...self::GARANTIAS, 'helpdesk.access', 'tickets.reply']);

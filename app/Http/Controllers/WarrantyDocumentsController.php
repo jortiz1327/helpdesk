@@ -13,6 +13,7 @@ use App\Services\WarrantyDocuments;
 use App\Services\WarrantyLabels;
 use App\Services\WarrantyPermissions;
 use App\Services\WarrantyReplacements;
+use App\Services\WarrantySurvey;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -154,7 +155,8 @@ class WarrantyDocumentsController extends Controller
         $me = $request->user();
         $motivo = $this->puedeEnviar($w, $me);
         return response()->json(['ok' => true] + $this->correosCliente($w, $me)
-            + ['can_send' => $motivo === null, 'cannot_send' => $motivo]
+            + ['can_send' => $motivo === null, 'cannot_send' => $motivo, 'survey' => WarrantySurvey::settings()['active'],
+                'rated' => WarrantySurvey::forWarranty($w->id)]
             + WarrantyDocuments::resolutionEmail($w, $me->name));
     }
 
@@ -316,13 +318,17 @@ class WarrantyDocumentsController extends Controller
         }
 
         $html = collect(preg_split('/\R{2,}/u', $texto))->map(fn ($p) => '<p>' . nl2br(e(trim($p)), false) . '</p>')->implode('');
+        // La encuesta de 1 a 5 al pie (HTML nuestro, no lo escribe el agente).
+        $encuesta = $request->boolean('survey');
+        if ($encuesta) $html .= WarrantySurvey::emailBlock($w);
         $r = app(TicketReplyService::class)->porCorreo($t, $html, [], [], [], $me, $adjuntos, true, 'Resolución de tu garantía');
         if (! ($r['ok'] ?? false)) {
             return response()->json(['ok' => false, 'error' => $r['error'] ?? 'No se pudo enviar el correo'], $r['_status'] ?? 502);
         }
 
         $w->forceFill(['customer_email' => $to])->save();
-        WarrantyDocuments::evento($w->id, $me->id, "Correo de resolución enviado a {$to} desde el ticket {$t->code}" . ($adjuntos ? ' (con el informe)' : ''));
+        WarrantyDocuments::evento($w->id, $me->id, "Correo de resolución enviado a {$to} desde el ticket {$t->code}"
+            . ($adjuntos && $encuesta ? ' (con el informe y la encuesta)' : ($adjuntos ? ' (con el informe)' : ($encuesta ? ' (con la encuesta)' : ''))));
         return response()->json(['ok' => true, 'ticket' => $t->code]);
     }
 
