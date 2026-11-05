@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
+import { useDialog } from './a11y.js'
 
 /* -------------------------------------------------------------------------
  * PROTOCOLOS Y GUÍAS de garantías: documentación operativa (cómo se trabaja, condiciones
@@ -35,7 +36,7 @@ export function VisorGuia({ g, onClose }) {
   const url = api.warrantyGuideUrl(g.id)
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className="modal gd-visor">
+      <div className="modal gd-visor" role="dialog" aria-modal="true" aria-label={g.title}>
         <div className="modal-head">
           <h3>{g.title}{g.version ? <small className="dev-mute"> · v{g.version}</small> : null}</h3>
           <a className="dev-btn" href={api.warrantyGuideUrl(g.id, true)}><Icon.download /> Descargar</a>
@@ -53,6 +54,7 @@ export function VisorGuia({ g, onClose }) {
 /** Alta o cambio de un documento. */
 function Formulario({ g, meta, onClose, onSaved }) {
   const toast = useToast()
+  const dlg = useDialog(null, g?.id ? 'Editar guía' : 'Nueva guía')
   const confirm = useConfirm()
   const [f, setF] = useState(() => ({ title: '', description: '', kind: 'protocolos', language: 'es', categories: [], clients: [], version: '', keywords: '', active: true, ...(g || {}) }))
   const [algunas, setAlgunas] = useState(() => !!(g && (g.categories.length || g.clients.length)))
@@ -85,7 +87,7 @@ function Formulario({ g, meta, onClose, onSaved }) {
   const falta = !f.title.trim() || (!g?.id && !archivo) || (algunas && !f.categories.length && !f.clients.some((c) => c.trim()))
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className="modal" style={{ maxWidth: 640 }}>
+      <div className="modal" style={{ maxWidth: 640 }} {...dlg}>
         <div className="modal-head"><h3>{g?.id ? 'Editar documento' : 'Nuevo documento'}</h3><button className="x" onClick={onClose}>×</button></div>
         <div className="modal-body gd-form">
           <label className="field"><span className="lbl">Título <em>*</em></span>

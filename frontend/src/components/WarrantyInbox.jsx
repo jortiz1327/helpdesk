@@ -6,6 +6,7 @@ import Select from './Select.jsx'
 import LoadError from './LoadError.jsx'
 import { TicketModal, Paginador, prChip } from './Tickets.jsx'
 import { NuevaGarantia } from './Warranties.jsx'
+import { filaClic } from './a11y.js'
 
 /*
  * «Tickets de garantías»: bandeja propia de Gestión de garantías. Lista los tickets de la
@@ -105,7 +106,7 @@ export default function WarrantyInbox({ user, initialTicket = null, onOpenWarran
                     const vivo = ['nuevo', 'abierto', 'planificado'].includes(t.status)
                     const remite = t.contact_email || t.contact_phone || ''
                     return (
-                      <tr key={t.id} className="wi-row" onClick={() => setOpen(t.id)}>
+                      <tr key={t.id} className="wi-row" {...filaClic(() => setOpen(t.id))}>
                         <td><span className="wi-code">{t.code}</span></td>
                         <td className="wi-asunto"><b title={t.subject}>{t.subject || '(sin asunto)'}</b><span>{t.contact_name && remite ? `${t.contact_name} · ${remite}` : (t.contact_name || remite)}</span></td>
                         <td className="wi-cli">{t.empresa || t.sede_name || <span className="dev-mute">—</span>}{t.empresa && t.sede_name ? <span>{t.sede_name}</span> : null}</td>

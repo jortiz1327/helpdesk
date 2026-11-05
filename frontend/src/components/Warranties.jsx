@@ -10,6 +10,7 @@ import WarrantyDocuments from './WarrantyDocuments.jsx'
 import { GuiasRelacionadas } from './WarrantyGuides.jsx'
 import { leerCodigos } from '../barcode.js'
 import { TicketModal } from './Tickets.jsx'
+import { useDialog, filaClic } from './a11y.js'
 
 /* -------------------------------------------------------------------------
  * GARANTÍAS (Gestión de garantías). Expedientes G-AAAA-NNNN.
@@ -53,6 +54,7 @@ function CamposCierre({ modo, v, pon, opts, actual }) {
 
 /* Cerrar o reabrir una o varias garantías: estado de destino y lo que pide cada caso. */
 function CierreModal({ modo, titulo, estados, inicial, opts, agentes, conFecha, onClose, onOk }) {
+  const dlg = useDialog(onClose, titulo)
   const [v, setV] = useState(inicial)
   const [busy, setBusy] = useState(false)
   const pon = (k) => (x) => setV((s) => ({ ...s, [k]: x }))
@@ -60,7 +62,7 @@ function CierreModal({ modo, titulo, estados, inicial, opts, agentes, conFecha, 
   const ok = async () => { setBusy(true); const r = await onOk(v); setBusy(false); if (r) onClose() }
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className="modal" style={{ maxWidth: 520 }}>
+      <div className="modal" style={{ maxWidth: 520 }} {...dlg}>
         <div className="modal-head"><h3>{titulo}</h3><button className="x" onClick={onClose}>×</button></div>
         <div className="modal-body">
           <div className={conFecha ? 'grid2' : ''}>
@@ -111,6 +113,7 @@ function UrgPill({ u, opts }) { return u ? <Pill cls={URG_CLS[u] || 'gray'}>{opt
 /* --- Alta y edición --- */
 function Formulario({ inicial, opts, onClose, onSaved }) {
   const toast = useToast()
+  const dlg = useDialog(null, inicial.id ? 'Editar garantía' : 'Nueva garantía')
   const [f, setF] = useState(() => ({ ...inicial, closed_at: (inicial.closed_at || '').slice(0, 10) }))
   const [saving, setSaving] = useState(false)
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
@@ -212,7 +215,7 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
 
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className={`modal ${enEtiquetas ? 'wr-alta-lbls' : ''}`} style={{ maxWidth: f.id ? 640 : enEtiquetas ? 1080 : 720 }}>
+      <div className={`modal ${enEtiquetas ? 'wr-alta-lbls' : ''}`} style={{ maxWidth: f.id ? 640 : enEtiquetas ? 1080 : 720 }} {...dlg}>
         <div className="modal-head">
           <h3>{f.id ? `Editar ${f.code}` : inicial.ticket_code ? `Nueva garantía desde ${inicial.ticket_code}` : 'Nueva garantía'}</h3>
           {!f.id && (
@@ -490,7 +493,7 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
             {data === null
               ? Array.from({ length: 6 }, (_, i) => <tr key={i}>{Array.from({ length: 10 }, (_, j) => <td key={j}><span className="dev-skel" /></td>)}</tr>)
               : filas.map((w) => (
-                <tr key={w.id} className={`wr-row ${sel.has(w.id) ? 'wl-on' : ''}`} onClick={() => onOpen(w.id)}>
+                <tr key={w.id} className={`wr-row ${sel.has(w.id) ? 'wl-on' : ''}`} {...filaClic(() => onOpen(w.id))}>
                   <td className="wl-ck" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(w.id)} onChange={() => marcar(w.id)} /></td>
                   <td><span className="wr-code">{w.code}</span><Alertas list={w.alerts} /></td>
                   <td className="wl-cli">
@@ -983,6 +986,7 @@ function AltaZkong({ items }) {
 // abre directamente en las fotos.
 function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
   const toast = useToast()
+  const dlg = useDialog(() => cerrar(), 'Revisar dispositivos')
   const uno = iniciales.length === 1 ? iniciales[0] : null
   // Lo que se propone para una solución; si todos están fuera de plazo, lo que cubría la
   // garantía pasa a «Paga el cliente» (Configuración → Plazos).
@@ -1071,7 +1075,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
 
   return (
     <div className="modal-bg wr-over" onClick={(e) => e.target.classList.contains('modal-bg') && cerrar()}>
-      <div className={`modal wr-rev${paso === 'fotos' ? ' wide' : ''}`} onKeyDown={(e) => { if (e.key === 'Escape') cerrar() }}>
+      <div className={`modal wr-rev${paso === 'fotos' ? ' wide' : ''}`} {...dlg}>
         <div className="modal-h">
           <h3>{uno ? <>Revisar <span className="mono">{uno.code}</span></> : `Revisar ${items.length} dispositivos`}</h3>
           <button className="icon-btn" onClick={cerrar} title="Cerrar (Esc)">✕</button>
@@ -1585,7 +1589,7 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
 
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className="modal fc-modal" role="dialog" aria-label="Fotos del cliente">
+      <div className="modal fc-modal" role="dialog" aria-modal="true" aria-label="Fotos del cliente">
         <div className="modal-h">
           <div>
             <h3>Fotos del cliente</h3>

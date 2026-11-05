@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
+import { filaClic } from './a11y.js'
 
 /* -------------------------------------------------------------------------
  * CLIENTES Y PROYECTOS de Gestión de garantías. Solo consulta.
@@ -150,7 +151,7 @@ function Lista({ onOpen }) {
             </tr></thead>
             <tbody>
               {visibles.map((r) => (
-                <tr key={r.key} className="wr-row" onClick={() => onOpen(r.key)}>
+                <tr key={r.key} className="wr-row" {...filaClic(() => onOpen(r.key))}>
                   <td>
                     <b className="cl-name">{r.name}</b>
                     <small className="zk-sub">
@@ -317,7 +318,7 @@ function Ficha({ k, onBack, onOpenWarranty }) {
                   <thead><tr><th>Garantía</th><th>Hotel o tienda</th><th>Estado</th><th className="c" title="Dispositivos revisados de los que tiene la garantía">Revisados</th><th>Responsable</th><th /></tr></thead>
                   <tbody>
                     {gs.map((g) => (
-                      <tr key={g.id} className="wr-row" onClick={() => onOpenWarranty(g.id)}>
+                      <tr key={g.id} className="wr-row" {...filaClic(() => onOpenWarranty(g.id))}>
                         <td><span className="wr-code">{g.code}</span><small className="zk-sub">{g.received_at ? `Recibida el ${fecha(g.received_at)}` : 'Pendiente de recibir'}{g.closed_at ? ` · cerrada el ${fecha(g.closed_at)}` : ''}</small></td>
                         <td>{g.project || <span className="dev-mute">—</span>}</td>
                         <td><Pill cls={g.closed ? 'green' : 'blue'}>{g.status}</Pill></td>

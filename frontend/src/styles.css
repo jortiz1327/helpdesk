@@ -6403,3 +6403,13 @@ button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); 
 .wr-cs-issue { grid-column: 2 / -1; margin: 0; display: flex; align-items: flex-start; gap: 5px; font-size: 12px; font-weight: 600; font-style: italic; color: var(--ink-2, #334155); }
 .wr-cs-issue svg { flex: none; width: 13px; height: 13px; margin-top: 1px; fill: var(--ink-3); }
 .wr-lbls .wr-cs-issue { grid-column: 1 / -1; }
+
+/* Filas de tabla que se abren con el teclado (Intro / Espacio): se ve dónde está el foco. */
+.wr-row:focus-visible, .wi-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.wr-row:focus-visible > td, .wi-row:focus-visible > td { background: var(--hover); }
+/* La caja de la ventana recibe el foco al abrir para que Esc funcione: sin aro. */
+.modal[role="dialog"]:focus, .modal[role="dialog"]:focus-visible { outline: none; }
+.st-link:focus-visible { border-radius: 4px; text-decoration: underline; }
+/* Chips de nivel de la fase también legibles en oscuro. */
+:root:not([data-theme="light"]) .st-lvl.crit { background: rgba(248, 113, 113, 0.16); color: #fca5a5; }
+:root:not([data-theme="light"]) .st-lvl.warn { background: rgba(251, 191, 36, 0.16); color: #fcd34d; }

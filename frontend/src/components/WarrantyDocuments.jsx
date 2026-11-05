@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
+import { useDialog } from './a11y.js'
 
 /* -------------------------------------------------------------------------
  * DOCUMENTOS de una garantía (pestaña de la ficha). Presupuestos, pedidos y albaranes
@@ -30,9 +31,10 @@ async function descargar(id, toast) {
 }
 
 function Modal({ title, wide, onClose, children, foot }) {
+  const dlg = useDialog(onClose, typeof title === 'string' ? title : undefined)
   return (
     <div className="modal-bg wr-over" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className={`modal wd-modal${wide ? ' wide' : ''}`} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
+      <div className={`modal wd-modal${wide ? ' wide' : ''}`} {...dlg}>
         <div className="modal-h"><h3>{title}</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
         <div className="modal-body">{children}</div>
         {foot ? <div className="modal-foot">{foot}</div> : null}

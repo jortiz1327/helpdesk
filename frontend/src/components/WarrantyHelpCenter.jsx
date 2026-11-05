@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
+import { useDialog } from './a11y.js'
 
 /* -------------------------------------------------------------------------
  * CENTRO DE AYUDA de Gestión de garantías: artículos por apartado, con buscador y
@@ -63,6 +64,7 @@ export function TextoAyuda({ body }) {
 /** Cambiar un artículo (de serie o añadido) o escribir uno nuevo. */
 function Editor({ a, d, onClose, onSaved }) {
   const toast = useToast()
+  const dlg = useDialog(null, 'Editar artículo')
   const confirm = useConfirm()
   const [f, setF] = useState(() => ({ key: '', section: 'primeros', title: '', summary: '', body: '', related: [], active: true, ...(a || {}) }))
   const [busy, setBusy] = useState(false)
@@ -88,7 +90,7 @@ function Editor({ a, d, onClose, onSaved }) {
   const otros = d.articles.filter((x) => x.key !== f.key)
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
-      <div className="modal" style={{ maxWidth: 760 }}>
+      <div className="modal" style={{ maxWidth: 760 }} {...dlg}>
         <div className="modal-head"><h3 className="hc-ed-h"><Icon.pencil /> {a ? 'Editar artículo' : 'Nuevo artículo'}</h3><button className="x" onClick={onClose}>×</button></div>
         <div className="modal-body gd-form">
           <div className="grid2">
