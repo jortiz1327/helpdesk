@@ -164,6 +164,37 @@ class DevicesHubTest extends TestCase
         $this->assertSame([], $this->logins);
     }
 
+    // La cuenta de productos es otra cuenta del mismo servidor: la de administrador no cambia.
+    public function test_cuenta_de_productos_aparte_sin_tocar_la_de_administrador(): void
+    {
+        $tok = ['X-App-Token' => $this->token([...self::GARANTIAS, 'warranties.servers'])];
+        $s = $this->servidor('app02.test');
+        $s->forceFill(['token' => 'tok-admin'])->save();
+        $guardar = fn (array $d) => $this->postJson('/api/zkong_servers.php?action=save', $d + ['id' => $s->id, 'name' => 'APP02', 'base_url' => 'https://app02.test/zk', 'username' => 'admin'], $tok);
+
+        $guardar(['product_username' => 'jortiz', 'product_store_id' => '555'])->assertStatus(400);   // sin su contraseña
+        $guardar(['product_username' => 'jortiz', 'product_password' => 'otra'])->assertStatus(400);  // sin tienda
+        $guardar(['product_username' => 'jortiz', 'product_password' => 'otra', 'product_store_id' => '555'])->assertOk();
+        $this->assertSame('555', $s->fresh()->product_store_id);
+        $f = $s->fresh();
+        $this->assertSame(['admin', 'tok-admin', 'jortiz', 'otra'], [$f->username, $f->token, $f->product_username, $f->product_password]);
+        $this->assertStringNotContainsString('otra', (string) \DB::table('zkong_servers')->where('id', $s->id)->value('product_password'));   // cifrada
+        $this->getJson('/api/zkong_servers.php', $tok)->assertJsonPath('servers.0.product_username', 'jortiz')->assertJsonMissingPath('servers.0.product_password');
+
+        // Probarla entra con jortiz y guarda su token aparte.
+        $this->postJson('/api/zkong_servers.php?action=test&cuenta=productos', ['id' => $s->id], $tok)->assertJson(['ok' => true]);
+        $this->assertSame(['app02.test', 'jortiz', 'otra'], end($this->logins));
+        $f = $s->fresh();
+        $this->assertSame('tok-admin', $f->token);
+        $this->assertNotNull($f->product_token);
+
+        // Guardar sin tocarla la deja; vaciar el usuario la quita.
+        $guardar(['product_username' => 'jortiz', 'product_store_id' => '555'])->assertOk();
+        $this->assertSame('otra', $s->fresh()->product_password);
+        $guardar(['product_username' => ''])->assertOk();
+        $this->assertNull($s->fresh()->product_password);
+    }
+
     public function test_si_cambia_la_clave_publica_no_se_envia_la_contrasena(): void
     {
         $tok = $this->token([...self::GARANTIAS, 'warranties.servers']);

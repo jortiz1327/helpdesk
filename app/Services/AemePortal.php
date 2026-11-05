@@ -133,23 +133,35 @@ class AemePortal
             ->values()->all();
     }
 
+    /*
+     * Títulos sueltos que no son un hotel ni una tienda: servicios web (hosting, dominios,
+     * certificados, servidores), cuotas, gastos, registros y departamentos internos,
+     * desplazamientos, formaciones, stock, pruebas…
+     */
+    private const NO_ES_BASE = '/\b(host|hosting|dominios?|dom|doms|cert|certificado|ssl|servidor|vps|prestashop|wordpress|wp|cuota|gastos?|registro|departamento|gesti[oó]n|gestiones|desplazamiento|formaci[oó]n|albaran(es)?|dep[oó]sito|stock|prueba|pruebas|demo|plantillas|migraci[oó]n|migraciones|aplicaci[oó]n|app|portal|desarrollo|programaci[oó]n|mejoras?|tareas|temas|planificaci[oó]n|facturas|chatbot|consultor[ií]a|conectores|actualizaciones|implementaci[oó]n|panel|video|revisi[oó]n|reestructuraci[oó]n|material|ventas|gerencia|comercial|posiciones|basculas|totems|pantallas|dosier|instalaci[oó]n|guardia|xxx+)\b|\.(com|es|net|cloud|online|aero|xyz)\b|^comanda\b|^proyecto temporal$/iu';
+
     /**
      * El hotel o tienda de un proyecto del portal, o null si no es base de garantías:
      *   "Fergus Club Europa - Proyecto"             → "Fergus Club Europa"
      *   "Farmacia Remunta - Comanda 981 - Expofarm" → "Farmacia Remunta"
-     *   "Soporte - …", "(Nulo) …", ampliaciones y "Stock …" → null
+     *   "Coral Suites" (sin sufijo)                 → "Coral Suites"
+     *   "Soporte - …", "(Nulo) …", ampliaciones, "Stock …", «X - Acciones comerciales»,
+     *   «X - Soporte» y títulos sueltos de servicios, gastos o internos → null
      */
     public static function baseName(string $title): ?string
     {
-        $title = trim($title);
+        $title = trim((string) preg_replace('/\s+/u', ' ', $title));
         if (str_starts_with($title, 'Soporte - ') || str_starts_with($title, '(Nulo)') || preg_match('/ampliaci[oó]n/iu', $title)) {
             return null;
         }
         $name = null;
-        if (preg_match('/^(?<name>.+?) - Proyecto$/u', $title, $m) || preg_match('/^(?<name>.+?) - Comanda\s*\d*(?: - .+)?$/iu', $title, $m)) {
-            $name = trim((string) preg_replace('/\s+/u', ' ', $m['name']));
+        if (preg_match('/^(?<name>.+?)\s*-\s*Proyecto$/u', $title, $m) || preg_match('/^(?<name>.+?) - Comanda\s*\d*(?: - .+)?$/iu', $title, $m)) {
+            $name = trim($m['name']);
+        } elseif (! preg_match('/\s-|-\s|–/u', (string) preg_replace('/\([^)]*\)/u', '', $title)) && ! preg_match(self::NO_ES_BASE, $title)) {
+            // Sin sufijo («Coral Suites»): el propio título, si no es un servicio ni algo interno.
+            $name = $title;
         }
-        if ($name === null || preg_match('/^stock\b/iu', $name)) {
+        if ($name === null || $name === '' || preg_match('/^stock\b/iu', $name)) {
             return null;
         }
         return $name;

@@ -52,6 +52,8 @@ export const Icon = {
   bolt: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg>,
   image: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z" /></svg>,
   video: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" /></svg>,
+  // Escanear un código: el marco del visor y las barras dentro.
+  scan: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M3 4a1 1 0 0 1 1-1h4v2H5v3H3V4zm13-1h4a1 1 0 0 1 1 1v4h-2V5h-3V3zM3 16h2v3h3v2H4a1 1 0 0 1-1-1v-4zm16 0h2v4a1 1 0 0 1-1 1h-4v-2h3v-3zM7 8h1.6v8H7V8zm2.6 0h1v8h-1V8zm2 0h2v8h-2V8zm3 0h1v8h-1V8zm2 0h.9v8h-.9V8z" /></svg>,
   link: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8v2zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z" /></svg>,
   mic: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z" /></svg>,
   phone: (p) => <svg viewBox="0 0 24 24" {...p}><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11.4 11.4 0 0 0 3.6.6 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .6 3.6 1 1 0 0 1-.25 1l-2.25 2.2z" /></svg>,

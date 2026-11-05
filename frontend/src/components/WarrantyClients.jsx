@@ -318,7 +318,7 @@ function Ficha({ k, onBack, onOpenWarranty }) {
                   <tbody>
                     {gs.map((g) => (
                       <tr key={g.id} className="wr-row" onClick={() => onOpenWarranty(g.id)}>
-                        <td><span className="wr-code">{g.code}</span><small className="zk-sub">Recibida el {fecha(g.received_at)}{g.closed_at ? ` · cerrada el ${fecha(g.closed_at)}` : ''}</small></td>
+                        <td><span className="wr-code">{g.code}</span><small className="zk-sub">{g.received_at ? `Recibida el ${fecha(g.received_at)}` : 'Pendiente de recibir'}{g.closed_at ? ` · cerrada el ${fecha(g.closed_at)}` : ''}</small></td>
                         <td>{g.project || <span className="dev-mute">—</span>}</td>
                         <td><Pill cls={g.closed ? 'green' : 'blue'}>{g.status}</Pill></td>
                         <td className="c">{g.items ? <span className="zk-prog"><span><i style={{ width: `${(g.reviewed / g.items) * 100}%` }} /></span>{g.reviewed}/{g.items}</span> : <span className="wt-0">Sin dispositivos</span>}</td>

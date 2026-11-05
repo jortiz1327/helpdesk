@@ -26,8 +26,23 @@ class ZkongClient
 
     private bool $reintentado = false;
 
-    public function __construct(private ZkongServer $server)
+    /**
+     * $productos: entra con la cuenta que crea productos (product_*) en vez de la de
+     * administrador. Cada cuenta tiene su token y su comercio; la clave del servidor es la misma.
+     */
+    public function __construct(private ZkongServer $server, private bool $productos = false)
     {
+    }
+
+    /** Nombre de la columna para la cuenta en uso: token → product_token, etc. */
+    private function col(string $campo): string
+    {
+        return $this->productos ? "product_{$campo}" : $campo;
+    }
+
+    private function token(): ?string
+    {
+        return $this->server->{$this->col('token')};
     }
 
     public function get(string $uri, array $query = []): array
@@ -53,11 +68,11 @@ class ZkongClient
         if (! $calls) {
             return [];
         }
-        if (! $this->server->token) {
+        if (! $this->token()) {
             $this->login();
         }
         $base = rtrim($this->server->base_url, '/');
-        $headers = ['Language' => 'en', 'Authorization' => $this->server->token];
+        $headers = ['Language' => 'en', 'Authorization' => $this->token()];
 
         $res = Http::pool(function (Pool $pool) use ($calls, $base, $headers) {
             foreach ($calls as $key => [$uri, $body]) {
@@ -89,13 +104,17 @@ class ZkongClient
             throw new ZkongException('La clave pública de ' . $this->server->name . ' no es la de siempre y no se le ha enviado la contraseña. '
                 . 'Si el servidor la ha cambiado de verdad, vuelve a escribir su contraseña en Servidores ZKONG para aceptar la nueva.');
         }
+        $usuario = (string) $this->server->{$this->col('username')};
+        if ($usuario === '') {
+            throw new ZkongException($this->server->name . ' no tiene ' . ($this->productos ? 'cuenta de productos' : 'usuario') . ' configurado.');
+        }
         $pem = "-----BEGIN PUBLIC KEY-----\n" . trim($key) . "\n-----END PUBLIC KEY-----\n";
-        if (! openssl_public_encrypt((string) $this->server->password, $cifrada, $pem)) {
+        if (! openssl_public_encrypt((string) $this->server->{$this->col('password')}, $cifrada, $pem)) {
             throw new ZkongException('No se pudo cifrar la contraseña con la clave del servidor.');
         }
 
         $json = $this->send('POST', '/user/login', [
-            'account'   => $this->server->username,
+            'account'   => $usuario,
             'password'  => base64_encode($cifrada),
             'loginType' => 3,
         ], null);
@@ -108,28 +127,28 @@ class ZkongClient
         // Sin tocar updated_at: es la marca de «se editó el servidor» que invalida su caché.
         $this->server->timestamps = false;
         $this->server->forceFill([
-            'token'            => $token,
-            'merchant_id'      => $json['data']['currentUser']['merchantId'] ?? null,
-            'agency_id'        => $json['data']['currentUser']['agencyId'] ?? null,
-            'token_updated_at' => now(),
+            $this->col('token')            => $token,
+            $this->col('merchant_id')      => $json['data']['currentUser']['merchantId'] ?? null,
+            $this->col('agency_id')        => $json['data']['currentUser']['agencyId'] ?? null,
+            $this->col('token_updated_at') => now(),
             'public_key_sha256' => $huella,
         ])->save();
         $this->server->timestamps = true;
 
-        return ['merchant_id' => $this->server->merchant_id, 'agency_id' => $this->server->agency_id];
+        return ['merchant_id' => $this->server->{$this->col('merchant_id')}, 'agency_id' => $this->server->{$this->col('agency_id')}];
     }
 
     private function call(string $method, string $uri, array $data): array
     {
-        if (! $this->server->token) {
+        if (! $this->token()) {
             $this->login();
         }
-        $json = $this->send($method, $uri, $data, $this->server->token);
+        $json = $this->send($method, $uri, $data, $this->token());
 
         if (! ($json['success'] ?? false) && in_array($json['code'] ?? null, self::TOKEN_CADUCADO, true) && ! $this->reintentado) {
             $this->reintentado = true;
             $this->login();
-            $json = $this->send($method, $uri, $data, $this->server->token);
+            $json = $this->send($method, $uri, $data, $this->token());
         }
 
         if (! ($json['success'] ?? false)) {

@@ -394,7 +394,7 @@ export const api = {
   deleteZkongServer: (id) => req('zkong_servers.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
-  testZkongServer: (id) => req('zkong_servers.php?action=test', {
+  testZkongServer: (id, productos = false) => req(`zkong_servers.php?action=test${productos ? '&cuenta=productos' : ''}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }), timeout: 60000,
   }),
   // Expedientes de garantía.
@@ -438,6 +438,10 @@ export const api = {
   // Centro de ayuda de garantías: warrantyHelpDo('save' | 'remove', {...}).
   warrantyHelp: () => req('warranty_help.php'),
   warrantyHelpDo: (action, payload) => postJson(`warranty_help.php?action=${action}`, payload),
+  // Etiqueta de almacén (Cloud): emparejar un código o quitar la que tiene.
+  warrantyCloudLabel: (id, code, remove = false) => req('warranties.php?action=cloud_label', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, code, remove }), timeout: 60000,
+  }),
   warrantyStep: (id, list, step, done) => req('warranties.php?action=step', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, list, step, done }),
   }),

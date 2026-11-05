@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Warranty;
 use App\Models\ZkongServer;
 use App\Services\Zkong\ZkongClient;
+use App\Services\Zkong\ZkongException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -21,9 +22,10 @@ use Throwable;
  *   custFeature1  enviado por el cliente el      custFeature2  recibido en almacén
  *   custFeature3  revisado el                    custFeature4  pte. creación presupuesto
  *   custFeature5  resolución enviada el
- *   custFeature10…29  productos: «ref_aeme - Cant. N» (20 huecos)
+ *   custFeature10…29  productos: «ref_aeme - N» (20 huecos)
  *
- * Solo sale si está configurado (services.warranty_cloud: servidor y tienda). Sin eso
+ * Entra con la CUENTA DE PRODUCTOS del servidor (Servidores ZKONG), no con la de
+ * administrador. Solo sale si está configurado (services.warranty_cloud: servidor y tienda). Sin eso
  * (tests, local) no se llama a nada.
  */
 class WarrantyCloudItem
@@ -38,7 +40,7 @@ class WarrantyCloudItem
 
     public static function enabled(): bool
     {
-        return (bool) config('services.warranty_cloud.store_id') && (bool) config('services.warranty_cloud.server');
+        return self::server() !== null;
     }
 
     /** Lo llaman los modelos al cambiar algo: sale después de responder, una vez por garantía. */
@@ -60,15 +62,16 @@ class WarrantyCloudItem
             $s = self::server();
             if (! $w || ! $s) return false;
 
-            $c = new ZkongClient($s);
-            if (! $s->merchant_id) {
+            // Con la cuenta de productos del servidor (la de administrador no puede crearlos).
+            $c = new ZkongClient($s, true);
+            if (! $s->product_merchant_id) {
                 $c->login();   // el comercio y la agencia salen del login
                 $s->refresh();
             }
             $json = $c->post('/item/batchImportItem', [
-                'agencyId'   => $s->agency_id,
-                'merchantId' => $s->merchant_id,
-                'storeId'    => (string) config('services.warranty_cloud.store_id'),
+                'agencyId'   => $s->product_agency_id,
+                'merchantId' => $s->product_merchant_id,
+                'storeId'    => self::store(),
                 'unitName'   => 0,
                 'itemList'   => [self::item($w)],
             ]);
@@ -82,6 +85,85 @@ class WarrantyCloudItem
             Log::warning("Garantía {$warrantyId}: no se pudo mandar el producto al cloud: " . $e->getMessage());
             return false;
         }
+    }
+
+    /** Si se pueden emparejar etiquetas de almacén (servidor con cuenta de productos y tienda). */
+    public static function canPair(): bool
+    {
+        return self::enabled() && self::server() !== null;
+    }
+
+    /**
+     * Empareja una etiqueta de la tienda del almacén con el producto de la garantía (como
+     * dialprix: bind/batchBind, el Cloud elige la antena). Antes se manda el producto, por
+     * si aún no existe. Si la garantía tenía otra etiqueta, se desempareja; si la etiqueta
+     * estaba con otra garantía, esa se queda sin ella. Devuelve el código emparejado.
+     * Lanza ZkongException con el mensaje del Cloud si no se puede.
+     */
+    public static function pair(Warranty $w, string $eslCode): string
+    {
+        $esl = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $eslCode));
+        if (! preg_match('/^[A-Z0-9]{9}$/', $esl)) throw new ZkongException('El código de una etiqueta tiene 9 letras o números.');
+        $s = self::server();
+        if (! self::enabled() || ! $s) throw new ZkongException('La etiqueta de almacén no está configurada (servidor con cuenta de productos y tienda).');
+        if (! self::send($w->id)) throw new ZkongException('El Cloud no ha aceptado el producto de la garantía.');
+
+        $c = new ZkongClient($s, true);
+        $antes = (string) $w->cloud_label;
+        if ($antes !== '' && $antes !== $esl) {
+            try {
+                self::unbind($c, $antes, (string) $w->code);
+            } catch (Throwable $e) {
+                Log::warning("Garantía {$w->code}: no se pudo desemparejar {$antes}: " . $e->getMessage());
+            }
+        }
+        $c->post('/bind/batchBind', [
+            'storeId' => self::store(),
+            // batchBind quiere «itemBarcode» con c minúscula (con C responde «param invalid»).
+            'tagItemBinds' => [['eslBarcode' => $esl, 'itemBarcode' => (string) $w->code]],
+        ]);
+
+        // Una etiqueta solo enseña una garantía: la que la tuviera se queda sin ella.
+        foreach (Warranty::where('cloud_label', $esl)->where('id', '!=', $w->id)->get(['id', 'code']) as $otra) {
+            Warranty::whereKey($otra->id)->update(['cloud_label' => null, 'cloud_label_at' => null]);
+            self::evento($otra->id, $esl, null, "Etiqueta de almacén {$esl} pasada a {$w->code}");
+        }
+        // Sin pasar por el modelo: no es un cambio del producto (no hay que volver a mandarlo).
+        Warranty::whereKey($w->id)->update(['cloud_label' => $esl, 'cloud_label_at' => now(), 'last_activity_at' => now()]);
+        self::evento($w->id, $antes ?: null, $esl, $antes && $antes !== $esl ? "Etiqueta de almacén cambiada de {$antes} a {$esl}" : "Etiqueta de almacén {$esl} emparejada");
+        return $esl;
+    }
+
+    /** Quita la etiqueta de almacén de la garantía (la desempareja en el Cloud). */
+    public static function unpair(Warranty $w): void
+    {
+        $esl = (string) $w->cloud_label;
+        if ($esl === '') return;
+        $s = self::server();
+        if (! self::enabled() || ! $s) throw new ZkongException('La etiqueta de almacén no está configurada (servidor con cuenta de productos y tienda).');
+        self::unbind(new ZkongClient($s, true), $esl, (string) $w->code);
+        Warranty::whereKey($w->id)->update(['cloud_label' => null, 'cloud_label_at' => null, 'last_activity_at' => now()]);
+        self::evento($w->id, $esl, null, "Etiqueta de almacén {$esl} quitada");
+    }
+
+    private static function unbind(ZkongClient $c, string $esl, string $code): void
+    {
+        $c->post('/bind/batchUnbind', [
+            'storeId' => self::store(),
+            // Al revés que batchBind: aquí es «itemBarCode» con C (como dialprix).
+            'tagItemBinds' => [['eslBarcode' => $esl, 'itemBarCode' => $code]],
+        ]);
+    }
+
+    private static function store(): string
+    {
+        return (string) (self::server()?->product_store_id ?: config('services.warranty_cloud.store_id'));
+    }
+
+    private static function evento(int $id, ?string $de, ?string $a, string $texto): void
+    {
+        DB::table('warranty_events')->insert(['warranty_id' => $id, 'user_id' => auth()->id(), 'field' => 'cloud_label',
+            'from_value' => $de, 'to_value' => $texto, 'created_at' => now()]);
     }
 
     /** El producto tal como va al cloud. */
@@ -105,7 +187,8 @@ class WarrantyCloudItem
         ];
 
         // Productos: uno por hueco; si hay más de 20, el último dice cuántos faltan.
-        $prods = array_map(fn ($p) => "{$p['name']} - Cant. {$p['qty']}", $d['products']);
+        // «Ref - cantidad», como en la plantilla: con «Cant.» no cabe en el hueco (90 px a 10).
+        $prods = array_map(fn ($p) => "{$p['name']} - {$p['qty']}", $d['products']);
         if (count($prods) > self::HUECOS) {
             $resto = array_slice($prods, self::HUECOS - 1);
             $prods = array_slice($prods, 0, self::HUECOS - 1);
@@ -117,10 +200,16 @@ class WarrantyCloudItem
         return $item;
     }
 
+    /**
+     * El servidor de services.warranty_cloud.server, activo, con cuenta de productos y con
+     * tienda (la suya de Servidores ZKONG o, si no, services.warranty_cloud.store_id).
+     */
     private static function server(): ?ZkongServer
     {
         $n = (string) config('services.warranty_cloud.server');
-        return ZkongServer::where('active', true)->where(fn ($q) => $q->where('name', $n)->orWhere('id', ctype_digit($n) ? (int) $n : 0))->first();
+        $s = $n === '' ? null : ZkongServer::where('active', true)->whereNotNull('product_username')
+            ->where(fn ($q) => $q->where('name', $n)->orWhere('id', ctype_digit($n) ? (int) $n : 0))->first();
+        return $s && ($s->product_store_id ?: config('services.warranty_cloud.store_id')) ? $s : null;
     }
 
     /**

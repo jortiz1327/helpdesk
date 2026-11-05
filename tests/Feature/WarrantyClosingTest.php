@@ -38,6 +38,16 @@ class WarrantyClosingTest extends TestCase
         return DB::table('warranty_events')->where('warranty_id', $id)->whereIn('field', ['close', 'reopen'])->orderBy('id')->pluck('to_value', 'field')->all();
     }
 
+    // Se abre antes de que el cliente envíe nada: la fecha de recepción se pone al llegar.
+    public function test_la_fecha_de_recepcion_es_opcional(): void
+    {
+        $id = $this->guardar(['status' => 'no_iniciado', 'received_at' => ''])->assertOk()->json('id');
+        $this->assertNull(Warranty::find($id)->received_at);
+        $this->guardar(['id' => $id, 'status' => 'no_iniciado', 'received_at' => 'mañana'])->assertStatus(400);
+        $this->guardar(['id' => $id, 'status' => 'en_curso', 'received_at' => '2026-11-06'])->assertOk();
+        $this->assertSame('2026-11-06', Warranty::find($id)->received_at->toDateString());
+    }
+
     public function test_cerrar_y_reabrir(): void
     {
         $id = $this->guardar(['status' => 'en_curso'])->assertOk()->json('id');

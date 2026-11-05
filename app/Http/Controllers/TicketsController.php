@@ -197,7 +197,23 @@ class TicketsController extends Controller
      */
     protected function countQuery(User $me)
     {
-        return $this->scope(DB::table('tickets as t')->where('t.channel', '!=', 'cron'), $me);
+        return $this->sinSolicitudesDeGarantia($this->scope(DB::table('tickets as t')->where('t.channel', '!=', 'cron'), $me));
+    }
+
+    /**
+     * Lo de la bandeja de Tickets (listas, contadores, exportar, recientes): sin las
+     * solicitudes de garantía del portal («Solicitar una garantía»), que son solo de
+     * «Tickets de garantías». Los que llegan por correo, WhatsApp o «Crear una incidencia»
+     * siguen en las dos. Abrir uno (ficha, responder…) usa baseQuery: desde Garantías se abren.
+     */
+    protected function bandejaQuery(User $me)
+    {
+        return $this->sinSolicitudesDeGarantia($this->baseQuery($me));
+    }
+
+    private function sinSolicitudesDeGarantia($q)
+    {
+        return $q->whereNotExists(fn ($e) => $e->from('warranty_requests as wr')->whereColumn('wr.ticket_id', 't.id'));
     }
 
     protected function baseQuery(User $me)
@@ -244,7 +260,7 @@ class TicketsController extends Controller
             return response()->json(['ok' => false, 'error' => 'No tienes permiso para exportar'], 403);
         }
 
-        $q = $this->baseQuery($me);
+        $q = $this->bandejaQuery($me);
         $this->aplicarFiltros($q, $request, $me);
 
         $cap   = 5000;
@@ -489,7 +505,7 @@ class TicketsController extends Controller
     protected function list(Request $request)
     {
         $me = $request->user();
-        $q  = $this->baseQuery($me);
+        $q  = $this->bandejaQuery($me);
 
         /*
          * DOS BÚSQUEDAS DISTINTAS, a propósito (decisión del usuario):
@@ -814,7 +830,7 @@ class TicketsController extends Controller
         $byStatus = ($from || $to) ? $this->repartoPorEstado($me, $from, $to) : $byStatusAll;
 
         // Últimos tickets (panel «Tickets recientes» del Centro de Soporte)
-        $recent = (clone $this->baseQuery($me))
+        $recent = (clone $this->bandejaQuery($me))
             ->orderByDesc('t.last_message_at')
             ->limit(5)
             ->get([
@@ -836,7 +852,7 @@ class TicketsController extends Controller
             'total'     => array_sum($byStatusAll),
             'open'      => array_sum(array_intersect_key($byStatusAll, array_flip(TicketService::OPEN_STATUSES))),
             'resolved'  => $byStatusAll['resuelto'] + $byStatusAll['cerrado'],
-            'urgent'    => (clone $this->baseQuery($me))->where('t.priority', TicketService::topPriorityKey() ?? 'urgente')
+            'urgent'    => (clone $this->bandejaQuery($me))->where('t.priority', TicketService::topPriorityKey() ?? 'urgente')
                 ->whereIn('t.status', TicketService::OPEN_STATUSES)->count(),
             // El gráfico «Tickets por estado» respeta el rango de fechas pedido.
             'by_status' => $byStatus,
@@ -1500,7 +1516,7 @@ class TicketsController extends Controller
         if ($t->merged_into_id) return response()->json(['ok' => false, 'error' => 'Este ticket ya está fusionado'], 409);
 
         // Mismo alcance que la lista: no se ofrece fusionar con algo que no puedes ver.
-        $otros = (clone $this->baseQuery($me))
+        $otros = (clone $this->bandejaQuery($me))
             ->where('t.contact_id', $t->contact_id)
             ->where('t.id', '!=', $id)
             ->whereNull('t.merged_into_id')
@@ -1934,7 +1950,7 @@ class TicketsController extends Controller
 
         // baseQuery aplica scope(): solo avisa de las incidencias que este usuario PUEDE
         // ver (sus áreas / asignadas). Sin esto se filtraban las de otros departamentos.
-        $tickets = (clone $this->baseQuery($me))
+        $tickets = (clone $this->bandejaQuery($me))
             ->where('t.contact_id', $cid)
             ->whereIn('t.status', TicketService::OPEN_STATUSES)
             ->whereNull('t.merged_into_id')

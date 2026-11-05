@@ -120,7 +120,8 @@ class WarrantiesTest extends TestCase
         [$otro] = $this->agente(['helpdesk.access'], 'Pepe');
         $this->postJson('/api/warranties.php?action=save', ['received_at' => '2026-10-20', 'responsible_id' => $otro->id], $h)->assertStatus(400);
         $this->postJson('/api/warranties.php?action=save', ['received_at' => '2026-10-20', 'ticket_code' => 'TK-NO-EXISTE'], $h)->assertStatus(400);
-        $this->postJson('/api/warranties.php?action=save', ['received_at' => ''], $h)->assertStatus(400);
+        $this->postJson('/api/warranties.php?action=save', ['received_at' => '2026-13-45'], $h)->assertStatus(400);   // fecha mala
+        $this->postJson('/api/warranties.php?action=save', ['received_at' => ''], $h)->assertOk();                  // sin fecha: aún no ha llegado
     }
 
     /**
@@ -191,7 +192,7 @@ class WarrantiesTest extends TestCase
         DB::table('user_ticket_categories')->insert(['user_id' => $ana->id, 'category_id' => $ajena]);
         $this->assertSame('Asunto TK-AJENA', $this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->json('warranty.ticket_subject'));
         $m = $this->getJson("/api/warranties.php?action=get&id={$w->id}", $h)->json('messages');
-        $this->assertEqualsCanonicalizing([['correo', 'Llegaron rotas tres'], ['whatsapp', 'Ha mandado una foto']], array_map(fn ($x) => [$x['channel'], $x['text']], $m));
+        $this->assertEqualsCanonicalizing([['correo', "Llegaron rotas\ntres"], ['whatsapp', 'Ha mandado una foto']], array_map(fn ($x) => [$x['channel'], $x['text']], $m));
         $this->assertSame('TK-AJENA@cliente.com', $this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->json('to'));
     }
 
@@ -283,6 +284,18 @@ class WarrantiesTest extends TestCase
         $this->assertSame([], $codes('category=0&category_strict=1'));            // sin categoría válida, nada
         $this->assertSame(['TK-GAR-1', 'TK-SIN-1'], $codes("category={$catGar}"));   // Soporte sigue igual
 
+        // «Solicitar una garantía» del portal: solo en Tickets de garantías, no en Tickets.
+        // TK-GAR-1 (llegó por correo) sigue en las dos. Abrirla desde Garantías funciona.
+        $real = DB::table('ticket_categories')->where('key', 'garantias')->value('id')
+            ?? DB::table('ticket_categories')->insertGetId(['key' => 'garantias', 'name' => 'Garantías R', 'color' => '#888', 'position' => 3, 'active' => 1]);
+        $ticket($real, 'TK-GAR-2');                    // «Crear una incidencia» / correo: en las dos
+        $sol = $ticket($real, 'TK-SOL-1');             // «Solicitar una garantía»: solo en Garantías
+        DB::table('warranty_requests')->insert(['ticket_id' => $sol, 'email' => 'c@x.com', 'items' => '[]', 'created_at' => now(), 'updated_at' => now()]);
+        $this->assertSame(['TK-GAR-1', 'TK-GAR-2', 'TK-SIN-1', 'TK-SOP-1'], $codes(''));
+        $inbox = collect($this->getJson('/api/warranties.php?action=inbox&tab=todos', $h)->assertOk()->json('tickets'))->pluck('code')->sort()->values()->all();
+        $this->assertSame(['TK-GAR-2', 'TK-SOL-1'], $inbox);
+        $this->getJson("/api/tickets.php?action=detail&id={$sol}", $h)->assertOk();
+
         // Garantía creada a mano desde el ticket: queda enlazada.
         $w = $this->crear($h, ['ticket_code' => 'TK-GAR-1']);
         $r = $this->getJson("/api/warranties.php?action=by_ticket&ticket_id={$g}", $h)->assertOk()->json('warranties');
@@ -297,6 +310,16 @@ class WarrantiesTest extends TestCase
         $this->assertNull(\App\Services\AemePortal::baseName('(Nulo) Hotel X - Proyecto'));
         $this->assertNull(\App\Services\AemePortal::baseName('Stock Expofarm - Comanda 1011'));
         $this->assertNull(\App\Services\AemePortal::baseName('Proyecto temporal'));
+
+        // Sin sufijo también es un hotel o tienda (BREOGAN: «Coral Suites»); los servicios,
+        // gastos y lo interno, no.
+        $this->assertSame('Coral Suites', \App\Services\AemePortal::baseName('Coral Suites'));
+        $this->assertSame('Infitec 120424', \App\Services\AemePortal::baseName('Infitec 120424- Proyecto'));
+        $this->assertSame('Cooperativa San Benito (Huelva - Cerro)', \App\Services\AemePortal::baseName('Cooperativa San Benito (Huelva - Cerro)'));
+        foreach (['Hotel Anabel - Acciones comerciales', 'Hotel Tora - Soporte', 'Hosting ecoserra.es', 'Benalma Hotel Costa del Sol- Cuota anual',
+            'Gastos generales dominios', 'AEME Registro Garantías', 'Comanda 171122', 'Cert SSL + ip fija maquitor.com', 'Instalación hotel en canarias XXX'] as $t) {
+            $this->assertNull(\App\Services\AemePortal::baseName($t), $t);
+        }
 
         // Varios pedidos de la misma tienda: una sola entrada, la más reciente.
         $bases = \App\Services\AemePortal::bases([

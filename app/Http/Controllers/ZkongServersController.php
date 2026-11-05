@@ -30,6 +30,9 @@ class ZkongServersController extends Controller
             'id' => $s->id, 'name' => $s->name, 'base_url' => $s->base_url, 'username' => $s->username,
             'active' => $s->active, 'merchant_id' => $s->merchant_id,
             'token_updated_at' => $s->token_updated_at?->toDateTimeString(),
+            'product_username' => $s->product_username,
+            'product_store_id' => $s->product_store_id,
+            'product_token_updated_at' => $s->product_token_updated_at?->toDateTimeString(),
             'updated_at' => $s->updated_at?->toDateTimeString(),
         ]);
         return response()->json(['ok' => true, 'servers' => $rows]);
@@ -64,6 +67,20 @@ class ZkongServersController extends Controller
         if ($s->exists && $pass === '' && ($s->base_url !== $url || $s->username !== $user)) {
             return response()->json(['ok' => false, 'error' => 'Al cambiar la dirección o el usuario, vuelve a escribir la contraseña'], 400);
         }
+        // Cuenta de productos (opcional): mismas reglas. Vacía = el servidor no tiene.
+        $pUser = trim((string) $request->input('product_username', ''));
+        $pPass = (string) $request->input('product_password', '');
+        $pAntes = (string) $s->product_username;
+        if ($pUser !== '' && $pPass === '' && ($pAntes !== $pUser || ($s->exists && $s->base_url !== $url) || ! $s->product_password)) {
+            return response()->json(['ok' => false, 'error' => 'Escribe la contraseña de la cuenta de productos'], 400);
+        }
+        $tienda = preg_replace('/\D/', '', (string) $request->input('product_store_id', ''));
+        if ($pUser !== '' && $tienda === '') {
+            return response()->json(['ok' => false, 'error' => 'Indica la tienda del Cloud donde la cuenta de productos crea los productos'], 400);
+        }
+        $s->product_store_id = $pUser !== '' ? mb_substr($tienda, 0, 40) : null;
+        $cambiaProductos = $pAntes !== $pUser || $pPass !== '' || ($s->exists && $s->base_url !== $url);
+
         $cambiaAcceso = ! $s->exists || $s->base_url !== $url || $s->username !== $user || $pass !== '';
         $s->fill([
             'name'     => mb_substr($name, 0, 60),
@@ -80,6 +97,14 @@ class ZkongServersController extends Controller
             $s->token = null;
             $s->token_updated_at = null;
             $s->public_key_sha256 = null;
+        }
+        if ($cambiaProductos) {
+            $s->product_username = $pUser !== '' ? mb_substr($pUser, 0, 120) : null;
+            $s->product_password = $pUser !== '' ? ($pPass !== '' ? $pPass : $s->product_password) : null;
+            $s->product_token = null;
+            $s->product_merchant_id = null;
+            $s->product_agency_id = null;
+            $s->product_token_updated_at = null;
         }
         $s->save();
 
@@ -98,7 +123,8 @@ class ZkongServersController extends Controller
         $t = microtime(true);
         $ms = fn () => (int) round((microtime(true) - $t) * 1000);
         try {
-            $info = (new ZkongClient($s))->login();
+            // ?cuenta=productos prueba la cuenta que crea productos.
+            $info = (new ZkongClient($s, $request->query('cuenta') === 'productos'))->login();
             return response()->json(['ok' => true, 'merchant_id' => $info['merchant_id'], 'ms' => $ms()]);
         } catch (Throwable $e) {
             return response()->json(['ok' => false, 'error' => $e->getMessage(), 'ms' => $ms()]);

@@ -190,7 +190,7 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
   // Alta en dos pasos: primero los datos y después las etiquetas (pantalla propia, sin scroll).
   const [paso, setPaso] = useState('datos')
   const enEtiquetas = !f.id && paso === 'etiquetas'
-  const siguiente = () => { if (!f.received_at) { toast('Indica la fecha de recepción', 'err'); return } setPaso('etiquetas') }
+  const siguiente = () => setPaso('etiquetas')
   const bloqueoEtiquetas = f.id || !comp.text.trim() ? null
     : comp.checked !== comp.text || !comp.results ? 'Comprueba las etiquetas antes de crear la garantía'
     : comp.invalid?.length ? 'Quita los códigos que no son etiquetas ni antenas'
@@ -199,7 +199,6 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
     : null
 
   const guardar = async () => {
-    if (!f.received_at) { toast('Indica la fecha de recepción', 'err'); return }
     setSaving(true)
     const r = await api.saveWarranty(f.id ? f : { ...f, labels: comp.text, manual: comp.manual })
     setSaving(false)
@@ -259,8 +258,8 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
           <div className="grid2">
             <label className="field"><span className="lbl">Primera fecha de contacto</span>
               <input type="date" value={f.first_contact_at || ''} onChange={set('first_contact_at')} /></label>
-            <label className="field"><span className="lbl">Fecha de recepción <em>*</em></span>
-              <input type="date" value={f.received_at} onChange={set('received_at')} /></label>
+            <label className="field"><span className="lbl">Fecha de recepción <span className="hint">(cuando lleguen al almacén)</span></span>
+              <input type="date" value={f.received_at || ''} onChange={set('received_at')} /></label>
           </div>
           <label className="field"><span className="lbl">Fecha de instalación <span className="hint">(opcional: si se indica, cuenta para todos los dispositivos en lugar de su alta en ZKONG)</span></span>
             <input type="date" value={f.installed_at || ''} onChange={set('installed_at')} /></label>
@@ -322,7 +321,7 @@ export function NuevaGarantia({ inicial, onClose, onSaved }) {
     portal_project_id: s.portal_project_id || null, project_name: s.project_name || '',
     labels_text: (s.items || []).map((i) => i.code).join('\n'),
   } : {}
-  return <Formulario inicial={{ ...VACIA, received_at: hoy(), ...inicial, ...desdePortal }} opts={opts} onClose={onClose} onSaved={onSaved} />
+  return <Formulario inicial={{ ...VACIA, ...inicial, ...desdePortal }} opts={opts} onClose={onClose} onSaved={onSaved} />
 }
 
 /* --- Lista --- */
@@ -1459,7 +1458,7 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
   )
 }
 
-const CAMPOS = { created: 'Garantía creada', close: 'Cierre', reopen: 'Reapertura', steps: 'Pasos', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', shipment: 'Envío del cliente', client_notice: 'Aviso al cliente',first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', close: 'Cierre', reopen: 'Reapertura', steps: 'Pasos', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', shipment: 'Envío del cliente', client_notice: 'Aviso al cliente', cloud_label: 'Etiqueta de almacén', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
 
 /* Envíos que el cliente avisó desde el portal («Ya lo he enviado»): para esperarlo y
    localizar el paquete. No es obligatorio, así que puede no haber ninguno. */
@@ -1484,6 +1483,131 @@ function EnviosCliente({ list }) {
 }
 
 /* Pasos por tipo de cliente (Configuración): los de todas y los de su categoría o cliente. */
+/*
+ * Lo que escribió el cliente, línea a línea: «Clave: valor» con la clave en negrita, las
+ * líneas «- …» como lista (los dispositivos de la solicitud del portal) y, si es largo,
+ * recogido con «Ver todo».
+ */
+function MensajeCliente({ text }) {
+  const [todo, setTodo] = useState(false)
+  // Sin líneas en blanco: los correos guardan cada línea como un párrafo (una en blanco entre medias).
+  const lineas = String(text || '').split('\n').filter((l) => l.trim() !== '')
+  const largo = lineas.length > 12 || text.length > 900
+  const vista = largo && !todo ? lineas.slice(0, 10) : lineas
+  const bloques = []
+  vista.forEach((l, i) => {
+    const t = l.trim()
+    if (/^[-•*]\s+/.test(t)) {
+      const item = t.replace(/^[-•*]\s+/, '')
+      const ult = bloques[bloques.length - 1]
+      if (ult?.tipo === 'lista') ult.items.push(item); else bloques.push({ tipo: 'lista', items: [item], k: i })
+      return
+    }
+    const kv = t.match(/^([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ ().]{0,28}):\s*(.*)$/u)
+    bloques.push(kv ? { tipo: 'kv', clave: kv[1], valor: kv[2], k: i } : { tipo: 'texto', t, k: i })
+  })
+  return (
+    <div className="wf-msg">
+      {bloques.map((b) => b.tipo === 'lista' ? <ul key={b.k}>{b.items.map((x, j) => <li key={j}>{x}</li>)}</ul>
+        : b.tipo === 'kv' ? <p key={b.k}><b>{b.clave}:</b> {b.valor}</p>
+        : <p key={b.k}>{b.t}</p>)}
+      {largo ? <button type="button" className="ws-txt wf-msg-mas" onClick={() => setTodo((v) => !v)}>{todo ? 'Ver menos' : 'Ver todo'}</button> : null}
+    </div>
+  )
+}
+
+/*
+ * Etiqueta de almacén: la etiqueta de la tienda del almacén (Cloud) que enseña la pegatina
+ * de la garantía. Se escribe o se escanea su código y se empareja con el producto de la
+ * garantía; se puede cambiar por otra o quitar. Solo si está configurada (Servidores ZKONG).
+ */
+function EtiquetaAlmacen({ w, enabled, puede, onChanged }) {
+  const toast = useToast()
+  const confirm = useConfirm()
+  const [code, setCode] = useState('')
+  const [abierto, setAbierto] = useState(false)
+  const [ocupado, setOcupado] = useState('')       // 'pair' | 'remove' | 'scan'
+  const foto = useRef(null)
+  const actual = w.cloud_label || ''
+  const limpio = code.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const valido = /^[A-Z0-9]{9}$/.test(limpio)
+
+  if (!enabled && !actual) return null
+
+  const emparejar = async (c = limpio) => {
+    if (!/^[A-Z0-9]{9}$/.test(c)) { toast('El código de una etiqueta tiene 9 letras o números', 'err'); return }
+    if (actual && c !== actual && !(await confirm({ title: 'Cambiar la etiqueta de almacén', message: `${actual} dejará de enseñar ${w.code} y la enseñará ${c}.`, confirmText: 'Cambiar' }))) return
+    setOcupado('pair')
+    const r = await api.warrantyCloudLabel(w.id, c).catch(() => ({ ok: false, error: 'No se pudo conectar' }))
+    setOcupado('')
+    if (!r.ok) { toast(r.error || 'No se pudo emparejar', 'err'); return }
+    toast(`Etiqueta ${r.cloud_label} emparejada con ${w.code}`)
+    setCode(''); setAbierto(false)
+    onChanged?.()
+  }
+  const quitar = async () => {
+    if (!(await confirm({ title: 'Quitar la etiqueta de almacén', message: `${actual} dejará de enseñar la pegatina de ${w.code}.`, danger: true, confirmText: 'Quitar' }))) return
+    setOcupado('remove')
+    const r = await api.warrantyCloudLabel(w.id, '', true).catch(() => ({ ok: false, error: 'No se pudo conectar' }))
+    setOcupado('')
+    if (!r.ok) { toast(r.error || 'No se pudo quitar', 'err'); return }
+    toast(`Etiqueta ${actual} quitada`)
+    onChanged?.()
+  }
+  // Foto con la cámara (o una imagen): se lee su código de barras y se empareja.
+  const escanear = async (e) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    setOcupado('scan')
+    const leidos = (await leerCodigos(f)).filter((x) => /^[A-Z0-9]{9}$/.test(x))
+    setOcupado('')
+    if (!leidos.length) { toast('No se ha leído ningún código de etiqueta en la foto', 'err'); return }
+    setCode(leidos[0]); setAbierto(true)
+    emparejar(leidos[0])
+  }
+
+  const form = (
+    <div className="wf-alm-f">
+      <input className="mono" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código de la etiqueta"
+        maxLength={20} autoFocus={abierto} disabled={!!ocupado}
+        onKeyDown={(e) => { if (e.key === 'Enter' && valido) emparejar() ; if (e.key === 'Escape') { setAbierto(false); setCode('') } }} aria-label="Código de la etiqueta de almacén" />
+      <button className="dev-btn" type="button" title="Hacer una foto a la etiqueta y leer su código" disabled={!!ocupado} onClick={() => foto.current?.click()}>
+        <Icon.scan /> {ocupado === 'scan' ? 'Leyendo…' : 'Escanear'}</button>
+      <button className="btn" type="button" disabled={!valido || !!ocupado} onClick={() => emparejar()}>{ocupado === 'pair' ? 'Emparejando…' : 'Emparejar'}</button>
+      <input ref={foto} type="file" accept="image/*" capture="environment" hidden onChange={escanear} />
+    </div>
+  )
+
+  return (
+    <section className="wf-card wf-alm">
+      <header><h3><Icon.tag /> Etiqueta de almacén</h3>{actual ? <span className="wf-alm-st ok">Emparejada</span> : <span className="wf-alm-st">Sin etiqueta</span>}</header>
+      <div className="wf-alm-b">
+        {actual ? (
+          <>
+            <div className="wf-alm-act">
+              <code>{actual}</code>
+              <small>Enseña la pegatina de {w.code}{w.cloud_label_at ? ` · desde ${fechaHora(w.cloud_label_at)}` : ''}</small>
+            </div>
+            {puede && enabled && !abierto ? (
+              <div className="wf-alm-acc">
+                <button className="ws-txt" disabled={!!ocupado} onClick={() => setAbierto(true)}>Cambiar</button>
+                <button className="ws-txt danger" disabled={!!ocupado} onClick={quitar}>{ocupado === 'remove' ? 'Quitando…' : 'Quitar'}</button>
+              </div>
+            ) : null}
+            {abierto ? form : null}
+          </>
+        ) : puede ? (
+          <>
+            <p className="dev-mute">Escribe o escanea el código de una etiqueta de la tienda del almacén: enseñará la pegatina de esta garantía y se actualiza sola con cada cambio.</p>
+            {form}
+          </>
+        ) : <p className="dev-mute">Aún no tiene etiqueta de almacén.</p>}
+      </div>
+    </section>
+  )
+}
+
 function Pasos({ w, listas, puede, onChanged }) {
   const toast = useToast()
   const [ls, setLs] = useState(listas)
@@ -1550,7 +1674,8 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
 
   const w = d.warranty
   const abierta = !cerradaEn(opts, w.status)
-  const diasAbierta = dias(w.received_at, abierta ? null : w.closed_at)
+  // Sin recepción (aún no ha llegado nada) cuenta desde que se abrió.
+  const diasAbierta = dias(w.received_at || w.created_at, abierta ? null : w.closed_at)
   const diasSin = dias(w.last_activity_at)
   const stale = abierta && diasSin != null && diasSin >= (opts?.stale_days || 15)
 
@@ -1668,6 +1793,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
 
         <aside className="wf-side">
           <EnviosCliente list={d.shipments} />
+          <EtiquetaAlmacen w={w} enabled={!!d.cloud?.enabled} puede={!!p.edit} onChanged={cargar} />
           <Pasos w={w} listas={d.steps} puede={!!p.edit} onChanged={cargar} />
           <GuiasRelacionadas w={w} onGoAll={onGoGuides} />
           <section className="wf-card">
@@ -1683,7 +1809,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
                 ? remesas.map(([code, st]) => <span key={code} className="wf-rem"><b className="mono">{code}</b> <small>{opts?.review?.batch_statuses?.[st] || st}</small></span>)
                 : '—'}</dd></div>
               <div><dt>Primer contacto</dt><dd>{fecha(w.first_contact_at)}</dd></div>
-              <div><dt>Recepción</dt><dd>{fecha(w.received_at)}</dd></div>
+              <div><dt>Recepción</dt><dd>{w.received_at ? fecha(w.received_at) : <span className="dev-mute">Pendiente de recibir</span>}</dd></div>
               <div><dt>Instalación</dt><dd>{w.installed_at ? fecha(w.installed_at) : <span className="dev-mute" title="Cada dispositivo cuenta desde su alta en ZKONG">Alta en ZKONG</span>}</dd></div>
               {w.closed_at ? <div><dt>Cierre</dt><dd>{fecha(w.closed_at)}</dd></div> : null}
               {!abierta && w.close_reason ? <div><dt>Motivo de cierre</dt><dd>{motivoDe(opts, w.close_reason)}</dd></div> : null}
@@ -1712,7 +1838,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
                 {linea.map(({ k, nota: n, ev: e, msg: m }) => m ? (
                   <li key={k} className="msg">
                     <div className="wf-tl-h"><b>Cliente</b><span className={`wr-type t-msg-${m.channel}`}>{m.channel === 'whatsapp' ? 'WhatsApp' : 'Correo'}</span><time>{fechaHora(m.created_at)}</time></div>
-                    <p>{m.text}</p>
+                    <MensajeCliente text={m.text} />
                   </li>
                 ) : n ? (
                   <li key={k} className="nota">
@@ -1781,7 +1907,7 @@ export default function Warranties({ openId = null, onOpened, onOpenTicket, onGo
           ? <Ficha key={`${sel}-${reload}`} id={sel} opts={opts} onBack={() => setSel(null)}
               onEdit={(w) => setForm({ ...VACIA, ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '' })}
               onChanged={() => {}} onOpenTicket={onOpenTicket} onGoGuides={onGoGuides} />
-          : <Lista opts={opts} reload={reload} filtro={filtro} onOpen={setSel} onNew={() => setForm({ ...VACIA, received_at: hoy() })} />}
+          : <Lista opts={opts} reload={reload} filtro={filtro} onOpen={setSel} onNew={() => setForm({ ...VACIA })} />}
       </div></div>
 
       {form && <Formulario inicial={form} opts={opts} onClose={() => setForm(null)} onSaved={(id) => { setForm(null); refrescar(); setSel(id) }} />}

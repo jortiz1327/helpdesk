@@ -15,7 +15,7 @@ class WarrantyPermissions
         'warranties' => [
             'save' => 'warranties.edit', 'note' => 'warranties.edit', 'bulk' => 'warranties.edit',
             'labels_add' => 'warranties.edit', 'labels_recheck' => 'warranties.edit', 'label_model' => 'warranties.edit',
-            'label_delete' => 'warranties.edit', 'step' => 'warranties.edit',
+            'label_delete' => 'warranties.edit', 'step' => 'warranties.edit', 'cloud_label' => 'warranties.edit',
             'review' => 'warranties.review', 'photo_upload' => 'warranties.review', 'photo_from_ticket' => 'warranties.review',
             'photo_delete' => 'warranties.review',
             'delete' => 'warranties.delete',

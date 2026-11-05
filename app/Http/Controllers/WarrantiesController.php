@@ -64,6 +64,7 @@ class WarrantiesController extends Controller
             'team'              => $this->team($request),
             'report'            => $this->report($request),
             'step'              => $this->step($request),
+            'cloud_label'       => $this->cloudLabel($request),
             'tour'              => $this->tour($request),
             default   => $this->list($request),
         };
@@ -256,6 +257,8 @@ class WarrantiesController extends Controller
             'last_activity_at' => $w->last_activity_at?->toDateTimeString(),
             'created_at'       => $w->created_at?->toDateTimeString(),
             'labels_count'     => (int) ($w->labels_count ?? 0),
+            'cloud_label'      => $w->cloud_label,
+            'cloud_label_at'   => $w->cloud_label_at ? (string) $w->cloud_label_at : null,
         ];
     }
 
@@ -298,10 +301,32 @@ class WarrantiesController extends Controller
             'created_by_name' => $w->created_by_name,
         ], 'notes' => $notes, 'events' => $events, 'messages' => $mensajes, 'items' => $this->items($w->id),
             'steps' => WarrantySteps::forWarranty($w),
+            'cloud' => ['enabled' => \App\Services\WarrantyCloudItem::canPair()],
             // Envíos que avisó el cliente desde el portal («Ya lo he enviado»). El correo de
             // quien avisó es del ticket: solo para quien lo ve.
             'shipments' => $w->ticket_id ? array_map(fn ($s) => $w->ticketVisibleTo($request->user()) ? $s : ['email' => null] + $s,
                 PortalWarranties::shipments((int) $w->ticket_id)) : []]);
+    }
+
+    /**
+     * Etiqueta de almacén: empareja (code) o quita (remove) la etiqueta del Cloud que enseña
+     * la pegatina de la garantía. El mensaje del Cloud llega tal cual si no lo acepta.
+     */
+    private function cloudLabel(Request $request)
+    {
+        if (! $request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        try {
+            $request->boolean('remove') ? \App\Services\WarrantyCloudItem::unpair($w)
+                : \App\Services\WarrantyCloudItem::pair($w, (string) $request->input('code', ''));
+        } catch (\App\Services\Zkong\ZkongException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['ok' => false, 'error' => 'No se pudo hablar con el Cloud. Prueba de nuevo en un rato.'], 502);
+        }
+        $w->refresh();
+        return response()->json(['ok' => true, 'cloud_label' => $w->cloud_label, 'cloud_label_at' => $w->cloud_label_at ? (string) $w->cloud_label_at : null]);
     }
 
     // Marca o desmarca un paso de las listas por tipo de cliente.
@@ -332,13 +357,17 @@ class WarrantiesController extends Controller
     private function extracto(object $m): string
     {
         $txt = (string) $m->body;
-        if ($m->is_html) $txt = html_entity_decode(strip_tags(preg_replace('/<(br|\/p|\/div)[^>]*>/i', "\n", $txt)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $txt = trim(preg_replace('/\s+/u', ' ', $txt));
+        if ($m->is_html) $txt = html_entity_decode(strip_tags(preg_replace('/<(br|\/p|\/div|\/li)[^>]*>/i', "\n", $txt)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Se conservan los saltos de línea (la solicitud del portal viene por líneas: Empresa,
+        // Dónde, Dispositivos…): espacios de más fuera y como mucho una línea en blanco.
+        $txt = preg_replace('/[ \t\x{00A0}]+/u', ' ', str_replace(["\r\n", "\r"], "\n", $txt));
+        $txt = trim(preg_replace("/\n[ ]*\n(\s*\n)+/u", "\n\n", preg_replace('/ *\n */u', "\n", $txt)));
         if ($txt === '') {
             return ['image' => 'Ha mandado una foto', 'audio' => 'Ha mandado un audio', 'video' => 'Ha mandado un vídeo',
                 'document' => 'Ha mandado un documento', 'sticker' => 'Ha mandado un sticker'][$m->type] ?? 'Mensaje sin texto';
         }
-        return mb_strlen($txt) > 280 ? mb_substr($txt, 0, 279) . '…' : $txt;
+        // Entero (la pantalla lo recoge si es largo); un tope por si llega un correo enorme.
+        return mb_strlen($txt) > 3000 ? mb_substr($txt, 0, 2999) . '…' : $txt;
     }
 
     // Garantías creadas a partir de un ticket (para enseñarlas en su ficha).
@@ -767,9 +796,11 @@ class WarrantiesController extends Controller
             'description'    => $this->texto($request->input('description'), 5000),
         ];
 
-        if (! $this->esFecha($datos['received_at'])) {
-            return response()->json(['ok' => false, 'error' => 'Indica la fecha de recepción'], 400);
+        // Opcional: puede que el cliente aún no haya enviado las etiquetas.
+        if ($datos['received_at'] !== '' && ! $this->esFecha($datos['received_at'])) {
+            return response()->json(['ok' => false, 'error' => 'La fecha de recepción no es válida'], 400);
         }
+        $datos['received_at'] = $datos['received_at'] ?: null;
         // Fechas opcionales: vacías se quedan sin poner.
         $contacto = (string) $request->input('first_contact_at', '');
         $cierre = (string) $request->input('closed_at', '');

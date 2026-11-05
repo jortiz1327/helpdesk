@@ -11,7 +11,7 @@ import InfoTip from './InfoTip.jsx'
  * guarda cifrada y no vuelve nunca al navegador; «Probar» dice si entra y cuánto tarda.
  * ---------------------------------------------------------------------- */
 
-const blank = { id: 0, name: '', base_url: 'http://', username: '', password: '', active: true }
+const blank = { id: 0, name: '', base_url: 'http://', username: '', password: '', product_username: '', product_password: '', product_store_id: '', active: true }
 const num = (n) => Number(n || 0).toLocaleString('es-ES')
 const aFecha = (v) => (v ? new Date(String(v).replace(' ', 'T')) : null)
 const hace = (v) => {
@@ -71,7 +71,7 @@ export default function ZkongServers() {
   const ids = (rows || []).filter((s) => s.active).map((s) => s.id).join(',')
   useEffect(() => { if (rows) contar(rows) }, [ids])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const abrir = (s) => setForm(s ? { ...blank, ...s, password: '' } : { ...blank })
+  const abrir = (s) => setForm(s ? { ...blank, ...s, product_username: s.product_username || '', product_store_id: s.product_store_id || '', password: '', product_password: '' } : { ...blank })
 
   const save = async () => {
     if (!form.name.trim() || !form.username.trim()) { toast('Pon un nombre y el usuario', 'err'); return }
@@ -79,6 +79,7 @@ export default function ZkongServers() {
     setSaving(true)
     const payload = { ...form }
     if (form.id && !form.password) delete payload.password
+    if (!form.product_password) delete payload.product_password
     const r = await api.saveZkongServer(payload)
     setSaving(false)
     if (r.ok) {
@@ -104,6 +105,12 @@ export default function ZkongServers() {
   const probar = async (s) => {
     const ok = await probarUno(s)
     toast(ok ? `${s.name}: conecta` : `${s.name}: no conecta`, ok ? undefined : 'err')
+    load()
+  }
+  // La cuenta de productos (la que crea los productos de las garantías en el cloud).
+  const probarProductos = async (s) => {
+    const r = await api.testZkongServer(s.id, true).catch(() => ({ ok: false, error: 'No se pudo conectar' }))
+    toast(r.ok ? `${s.name}: la cuenta de productos entra` : `${s.name} (productos): ${r.error || 'no conecta'}`, r.ok ? undefined : 'err')
     load()
   }
   const probarTodos = async () => {
@@ -196,11 +203,13 @@ export default function ZkongServers() {
                       <tr key={s.id} className={s.active ? '' : 'zs-off'}>
                         <td><span className="zs-name"><span className="zs-ic"><Icon.server /></span><span><b>{s.name}</b><small className="zk-sub">{s.updated_at ? `Editado el ${fechaHora(s.updated_at)}` : ''}</small></span></span></td>
                         <td><code className="zs-url">{s.base_url}</code></td>
-                        <td>{s.username}<small className="zk-sub zs-pass" title="Se guarda cifrada y no vuelve nunca al navegador"><Icon.lock /> Contraseña guardada cifrada</small></td>
+                        <td>{s.username}<small className="zk-sub zs-pass" title="Se guarda cifrada y no vuelve nunca al navegador"><Icon.lock /> Contraseña guardada cifrada</small>
+                          {s.product_username && <small className="zk-sub" title="Cuenta con la que se crean los productos de las garantías en el cloud">Productos: <b>{s.product_username}</b>{s.product_store_id ? ` · tienda ${s.product_store_id}` : ''}{s.product_token_updated_at ? ` · entró ${hace(s.product_token_updated_at)}` : ' · sin probar'}</small>}</td>
                         <td>{estado(s)}</td>
                         <Totales s={s} t={totales[s.id]} />
                         <td className="zs-acts">
                           <button className="ws-txt" disabled={testing.includes(s.id) || !s.active} onClick={() => probar(s)} title={s.active ? 'Entrar con la cuenta para comprobar que funciona' : 'Actívalo para probarlo'}>Probar</button>
+                          {s.product_username && <button className="ws-txt" disabled={!s.active} onClick={() => probarProductos(s)} title="Entrar con la cuenta de productos">Probar productos</button>}
                           <button className="ws-txt" onClick={() => abrir(s)}>Editar</button>
                           <button className="ws-txt danger" onClick={() => del(s)}>Quitar</button>
                         </td>
@@ -239,6 +248,16 @@ export default function ZkongServers() {
                 <input className="mono" value={form.base_url} onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))} placeholder="http://app02.etiquetaselectronicas.com:9999" /></label>
               <label className="field"><span className="lbl">Contraseña {form.id ? <span className="hint">(vacío = no cambiar)</span> : <em>*</em>}</span>
                 <input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} placeholder={form.id ? '••••••••' : ''} autoComplete="new-password" /></label>
+              <div className="grid2">
+                <label className="field"><span className="lbl">Cuenta de productos <InfoTip text="Opcional. La cuenta que crea productos en el cloud (la de administrador no puede). Con ella se crean los productos de las garantías y se emparejan sus etiquetas. Vacío = no tiene." wide /></span>
+                  <input value={form.product_username} onChange={(e) => setForm((f) => ({ ...f, product_username: e.target.value }))} autoComplete="off" placeholder="jortiz" /></label>
+                <label className="field"><span className="lbl">Su contraseña {form.id && form.product_username && form.product_username === (rows || []).find((x) => x.id === form.id)?.product_username ? <span className="hint">(vacío = no cambiar)</span> : null}</span>
+                  <input type="password" value={form.product_password} onChange={(e) => setForm((f) => ({ ...f, product_password: e.target.value }))} autoComplete="new-password" /></label>
+              </div>
+              {form.product_username ? (
+                <label className="field"><span className="lbl">Tienda de productos <em>*</em> <InfoTip text="El store id de la tienda del Cloud donde se crean los productos de las garantías y se emparejan las etiquetas de almacén." wide /></span>
+                  <input className="mono" value={form.product_store_id} onChange={(e) => setForm((f) => ({ ...f, product_store_id: e.target.value.replace(/\D/g, '') }))} inputMode="numeric" placeholder="1749128482566" /></label>
+              ) : null}
               <label className="fb-req-row" style={{ marginTop: 2 }}>
                 <span className="fb-switch"><input type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} /><span className={`fb-toggle ${form.active ? 'on' : ''}`} /></span>
                 <span className="fb-req-label">Activo <span className="hint">· si no, el Centro de dispositivos no lo consulta</span></span>
