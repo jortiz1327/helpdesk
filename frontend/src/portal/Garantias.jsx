@@ -110,6 +110,8 @@ const DETALLE_MIN = 15
 const PRUEBA_ANTES = ['no_enciende', 'bateria']
 const pidePrueba = (i) => i.kind === 'esl' && PRUEBA_ANTES.includes(i.issue)
 const faltaPrueba = (i) => pidePrueba(i) && !i.tried
+// Batería de su última conexión (solo llega por debajo del 90 %): no completa, baja o sin batería.
+const nivelBateria = (b) => (b < 15 ? 'empty' : b < 50 ? 'low' : 'part')
 // Ya está en una garantía o solicitud en curso: i.ocupada es su referencia ('' si es de otro cliente).
 const estaOcupada = (i) => typeof i.ocupada === 'string'
 const faltaDetalle = (i) => i.issue === 'otro' && i.detail.trim().length < DETALLE_MIN
@@ -844,7 +846,9 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
     if (r.reauth) return onExpire()
     // busy: ya está en una garantía o solicitud en curso (G-…/TK-… si es suya, '' si no).
     setItems((s) => s.map((i) => (codes.includes(i.code) && i.existe === 'comprobando'
-      ? { ...i, existe: r.exists?.[i.code] ?? null, ocupada: typeof r.busy?.[i.code] === 'string' ? r.busy[i.code] : null } : i)))
+      ? { ...i, existe: r.exists?.[i.code] ?? null, ocupada: typeof r.busy?.[i.code] === 'string' ? r.busy[i.code] : null,
+          // battery: solo llega si estaba por debajo del 90 % en su última conexión.
+          bateria: typeof r.battery?.[i.code] === 'number' ? r.battery[i.code] : null } : i)))
   }
   const anadirPegados = () => { if (anadir(pegar.split(/[\s,;]+/))) setPegar('') }
 
@@ -1087,6 +1091,12 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
                             {!faltan ? <>{I.check} {t('g_photos_ok')}</> : obligan ? t('g_photos_missing', { n: faltan }) : t('g_photos_optional')}</span>
                         </div>
                         {/* Ocupa todo el ancho de la tarjeta, debajo (no aprieta la columna del fallo). */}
+                        {i.kind === 'esl' && i.bateria != null && (
+                          <div className={`gw-bateria n-${nivelBateria(i.bateria)}`} role="status">
+                            {G.warn}
+                            <span><b>{t(`g_bat_${nivelBateria(i.bateria)}_t`)}</b> {t('g_bat', { n: i.bateria })}</span>
+                          </div>
+                        )}
                         {faltaPrueba(i) && <PruebaAntes abierta={sinProbar[0]?.code === i.code} marcar={marcar}
                           onTried={() => probadas([i.code])} onWorks={() => yaFunciona(i.code)} />}
                         {i.existe === false && !i.forzada && (

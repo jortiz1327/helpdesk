@@ -208,6 +208,13 @@ class WarrantyLabels
         return Cache::has(self::NO_ESTA . $code) ? false : null;
     }
 
+    /** Batería (%) de una etiqueta según su última comprobación en caché, o null. No pregunta. */
+    public static function knownBattery(string $code): ?int
+    {
+        $c = Cache::get("warranty_label:{$code}");
+        return ($c['lookup_state'] ?? null) === 'found' && ($c['kind'] ?? null) === 'esl' && isset($c['battery']) ? (int) $c['battery'] : null;
+    }
+
     public static function contextOf(Warranty $w): array
     {
         return ['warranty_id' => $w->id, 'client' => $w->client_name, 'project' => $w->project_name];

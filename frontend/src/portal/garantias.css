@@ -353,6 +353,15 @@
 .gw-noexiste > svg{flex:none;width:17px;height:17px;color:#b45309}
 .gw-noexiste > span:nth-of-type(1){flex:1 1 260px}
 .gw-noexiste b{color:var(--ink)}
+/* Batería de la última conexión: no completa (suave), baja (ámbar), sin batería (rojo). */
+.gw-bateria{grid-column:1/-1;display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:12px;font-size:13.5px;line-height:1.45;
+  color:var(--ink-2);background:color-mix(in srgb,#f59e0b 6%,var(--surface));border:1px solid color-mix(in srgb,#d97706 22%,var(--line))}
+.gw-bateria > svg{flex:none;width:17px;height:17px;margin-top:1px;color:#b45309}
+.gw-bateria > span{flex:1;min-width:0}
+.gw-bateria b{color:var(--ink)}
+.gw-bateria.n-low{background:color-mix(in srgb,#f59e0b 11%,var(--surface));border-color:color-mix(in srgb,#d97706 38%,var(--line))}
+.gw-bateria.n-empty{background:color-mix(in srgb,#dc2626 8%,var(--surface));border-color:color-mix(in srgb,#dc2626 35%,var(--line))}
+.gw-bateria.n-empty > svg{color:#dc2626}
 .gw-item.ocupada{grid-template-columns:190px minmax(0,1fr);align-items:center;background:color-mix(in srgb,#f59e0b 5%,var(--surface));border-color:color-mix(in srgb,#d97706 35%,var(--line))}
 .gw-ocupada{display:flex;align-items:center;gap:12px;min-width:0;font-size:13.5px;line-height:1.45;color:var(--ink-2)}
 .gw-ocupada > svg{flex:none;width:17px;height:17px;color:#b45309}

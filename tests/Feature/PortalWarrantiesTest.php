@@ -140,6 +140,27 @@ class PortalWarrantiesTest extends TestCase
         $this->assertSame(['G-2026-0003'], $codes);
     }
 
+    /**
+     * Al cliente solo se le dice la batería, y solo si en su última conexión estaba por debajo
+     * del 90 %: sale de lo que se acaba de comprobar (en caché), sin otra consulta a ZKONG.
+     */
+    public function test_el_portal_avisa_de_la_bateria_baja(): void
+    {
+        $zk = \Mockery::mock(\App\Services\WarrantyLabels::class);
+        $zk->shouldReceive('existence')->andReturnUsing(function ($codes) {
+            $bat = ['812345601' => 72, '812345602' => 95, '812345603' => 8];
+            foreach ($codes as $c) {
+                \Illuminate\Support\Facades\Cache::put("warranty_label:{$c}", ['lookup_state' => 'found', 'kind' => 'esl', 'battery' => $bat[$c] ?? null], 60);
+            }
+            return array_fill_keys($codes, true);
+        });
+        $this->instance(\App\Services\WarrantyLabels::class, $zk);
+        $h = $this->pase('compi@empresa.com');
+
+        $this->postJson('/api/portal.php?action=warranty-check', ['codes' => ['812345601', '812345602', '812345603', '812345604']], $h)->assertOk()
+            ->assertJsonPath('battery', ['812345601' => 72, '812345603' => 8]);   // 95 % y sin dato: nada
+    }
+
     public function test_un_codigo_que_no_esta_en_los_servidores_hay_que_confirmarlo(): void
     {
         DB::table('ticket_categories')->insert(['key' => 'garantias', 'name' => 'Garantías', 'color' => '#888', 'position' => 1, 'active' => 1]);
@@ -150,7 +171,7 @@ class PortalWarrantiesTest extends TestCase
         $h = $this->pase('compi@empresa.com');
 
         $this->postJson('/api/portal.php?action=warranty-check', ['codes' => ['812345679', '999999999', 'HOLA']], $h)->assertOk()
-            ->assertExactJson(['ok' => true, 'exists' => ['812345679' => true, '999999999' => false], 'busy' => []]);
+            ->assertExactJson(['ok' => true, 'exists' => ['812345679' => true, '999999999' => false], 'busy' => [], 'battery' => []]);
 
         $base = ['place_other' => 'Hotel Prueba', 'name' => 'Ana', 'address' => 'Calle 1, Marbella'];
         $item = ['code' => '999999999', 'issue' => 'no_enciende'];

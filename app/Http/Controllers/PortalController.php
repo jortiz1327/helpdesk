@@ -102,8 +102,10 @@ class PortalController extends Controller
         // Los que ya están en una garantía o solicitud en curso (no consulta ZKONG).
         $busy = (object) $this->garantias()->enCurso($codes, $email);
         $existe = $this->garantias()->exists($codes, $email, $request->ip(), $limitado);
-        if ($limitado) return response()->json(['ok' => false, 'error' => 'Demasiadas comprobaciones seguidas: espera unos minutos', 'exists' => (object) $existe, 'busy' => $busy], 429);
-        return response()->json(['ok' => true, 'exists' => (object) $existe, 'busy' => $busy]);
+        // Batería por debajo del 90 % en su última conexión (sale de lo que exists() acaba de consultar).
+        $bat = (object) $this->garantias()->batteries($codes);
+        if ($limitado) return response()->json(['ok' => false, 'error' => 'Demasiadas comprobaciones seguidas: espera unos minutos', 'exists' => (object) $existe, 'busy' => $busy, 'battery' => $bat], 429);
+        return response()->json(['ok' => true, 'exists' => (object) $existe, 'busy' => $busy, 'battery' => $bat]);
     }
 
     /** Solicitar una garantía: crea el ticket con todo ordenado. Las fotos van después. */

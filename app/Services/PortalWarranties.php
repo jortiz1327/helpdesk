@@ -618,6 +618,24 @@ class PortalWarranties
         return $out;
     }
 
+    /** Por debajo de esto, el portal avisa de la batería (lo mismo que la ficha del agente). */
+    public const BATTERY_WARN = 90;
+
+    /**
+     * Batería de las etiquetas que ya se han comprobado (exists() las deja en caché): solo
+     * las que están por debajo de BATTERY_WARN, código => %. Para el cliente solo esto de
+     * ZKONG: es lo único que puede arreglar él (cambiar las pilas). No hace consultas.
+     */
+    public function batteries(array $codes): array
+    {
+        $out = [];
+        foreach (WarrantyLabels::parse(array_slice($codes, 0, self::MAX_ITEMS))[0] as $code) {
+            $b = WarrantyLabels::knownBattery($code);
+            if ($b !== null && $b < self::BATTERY_WARN) $out[$code] = $b;
+        }
+        return $out;
+    }
+
     /**
      * ¿Existen estos códigos en los servidores ZKONG? código => true | false | null (no
      * se pudo consultar). Solo los que tienen forma de etiqueta o antena, como mucho MAX_ITEMS.
