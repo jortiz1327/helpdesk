@@ -220,7 +220,7 @@ function Calor({ hm, conTasa, tip }) {
                   const v = c ? get(c) : null
                   const t = v == null ? 0 : Math.min(1, v / max)
                   return (
-                    <td key={y ?? 'x'} className={v == null ? 'nil' : t > 0.55 ? 'hot' : ''} style={v == null ? null : { '--t': `${Math.round(8 + t * 82)}%` }}
+                    <td key={y ?? 'x'} className={v == null ? 'nil' : t > 0.8 ? 'hot hot2' : t > 0.55 ? 'hot' : ''} style={v == null ? null : { '--t': `${Math.round(8 + t * 82)}%` }}
                       {...(c ? tip(<><b>{ref} · {y ? `vendidas en ${y}` : 'sin venta en el portal'}</b><span>{num(c.units)} repuestas en garantía</span>
                         {c.sold != null ? <span>{num(c.sold)} vendidas ese año{c.rate != null ? ` · vuelve el ${pct(c.rate, 1)}` : ''}</span> : null}</>) : {})}>
                       {v == null ? '' : fmt(v)}
