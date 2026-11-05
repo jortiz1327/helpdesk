@@ -83,14 +83,14 @@ async function conCode128(img) {
 }
 
 let zx = null
-async function conZxing(img) {
+async function conZxing(img, rapido) {
   zx ||= import('@zxing/library')
   const Z = await zx
   const hints = new Map()
   hints.set(Z.DecodeHintType.TRY_HARDER, true)
   // Solo códigos de barras: un QR de la pantalla (la web del producto) taparía el de la etiqueta.
   const reader = new Z.MultiFormatOneDReader(hints)
-  for (const lado of [1400, 900, 2200]) {
+  for (const lado of rapido ? [1400] : [1400, 900, 2200]) {
     for (const giro of [0, 90]) {
       await respiro()
       const [lum, width, height] = grises(lienzo(img, lado, giro))
@@ -105,7 +105,9 @@ async function conZxing(img) {
   return []
 }
 
-export async function leerCodigos(file) {
+/* `rapido`: para la cámara en directo, que lee un fotograma tras otro; zxing prueba un
+   solo tamaño para no tardar en cada uno (si no lo lee, el siguiente fotograma vuelve a intentarlo). */
+export async function leerCodigos(file, { rapido = false } = {}) {
   let img
   try { img = await imagen(file) } catch { return [] }
   try {
@@ -119,7 +121,7 @@ export async function leerCodigos(file) {
       if (hallados.length) return [...new Set(hallados)]
     } catch { /* sin soporte real: zxing */ }
   }
-  try { return await conZxing(img) } catch { return [] }
+  try { return await conZxing(img, rapido) } catch { return [] }
 }
 
 /*

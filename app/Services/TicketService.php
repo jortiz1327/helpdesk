@@ -407,6 +407,31 @@ class TicketService
      * $notify=false silencia el aviso: lo usa la AUTOASIGNACIÓN al responder (no tiene
      * sentido avisarte de que te has asignado tú al contestar).
      */
+    /**
+     * Avisos de ASIGNACIÓN aplazados. Mientras hay una cola abierta (aplazarAvisos), assign()
+     * no avisa: guarda el aviso y lo manda soltarAvisos(true) cuando el alta ya está bien
+     * guardada; con soltarAvisos(false) se descartan (el alta se revirtió). Así un correo
+     * que falla al guardarse y se reintenta no avisa al agente en cada reintento.
+     * Estática: las reglas y el turno usan sus propias instancias de TicketService.
+     */
+    protected static ?array $avisosAplazados = null;
+
+    public static function aplazarAvisos(): void
+    {
+        self::$avisosAplazados = [];
+    }
+
+    public static function soltarAvisos(bool $enviar): void
+    {
+        $avisos = self::$avisosAplazados ?? [];
+        self::$avisosAplazados = null;
+        if (!$enviar) return;
+        foreach ($avisos as $aviso) {
+            try { $aviso(); }
+            catch (\Throwable $e) { \Illuminate\Support\Facades\Log::warning('Aviso de asignación falló', ['error' => $e->getMessage()]); }
+        }
+    }
+
     public function assign(int $ticketId, ?int $assignee, ?int $userId = null, bool $notify = true): void
     {
         $cur = DB::table('tickets')->where('id', $ticketId)->value('assigned_to');
@@ -421,13 +446,19 @@ class TicketService
 
         // Solo cuando se asigna a alguien (al desasignar no hay a quién avisar).
         if ($assignee && $notify) {
-            app(NotifyService::class)->ticket('ticket_assigned', $ticketId);   // correo
-            // Aviso in-app al nuevo responsable (push se salta si se autoasignó).
-            $inf    = DB::table('tickets')->where('id', $ticketId)->first(['code', 'subject']);
-            $quien  = $userId ? DB::table('users')->where('id', $userId)->value('name') : null;
-            $cuerpo = ($quien ? "{$quien} te asignó" : 'Te han asignado') . " el ticket {$inf->code}"
-                . ($inf->subject ? ": «" . mb_substr($inf->subject, 0, 120) . "»" : '');
-            app(NotificationService::class)->push((int) $assignee, 'assigned', $cuerpo, $ticketId, $userId);
+            $avisar = function () use ($ticketId, $assignee, $userId) {
+                // Si entretanto cambió de manos (o el ticket ya no existe), no se avisa.
+                $inf = DB::table('tickets')->where('id', $ticketId)->first(['code', 'subject', 'assigned_to']);
+                if (!$inf || (int) $inf->assigned_to !== (int) $assignee) return;
+                app(NotifyService::class)->ticket('ticket_assigned', $ticketId);   // correo
+                // Aviso in-app al nuevo responsable (push se salta si se autoasignó).
+                $quien  = $userId ? DB::table('users')->where('id', $userId)->value('name') : null;
+                $cuerpo = ($quien ? "{$quien} te asignó" : 'Te han asignado') . " el ticket {$inf->code}"
+                    . ($inf->subject ? ": «" . mb_substr($inf->subject, 0, 120) . "»" : '');
+                app(NotificationService::class)->push((int) $assignee, 'assigned', $cuerpo, $ticketId, $userId);
+            };
+            if (self::$avisosAplazados !== null) self::$avisosAplazados[] = $avisar;
+            else $avisar();
         }
     }
 

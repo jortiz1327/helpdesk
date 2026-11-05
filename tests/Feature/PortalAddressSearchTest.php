@@ -93,6 +93,23 @@ class PortalAddressSearchTest extends TestCase
             ->assertJsonPath('results.0.address', "Avenida Paseo de la Reforma 222\n06600 Ciudad de México\nMéxico");
     }
 
+    // Pasado el tope diario de Google (lo que se paga), se busca en Photon.
+    public function test_tope_diario_de_google(): void
+    {
+        config(['services.places.google_key' => 'clave-de-prueba', 'services.places.google_daily_search' => 2]);
+        Http::fake([
+            'places.googleapis.com/*' => Http::response(['suggestions' => []]),
+            'photon.komoot.io/*' => Http::response(['features' => []]),
+        ]);
+        $h = $this->pase();
+        foreach (['uno', 'dos', 'tres'] as $q) {
+            $this->getJson("/api/portal.php?action=address-search&q=calle+{$q}", $h)->assertOk();
+        }
+        $a = fn ($host) => collect(Http::recorded())->filter(fn ($p) => str_contains($p[0]->url(), $host))->count();
+        $this->assertSame(2, $a('places.googleapis.com'));
+        $this->assertSame(1, $a('photon.komoot.io'));
+    }
+
     public function test_cupo_por_minuto(): void
     {
         config(['services.places.google_key' => null]);

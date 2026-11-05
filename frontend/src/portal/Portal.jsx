@@ -260,15 +260,19 @@ function PortalApp() {
       setView('ticket')
       window.history.replaceState(null, '', window.location.pathname)
       return
-    }
-    // ENLACE DIRECTO al formulario de crear incidencia (para las redirecciones de las
+    }    // ENLACE DIRECTO al formulario de crear incidencia (para las redirecciones de las
     // webs): quien entre en …/create-ticket ve el formulario abierto de una.
     if (window.location.pathname.replace(/\/+$/, '').endsWith('/create-ticket')) {
       setView('crear')
     }
     // …/garantias abre el apartado de garantías (pide el código si no hay sesión).
+    // Con ?g=G-AAAA-NNNN (el botón de los avisos por correo) abre esa garantía, tras el código.
     if (window.location.pathname.replace(/\/+$/, '').endsWith('/garantias')) {
-      setView('g_mis')
+      const g = (p.get('g') || '').trim().toUpperCase()
+      if (/^G-\d{4}-\d{3,6}$/.test(g)) {
+        setGCode(g); setView('g_garantia')
+        window.history.replaceState(null, '', window.location.pathname)
+      } else setView('g_mis')
     }
   }, [])
 
@@ -312,8 +316,7 @@ function PortalApp() {
         ? <Mis go={go} onOpen={(c) => { setOpenCode(c); go('ticket') }} onExpire={caduco} />
         : <Acceso intent="mis" go={go} onReady={onPass} caducado={caducado} />)}
       {view === 'ticket' && <Detalle code={openCode} back={() => go('mis')} onExpire={caduco} />}
-      {view === 'estado' && <Estado go={go} />}
-      {/* GARANTÍAS: todo pide el código (son datos de la empresa). */}
+      {view === 'estado' && <Estado go={go} />}      {/* GARANTÍAS: todo pide el código (son datos de la empresa). */}
       {view.startsWith('g_') && !pass && view !== 'g_enviada'
         ? <Acceso intent="garantias" go={go} onReady={onPass} caducado={caducado} />
         : <>

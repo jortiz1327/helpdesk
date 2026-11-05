@@ -157,9 +157,12 @@ function Correo({ w, informe, onClose, onSent }) {
 
   const enviar = async () => {
     const extra = adjuntar && informe ? ` con el informe ${informe.number}` : ''
-    if (!(await confirm({ title: 'Enviar correo de resolución', message: `¿Enviar a ${m.to.trim()}${extra}? Saldrá como respuesta del ticket ${m.ticket.code} y quedará en la conversación con el cliente.`, confirmText: 'Enviar' }))) return
+    const to = m.to.trim()
+    const otro = !(m.suggestions || []).some((s) => s.email === to.toLowerCase())
+    const aviso = otro ? ` Ojo: ${to} no es ningún correo conocido de este cliente (ni del ticket, ni del portal, ni usado antes en la garantía).` : ''
+    if (!(await confirm({ title: 'Enviar correo de resolución', message: `¿Enviar a ${to}${extra}? Saldrá como respuesta del ticket ${m.ticket.code} y quedará en la conversación con el cliente.${aviso}`, confirmText: 'Enviar', danger: otro }))) return
     setEnviando(true)
-    const r = await api.warrantyDocsDo('send_email', { id: w.id, to: m.to.trim(), subject: m.subject, body: m.body, attach_report: adjuntar && !!informe })
+    const r = await api.warrantyDocsDo('send_email', { id: w.id, to, subject: m.subject, body: m.body, attach_report: adjuntar && !!informe, confirm_other: otro })
     setEnviando(false)
     if (!r.ok) { toast(r.error || 'No se pudo enviar', 'err'); return }
     toast(`Correo enviado desde ${r.ticket}`)
@@ -238,6 +241,7 @@ const COD_OK = { esl: /^[A-Z0-9]{9}$/, ap: /^[0-9A-F]{12}$/ }
 const limpio = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 function Sustituciones({ w, perms, onClose, onChanged, onOpenTicket }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [r, setR] = useState(null)
   const [filas, setFilas] = useState([])
   const [paso, setPaso] = useState('lista')   // 'lista' | 'ticket'
@@ -245,7 +249,7 @@ function Sustituciones({ w, perms, onClose, onChanged, onOpenTicket }) {
   const [ocupado, setOcupado] = useState('')
   const cargar = useCallback(() => api.warrantyReplacements(w.id).then((x) => {
     if (!x.ok) { toast(x.error, 'err'); onClose(); return }
-    setR(x); setEmail(x.email.to || '')
+    setR(x); setEmail(x.email?.to || '')   // sin permiso de documentos no llegan los correos
     setFilas(x.items.map((i) => ({ ...i, position: i.position || '', position_title: i.position_title || '', replaced_by: i.replaced_by || '' })))
   }), [w.id])
   useEffect(() => { cargar() }, [cargar])
@@ -282,7 +286,14 @@ function Sustituciones({ w, perms, onClose, onChanged, onOpenTicket }) {
 
   const crearTicket = async () => {
     setOcupado('ticket')
-    const x = await api.warrantyDocsDo('replacements_ticket', { id: w.id, email: email.trim() })
+    let x = await api.warrantyDocsDo('replacements_ticket', { id: w.id, email: email.trim() })
+    // Un correo que no es de este cliente: se pregunta antes de crear el ticket a su nombre.
+    if (x.needs_confirm) {
+      setOcupado('')
+      if (!(await confirm({ title: 'Correo desconocido', message: `${email.trim()} no es ningún correo conocido de este cliente. El ticket quedará a su nombre. ¿Crearlo igualmente?`, confirmText: 'Crear', danger: true }))) return
+      setOcupado('ticket')
+      x = await api.warrantyDocsDo('replacements_ticket', { id: w.id, email: email.trim(), confirm_other: true })
+    }
     setOcupado('')
     if (!x.ok) { toast(x.error, 'err'); return }
     toast(`Ticket ${x.code} creado`)
@@ -301,9 +312,9 @@ function Sustituciones({ w, perms, onClose, onChanged, onOpenTicket }) {
         <div className="wd-mail-row">
           <span>Cliente</span>
           <input type="email" list="wd-sus-sug" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@cliente.com" className={email && !emailOk ? 'bad' : ''} autoFocus />
-          <datalist id="wd-sus-sug">{r.email.suggestions.map((s) => <option key={s.email} value={s.email}>{s.label}</option>)}</datalist>
+          <datalist id="wd-sus-sug">{(r.email?.suggestions || []).map((s) => <option key={s.email} value={s.email}>{s.label}</option>)}</datalist>
         </div>
-        {r.email.suggestions.length ? <div className="wd-sug">{r.email.suggestions.filter((s) => s.email !== email.trim().toLowerCase()).map((s) => (
+        {r.email?.suggestions?.length ? <div className="wd-sug">{r.email.suggestions.filter((s) => s.email !== email.trim().toLowerCase()).map((s) => (
           <button key={s.email} type="button" onClick={() => setEmail(s.email)} title={s.label}>{s.email} <small>{s.label}</small></button>
         ))}</div> : null}
         <table className="dev-table wd-sus-prev">

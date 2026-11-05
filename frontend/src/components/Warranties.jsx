@@ -877,13 +877,43 @@ function FotoSlot({ label, photo, code, active, busy, onActivate, onFile, onSrc,
   )
 }
 
-/* Plazo de garantía de un dispositivo: solo se marca si está fuera (y, en el título, hasta cuándo). */
+// «hace 2 años y 3 meses» desde una fecha AAAA-MM-DD.
+function antiguedad(d) {
+  const [a, m] = String(d).split('-').map(Number)
+  const hoy = new Date()
+  let meses = (hoy.getFullYear() - a) * 12 + (hoy.getMonth() + 1 - m)
+  if (!(meses >= 0)) return ''
+  const y = Math.floor(meses / 12); meses %= 12
+  const txt = [y ? `${y} ${y === 1 ? 'año' : 'años'}` : '', meses ? `${meses} ${meses === 1 ? 'mes' : 'meses'}` : ''].filter(Boolean).join(' y ')
+  return txt ? `hace ${txt}` : 'este mes'
+}
+
+/* Plazo de garantía de un dispositivo: la fecha de alta SIEMPRE (dato informativo, para
+   tenerlo en cuenta al revisar) y, si está fuera de plazo, la marca. */
 function Plazo({ t }) {
-  if (!t) return null
-  const desde = t.source === 'manual' ? 'instalada (fecha de la garantía)' : 'alta en ZKONG'
-  const tit = `${desde} el ${fecha(t.installed_at)} · hardware hasta el ${fecha(t.hardware_until)} · pilas hasta el ${fecha(t.battery_until)}`
-  if (t.hardware_ok) return t.battery_ok ? null : <em className="wr-term bat" title={tit}>Pilas fuera de plazo</em>
-  return <em className="wr-term out" title={tit}><Icon.clock /> Fuera de plazo</em>
+  if (!t) return <em className="wr-term alta none" title="ZKONG no da la fecha de alta de este dispositivo">Alta: sin fecha</em>
+  const desde = t.source === 'manual' ? 'Instalada (fecha de la garantía)' : 'Alta en ZKONG'
+  const tit = `${desde} el ${fecha(t.installed_at)} (${antiguedad(t.installed_at)}) · hardware hasta el ${fecha(t.hardware_until)} · pilas hasta el ${fecha(t.battery_until)}`
+  return (
+    <>
+      <em className="wr-term alta" title={tit}>{t.source === 'manual' ? 'Instalada' : 'Alta'} {fecha(t.installed_at)}</em>
+      {!t.hardware_ok ? <em className="wr-term out" title={tit}><Icon.clock /> Fuera de plazo</em>
+        : !t.battery_ok ? <em className="wr-term bat" title={tit}>Pilas fuera de plazo</em> : null}
+    </>
+  )
+}
+
+/* En «Revisar»: cuándo se dio de alta (uno) o el rango de altas (varios). Solo informa. */
+function AltaZkong({ items }) {
+  const fechas = items.map((i) => i.term?.installed_at).filter(Boolean).sort()
+  const sin = items.length - fechas.length
+  if (!fechas.length) return <p className="wr-rev-alta dev-mute"><Icon.clock /> ZKONG no da la fecha de alta {items.length === 1 ? 'de este dispositivo' : 'de estos dispositivos'}.</p>
+  const manual = items.some((i) => i.term?.source === 'manual')
+  const que = manual ? 'Instalación (fecha de la garantía)' : 'Alta en ZKONG'
+  return (
+    <p className="wr-rev-alta"><Icon.clock /> <span>{que}: <b>{fechas[0] === fechas[fechas.length - 1] ? fecha(fechas[0]) : `del ${fecha(fechas[0])} al ${fecha(fechas[fechas.length - 1])}`}</b>
+      {' '}<span className="dev-mute">({fechas[0] === fechas[fechas.length - 1] ? antiguedad(fechas[0]) : `la más antigua, ${antiguedad(fechas[0])}`}{sin ? ` · ${sin} sin fecha` : ''})</span></span></p>
+  )
 }
 
 // preset: la solución elegida en la barra de selección. Un dispositivo que ya pide fotos
@@ -985,6 +1015,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
         {paso === 'solucion' ? (
           <div className="modal-body">
             {!uno && <p className="wr-rev-codes mono">{items.slice(0, 12).map((x) => x.code).join(' · ')}{items.length > 12 ? ` y ${items.length - 12} más` : ''}</p>}
+            <AltaZkong items={items} />
             <div className="wr-res-grid">
               {Object.entries(rv.resolutions).filter(([k]) => k !== 'pendiente').map(([k, r]) => {
                 const ui = RES_UI[k] || RES_UI.pendiente
@@ -1382,7 +1413,29 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
   )
 }
 
-const CAMPOS = { created: 'Garantía creada', close: 'Cierre', reopen: 'Reapertura', steps: 'Pasos', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+const CAMPOS = { created: 'Garantía creada', close: 'Cierre', reopen: 'Reapertura', steps: 'Pasos', items: 'Etiquetas', item_model: 'Modelo de una etiqueta', review: 'Revisión de dispositivos', zkong: 'ZKONG', documents: 'Documentos', shipment: 'Envío del cliente', client_notice: 'Aviso al cliente',first_contact_at: 'Primera fecha de contacto', received_at: 'Fecha de recepción', installed_at: 'Fecha de instalación', closed_at: 'Fecha de cierre', client_name: 'Cliente', project_name: 'Proyecto', category: 'Categoría', urgency: 'Urgencia', status: 'Estado', responsible_id: 'Responsable', ticket_id: 'Ticket', description: 'Descripción' }
+
+/* Envíos que el cliente avisó desde el portal («Ya lo he enviado»): para esperarlo y
+   localizar el paquete. No es obligatorio, así que puede no haber ninguno. */
+function EnviosCliente({ list }) {
+  if (!list?.length) return null
+  const fecha = (s) => new Date(`${s}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+  return (
+    <section className="wf-card wf-envios">
+      <header><h3><Icon.truck /> Envío del cliente</h3></header>
+      <ul>
+        {list.map((s, i) => (
+          <li key={i}>
+            <b>Enviado el {fecha(s.shipped_on)}</b>
+            <span>{[s.carrier, s.tracking ? `Seguimiento ${s.tracking}` : 'Sin seguimiento'].filter(Boolean).join(' · ')}</span>
+            <span className="dev-mute">{s.packages} {s.packages === 1 ? 'paquete' : 'paquetes'}{s.units ? ` · ${s.units} dispositivos` : ''}{s.email ? ` · avisó ${s.email}` : ''}</span>
+            {s.note ? <span className="wf-envio-nota">{s.note}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
 /* Pasos por tipo de cliente (Configuración): los de todas y los de su categoría o cliente. */
 function Pasos({ w, listas, puede, onChanged }) {
@@ -1414,8 +1467,7 @@ function Pasos({ w, listas, puede, onChanged }) {
                   <input type="checkbox" checked={!!s.done_at} disabled={!puede || ocupado === `${l.id}|${s.id}`} onChange={() => marcar(l, s)} />
                   <span>{s.text}</span>
                 </label>
-                {s.done_at ? <small>{s.done_by || 'Alguien'} · {fechaHora(s.done_at)}</small> : null}
-              </li>
+                {s.done_at ? <small>{s.done_by || 'Alguien'} · {fechaHora(s.done_at)}</small> : null}              </li>
             ))}
           </ul>
         </div>
@@ -1569,6 +1621,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
         </div>
 
         <aside className="wf-side">
+          <EnviosCliente list={d.shipments} />
           <Pasos w={w} listas={d.steps} puede={!!p.edit} onChanged={cargar} />
           <GuiasRelacionadas w={w} onGoAll={onGoGuides} />
           <section className="wf-card">

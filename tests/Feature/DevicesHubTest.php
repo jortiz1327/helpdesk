@@ -130,6 +130,25 @@ class DevicesHubTest extends TestCase
         $this->assertSame([['app02.test', 'admin', 'secreta']], $this->logins);
     }
 
+    // La contraseña guardada no viaja a otra dirección ni a otro usuario sin volver a escribirla;
+    // y un servidor no puede apuntar a la red interna.
+    public function test_otra_direccion_pide_la_contrasena_y_nada_de_red_interna(): void
+    {
+        $tok = ['X-App-Token' => $this->token([...self::GARANTIAS, 'warranties.servers'])];
+        $s = $this->servidor('app02.test');
+        $guardar = fn (array $d) => $this->postJson('/api/zkong_servers.php?action=save', $d + ['id' => $s->id, 'name' => 'APP02', 'base_url' => 'https://app02.test/zk', 'username' => 'admin'], $tok);
+
+        $guardar(['base_url' => 'https://otra.test/zk'])->assertStatus(400)->assertJsonPath('error', 'Al cambiar la dirección o el usuario, vuelve a escribir la contraseña');
+        $guardar(['username' => 'otro'])->assertStatus(400);
+        $guardar(['name' => 'APP 02'])->assertOk();   // otro nombre, misma dirección y usuario: vale
+        $this->assertSame('https://app02.test/zk', $s->fresh()->base_url);
+
+        foreach (['http://127.0.0.1:9999', 'http://localhost', 'http://169.254.169.254', 'http://10.0.0.5:9999', 'http://192.168.1.10'] as $url) {
+            $guardar(['base_url' => $url, 'password' => 'x'])->assertStatus(400);
+        }
+        $this->assertSame([], $this->logins);
+    }
+
     public function test_si_cambia_la_clave_publica_no_se_envia_la_contrasena(): void
     {
         $tok = $this->token([...self::GARANTIAS, 'warranties.servers']);

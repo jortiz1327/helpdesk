@@ -32,6 +32,8 @@ class WarrantyLabels
     public const RECENT_MONTHS = 12;
     public const SILENT_DAYS = 30;
     private const CACHE_MIN = 15;      // lo que dijo el servidor, para no repetir al guardar
+    private const NOT_FOUND_MIN = 15;  // «no aparece», solo para la comprobación del portal
+    private const NO_ESTA = 'warranty_label_none:';
 
     public function __construct(private ZkongDevices $devices)
     {
@@ -46,6 +48,7 @@ class WarrantyLabels
         $tokens = is_array($input) ? $input : (preg_split('/[\s,;]+/', $input) ?: []);
         $ok = $bad = [];
         foreach ($tokens as $t) {
+            if (! is_scalar($t)) continue;   // lo que llega de fuera puede traer listas dentro
             $c = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $t));
             if ($c === '') {
                 continue;
@@ -174,6 +177,37 @@ class WarrantyLabels
         return $lista->sortBy('ref', SORT_NATURAL)->values()->all();
     }
 
+    /**
+     * Solo si cada código existe en algún servidor ZKONG (app, app02…): código => true
+     * (está), false (no aparece en ninguno) o null (no se pudo consultar). Para el portal:
+     * nada de dónde está ni de quién es.
+     */
+    public function existence(array $codes, ?int $userId = null): array
+    {
+        if (! $codes) {
+            return [];
+        }
+        // Lo ya sabido no se pregunta. Sin segunda pasada (la del equipo, que da una
+        // etiqueta por inexistente solo tras repetir): aquí basta con una, y cuesta la mitad.
+        $out = array_map(fn ($c) => self::known($c), array_combine($codes, $codes));
+        $faltan = array_keys(array_filter($out, fn ($v) => $v === null));
+        if ($faltan) {
+            foreach ($this->lookup($faltan, $userId, false, false) as $code => $l) {
+                $out[$code] = ['found' => true, 'not_found' => false][$l['lookup_state']] ?? null;
+                // El «no aparece» también se recuerda un rato: repetir el mismo código no vuelve a costar.
+                if ($out[$code] === false) Cache::put(self::NO_ESTA . $code, true, now()->addMinutes(self::NOT_FOUND_MIN));
+            }
+        }
+        return $out;
+    }
+
+    /** Lo que ya se sabe de un código sin preguntar: true (está), false (no aparece) o null. */
+    public static function known(string $code): ?bool
+    {
+        if ((Cache::get("warranty_label:{$code}")['lookup_state'] ?? null) === 'found') return true;
+        return Cache::has(self::NO_ESTA . $code) ? false : null;
+    }
+
     public static function contextOf(Warranty $w): array
     {
         return ['warranty_id' => $w->id, 'client' => $w->client_name, 'project' => $w->project_name];
@@ -182,7 +216,7 @@ class WarrantyLabels
     /* ---------------------------------------------------------------- */
 
     /** Lo que dicen los servidores de cada código (15 min en caché salvo $fresh). */
-    private function lookup(array $codes, ?int $userId, bool $fresh): array
+    private function lookup(array $codes, ?int $userId, bool $fresh, bool $reintentar = true): array
     {
         $out = [];
         $faltan = [];
@@ -196,7 +230,7 @@ class WarrantyLabels
             // Un servidor a veces contesta «bien» pero sin filas: antes de dar una etiqueta por
             // inexistente se pregunta otra vez solo por esas.
             $vacias = array_values(array_filter($faltan, fn ($c) => empty($res['labels'][$c]['live'])));
-            if ($vacias && ! $res['failed']) {
+            if ($reintentar && $vacias && ! $res['failed']) {
                 $otra = $this->devices->labels($vacias, $userId);
                 foreach ($vacias as $c) {
                     if (! empty($otra['labels'][$c]['live'])) {

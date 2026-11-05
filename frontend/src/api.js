@@ -216,12 +216,14 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
   // Suelta el bloqueo del ticket al cerrarlo (si no, caduca solo)
-  unlockTicket: (id) => req('tickets.php?action=unlock', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  // keepalive: la petición sale aunque la pestaña se esté cerrando (al cerrar la web).
+  unlockTicket: (id, keepalive = false) => req('tickets.php?action=unlock', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }), keepalive,
   }),
   // Latido del candado: renueva el bloqueo mientras el agente sigue en el ticket
-  heartbeatTicket: (id) => req('tickets.php?action=heartbeat', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  // idle = segundos desde la última actividad del agente (cuenta atrás que ven los demás).
+  heartbeatTicket: (id, idle = 0) => req('tickets.php?action=heartbeat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, idle }),
   }),
   // Horario de atención y festivos (base del SLA)
   getBusinessHours: () => req('business_hours.php'),

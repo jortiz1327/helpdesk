@@ -888,9 +888,10 @@ class TicketsController extends Controller
             'categories' => DB::table('ticket_categories')->where('active', 1)->orderBy('position')->get(),
             'labels'     => \App\Models\TicketLabel::activas(),   // catálogo activo (filtro + acción masiva)
             'users'      => $users,   // a quién se puede asignar
-            // Minutos que dura el bloqueo: el frontend lo usa para saber si la marca
-            // «alguien está viendo esto» de la lista sigue vigente. 0 = función apagada.
+            // Bloqueo: 0 minutos = función apagada. lock_lease (s) es lo que vive el candado
+            // sin latido: con él decide la lista si «alguien está viendo esto» sigue vigente.
             'lock_minutes' => app(TicketLockService::class)->minutes(),
+            'lock_lease'   => TicketLockService::LEASE_SECONDS,
         ]);
     }
 
@@ -1214,7 +1215,12 @@ class TicketsController extends Controller
     {
         $id = (int) $this->validar($request, ['id' => ['required', 'integer', 'min:1']], ['id.required' => 'Falta el ticket'])['id'];
         if ($bloqueo = $this->sinAcceso($request->user(), $id)) return $bloqueo;
-        $lock = app(TicketLockService::class)->acquire($id, (int) $request->user()->id);
+        // Igual que al abrir: un resuelto/cerrado no se toma, solo se informa.
+        $svc = app(TicketLockService::class);
+        $cerrado = in_array(DB::table('tickets')->where('id', $id)->value('status'), ['resuelto', 'cerrado'], true);
+        // idle: segundos desde que el agente tocó algo (para la cuenta atrás de los demás).
+        $lock = $cerrado ? $svc->status($id, (int) $request->user()->id)
+            : $svc->acquire($id, (int) $request->user()->id, (int) $request->input('idle', 0));
         return response()->json(['ok' => true, 'lock' => $lock]);
     }
 

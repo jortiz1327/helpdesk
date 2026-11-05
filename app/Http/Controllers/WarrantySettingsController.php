@@ -8,6 +8,7 @@ use App\Models\WarrantyDocument;
 use App\Models\WarrantyItem;
 use App\Services\WarrantyAlertNotices;
 use App\Services\WarrantyAlerts;
+use App\Services\WarrantyClientNotices;
 use App\Services\WarrantyDocuments;
 use App\Services\WarrantyReplacements;
 use App\Services\WarrantySteps;
@@ -51,6 +52,7 @@ class WarrantySettingsController extends Controller
             'tour_save'       => $this->tourSave($request),
             'close_reasons_save' => $this->closeReasonsSave($request),
             'notices_save'    => $this->noticesSave($request),
+            'client_notices_save' => $this->clientNoticesSave($request),
             default           => $this->get(),
         };
     }
@@ -90,6 +92,9 @@ class WarrantySettingsController extends Controller
             'checklists' => WarrantySteps::settings(),
             'tour' => WarrantyTour::settings(),
             'notices' => WarrantyAlertNotices::settings(),
+            'client_notices' => WarrantyClientNotices::settings(),
+            'client_notice_phases' => collect(WarrantyClientNotices::PHASES)->map(fn ($p, $k) => ['key' => $k, 'label' => $p[0], 'when' => $p[1],
+                'subject' => WarrantyClientNotices::textos(new Warranty(['code' => 'G-' . date('Y') . '-0001']), $k)[0]])->values(),
             'notice_users' => User::where('active', true)->permission('warranties.access')->orderBy('name')->get(['id', 'name']),
             'notice_default_to' => User::whereIn('id', WarrantyAlertNotices::sinResponsable())->orderBy('name')->pluck('name'),
             'close_reasons' => collect(WarrantyClosing::reasons())->map(fn ($r) => $r + ['used' => (int) ($usoMotivo[$r['key']] ?? 0)])->values(),
@@ -198,6 +203,12 @@ class WarrantySettingsController extends Controller
         [$v, $error] = WarrantyAlertNotices::clean($request->all());
         if ($error) return $this->error($error);
         $this->guardar('notices', $v);
+        return response()->json(['ok' => true]);
+    }
+
+    private function clientNoticesSave(Request $request)
+    {
+        $this->guardar('client_notices', WarrantyClientNotices::clean($request->all()));
         return response()->json(['ok' => true]);
     }
 

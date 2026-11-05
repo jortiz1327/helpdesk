@@ -50,6 +50,18 @@ class WarrantyReplacementsTest extends TestCase
         return $this->postJson("/api/warranty_docs.php?action={$action}", ['id' => $this->w->id] + $d, $this->h);
     }
 
+    // Sin permiso de documentos se ven las sustituciones, pero no los correos del cliente.
+    public function test_sin_permiso_de_documentos_no_ve_los_correos(): void
+    {
+        $this->item('802556445', 'defectuosa');
+        $u = User::create(['name' => 'Leo', 'email' => 'leo@x.com', 'password' => bcrypt('x'), 'active' => 1]);
+        $u->givePermissionTo(['warranties.access', 'warranties.edit']);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $r = $this->getJson("/api/warranty_docs.php?action=replacements&id={$this->w->id}", ['X-App-Token' => TokenService::make($u)])->assertOk();
+        $this->assertNull($r->json('email'));
+        $this->assertNotNull($this->getJson("/api/warranty_docs.php?action=replacements&id={$this->w->id}", $this->h)->json('email'));
+    }
+
     public function test_apuntar_posiciones_y_etiquetas_nuevas(): void
     {
         $a = $this->item('802556445', 'defectuosa');
@@ -83,11 +95,14 @@ class WarrantyReplacementsTest extends TestCase
     public function test_ticket_de_posiciones_sin_escribir_al_cliente(): void
     {
         $a = $this->item('802556445', 'defectuosa', ['position' => 'SC-02', 'position_title' => 'Habitación 102']);
-        $this->docs('replacements_ticket', ['email' => 'recepcion@hotel.com'])->assertStatus(400)->assertJsonPath('error', 'Apunta primero las etiquetas nuevas');
+        $this->docs('replacements_ticket', ['email' => 'recepcion@hotel.com', 'confirm_other' => true])->assertStatus(400)->assertJsonPath('error', 'Apunta primero las etiquetas nuevas');
         $a->update(['replaced_by' => '8E9749440']);
         $this->docs('replacements_ticket', ['email' => 'no-es-correo'])->assertStatus(400);
 
-        $r = $this->docs('replacements_ticket', ['email' => 'Recepcion@Hotel.com'])->assertOk()->json();
+        // Un correo que no es de este cliente pide confirmación antes de crear nada a su nombre.
+        $this->docs('replacements_ticket', ['email' => 'Recepcion@Hotel.com'])->assertStatus(409)->assertJsonPath('needs_confirm', true);
+        $this->assertSame(0, DB::table('tickets')->count());
+        $r = $this->docs('replacements_ticket', ['email' => 'Recepcion@Hotel.com', 'confirm_other' => true])->assertOk()->json();
         $t = DB::table('tickets')->find($r['id']);
         $this->assertSame('Nuevas etiquetas para Hotel Cala Blanca (G-2026-0007)', $t->subject);
         $this->assertSame('recepcion@hotel.com', DB::table('contacts')->where('id', $t->contact_id)->value('email'));
@@ -98,7 +113,7 @@ class WarrantyReplacementsTest extends TestCase
         Mail::assertNothingQueued();
 
         // Una vez por garantía.
-        $this->docs('replacements_ticket', ['email' => 'recepcion@hotel.com'])->assertStatus(400);
+        $this->docs('replacements_ticket', ['email' => 'recepcion@hotel.com', 'confirm_other' => true])->assertStatus(400);
         $this->assertSame($r['code'], $this->getJson("/api/warranty_docs.php?action=replacements&id={$this->w->id}", $this->h)->json('positions_ticket.code'));
     }
 

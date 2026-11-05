@@ -73,6 +73,55 @@ class MailLoopGuardTest extends TestCase
         $this->assertSame($antes, DB::table('tickets')->where('contact_id', $cid)->count(), 'pasado el tope no debe crear el nº 11');
     }
 
+    /**
+     * El bucle de «Se te ha asignado el ticket TK-…»: el ticket se creaba y asignaba (y
+     * avisaba al agente), el mensaje fallaba al guardarse, se revertía, y en cada reintento
+     * se volvía a crear con el mismo código y a avisar. El aviso solo sale si el alta queda.
+     */
+    public function test_un_correo_que_falla_al_guardarse_no_avisa_de_la_asignacion(): void
+    {
+        $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
+        $u = \App\Models\User::create(['name' => 'Ana', 'email' => 'ana@x.com', 'password' => bcrypt('x')]);
+        $u->assignRole('agente');
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        \App\Models\TicketRule::create(['name' => 'A Ana', 'active' => true, 'position' => 1, 'channel' => 'any', 'match' => 'any',
+            'conditions' => [['field' => 'subject', 'op' => 'contains', 'value' => 'mistral']], 'actions' => ['assign_to' => $u->id], 'stop' => false]);
+        $avisos = [];
+        $this->mock(\App\Services\NotifyService::class, function ($m) use (&$avisos) {
+            $m->shouldReceive('ticket')->andReturnUsing(function ($k) use (&$avisos) { $avisos[] = $k; return true; });
+        });
+
+        $roto = new class('cli@x.com', 'RE: Etiquetas Mistral') extends FakeMailMsg {
+            public function getAttachments(): array { throw new \RuntimeException('adjunto ilegible'); }
+        };
+        for ($i = 0; $i < 3; $i++) {   // tres pasadas del sondeo, como en producción
+            try { $this->handle($roto); $this->fail('debía fallar'); } catch (\RuntimeException $e) {}
+        }
+        $this->assertSame([], $avisos, 'ningún aviso de un alta revertida');
+        $this->assertSame(0, DB::table('tickets')->count());
+        $this->assertSame(0, DB::table('notifications')->count());
+
+        // Cuando por fin se guarda, sí: un aviso de asignación y el acuse.
+        $this->handle(new FakeMailMsg('cli@x.com', 'RE: Etiquetas Mistral'));
+        $this->assertSame(['ticket_assigned', 'ticket_created'], $avisos);
+        $this->assertSame(1, DB::table('notifications')->where('user_id', $u->id)->where('type', 'assigned')->count());
+    }
+
+    /** TK-2611-0035: un Outlook con todo el hilo citado pasaba de los 64 KB de TEXT y no entraba. */
+    public function test_un_correo_muy_largo_entra_entero(): void
+    {
+        $largo = new class('hilo@x.com', 'RE: Etiquetas Mistral') extends FakeMailMsg {
+            public function getHTMLBody(): string
+            {
+                return implode('', array_map(fn ($i) => "<p><span style=\"font-size:11.0pt\">Buenas tardes Diego, seguimos con las etiquetas de la cocina (mensaje {$i}).</span></p>", range(1, 2500)));
+            }
+        };
+        $this->assertTrue($this->handle($largo)['mensaje']);
+        $body = DB::table('messages')->where('channel', 'email')->orderByDesc('id')->value('body');
+        $this->assertGreaterThan(65535, strlen($body));
+        $this->assertSame(2500, substr_count($body, 'Buenas tardes Diego'));
+    }
+
     public function test_un_correo_normal_crea_ticket_con_mensaje(): void
     {
         $res = $this->handle(new FakeMailMsg('nuevo@x.com', 'Necesito ayuda con el dongle'));

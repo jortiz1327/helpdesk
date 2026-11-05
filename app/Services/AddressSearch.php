@@ -39,8 +39,9 @@ class AddressSearch
         // Lo mismo buscado por otros (o al borrar y volver a escribir) no se vuelve a pedir.
         return Cache::remember("addr.{$p}.{$lang}." . sha1(mb_strtolower($q)), now()->addDay(), function () use ($p, $q, $lang, $session) {
             try {
-                // Si Google falla (clave sin Places, cuota…), Photon en su lugar: mejor algo que nada.
-                if ($p === 'google' && ($r = $this->googleSearch($q, $lang, $session)) !== null) return $r;
+                // Si Google falla (clave sin Places, cuota…) o ya se gastó lo del día, Photon
+                // en su lugar: mejor algo que nada.
+                if ($p === 'google' && $this->cupoGoogle('search') && ($r = $this->googleSearch($q, $lang, $session)) !== null) return $r;
                 return $this->photonSearch($q, $lang);
             } catch (Throwable $e) {
                 Log::warning("Direcciones ({$p}): " . $e->getMessage());
@@ -54,7 +55,11 @@ class AddressSearch
     {
         if ($this->provider() !== 'google' || ! preg_match('/^[A-Za-z0-9_\-]{10,300}$/', $id)) return null;
         $lang = in_array($lang, ['es', 'en', 'pt'], true) ? $lang : 'es';
-        return Cache::remember("addr.place.{$lang}.{$id}", now()->addDays(7), function () use ($id, $lang, $session) {
+        $cache = "addr.place.{$lang}.{$id}";
+        if (Cache::has($cache)) return Cache::get($cache);
+        // Gastado lo del día: el formulario deja escribirla a mano.
+        if (! $this->cupoGoogle('details')) return null;
+        return Cache::remember($cache, now()->addDays(7), function () use ($id, $lang, $session) {
             try {
                 $r = Http::timeout(self::TIMEOUT)->withHeaders([
                     'X-Goog-Api-Key' => config('services.places.google_key'),
@@ -70,6 +75,21 @@ class AddressSearch
     }
 
     /* ----------------------------------------------------------------- Google */
+
+    /**
+     * Tope de llamadas a Google al día, para TODO el portal (el cupo por correo no basta:
+     * con varios correos se multiplica). Por defecto, lo gratis de Google repartido por días
+     * (10.000 sugerencias y 5.000 detalles al mes). Pasado el tope, Photon o a mano.
+     */
+    private function cupoGoogle(string $tipo): bool
+    {
+        $max = (int) config("services.places.google_daily_{$tipo}", $tipo === 'search' ? 300 : 150);
+        $k = "places_google.{$tipo}." . now()->toDateString();
+        Cache::add($k, 0, now()->endOfDay());
+        if ((int) Cache::get($k, 0) >= $max) return false;
+        Cache::increment($k);
+        return true;
+    }
 
     /** Sugerencias de Google, o null si Google no responde bien. */
     private function googleSearch(string $q, string $lang, string $session): ?array

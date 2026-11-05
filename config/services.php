@@ -35,11 +35,20 @@ return [
         ],
     ],
 
+    // Avisos al cliente cuando su garantía cambia de fase. Solo salen en producción, para
+    // que en local o en pruebas nunca le llegue un correo de verdad a un cliente.
+    'warranty_notices' => [
+        'send' => (bool) env('WARRANTY_NOTICES_SEND', env('APP_ENV') === 'production'),
+    ],
+
     // Buscador de direcciones del portal (garantías). Con clave, Google Places (la mejor
     // en cualquier país); sin ella, Photon (OpenStreetMap, gratis). La clave solo la usa
     // el servidor: el navegador nunca la ve.
     'places' => [
         'google_key' => env('GOOGLE_PLACES_KEY'),
+        // Tope diario para todo el portal (lo gratis de Google repartido por días).
+        'google_daily_search' => (int) env('GOOGLE_PLACES_DAILY_SEARCH', 300),
+        'google_daily_details' => (int) env('GOOGLE_PLACES_DAILY_DETAILS', 150),
         'photon_url' => env('PHOTON_URL', 'https://photon.komoot.io/api/'),
     ],
 

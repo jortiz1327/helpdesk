@@ -33,6 +33,13 @@ class Warranty extends Model
 
     private static ?array $estados = null;
 
+    // Avisos al cliente por fase (alta y cambios de estado), vengan de donde vengan.
+    protected static function booted(): void
+    {
+        static::created(fn (self $w) => \App\Services\WarrantyClientNotices::queue($w, true));
+        static::updated(fn (self $w) => $w->wasChanged('status') ? \App\Services\WarrantyClientNotices::queue($w, false) : null);
+    }
+
     /** Todos los estados, en orden: [key => {label, color, closed, active, system}]. */
     public static function statusRows(): array
     {

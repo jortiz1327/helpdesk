@@ -138,6 +138,22 @@ class ZkongClient
         return $json;
     }
 
+    /**
+     * Los servidores ZKONG son de internet: una dirección que es (o resuelve a) loopback,
+     * red privada, link-local (metadatos de la nube) o reservada no se admite. Si el nombre
+     * no resuelve, se deja: la conexión fallará sola.
+     */
+    public static function hostPermitido(string $url): bool
+    {
+        $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
+        if ($host === '' || strtolower($host) === 'localhost') return false;
+        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (gethostbynamel($host) ?: []);
+        foreach ($ips as $ip) {
+            if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) return false;
+        }
+        return true;
+    }
+
     private function send(string $method, string $uri, array $data, ?string $token): array
     {
         $headers = ['Language' => 'en'];
@@ -145,9 +161,13 @@ class ZkongClient
             $headers['Authorization'] = $token;   // ZKONG lo quiere tal cual, sin «Bearer»
         }
         $url = rtrim($this->server->base_url, '/') . $uri;
+        if (! self::hostPermitido($url)) {
+            throw new ZkongException('La dirección de ' . $this->server->name . ' apunta a una red interna: no se usa.');
+        }
 
         try {
-            $http = Http::withHeaders($headers)->acceptJson()->connectTimeout(8)->timeout(25);
+            // Sin seguir redirecciones: la contraseña y el token solo van a la dirección escrita.
+            $http = Http::withHeaders($headers)->acceptJson()->connectTimeout(8)->timeout(25)->withoutRedirecting();
             $res = $method === 'GET' ? $http->get($url, $data) : $http->asJson()->post($url, $data);
         } catch (ConnectionException $e) {
             throw new ZkongException('No se pudo conectar con ' . $this->server->name . ' (sin respuesta: revisa la dirección y el puerto).');

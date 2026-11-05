@@ -2667,6 +2667,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
   background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); color: #e8a33d; }
 .tk-locked svg { width: 16px; height: 16px; fill: currentColor; flex: 0 0 16px; }
 :root[data-theme="light"] .tk-locked { background: #fff8ec; border-color: #f5c877; color: #92600c; }
+/* Lo tengo yo: discreto, una línea sobre el editor con la cuenta atrás. */
+.tk-lock-mine { display: flex; align-items: center; gap: 7px; margin: 0 20px 8px; font-size: 12px; color: var(--ink-2); }
+.tk-lock-mine svg { width: 13px; height: 13px; fill: currentColor; flex: 0 0 13px; opacity: .8; }
+.tk-cuenta { font-variant-numeric: tabular-nums; font-weight: 700; }
 
 /* --- Pestaña «Del cliente»: sus otros tickets --- */
 .tkm-client-h { display: flex; align-items: baseline; gap: 10px; padding: 4px 2px 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
@@ -5338,6 +5342,11 @@ button.dev-code:hover { text-decoration: underline; }
 .wf-tabs-card .wr-tabs { margin: 0; padding: 4px 14px 0; border-bottom: 1px solid var(--line); }
 .wf-tab-sum { margin-left: auto; align-self: center; font-size: 12px; }
 .wf-tab-body { padding: 16px 18px 18px; }
+.wf-envios ul { list-style: none; margin: 4px 0 6px; padding: 0 18px; }
+.wf-envios li { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; overflow-wrap: anywhere; }
+.wf-envios li:last-child { border-bottom: 0; }
+.wf-envios li span { font-size: 12.5px; }
+.wf-envio-nota { color: var(--ink-2); font-style: italic; }
 .wf-dl { margin: 6px 0 4px; padding: 0 18px; }
 .wf-dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .wf-dl > div:last-child { border-bottom: 0; }
@@ -5627,6 +5636,10 @@ button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); 
 .wr-term svg { width: 11px; height: 11px; fill: currentColor; }
 .wr-term.out { border: 1px solid color-mix(in srgb, #c27803 40%, transparent); background: color-mix(in srgb, #c27803 10%, transparent); color: #a16207; }
 .wr-term.bat { border: 1px solid var(--border); background: var(--surface-2, transparent); color: var(--text-muted, #64748b); font-weight: 600; }
+.wr-term.alta { border: 1px solid var(--border); background: transparent; color: var(--text-muted, #64748b); font-weight: 600; font-variant-numeric: tabular-nums; }
+.wr-term.alta.none { font-weight: 500; opacity: .8; }
+.wr-rev-alta { display: flex; align-items: flex-start; gap: 6px; margin: 0 0 12px; font-size: 13px; }
+.wr-rev-alta svg { flex: none; width: 14px; height: 14px; margin-top: 2px; fill: var(--text-muted, #64748b); }
 .wr-chips button svg { width: 12px; height: 12px; fill: currentColor; vertical-align: -1px; }
 .ws-panel > .ws-body { padding: 16px 20px 18px; }
 .ws-panel > .ws-body > .ws-sub:first-child { margin-top: 0; }

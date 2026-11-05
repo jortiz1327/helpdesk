@@ -51,11 +51,19 @@ class ZkongServersController extends Controller
         if (! preg_match('#^https?://[a-z0-9.-]+(:\d+)?(/[\w./-]*)?$#i', $url)) {
             return response()->json(['ok' => false, 'error' => 'Escribe la dirección completa, p. ej. http://app02.etiquetaselectronicas.com:9999'], 400);
         }
+        if (! ZkongClient::hostPermitido($url)) {
+            return response()->json(['ok' => false, 'error' => 'Esa dirección es de una red interna: escribe la del servidor ZKONG en internet'], 400);
+        }
         if (! $id && $pass === '') {
             return response()->json(['ok' => false, 'error' => 'Falta la contraseña'], 400);
         }
 
         $s = $id ? ZkongServer::findOrFail($id) : new ZkongServer(['position' => (int) ZkongServer::max('position') + 1]);
+        // La contraseña guardada solo vale para la dirección y el usuario con que se guardó:
+        // si cambian, hay que volver a escribirla (si no, se le mandaría a otra máquina).
+        if ($s->exists && $pass === '' && ($s->base_url !== $url || $s->username !== $user)) {
+            return response()->json(['ok' => false, 'error' => 'Al cambiar la dirección o el usuario, vuelve a escribir la contraseña'], 400);
+        }
         $cambiaAcceso = ! $s->exists || $s->base_url !== $url || $s->username !== $user || $pass !== '';
         $s->fill([
             'name'     => mb_substr($name, 0, 60),

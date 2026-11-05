@@ -58,9 +58,11 @@ class PortalController extends Controller
             'warranty'          => $this->conPase($request, fn ($email) => $this->garantia($email, (string) $request->query('code'))),
             'warranty-places'   => $this->conPase($request, fn ($email) =>
                                     response()->json(['ok' => true] + $this->garantias()->places($email))),
+            'warranty-check'    => $this->conPase($request, fn ($email) => $this->comprobarCodigos($request, $email)),
             'warranty-request'  => $this->conPase($request, fn ($email) => $this->solicitarGarantia($request, $email)),
             'warranty-photo'    => $this->conPase($request, fn ($email) => $this->fotoGarantia($request, $email)),
             'warranty-reply'    => $this->conPase($request, fn ($email) => $this->responderGarantia($request, $email)),
+            'warranty-shipment' => $this->conPase($request, fn ($email) => $this->envioGarantia($request, $email)),
             'warranty-pdf'      => $this->conPase($request, fn ($email) => $this->pdfGarantia($request, $email)),
             // Buscador de direcciones (con pase y con límite: cada búsqueda puede costar).
             'address-search'    => $this->conPase($request, fn ($email) => $this->buscarDireccion($request, $email)),
@@ -85,11 +87,30 @@ class PortalController extends Controller
         return response()->json(['ok' => true, 'warranty' => $d]);
     }
 
+    /** Un campo de texto de la petición; si llega una lista u objeto, vacío (no un error 500). */
+    private function texto(Request $request, string $campo): string
+    {
+        $v = $request->input($campo);
+        return is_scalar($v) ? (string) $v : '';
+    }
+
+    /** Al añadir códigos a la solicitud: si existen en los servidores (solo sí / no / no se sabe). */
+    protected function comprobarCodigos(Request $request, string $email)
+    {
+        if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        $codes = (array) $request->input('codes', []);
+        // Los que ya están en una garantía o solicitud en curso (no consulta ZKONG).
+        $busy = (object) $this->garantias()->enCurso($codes, $email);
+        $existe = $this->garantias()->exists($codes, $email, $request->ip(), $limitado);
+        if ($limitado) return response()->json(['ok' => false, 'error' => 'Demasiadas comprobaciones seguidas: espera unos minutos', 'exists' => (object) $existe, 'busy' => $busy], 429);
+        return response()->json(['ok' => true, 'exists' => (object) $existe, 'busy' => $busy]);
+    }
+
     /** Solicitar una garantía: crea el ticket con todo ordenado. Las fotos van después. */
     protected function solicitarGarantia(Request $request, string $email)
     {
         if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
-        [$ok, $error, $code] = $this->garantias()->request($email, $request->only(['place_id', 'place_other', 'items', 'name', 'phone', 'address']));
+        [$ok, $error, $code] = $this->garantias()->request($email, $request->only(['place_id', 'place_other', 'items', 'name', 'phone', 'address']), $request->ip());
         if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
         return response()->json(['ok' => true, 'code' => $code]);
     }
@@ -98,8 +119,19 @@ class PortalController extends Controller
     protected function fotoGarantia(Request $request, string $email)
     {
         if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
-        [$ok, $error] = $this->garantias()->photo($email, (string) $request->input('ticket'), (string) $request->input('code'),
-            (string) $request->input('type'), $request->file('file'));
+        $f = $request->file('file');
+        [$ok, $error] = $this->garantias()->photo($email, $this->texto($request, 'ticket'), $this->texto($request, 'code'),
+            $this->texto($request, 'type'), $f instanceof \Illuminate\Http\UploadedFile ? $f : null, $request->ip());
+        if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
+        return response()->json(['ok' => true]);
+    }
+
+    /** «Ya lo he enviado»: aviso del envío del material (fecha, transportista, seguimiento…). */
+    protected function envioGarantia(Request $request, string $email)
+    {
+        if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        [$ok, $error] = $this->garantias()->shipment($email, $this->texto($request, 'code'),
+            $request->only(['shipped_on', 'carrier', 'tracking', 'packages', 'units', 'note']));
         if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
         return response()->json(['ok' => true]);
     }
@@ -107,8 +139,8 @@ class PortalController extends Controller
     protected function responderGarantia(Request $request, string $email)
     {
         if (!$request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
-        [$ok, $error] = $this->garantias()->reply($email, (string) $request->input('code'), (string) $request->input('body'),
-            (array) $request->file('files', []));
+        $files = array_values(array_filter((array) $request->file('files', []), fn ($f) => $f instanceof \Illuminate\Http\UploadedFile));
+        [$ok, $error] = $this->garantias()->reply($email, $this->texto($request, 'code'), $this->texto($request, 'body'), $files);
         if (!$ok) return response()->json(['ok' => false, 'error' => $error], 422);
         return response()->json(['ok' => true]);
     }

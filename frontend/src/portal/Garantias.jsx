@@ -101,10 +101,21 @@ function Desplegable({ value, options, onChange, placeholder, label, className =
 // Fotos de cada dispositivo: las mismas que pide la revisión del equipo.
 const FOTOS = { esl: ['front', 'back_batteries', 'back_no_batteries'], ap: ['front', 'back'] }
 const ISSUES = ['no_enciende', 'pantalla', 'sin_conexion', 'bateria', 'otro']
-// Lo que tiene que contar, como mínimo, de cada dispositivo (lo mismo exige el servidor):
-// sin explicación no se sabe si es un fallo o un uso que no cubre la garantía.
+// Con un fallo de la lista basta; con «Otro» tiene que contar qué le pasa, como mínimo
+// esto (lo mismo exige el servidor): sin explicación no se sabe si es un fallo o un uso
+// que no cubre la garantía.
 const DETALLE_MIN = 15
-const explicado = (i) => !!i.issue && i.detail.trim().length >= DETALLE_MIN
+// «Batería» o «No enciende» en una etiqueta: antes de pedirla, que pruebe a reiniciarla y
+// con otras pilas (lo que diría soporte). Muchas vuelven a funcionar y no hace falta enviarlas.
+const PRUEBA_ANTES = ['no_enciende', 'bateria']
+const pidePrueba = (i) => i.kind === 'esl' && PRUEBA_ANTES.includes(i.issue)
+const faltaPrueba = (i) => pidePrueba(i) && !i.tried
+// Ya está en una garantía o solicitud en curso: i.ocupada es su referencia ('' si es de otro cliente).
+const estaOcupada = (i) => typeof i.ocupada === 'string'
+const faltaDetalle = (i) => i.issue === 'otro' && i.detail.trim().length < DETALLE_MIN
+const explicado = (i) => !!i.issue && !faltaDetalle(i)
+// Un código que no está en nuestros servidores y se añade igualmente: con sus fotos.
+const fotosObligatorias = (i) => i.existe === false
 const ESL = /^[A-Z0-9]{9}$/
 const AP = /^[0-9A-F]{12}$/
 const limpiar = (s) => String(s || '').toUpperCase().replace(/[\s:\-]/g, '')
@@ -244,6 +255,84 @@ function Resultado({ r }) {
   )
 }
 
+/* «Ya lo he enviado»: el cliente avisa de que nos ha mandado el material. No es
+   obligatorio (el paquete llega igual), pero con el seguimiento lo esperamos y lo
+   localizamos antes. Lo avisado se queda a la vista, también para sus compañeros. */
+const TRANSPORTISTAS = ['SEUR', 'MRW', 'Correos', 'Correos Express', 'GLS', 'Nacex', 'DHL', 'UPS', 'FedEx', 'TNT', 'CTT']
+const hoyISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10) }
+function EnvioMaterial({ w, onDone, onExpire }) {
+  const { t, lang } = useLang()
+  const vacio = () => ({ shipped_on: hoyISO(), carrier: '', tracking: '', packages: '1', units: String((w.labels || 0) + (w.aps || 0) || ''), note: '' })
+  const [abierto, setAbierto] = useState(false)
+  const [f, setF] = useState(vacio)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [ok, setOk] = useState(false)
+  const set = (c) => setF((x) => ({ ...x, ...c }))
+  const envios = w.shipments || []
+  if (!w.can_ship && !envios.length) return null
+
+  const enviar = async (e) => {
+    e.preventDefault()
+    setBusy(true); setErr('')
+    const r = await portal.warrantyShipment(w.code, f)
+    setBusy(false)
+    if (r.reauth) return onExpire()
+    if (!r.ok) { setErr(r.error || t('err_create')); return }
+    setAbierto(false); setF(vacio()); setOk(true)
+    onDone()
+  }
+
+  return (
+    <div className="gw-box gw-envio">
+      <div className="gw-box-h"><h2>{G.box} {t('g_ship_title')}</h2>
+        {w.can_ship && !abierto && <button className="btn sec gw-envio-b" onClick={() => { setAbierto(true); setOk(false) }}>{envios.length ? t('g_ship_another') : t('g_ship_btn')}</button>}
+      </div>
+      {!envios.length && !abierto && <p className="gw-mute">{t('g_ship_intro')}</p>}
+      {ok && <div className="gw-aviso">{I.check}<span>{t('g_ship_ok')}</span></div>}
+      {envios.length > 0 && (
+        <ul className="gw-envios">
+          {envios.map((s, i) => (
+            <li key={i}>
+              <b>{t('g_ship_sent_on', { date: fmtDate(s.shipped_on, lang) })}</b>
+              <span>{[s.carrier, s.tracking ? `${t('g_ship_tracking')}: ${s.tracking}` : null].filter(Boolean).join(' · ') || t('g_ship_no_tracking')}</span>
+              <small>{t(s.packages === 1 ? 'g_ship_n_package' : 'g_ship_n_packages', { n: s.packages })}{s.units ? ` · ${t('g_ship_n_units', { n: s.units })}` : ''}{s.email ? ` · ${s.email}` : ''}</small>
+              {s.note && <small className="gw-envio-nota">{s.note}</small>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {abierto && (
+        <form className="gw-envio-f" onSubmit={enviar}>
+          <p className="gw-mute">{t('g_ship_form_intro')}</p>
+          <div className="gw-grid2">
+            <label className="f"><span className="lab">{t('g_ship_date')}</span>
+              <input className="inp" type="date" required value={f.shipped_on} max={hoyISO()} onChange={(e) => set({ shipped_on: e.target.value })} /></label>
+            <label className="f"><span className="lab">{t('g_ship_carrier')} <span className="hint" style={{ fontWeight: 400 }}>{t('g_optional')}</span></span>
+              <input className="inp" list="gw-transportistas" maxLength={60} value={f.carrier} onChange={(e) => set({ carrier: e.target.value })} placeholder="SEUR, MRW, Correos…" />
+              <datalist id="gw-transportistas">{TRANSPORTISTAS.map((x) => <option key={x} value={x} />)}</datalist></label>
+          </div>
+          <label className="f"><span className="lab">{t('g_ship_tracking')} <span className="hint" style={{ fontWeight: 400 }}>{t('g_ship_tracking_hint')}</span></span>
+            <input className="inp gw-mono" maxLength={80} value={f.tracking} onChange={(e) => set({ tracking: e.target.value })} autoComplete="off" /></label>
+          <div className="gw-grid2">
+            <label className="f"><span className="lab">{t('g_ship_packages')}</span>
+              <input className="inp" type="number" min={1} max={99} required value={f.packages} onChange={(e) => set({ packages: e.target.value })} /></label>
+            <label className="f"><span className="lab">{t('g_ship_units')} <span className="hint" style={{ fontWeight: 400 }}>{t('g_optional')}</span></span>
+              <input className="inp" type="number" min={1} max={5000} value={f.units} onChange={(e) => set({ units: e.target.value })} /></label>
+          </div>
+          <label className="f"><span className="lab">{t('g_ship_note')} <span className="hint" style={{ fontWeight: 400 }}>{t('g_optional')}</span></span>
+            <input className="inp" maxLength={300} value={f.note} onChange={(e) => set({ note: e.target.value })} placeholder={t('g_ship_note_ph')} /></label>
+          {err && <p className="gw-err">{err}</p>}
+          <div className="gw-envio-acts">
+            <button type="button" className="btn sec" onClick={() => { setAbierto(false); setErr('') }}>{t('g_ship_cancel')}</button>
+            <button className="btn" disabled={busy}>{busy ? t('sending') : t('g_ship_send')}</button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
 export function DetalleGarantia({ code, back, onExpire }) {
   const { t, lang } = useLang()
   const [w, setW] = useState(null)
@@ -306,7 +395,15 @@ export function DetalleGarantia({ code, back, onExpire }) {
         <div className="gw-box-h"><h2>{t('g_progress')}</h2></div>
         <Fases steps={w.steps} grande />
         <div className={`gw-aviso ${w.hint === 'tu_respuesta' ? 'wait' : ''}`}>{I.info}<span>{explica}</span></div>
+        {w.phase !== 'resuelta' && (
+          <details className="gw-como">
+            <summary>{t('g_how_it_works')}</summary>
+            <ProcesoGarantia code={w.code} />
+          </details>
+        )}
       </div>
+
+      <EnvioMaterial w={w} onDone={load} onExpire={onExpire} />
 
       <div className="gw-cols">
         <div className="gw-box">
@@ -412,6 +509,95 @@ export function DetalleGarantia({ code, back, onExpire }) {
 
 /* --------------------------- Solicitar garantía --------------------------- */
 
+const hayCamara = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+
+/*
+ * Cámara en directo: lee los códigos de barras de lo que enfoca, uno tras otro, sin hacer
+ * fotos. Cada código nuevo se añade al momento (con ese fotograma como foto frontal) y
+ * la cámara sigue abierta para el siguiente. `ya`: los códigos que ya están en la lista.
+ */
+function EscanerCamara({ ya, onCodes, onClose }) {
+  const { t } = useLang()
+  const video = useRef(null)
+  const vistos = useRef(new Set(ya))
+  const avisar = useRef(onCodes)
+  avisar.current = onCodes
+  const [err, setErr] = useState('')
+  const [nuevos, setNuevos] = useState([])
+  const [nota, setNota] = useState(null)   // {code, repe}
+
+  useEffect(() => {
+    let vivo = true, stream = null, quitarNota = null
+    const espera = (ms) => new Promise((r) => setTimeout(r, ms))
+    ;(async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        })
+      } catch (e) {
+        if (vivo) setErr(e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? t('g_cam_denied') : t('g_cam_fail'))
+        return
+      }
+      if (!vivo) { stream.getTracks().forEach((k) => k.stop()); return }
+      const v = video.current
+      v.srcObject = stream
+      try { await v.play() } catch { /* algunos navegadores ya lo reproducen solo */ }
+      const c = document.createElement('canvas')
+      while (vivo) {
+        await espera(200)
+        if (!vivo || v.readyState < 2 || !v.videoWidth) continue
+        c.width = v.videoWidth; c.height = v.videoHeight
+        c.getContext('2d').drawImage(v, 0, 0)
+        const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9))
+        if (!blob || !vivo) continue
+        const file = new File([blob], `camara-${Date.now()}.jpg`, { type: 'image/jpeg' })
+        const leidos = await leerCodigos(file, { rapido: true })
+        if (!vivo || !leidos.length) continue
+        const frescos = leidos.filter((x) => !vistos.current.has(x))
+        if (!frescos.length) { setNota({ code: leidos[0], repe: true }) } else {
+          frescos.forEach((x) => vistos.current.add(x))
+          avisar.current(frescos, frescos.length === 1 ? file : null)
+          setNuevos((s) => [...s, ...frescos])
+          setNota({ code: frescos.join(', '), repe: false })
+          navigator.vibrate?.(60)
+        }
+        clearTimeout(quitarNota); quitarNota = setTimeout(() => vivo && setNota(null), 2200)
+        await espera(700)   // un respiro para apartar la etiqueta antes de leer otra
+      }
+    })()
+    const tecla = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', tecla)
+    return () => {
+      vivo = false; clearTimeout(quitarNota)
+      window.removeEventListener('keydown', tecla)
+      stream?.getTracks().forEach((k) => k.stop())
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="gw-cam" role="dialog" aria-modal="true" aria-label={t('g_cam_title')}>
+      <div className="gw-cam-box">
+        <div className="gw-cam-h">
+          <div><b>{t('g_cam_title')}</b><span>{t('g_cam_sub')}</span></div>
+          <button type="button" className="gw-cam-x" onClick={onClose} aria-label={t('g_cam_done')}>{I.x}</button>
+        </div>
+        {err ? <p className="gw-err">{G.warn} {err}</p> : (
+          <div className="gw-cam-v">
+            <video ref={video} playsInline muted autoPlay />
+            <span className="gw-cam-marco" aria-hidden="true" />
+            {nota && <span className={`gw-cam-nota ${nota.repe ? 'repe' : ''}`} role="status">
+              {nota.repe ? t('g_cam_already', { code: nota.code }) : t('g_cam_added', { code: nota.code })}</span>}
+          </div>
+        )}
+        <div className="gw-cam-pie">
+          <span>{nuevos.length ? t('g_cam_n', { n: nuevos.length }) : ''}</span>
+          <button type="button" className="btn" onClick={onClose}>{t('g_cam_done')}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* Dónde está el código: una etiqueta mostrando un producto, con su código de barras (el
    pequeño del borde, sin número: el número solo sale si está desvinculada) marcado. */
 function AyudaCodigo({ onClose }) {
@@ -441,6 +627,40 @@ function AyudaCodigo({ onClose }) {
 }
 
 /* Una casilla de foto: vacía (subir) o con la miniatura (cambiar o quitar). */
+/* Prueba antes de pedir: cómo reiniciarla y con otras pilas. «Ya lo he probado y sigue
+   igual» deja seguir; «Ya funciona» la quita de la solicitud. Los pasos se abren solos en
+   la primera que lo necesita; en las demás, plegados (son los mismos). */
+const PASOS_REINICIO = 8
+function PruebaAntes({ abierta, onTried, onWorks, marcar }) {
+  const { t } = useLang()
+  const [ver, setVer] = useState(abierta)
+  return (
+    <div className={`gw-prueba ${marcar ? 'mal' : ''}`} role="group" aria-label={t('g_try_title')}>
+      <div className="gw-prueba-h">
+        <span className="gw-prueba-ic">{G.bateria}</span>
+        <p><b>{t('g_try_title')}</b><small>{t('g_try_sub')}</small></p>
+        <button type="button" className={`gw-prueba-tg ${ver ? 'on' : ''}`} aria-expanded={ver} onClick={() => setVer((v) => !v)}>
+          {ver ? t('g_try_hide') : t('g_try_how')} {G.chev}</button>
+      </div>
+      {/* Se despliega animando la altura (filas 0fr → 1fr), sin saltos. */}
+      <div className={`gw-prueba-cuerpo ${ver ? 'on' : ''}`} aria-hidden={!ver}>
+        <div>
+          <ol className="gw-prueba-pasos">{Array.from({ length: PASOS_REINICIO }, (_, n) => <li key={n}>{t('g_try_step_' + (n + 1))}</li>)}</ol>
+          <div className="gw-prueba-notas">
+            <p>{G.ap}<span>{t('g_try_range')}</span></p>
+            <p>{G.bateria}<span>{t('g_try_batteries')}</span></p>
+            <p className="aviso">{G.warn}<span>{t('g_try_brands')}</span></p>
+          </div>
+        </div>
+      </div>
+      <div className="gw-prueba-acts">
+        <button type="button" className="btn sec" onClick={onWorks}>{I.check} {t('g_try_works')}</button>
+        <button type="button" className="btn" onClick={onTried}>{t('g_try_still')}</button>
+      </div>
+    </div>
+  )
+}
+
 function FotoSlot({ tipo, kind, foto, onPick, onRemove }) {
   const { t } = useLang()
   const ref = useRef(null)
@@ -565,6 +785,7 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
   const [items, setItems] = useState([])        // [{code, kind, issue, detail, fotos: {tipo: {file}}, aviso}]
   const [aviso, setAviso] = useState('')
   const [leyendo, setLeyendo] = useState(false)
+  const [camara, setCamara] = useState(false)
   const [ayuda, setAyuda] = useState(false)
   const [nombre, setNombre] = useState('')
   const [tel, setTel] = useState('')
@@ -573,12 +794,21 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
   const [enviando, setEnviando] = useState(null)  // null | {hechas, total}
   const [err, setErr] = useState('')
   const fotoCodigo = useRef(null)
+  const [confirmarLugar, setConfirmarLugar] = useState('')   // cadena: «¿otra vez en X?» hasta que conteste
 
   useEffect(() => {
     portal.warrantyPlaces().then((r) => {
       if (r.reauth) return onExpire()
       setLugares(r.ok ? r.places : []); setEmpresa(r.ok ? r.company : null)
-      if (r.ok && r.places.length === 1) setPlaceId(r.places[0].id)
+      if (!r.ok) return
+      // Lo de la última vez. Si es una cadena (su empresa tiene varios hoteles o ya ha
+      // pedido desde sitios distintos) se deja puesto y se pregunta; si no, se pone sin más.
+      const ult = (r.recent || [])[0]
+      const enLista = ult?.id ? r.places.find((p) => p.id === ult.id) : null
+      if (enLista) setPlaceId(enLista.id)
+      else if (ult) { setOtro(ult.name); setPlaceId(null) }
+      else if (r.places.length === 1) setPlaceId(r.places[0].id)
+      if (ult && (r.places.length > 1 || (r.recent || []).length > 1)) setConfirmarLugar(enLista ? enLista.name : ult.name)
     })
     portal.me().then((r) => { if (r.ok) setEmail(r.email) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -594,11 +824,27 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
       if (!c) continue
       if (!ESL.test(c) && !AP.test(c)) { malos.push(c); continue }
       if (items.some((i) => i.code === c) || nuevos.some((i) => i.code === c)) continue
-      nuevos.push({ code: c, kind: tipoDe(c), issue: '', detail: '', fotos: fotoFrontal ? { front: { file: fotoFrontal, leido: c } } : {} })
+      nuevos.push({ code: c, kind: tipoDe(c), issue: '', detail: '', existe: 'comprobando', forzada: false, tried: false,
+        fotos: fotoFrontal ? { front: { file: fotoFrontal, leido: c } } : {} })
     }
     setAviso(malos.length ? t('g_bad_codes', { codes: malos.slice(0, 5).join(', ') }) : '')
-    if (nuevos.length) setItems((s) => [...s, ...nuevos])
+    // Contra la lista del momento: la cámara añade varios seguidos antes de volver a pintar.
+    if (nuevos.length) {
+      setItems((s) => [...s, ...nuevos.filter((n) => !s.some((i) => i.code === n.code))])
+      comprobar(nuevos.map((n) => n.code))
+    }
     return nuevos.length
+  }
+
+  /* ¿Existen en nuestros servidores (app, app02)? Uno que no aparece se pregunta si se
+     añade igualmente, y entonces sus fotos son obligatorias. Si no se puede comprobar,
+     se deja pasar (null). */
+  const comprobar = async (codes) => {
+    const r = await portal.warrantyCheck(codes)
+    if (r.reauth) return onExpire()
+    // busy: ya está en una garantía o solicitud en curso (G-…/TK-… si es suya, '' si no).
+    setItems((s) => s.map((i) => (codes.includes(i.code) && i.existe === 'comprobando'
+      ? { ...i, existe: r.exists?.[i.code] ?? null, ocupada: typeof r.busy?.[i.code] === 'string' ? r.busy[i.code] : null } : i)))
   }
   const anadirPegados = () => { if (anadir(pegar.split(/[\s,;]+/))) setPegar('') }
 
@@ -626,15 +872,27 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
   }))
   const cambiar = (code, k, v) => setItems((s) => s.map((i) => (i.code === code ? { ...i, [k]: v } : i)))
 
-  const faltanFotos = items.filter((i) => FOTOS[i.kind].some((f) => !i.fotos[f]))
-  const sinExplicar = items.filter((i) => !explicado(i))
+  // Las fotos solo son obligatorias en un código que no aparece y que añadió igualmente.
+  // Las que ya están en otra garantía o solicitud en curso no se piden otra vez: hay que quitarlas.
+  const ocupadas = items.filter(estaOcupada)
+  const libres = items.filter((i) => !estaOcupada(i))
+  const faltanFotos = libres.filter((i) => fotosObligatorias(i) && FOTOS[i.kind].some((f) => !i.fotos[f]))
+  const sinExplicar = libres.filter((i) => !explicado(i))
+  const comprobando = items.filter((i) => i.existe === 'comprobando')
+  const sinConfirmar = libres.filter((i) => i.existe === false && !i.forzada)
+  const quitarOcupadas = () => setItems((s) => s.filter((i) => !estaOcupada(i)))
   const nE = items.filter((i) => i.kind === 'esl').length
   const nA = items.filter((i) => i.kind === 'ap').length
   // Los avisos de lo que falta en una fila salen cuando intenta seguir (no al añadirla).
   const [marcar, setMarcar] = useState(false)
   const issueOpts = ISSUES.map((k) => ({ value: k, label: t('g_issue_' + k), desc: t('g_issue_desc_' + k), icon: G[k] }))
 
-  const puede = { 1: !!sitio, 2: items.length > 0 && faltanFotos.length === 0 && sinExplicar.length === 0, 3: nombre.trim() && dir.trim(), 4: true }
+  const sinProbar = libres.filter(faltaPrueba)
+  const puede = { 1: !!sitio && !confirmarLugar, 2: items.length > 0 && !ocupadas.length && faltanFotos.length === 0 && sinExplicar.length === 0 && !comprobando.length && !sinConfirmar.length && !sinProbar.length, 3: nombre.trim() && dir.trim(), 4: true }
+  // «Ya funciona»: se quita de la solicitud (y se le dice, para que no la busque).
+  const [arregladas, setArregladas] = useState([])
+  const yaFunciona = (code) => { setItems((s) => s.filter((x) => x.code !== code)); setArregladas((a) => [...a, code]) }
+  const probadas = (codes) => setItems((s) => s.map((x) => (codes.includes(x.code) ? { ...x, tried: true } : x)))
   const siguiente = () => { setErr(''); setMarcar(false); setPaso((p) => Math.min(4, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const atras = () => { setErr(''); setPaso((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const ir = (p) => { setErr(''); setPaso(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }
@@ -647,7 +905,7 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
     setEnviando({ hechas: 0, total })
     const r = await portal.warrantyRequest({
       place_id: placeId || null, place_other: placeId ? '' : otro.trim(),
-      items: items.map((i) => ({ code: i.code, issue: i.issue, detail: i.detail })),
+      items: items.map((i) => ({ code: i.code, issue: i.issue, detail: i.detail, forced: i.forzada, tried: pidePrueba(i) && !!i.tried })),
       name: nombre.trim(), phone: tel.trim(), address: dir.trim(),
     })
     if (r.reauth) { setEnviando(null); return onExpire() }
@@ -692,10 +950,21 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
           <>
             <h2>{t('g_where_title')}</h2>
             <p className="gw-paso-sub">{lugares?.length ? t('g_where_sub') : t('g_where_sub_free')}</p>
+            {/* Cadena: se deja puesto el de la última vez, pero se pregunta (puede ser otro hotel). */}
+            {confirmarLugar && (
+              <div className="gw-mismo">
+                <span>{G.building}</span>
+                <p><b>{t('g_same_place_q', { place: confirmarLugar })}</b><small>{t('g_same_place_sub')}</small></p>
+                <div className="gw-mismo-b">
+                  <button type="button" className="btn sec" onClick={() => { setConfirmarLugar(''); setPlaceId(null); setOtro('') }}>{t('g_same_place_no')}</button>
+                  <button type="button" className="btn" onClick={() => { setConfirmarLugar(''); siguiente() }}>{t('g_same_place_yes')} {I.arrow}</button>
+                </div>
+              </div>
+            )}
             {lugares === null ? <p className="gw-mute">{t('loading')}</p> : (
               <div className="gw-lugares">
                 {lugares.map((p) => (
-                  <button key={p.id} type="button" className={`gw-lugar ${placeId === p.id ? 'on' : ''}`} onClick={() => setPlaceId(p.id)}>
+                  <button key={p.id} type="button" className={`gw-lugar ${placeId === p.id ? 'on' : ''}`} onClick={() => { setPlaceId(p.id); setConfirmarLugar('') }}>
                     <span className="gw-lugar-ic">{G.building}</span><b>{p.name}</b>
                     <span className="gw-radio" />
                   </button>
@@ -703,7 +972,7 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
                 <div className={`gw-lugar otro ${!placeId ? 'on' : ''}`} onClick={() => setPlaceId(null)}>
                   <span className="gw-lugar-ic">{I.plus}</span>
                   <span className="gw-lugar-otro"><b>{lugares.length ? t('g_other_place') : t('g_place_name')}</b>
-                    <input className="inp" value={otro} onChange={(e) => { setOtro(e.target.value); setPlaceId(null) }}
+                    <input className="inp" value={otro} onChange={(e) => { setOtro(e.target.value); setPlaceId(null); setConfirmarLugar('') }}
                       placeholder={t('g_other_place_ph')} /></span>
                   {lugares.length > 0 && <span className="gw-radio" />}
                 </div>
@@ -730,10 +999,16 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
                 <button type="button" className="btn" disabled={!pegar.trim()} onClick={anadirPegados}>{I.plus} {t('g_add')}</button>
                 <input ref={fotoCodigo} type="file" accept="image/*" capture="environment" hidden
                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) leerDeFoto(f) }} />
-                <button type="button" className="btn sec" disabled={leyendo} onClick={() => fotoCodigo.current?.click()}>
-                  {G.barcode} {leyendo ? t('g_reading') : t('g_read_photo')}</button>
+                <div className="gw-entrada-dos">
+                  <button type="button" className="btn sec" disabled={leyendo} onClick={() => fotoCodigo.current?.click()}>
+                    {G.barcode} {leyendo ? t('g_reading') : t('g_read_photo')}</button>
+                  {hayCamara && <button type="button" className="btn sec" onClick={() => { setAviso(''); setCamara(true) }}>
+                    {G.camera} {t('g_cam')}</button>}
+                </div>
               </div>
             </div>
+            {camara && <EscanerCamara ya={items.map((i) => i.code)} onClose={() => setCamara(false)}
+              onCodes={(codes, file) => anadir(codes, file)} />}
             {aviso && <p className="gw-err">{G.warn} {aviso}</p>}
             {ayuda && <AyudaCodigo onClose={() => setAyuda(false)} />}
 
@@ -743,23 +1018,63 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
                   <b>{t('g_devices_added', { n: items.length })}</b>
                   <span>{t('g_photos_needed')}</span>
                 </div>
+                {arregladas.length > 0 && (
+                  <div className="gw-aviso ok">{I.check}<span>{t(arregladas.length === 1 ? 'g_try_fixed_1' : 'g_try_fixed', { n: arregladas.length, codes: arregladas.join(', ') })}</span></div>
+                )}
+                {ocupadas.length > 1 && (
+                  <div className="gw-prueba-todas">
+                    <span>{t('g_busy_many', { n: ocupadas.length })}</span>
+                    <button type="button" className="btn sec" onClick={quitarOcupadas}>{t('g_busy_remove_all', { n: ocupadas.length })}</button>
+                  </div>
+                )}
+                {sinProbar.length > 1 && (
+                  <div className="gw-prueba-todas">
+                    <span>{t('g_try_many', { n: sinProbar.length })}</span>
+                    <button type="button" className="btn sec" onClick={() => probadas(sinProbar.map((x) => x.code))}>{t('g_try_still_all', { n: sinProbar.length })}</button>
+                  </div>
+                )}
                 <div className="gw-items">
                   {items.map((i) => {
                     const faltan = FOTOS[i.kind].filter((f) => !i.fotos[f]).length
-                    return (
-                      <div key={i.code} className={`gw-item ${faltan ? 'falta' : ''}`}>
+                    const obligan = fotosObligatorias(i)
+                    const quitar = () => setItems((s) => s.filter((x) => x.code !== i.code))
+                    if (estaOcupada(i)) return (
+                      <div key={i.code} className="gw-item ocupada">
                         <div className="gw-item-id">
                           <span className="gw-item-ic">{i.kind === 'ap' ? G.ap : G.tag}</span>
                           <span><b className="gw-mono">{i.code}</b><small>{i.kind === 'ap' ? t('g_antenna') : t('g_label')}</small></span>
-                          <button type="button" className="gw-quitar" onClick={() => setItems((s) => s.filter((x) => x.code !== i.code))} title={t('remove')}>{G.trash}</button>
+                        </div>
+                        <div className={`gw-ocupada ${marcar ? 'mal' : ''}`} role="alert">
+                          {G.warn}
+                          <span><b>{i.ocupada ? t('g_busy_t', { ref: i.ocupada }) : t('g_busy_t_other')}</b>
+                            {i.ocupada ? t('g_busy') : t('g_busy_other')}</span>
+                          <button type="button" className="btn sec" onClick={quitar}>{G.trash} {t('g_busy_remove')}</button>
+                        </div>
+                      </div>
+                    )
+                    return (
+                      <div key={i.code} className={`gw-item ${(obligan && faltan) || (i.existe === false && !i.forzada) ? 'falta' : i.existe === true ? 'existe' : ''}`}>
+                        <div className="gw-item-id">
+                          <span className="gw-item-ic">{i.kind === 'ap' ? G.ap : G.tag}</span>
+                          <span><b className="gw-mono">{i.code}</b><small>{i.kind === 'ap' ? t('g_antenna') : t('g_label')}</small>
+                            {i.existe === 'comprobando' && <small className="gw-item-chk">{t('g_checking')}</small>}
+                            {i.existe === true && <small className="gw-item-chk si">{I.check} {t('g_found_short')}</small>}
+                            {i.existe === false && i.forzada && <small className="gw-item-chk no">{t('g_not_found_short')}</small>}</span>
+                          <button type="button" className="gw-quitar" onClick={quitar} title={t('remove')}>{G.trash}</button>
                         </div>
                         <div className="gw-item-f">
                           <Desplegable value={i.issue} options={issueOpts} onChange={(v) => cambiar(i.code, 'issue', v)}
                             placeholder={t('g_issue_pick')} label={t('g_issue_q')} invalid={marcar && !i.issue} />
-                          <textarea className={`inp gw-detalle ${marcar && i.detail.trim().length < DETALLE_MIN ? 'mal' : ''}`} rows={2} value={i.detail} maxLength={300}
+                          <textarea className={`inp gw-detalle ${marcar && faltaDetalle(i) ? 'mal' : ''}`} rows={2} value={i.detail} maxLength={300}
                             onChange={(e) => cambiar(i.code, 'detail', e.target.value)}
-                            placeholder={t(i.issue ? 'g_detail_ph_' + i.issue : 'g_detail_ph')} aria-label={t('g_detail_label')} />
-                          {i.detail.trim().length < DETALLE_MIN && (
+                            placeholder={t(i.issue ? 'g_detail_ph_' + i.issue : 'g_detail_ph') + (i.issue && i.issue !== 'otro' ? ` ${t('g_optional')}` : '')}
+                            aria-label={t('g_detail_label')} />
+                          {i.issue === 'pantalla' && <p className="gw-item-excl">{G.warn}<span>{t('g_issue_pantalla_excl')}</span></p>}
+                          {pidePrueba(i) && i.tried && (
+                            <p className="gw-prueba-ok">{I.check}<span>{t('g_try_done')}</span>
+                              <button type="button" className="linkbtn" onClick={() => cambiar(i.code, 'tried', false)}>{t('g_try_undo')}</button></p>
+                          )}
+                          {faltaDetalle(i) && (
                             <small className={`gw-detalle-n ${marcar ? 'mal' : ''}`}>{t('g_detail_min', { n: DETALLE_MIN - i.detail.trim().length })}</small>
                           )}
                         </div>
@@ -768,8 +1083,25 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
                             <FotoSlot key={tipo} tipo={tipo} kind={i.kind} foto={i.fotos[tipo]}
                               onPick={(f) => ponerFoto(i.code, tipo, f)} onRemove={() => quitarFoto(i.code, tipo)} />
                           ))}
-                          <span className={`gw-fotos-n ${faltan ? '' : 'ok'}`}>{faltan ? t('g_photos_missing', { n: faltan }) : <>{I.check} {t('g_photos_ok')}</>}</span>
+                          <span className={`gw-fotos-n ${!faltan ? 'ok' : obligan ? '' : 'opc'}`}>
+                            {!faltan ? <>{I.check} {t('g_photos_ok')}</> : obligan ? t('g_photos_missing', { n: faltan }) : t('g_photos_optional')}</span>
                         </div>
+                        {/* Ocupa todo el ancho de la tarjeta, debajo (no aprieta la columna del fallo). */}
+                        {faltaPrueba(i) && <PruebaAntes abierta={sinProbar[0]?.code === i.code} marcar={marcar}
+                          onTried={() => probadas([i.code])} onWorks={() => yaFunciona(i.code)} />}
+                        {i.existe === false && !i.forzada && (
+                          <div className={`gw-noexiste ${marcar ? 'mal' : ''}`} role="alert">
+                            {G.warn}
+                            <span><b>{t('g_not_found_t')}</b> {t('g_not_found')}</span>
+                            <span className="gw-noexiste-b">
+                              <button type="button" className="btn sec" onClick={quitar}>{t('remove')}</button>
+                              <button type="button" className="btn" onClick={() => cambiar(i.code, 'forzada', true)}>{t('g_add_anyway')}</button>
+                            </span>
+                          </div>
+                        )}
+                        {i.existe === false && i.forzada && faltan > 0 && (
+                          <p className="gw-noexiste-f">{G.camera} {t('g_not_found_photos')}</p>
+                        )}
                         {i.aviso && <p className="gw-err">{G.warn} {i.aviso}</p>}
                       </div>
                     )
@@ -839,9 +1171,13 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
 
         <div className="gw-paso-pie">
           {paso > 1 ? <button type="button" className="btn sec gw-atras" disabled={!!enviando} onClick={atras}>{I.back} {t('g_back')}</button> : <span />}
-          {paso === 2 && items.length > 0 && (faltanFotos.length > 0 || sinExplicar.length > 0) && (
+          {paso === 2 && items.length > 0 && (ocupadas.length > 0 || faltanFotos.length > 0 || sinExplicar.length > 0 || comprobando.length > 0 || sinConfirmar.length > 0 || sinProbar.length > 0) && (
             <span className="gw-pie-why">{[
+              comprobando.length ? t('g_checking') : '',
+              ocupadas.length ? t(ocupadas.length === 1 ? 'g_busy_block_1' : 'g_busy_block', { n: ocupadas.length }) : '',
+              sinConfirmar.length ? t(sinConfirmar.length === 1 ? 'g_confirm_block_1' : 'g_confirm_block', { n: sinConfirmar.length }) : '',
               sinExplicar.length ? t(sinExplicar.length === 1 ? 'g_details_block_1' : 'g_details_block', { n: sinExplicar.length }) : '',
+              sinProbar.length ? t(sinProbar.length === 1 ? 'g_try_block_1' : 'g_try_block', { n: sinProbar.length }) : '',
               faltanFotos.length ? t(faltanFotos.length === 1 ? 'g_photos_block_1' : 'g_photos_block', { n: faltanFotos.length }) : '',
             ].filter(Boolean).join(' · ')}</span>
           )}
@@ -853,6 +1189,29 @@ export function SolicitarGarantia({ go, onDone, onExpire }) {
         </div>
       </div>
     </div></section>
+  )
+}
+
+/* El protocolo de garantías, paso a paso: primero revisamos las fotos y, según lo que
+   veamos, se sigue (o no hace falta) con el envío, la revisión técnica y el presupuesto.
+   Debajo, lo que no cubre la garantía. En la pantalla de «enviada» y en cada solicitud. */
+function ProcesoGarantia({ code }) {
+  const { t } = useLang()
+  return (
+    <div className="gw-proc">
+      <ol className="gw-ok-pasos">
+        {[1, 2, 3, 4].map((n) => (
+          <li key={n}><b>{n}</b><div><strong>{t(`g_next_${n}_t`)}</strong><Rich tag="div" html={t(`g_next_${n}`, { code })} /></div></li>
+        ))}
+      </ol>
+      <details className="gw-excl">
+        <summary>{G.warn} {t('g_excl_t')}</summary>
+        <p>{t('g_excl_intro')}</p>
+        <ul>{[1, 2, 3, 4, 5].map((n) => <li key={n}>{t('g_excl_' + n)}</li>)}</ul>
+        <Rich tag="p" html={t('g_excl_fisico')} />
+        <Rich tag="p" html={t('g_excl_plazo')} />
+      </details>
+    </div>
   )
 }
 
@@ -878,11 +1237,7 @@ export function GarantiaEnviada({ res, go, onOpen }) {
           <p className="gw-err">{G.warn} {t('g_photos_failed', { list: res.fallidas.slice(0, 6).join(', ') })}</p>
         )}
         <h2 className="gw-ok-h">{t('g_next_steps')}</h2>
-        <ol className="gw-ok-pasos">
-          <li><b>1</b><span><strong>{t('g_next_1_t')}</strong>{t('g_next_1')}</span></li>
-          <li><b>2</b><span><strong>{t('g_next_2_t')}</strong><Rich html={t('g_next_2', { code: res.code })} /></span></li>
-          <li><b>3</b><span><strong>{t('g_next_3_t')}</strong>{t('g_next_3')}</span></li>
-        </ol>
+        <ProcesoGarantia code={res.code} />
         <p className="ok-mail">{I.mail} {t('created_mail_note')}</p>
         <div className="gw-ok-b">
           <button className="btn" onClick={() => onOpen(res.code)}>{t('g_view_request')} {I.arrow}</button>

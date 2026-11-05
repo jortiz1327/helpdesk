@@ -297,7 +297,11 @@ class WarrantiesController extends Controller
             'ticket_visible'  => $w->ticketVisibleTo($request->user()),
             'created_by_name' => $w->created_by_name,
         ], 'notes' => $notes, 'events' => $events, 'messages' => $mensajes, 'items' => $this->items($w->id),
-            'steps' => WarrantySteps::forWarranty($w)]);
+            'steps' => WarrantySteps::forWarranty($w),
+            // Envíos que avisó el cliente desde el portal («Ya lo he enviado»). El correo de
+            // quien avisó es del ticket: solo para quien lo ve.
+            'shipments' => $w->ticket_id ? array_map(fn ($s) => $w->ticketVisibleTo($request->user()) ? $s : ['email' => null] + $s,
+                PortalWarranties::shipments((int) $w->ticket_id)) : []]);
     }
 
     // Marca o desmarca un paso de las listas por tipo de cliente.

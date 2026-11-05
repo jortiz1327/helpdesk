@@ -117,6 +117,7 @@ export const portal = {
   warranties: () => call('warranties'),
   warranty: (code) => call('warranty', { query: { code } }),
   warrantyPlaces: () => call('warranty-places'),
+  warrantyCheck: (codes) => call('warranty-check', { method: 'POST', body: { codes } }),
   warrantyRequest: (data) => call('warranty-request', { method: 'POST', body: data }),
   warrantyPhoto: (ticket, code, type, file) => {
     const fd = new FormData()
@@ -129,6 +130,8 @@ export const portal = {
     files.forEach((f) => fd.append('files[]', f))
     return call('warranty-reply', { method: 'POST', form: fd })
   },
+  // «Ya lo he enviado»: { shipped_on, carrier, tracking, packages, units, note }.
+  warrantyShipment: (code, data) => call('warranty-shipment', { method: 'POST', body: { code, ...data } }),
   // Buscador de direcciones (lo pide el servidor a Google o a OpenStreetMap).
   addressSearch: (q, lang, session) => call('address-search', { query: { q, lang, session } }),
   addressPlace: (id, lang, session) => call('address-place', { query: { id, lang, session } }),

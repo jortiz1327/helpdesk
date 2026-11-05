@@ -57,7 +57,7 @@ class WarrantyResolutionEmailTest extends TestCase
 
     private function enviar(Warranty $w, array $h, array $datos = [])
     {
-        return $this->postJson('/api/warranty_docs.php?action=send_email', $datos + ['id' => $w->id, 'to' => 'compras@hotelsol.com',
+        return $this->postJson('/api/warranty_docs.php?action=send_email', $datos + ['id' => $w->id, 'to' => 'compras@hotelsol.com', 'confirm_other' => true,
             'subject' => 'Resolución de su garantía G-2026-0001', 'body' => "Hola:\n\nYa está revisado.\nUn saludo"], $h);
     }
 
@@ -70,6 +70,9 @@ class WarrantyResolutionEmailTest extends TestCase
         $this->assertSame([null, 'whatsapp', true], [$m['to'], $m['ticket']['channel'], $m['can_send']]);
 
         $this->enviar($w, $h, ['to' => 'no-es-correo'])->assertStatus(400);
+        // Un correo que no es de este cliente (aquí el ticket es de WhatsApp: no hay ninguno) pide confirmarlo.
+        $this->enviar($w, $h, ['to' => 'compras@hotelsol.com', 'confirm_other' => false])->assertStatus(409)->assertJsonPath('needs_confirm', true);
+        $this->assertSame([], $this->enviados);
         $this->enviar($w, $h, ['to' => ' Compras@HotelSol.com '])->assertOk()->assertJson(['ticket' => 'TK-2611-0001']);
 
         $this->assertCount(1, $this->enviados);
@@ -80,9 +83,10 @@ class WarrantyResolutionEmailTest extends TestCase
         $this->assertSame(1, DB::table('warranty_events')->where('warranty_id', $w->id)->where('field', 'documents')
             ->where('to_value', 'Correo de resolución enviado a compras@hotelsol.com desde el ticket TK-2611-0001')->count());
 
-        // La próxima vez sale propuesto.
+        // La próxima vez sale propuesto, y ya no pide confirmación.
         $m = $this->getJson("/api/warranty_docs.php?action=email&id={$w->id}", $h)->json();
         $this->assertSame(['compras@hotelsol.com', 'Usado antes en esta garantía'], [$m['to'], $m['suggestions'][0]['label']]);
+        $this->enviar($w, $h, ['confirm_other' => false])->assertOk();
     }
 
     public function test_con_el_informe_adjunto(): void

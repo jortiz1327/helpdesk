@@ -553,6 +553,32 @@ function Avisos({ cfg, users, porDefecto, hacer }) {
   )
 }
 
+/* Avisos al cliente: un correo corto con el enlace al portal en las fases que le importan. */
+function AvisosCliente({ cfg, fases, hacer }) {
+  const [v, setV] = useState(cfg)
+  useEffect(() => setV(cfg), [cfg])
+  const cambiado = JSON.stringify(v) !== JSON.stringify(cfg)
+  return (
+    <Card title="Avisos al cliente" sub="Cuando su garantía cambia de fase, el cliente recibe un correo corto con el botón «Ver mi garantía» del portal. Una sola vez por garantía y fase."
+      foot={(
+        <div className="ws-foot">
+          <span className="dev-mute">Va al correo del cliente de la garantía o, si no tiene, al del ticket si es de correo. A WhatsApp no. Sale del buzón de soporte.</span>
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(cfg)}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado} onClick={() => hacer('client_notices_save', v, 'Avisos al cliente guardados')}><Icon.save /> Guardar</button>
+        </div>
+      )}>
+      <div className="ws-body ws-avisos">
+        {fases.map((f) => (
+          <div key={f.key} className="ws-aviso">
+            <label className="wr-check"><input type="checkbox" checked={!!v[f.key]} onChange={(e) => setV((x) => ({ ...x, [f.key]: e.target.checked }))} /> <b>{f.label}</b></label>
+            <p className="dev-mute">{f.when}. Asunto: «{f.subject}».</p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 /* Tour guiado: el título y el texto de cada paso (qué se señala lo fija la app). */
 function TourTextos({ steps, hacer }) {
   const [v, setV] = useState(steps)
@@ -627,6 +653,7 @@ const SECCIONES = [
     ['urgencias', 'Urgencias', Icon.bolt, (d) => d.urgencies.length],
     ['alertas', 'Alertas', Icon.bell, (d) => d.alerts.filter((r) => r.active).length],
     ['avisos', 'Avisos de alertas', Icon.mail, (d) => [d.notices.bell && 'Campana', d.notices.email && 'Correo'].filter(Boolean).join(' · ') || 'No'],
+    ['avisos_cliente', 'Avisos al cliente', Icon.mail, (d) => Object.values(d.client_notices).filter(Boolean).length || 'No'],
     ['pasos', 'Pasos por tipo de cliente', Icon.check, (d) => d.checklists.filter((l) => l.active).length],
     ['motivos', 'Motivos de cierre', Icon.lock, (d) => d.close_reasons.filter((r) => r.active).length],
   ]],
@@ -694,7 +721,8 @@ export default function WarrantySettings() {
               {sec === 'urgencias' && <Urgencias list={d.urgencies} />}
               {sec === 'alertas' && <Alertas list={d.alerts} hacer={hacer} />}
               {sec === 'avisos' && <Avisos cfg={d.notices} users={d.notice_users} porDefecto={d.notice_default_to} hacer={hacer} />}
-              {sec === 'plantillas' && <Plantillas list={d.templates} hacer={hacer} />}
+              {sec === 'avisos_cliente' && <AvisosCliente cfg={d.client_notices} fases={d.client_notice_phases} hacer={hacer} />}
+              {sec === 'plantillas' &&<Plantillas list={d.templates} hacer={hacer} />}
               {sec === 'plazos' && <Plazos terms={d.terms} refs={d.term_references} categorias={d.categories} hacer={hacer} />}
               {sec === 'documentos' && <Documentos docs={d.docs} grupos={d.block_groups} hacer={hacer} />}
               {sec === 'motivos' && <MotivosCierre list={d.close_reasons} hacer={hacer} />}

@@ -163,6 +163,11 @@ class WarrantyDocumentsController extends Controller
      * (lo del ticket solo si quien pregunta lo ve en el Helpdesk), y los que se pueden
      * sugerir (también los del cliente en el portal AEME).
      */
+    private function correoConocido(Warranty $w, $me, string $email): bool
+    {
+        return collect($this->correosCliente($w, $me)['suggestions'])->contains('email', mb_strtolower($email));
+    }
+
     private function correosCliente(Warranty $w, $me): array
     {
         $t = $w->ticketVisibleTo($me) ? DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
@@ -192,7 +197,9 @@ class WarrantyDocumentsController extends Controller
         $me = $request->user();
         return response()->json(['ok' => true, 'items' => $items, 'asks_ticket' => WarrantyReplacements::asksTicket($w),
             'category' => $w->category, 'positions_ticket' => $t ? ['id' => $t->id, 'code' => $t->code, 'visible' => Warranty::canSeeTicket($me, $t->id)] : null,
-            'email' => $this->correosCliente($w, $me)]);
+            // Los correos del cliente (y los de su empresa en el portal), solo a quien prepara
+            // los documentos, como en la acción `email`: quien solo consulta no los ve.
+            'email' => $me->can('warranties.documents') ? $this->correosCliente($w, $me) : null]);
     }
 
     private function replacementsLookup(Request $request)
@@ -239,6 +246,11 @@ class WarrantyDocumentsController extends Controller
         $w = Warranty::findOrFail((int) $request->input('id'));
         $email = trim((string) $request->input('email'));
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) return response()->json(['ok' => false, 'error' => 'El correo del cliente no es válido'], 400);
+        // El ticket queda a nombre de ese contacto (y lo crea si no existe): uno que no es de
+        // este cliente solo con confirmación expresa.
+        if (! $this->correoConocido($w, $request->user(), $email) && ! $request->boolean('confirm_other')) {
+            return response()->json(['ok' => false, 'needs_confirm' => true, 'error' => "{$email} no es un correo conocido de este cliente: confírmalo antes de crear el ticket"], 409);
+        }
         $r = WarrantyReplacements::createTicket($w, $email, $request->user());
         return is_string($r) ? response()->json(['ok' => false, 'error' => $r], 400) : response()->json(['ok' => true] + $r);
     }
@@ -289,19 +301,8 @@ class WarrantyDocumentsController extends Controller
             return response()->json(['ok' => false, 'error' => 'Faltan el asunto o el texto'], 400);
         }
 
-        $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
-            ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')->where('t.id', $w->ticket_id)
-            ->first(['t.id', 't.code', 't.subject', 't.assigned_to', 't.contact_id', 'c.name as contact_name', 'c.wa_id as contact_wa',
-                'cat.signature as cat_signature', 'cat.name as category_name']);
-        // Las mismas reglas que al responder en el Helpdesk: el ticket de otro agente, no.
-        if (! $me->can('tickets.view_all') && $t->assigned_to && (int) $t->assigned_to !== (int) $me->id) {
-            $otro = DB::table('users')->where('id', $t->assigned_to)->value('name') ?: 'otro agente';
-            return response()->json(['ok' => false, 'error' => "El ticket {$t->code} lo tiene {$otro}: pídele que lo envíe o que te lo pase."], 403);
-        }
-        if ($quien = app(TicketLockService::class)->blockedBy((int) $t->id, (int) $me->id)) {
-            return response()->json(['ok' => false, 'error' => "{$quien} está atendiendo el ticket {$t->code} ahora mismo"], 409);
-        }
-        $t->contact_email = $to;
+        [$t, $no] = $this->ticketParaEnviar($request, $w, $me, $to);
+        if ($no) return $no;
         $t->subject = $asunto;   // la respuesta lleva [código del ticket] para volver al mismo hilo
 
         $adjuntos = null;
@@ -323,5 +324,31 @@ class WarrantyDocumentsController extends Controller
         $w->forceFill(['customer_email' => $to])->save();
         WarrantyDocuments::evento($w->id, $me->id, "Correo de resolución enviado a {$to} desde el ticket {$t->code}" . ($adjuntos ? ' (con el informe)' : ''));
         return response()->json(['ok' => true, 'ticket' => $t->code]);
+    }
+
+    /**
+     * El ticket de la garantía listo para responder por correo a $to, con las mismas reglas
+     * que responder en el Helpdesk (el ticket de otro agente no; si alguien lo está
+     * atendiendo, tampoco) y confirmación si el correo no es de este cliente. [ticket, error].
+     */
+    private function ticketParaEnviar(Request $request, Warranty $w, $me, string $to): array
+    {
+        $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+            ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')->where('t.id', $w->ticket_id)
+            ->first(['t.id', 't.code', 't.subject', 't.assigned_to', 't.contact_id', 'c.name as contact_name', 'c.wa_id as contact_wa',
+                'cat.signature as cat_signature', 'cat.name as category_name']);
+        if (! $t) return [null, response()->json(['ok' => false, 'error' => 'El ticket de la garantía ya no existe'], 404)];
+        if (! $me->can('tickets.view_all') && $t->assigned_to && (int) $t->assigned_to !== (int) $me->id) {
+            $otro = DB::table('users')->where('id', $t->assigned_to)->value('name') ?: 'otro agente';
+            return [null, response()->json(['ok' => false, 'error' => "El ticket {$t->code} lo tiene {$otro}: pídele que lo envíe o que te lo pase."], 403)];
+        }
+        if ($quien = app(TicketLockService::class)->blockedBy((int) $t->id, (int) $me->id)) {
+            return [null, response()->json(['ok' => false, 'error' => "{$quien} está atendiendo el ticket {$t->code} ahora mismo"], 409)];
+        }
+        if (! $this->correoConocido($w, $me, $to) && ! $request->boolean('confirm_other')) {
+            return [null, response()->json(['ok' => false, 'needs_confirm' => true, 'error' => "{$to} no es un correo conocido de este cliente: confírmalo antes de enviar"], 409)];
+        }
+        $t->contact_email = $to;
+        return [$t, null];
     }
 }

@@ -805,16 +805,16 @@ function TicketBehavior() {
       <div className="card em-card" style={{ marginTop: 16 }}>
         <h2>Evitar colisión de agentes</h2>
         <p className="em-desc">
-          Cuando un agente abre un ticket, queda <b>tomado</b> durante estos minutos: los demás lo ven ocupado
-          y no pueden responder a la vez. Se libera solo al cerrarlo o al agotarse el tiempo, así que
-          nadie deja un ticket atascado.
+          Mientras un agente tiene un ticket abierto, queda <b>tomado</b>: los demás lo ven ocupado
+          y no pueden responder a la vez. Se suelta al cerrarlo, al cerrar la pestaña o el navegador,
+          y también si lo deja abierto sin tocar nada durante estos minutos.
         </p>
-        <label className="field" style={{ maxWidth: 220 }}><span className="lbl">Minutos de bloqueo</span>
+        <label className="field" style={{ maxWidth: 220 }}><span className="lbl">Minutos sin actividad</span>
           <input type="number" min="0" max="60" value={f.ticket_lock_minutes}
             onChange={(e) => setF((s) => ({ ...s, ticket_lock_minutes: e.target.value }))} /></label>
         <p className="ct-hint">
           {Number(f.ticket_lock_minutes) > 0
-            ? `Un ticket abierto quedará tomado ${f.ticket_lock_minutes} minuto(s).`
+            ? `Si el agente no toca nada en ${f.ticket_lock_minutes} minuto(s), el ticket se libera solo.`
             : 'Con 0 el bloqueo queda desactivado: cualquiera puede responder en cualquier momento.'}
         </p>
       </div>

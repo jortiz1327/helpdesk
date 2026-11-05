@@ -525,6 +525,12 @@
   /* Mensaje del cliente: tarjeta limpia con acento a la izquierda. */
   .tl-bubble{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--brand);
     border-radius:6px 12px 12px 6px;padding:12px 15px;font-size:14.5px;line-height:1.55;box-shadow:var(--shadow)}
+  /* Los párrafos y listas de una respuesta, con su aire (el reset global los deja pegados). */
+  .tl-bubble p,.tl-bubble ul,.tl-bubble ol,.tl-bubble blockquote{margin:0 0 .8em}
+  .tl-bubble > :last-child{margin-bottom:0}
+  .tl-bubble ul,.tl-bubble ol{padding-left:1.3em}
+  .tl-bubble li{margin:.2em 0}
+  .tl-bubble blockquote{padding:8px 12px;border-left:3px solid var(--line);background:var(--surface-2);border-radius:0 8px 8px 0}
   /* Un CORREO va aislado en un iframe (su HTML no puede romper el portal). El
      «papel» es solo el marco blanco; el alto lo fija el propio iframe al medirse. */
   .tl-paper{border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);background:#fff;max-width:100%}
