@@ -152,6 +152,21 @@ class WarrantyCloudItemTest extends TestCase
         $this->postJson($url, ['id' => $w->id, 'remove' => true], $tok)->assertOk()->assertJsonPath('cloud_label', null);
     }
 
+    public function test_la_de_siempre_se_ofrece_en_otra_garantia(): void
+    {
+        config(['services.warranty_cloud.store_id' => '555']);
+        $a = $this->garantia();
+        $b = Warranty::create(['code' => 'G-2026-0008', 'status' => 'no_iniciado', 'client_name' => 'Otro', 'last_activity_at' => now(), 'status_changed_at' => now()]);
+        $this->assertNull(WarrantyCloudItem::usual($b));                       // nunca se ha usado ninguna
+
+        WarrantyCloudItem::pair($a, '874D61962');
+        $this->assertSame(['code' => '874D61962', 'warranty_id' => $a->id, 'warranty_code' => 'G-2026-0007'], WarrantyCloudItem::usual($b));
+        $this->assertNull(WarrantyCloudItem::usual($a->fresh()));             // ya la tiene esta
+
+        WarrantyCloudItem::unpair($a->fresh());                                  // queda libre: se sigue ofreciendo
+        $this->assertSame(['code' => '874D61962', 'warranty_id' => null, 'warranty_code' => null], WarrantyCloudItem::usual($b));
+    }
+
     public function test_si_zkong_rechaza_el_producto_no_rompe(): void
     {
         config(['services.warranty_cloud.store_id' => '555']);

@@ -268,7 +268,7 @@ function barra(x, y, w, h) {
   return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`
 }
 
-export function WarrantyReports() {
+export function WarrantyReports({ head = null }) {
   const [rango, setRango] = useState('anio')
   const [[desde, hasta], setFechas] = useState(RANGOS[3][2]())
   const [grupo, setGrupo] = useState('status')
@@ -330,7 +330,7 @@ export function WarrantyReports() {
 
   return (
     <>
-      <Cabecera icon={Icon.chart} title="Informes" sub={`Garantías recibidas ${periodo}`} />
+      {head || <Cabecera icon={Icon.chart} title="Informes" sub={`Garantías recibidas ${periodo}`} />}
       <div className="page-scroll"><div className="page dev-page wr-page wi-page">
         <div className="wt-filtros">
           <div className="dc-seg">{RANGOS.map((r) => <button key={r[0]} className={rango === r[0] ? 'on' : ''} onClick={() => elegirRango(r)}>{r[1]}</button>)}</div>

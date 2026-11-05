@@ -146,6 +146,26 @@ class WarrantyCloudItem
         self::evento($w->id, $esl, null, "Etiqueta de almacén {$esl} quitada");
     }
 
+    /**
+     * La etiqueta de almacén de siempre (la última usada) para ofrecerla en otra garantía:
+     * ['code', 'warranty_id', 'warranty_code'] si la enseña otra garantía ahora mismo
+     * (al emparejarla aquí se le quita a aquella), o solo 'code' si quedó libre. Null si
+     * nunca se ha usado ninguna.
+     */
+    public static function usual(Warranty $w): ?array
+    {
+        $ahora = Warranty::whereNotNull('cloud_label')->where('cloud_label', '!=', '')
+            ->orderByDesc('cloud_label_at')->orderByDesc('id')->first(['id', 'code', 'cloud_label']);
+        if ($ahora) {
+            return $ahora->id === $w->id ? null
+                : ['code' => $ahora->cloud_label, 'warranty_id' => $ahora->id, 'warranty_code' => $ahora->code];
+        }
+        // Ninguna la enseña ahora: la última que se quitó o se cambió.
+        $libre = DB::table('warranty_events')->where('field', 'cloud_label')->whereNotNull('from_value')->where('from_value', '!=', '')
+            ->orderByDesc('id')->value('from_value');
+        return $libre ? ['code' => $libre, 'warranty_id' => null, 'warranty_code' => null] : null;
+    }
+
     private static function unbind(ZkongClient $c, string $esl, string $code): void
     {
         $c->post('/bind/batchUnbind', [

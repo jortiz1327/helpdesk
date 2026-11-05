@@ -43,7 +43,8 @@ import Devices from "./components/Devices.jsx";
 import Zkong from "./components/Zkong.jsx";
 import WarrantyInbox from "./components/WarrantyInbox.jsx";
 import WarrantySettings from "./components/WarrantySettings.jsx";
-import { WarrantyTeam, WarrantyReports } from "./components/WarrantyTeam.jsx";
+import { WarrantyTeam } from "./components/WarrantyTeam.jsx";
+import WarrantyStats from "./components/WarrantyStats.jsx";
 import WarrantyClients from "./components/WarrantyClients.jsx";
 import DeviceCatalog from "./components/DeviceCatalog.jsx";
 import ZkongServers from "./components/ZkongServers.jsx";
@@ -654,6 +655,19 @@ const AREAS = [
         home: "devices",
         groups: [
             {
+                // Arriba del todo, fuera de los apartados: fallos de los dispositivos,
+                // presupuestos y envíos del portal e informe de expedientes.
+                items: [
+                    {
+                        key: "garantias_informes",
+                        label: "Estadísticas",
+                        icon: Icon.chart,
+                        perm: "warranties.access",
+                        color: "#12925a",
+                    },
+                ],
+            },
+            {
                 // Expedientes y la bandeja de tickets de categoría Garantías (de donde el
                 // agente crea la garantía a mano). La bandeja exige también soporte.
                 title: "Garantías",
@@ -679,13 +693,6 @@ const AREAS = [
                         icon: Icon.user,
                         perm: "warranties.access",
                         color: "#0891b2",
-                    },
-                    {
-                        key: "garantias_informes",
-                        label: "Informes",
-                        icon: Icon.chart,
-                        perm: "warranties.access",
-                        color: "#12925a",
                     },
                     {
                         // Solo consulta: garantías de aquí y documentos del portal AEME.
@@ -1707,7 +1714,7 @@ export default function App() {
                         )}
                         {view === "zkong_servers" && can("warranties.servers") && <ZkongServers />}
                         {view === "garantias" && can("warranties.access") && (
-                            <Warranties openId={garantiaAbierta} onOpened={() => setGarantiaAbierta(null)} filtro={garantiaFiltro}
+                            <Warranties openId={garantiaAbierta} onOpened={() => setGarantiaAbierta(null)} filtro={garantiaFiltro} user={auth.user}
                                 onGoGuides={() => setView("garantias_guias")}
                                 onOpenTicket={can("helpdesk.access") ? (id) => { setTicketGarantia(id); setView("garantias_tickets"); } : null} />
                         )}
@@ -1720,7 +1727,7 @@ export default function App() {
                         {view === "garantias_equipo" && can("warranties.access") && (
                             <WarrantyTeam onFilter={(f) => { setGarantiaFiltro({ ...f }); setView("garantias"); }} />
                         )}
-                        {view === "garantias_informes" && can("warranties.access") && <WarrantyReports />}
+                        {view === "garantias_informes" && can("warranties.access") && <WarrantyStats />}
                         {view === "garantias_clientes" && can("warranties.access") && (
                             <WarrantyClients onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
                         )}

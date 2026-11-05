@@ -63,6 +63,8 @@ class WarrantiesController extends Controller
             'ticket_images'     => $this->ticketImages($request),
             'team'              => $this->team($request),
             'report'            => $this->report($request),
+            'failures'          => $this->failures($request),
+            'portal_stats'      => $this->portalStats($request),
             'step'              => $this->step($request),
             'cloud_label'       => $this->cloudLabel($request),
             'tour'              => $this->tour($request),
@@ -301,7 +303,8 @@ class WarrantiesController extends Controller
             'created_by_name' => $w->created_by_name,
         ], 'notes' => $notes, 'events' => $events, 'messages' => $mensajes, 'items' => $this->items($w->id),
             'steps' => WarrantySteps::forWarranty($w),
-            'cloud' => ['enabled' => \App\Services\WarrantyCloudItem::canPair()],
+            'cloud' => ['enabled' => \App\Services\WarrantyCloudItem::canPair(),
+                'usual' => \App\Services\WarrantyCloudItem::canPair() ? \App\Services\WarrantyCloudItem::usual($w) : null],
             // Envíos que avisó el cliente desde el portal («Ya lo he enviado»). El correo de
             // quien avisó es del ticket: solo para quien lo ve.
             'shipments' => $w->ticket_id ? array_map(fn ($s) => $w->ticketVisibleTo($request->user()) ? $s : ['email' => null] + $s,
@@ -509,6 +512,8 @@ class WarrantiesController extends Controller
             // Si el ticket vino del formulario de garantías del portal: el fallo que contó
             // el cliente y sus fotos pasan solos a cada dispositivo.
             PortalWarranties::applyToItems($w, $r['added'], $userId);
+            // Al añadirlas se buscan en el Cloud: eso ya es «comprobarlas».
+            WarrantySteps::auto($w, 'cloud', $userId);
         }
         return $r;
     }
@@ -517,6 +522,7 @@ class WarrantiesController extends Controller
     {
         $w = Warranty::findOrFail((int) $request->input('id'));
         $this->labels()->recheck($w, $request->user()->id);
+        WarrantySteps::auto($w, 'cloud', $request->user()->id);
         return response()->json(['ok' => true]);
     }
 
@@ -681,6 +687,7 @@ class WarrantiesController extends Controller
         $this->evento($w->id, $request->user()->id, 'review', null,
             WarrantyItem::RESOLUTIONS[$res]['label'] . ' (' . $items->count() . '): ' . $this->lista($items->pluck('code')->all()));
         $w->forceFill(['last_activity_at' => now()])->save();
+        WarrantySteps::auto($w, 'revision', $request->user()->id);
 
         return response()->json(['ok' => true, 'items' => $this->items($w->id)]);
     }
@@ -1047,6 +1054,25 @@ class WarrantiesController extends Controller
     }
 
     private const REPORT_GROUPS = ['status', 'urgency', 'category', 'responsible', 'client', 'month', 'close_reason'];
+
+    /** Estadísticas: lo repuesto en los albaranes de garantía del portal frente a lo vendido. */
+    private function failures(Request $request)
+    {
+        $f = ['kind' => (string) $request->query('kind', ''), 'client' => (int) $request->query('client') ?: null];
+        foreach (['from', 'to'] as $k) if ($this->esFecha($v = (string) $request->query($k, ''))) $f[$k] = $v;
+        $r = \App\Services\PortalWarrantyFailures::report($f);
+        return $r === null ? response()->json(['ok' => false, 'error' => 'El portal AEME no responde ahora mismo. Prueba en un rato.'], 502)
+            : response()->json(['ok' => true] + $r);
+    }
+
+    /** Estadísticas: presupuestos, envíos y facturas de los proyectos de garantía del portal. */
+    private function portalStats(Request $request)
+    {
+        $d = fn ($k) => $this->esFecha($v = (string) $request->query($k, '')) ? $v : null;
+        $r = \App\Services\PortalWarrantyStats::report($d('from'), $d('to'), (int) $request->query('client') ?: null);
+        return $r === null ? response()->json(['ok' => false, 'error' => 'El portal AEME no responde ahora mismo. Prueba en un rato.'], 502)
+            : response()->json(['ok' => true] + $r);
+    }
 
     /**
      * Informe de las garantías recibidas en un rango: totales, tiempo medio hasta el

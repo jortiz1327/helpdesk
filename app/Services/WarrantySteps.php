@@ -19,8 +19,8 @@ class WarrantySteps
     // De serie, sacados de los procedimientos de garantías: se cambian en Configuración.
     public const DEFAULTS = [
         ['id' => 'general', 'name' => 'Todas', 'active' => true, 'all' => true, 'categories' => [], 'clients' => [], 'steps' => [
-            ['id' => 'g1', 'text' => 'Comprobar las etiquetas en ZKONG'],
-            ['id' => 'g2', 'text' => 'Revisar los dispositivos y hacer las fotos'],
+            ['id' => 'g1', 'text' => 'Comprobar las etiquetas en el Cloud', 'auto' => 'cloud'],
+            ['id' => 'g2', 'text' => 'Revisar los dispositivos y hacer las fotos', 'auto' => 'revision'],
             ['id' => 'g3', 'text' => 'Avisar a Finanzas de los presupuestos'],
             ['id' => 'g4', 'text' => 'Enviar el correo de resolución'],
         ]],
@@ -63,10 +63,47 @@ class WarrantySteps
             if (! self::applies($l, $w)) continue;
             $out[] = ['id' => $l['id'], 'name' => $l['name'], 'steps' => array_map(function ($s) use ($l, $hechos) {
                 $h = $hechos["{$l['id']}|{$s['id']}"] ?? null;
-                return ['id' => $s['id'], 'text' => $s['text'], 'done_at' => $h ? (string) $h->checked_at : null, 'done_by' => $h->name ?? null];
+                return ['id' => $s['id'], 'text' => $s['text'], 'auto' => self::autoDe($l, $s),
+                    'done_at' => $h ? (string) $h->checked_at : null, 'done_by' => $h ? ($h->name ?? 'Automático') : null];
             }, $l['steps'])];
         }
         return $out;
+    }
+
+    public const AUTOS = ['cloud' => 'Al comprobar las etiquetas en el Cloud', 'revision' => 'Al revisar todas las etiquetas'];
+
+    /*
+     * Qué marca solo un paso: 'cloud' (se comprueban las etiquetas en el Cloud) o 'revision'
+     * (todas revisadas). Los dos primeros de «Todas» lo traen de serie aunque la lista se
+     * guardara antes de existir esto.
+     */
+    private static function autoDe(array $l, array $s): ?string
+    {
+        if (array_key_exists('auto', $s)) return isset(self::AUTOS[$s['auto']]) ? $s['auto'] : null;
+        return $l['id'] === 'general' ? (['g1' => 'cloud', 'g2' => 'revision'][$s['id']] ?? null) : null;
+    }
+
+    /**
+     * Marca solos los pasos de ese disparador que aún no están hechos (con una línea en el
+     * historial). Con 'revision' solo si todas las etiquetas tienen ya su revisión.
+     */
+    public static function auto(Warranty $w, string $trigger, ?int $userId): void
+    {
+        if ($trigger === 'revision') {
+            $q = DB::table('warranty_items')->where('warranty_id', $w->id);
+            if (! (clone $q)->exists() || (clone $q)->where('resolution', 'pendiente')->exists()) return;
+        }
+        foreach (self::settings() as $l) {
+            if (! self::applies($l, $w)) continue;
+            foreach ($l['steps'] as $s) {
+                if (self::autoDe($l, $s) !== $trigger) continue;
+                $clave = ['warranty_id' => $w->id, 'list_id' => $l['id'], 'step_id' => $s['id']];
+                if (DB::table('warranty_step_checks')->where($clave)->exists()) continue;
+                DB::table('warranty_step_checks')->insert($clave + ['user_id' => $userId, 'checked_at' => now()]);
+                DB::table('warranty_events')->insert(['warranty_id' => $w->id, 'user_id' => $userId, 'field' => 'steps',
+                    'from_value' => null, 'to_value' => mb_substr("✓ {$s['text']} ({$l['name']}) · automático", 0, 500), 'created_at' => now()]);
+            }
+        }
     }
 
     /** Marca o desmarca un paso (deja línea en el historial). Error en texto, o null. */
@@ -115,7 +152,7 @@ class WarrantySteps
                 if ($t === '') continue;
                 $pid = preg_match('/^[a-z0-9_-]{1,20}$/', (string) ($s['id'] ?? '')) && ! isset($pids[$s['id']]) ? $s['id'] : substr('s' . bin2hex(random_bytes(6)), 0, 13);
                 $pids[$pid] = true;
-                $pasos[] = ['id' => $pid, 'text' => $t];
+                $pasos[] = ['id' => $pid, 'text' => $t] + (array_key_exists('auto', $s) ? ['auto' => isset(self::AUTOS[$s['auto']]) ? $s['auto'] : null] : []);
             }
             if (! $pasos) return [null, "«{$nombre}» no tiene pasos"];
             if (count($pasos) > self::MAX_STEPS) return [null, "«{$nombre}»: como mucho " . self::MAX_STEPS . ' pasos'];

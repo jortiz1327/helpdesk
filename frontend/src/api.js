@@ -453,6 +453,8 @@ export const api = {
   }),
   warrantyTeam: (p = {}) => req(`warranties.php?action=team&from=${p.from || ''}&to=${p.to || ''}`),
   warrantyReport: (params) => req('warranties.php?action=report&' + new URLSearchParams(params).toString()),
+  warrantyFailures: (params) => req('warranties.php?action=failures&' + new URLSearchParams(params).toString()),
+  warrantyPortalStats: (params) => req('warranties.php?action=portal_stats&' + new URLSearchParams(params).toString()),
   // Clientes y proyectos (solo consulta). key = «p:<cliente del portal>» o «n:<nombre>».
   warrantyClients: () => req('warranty_clients.php'),
   warrantyClient: (key, fresh = false) => req(`warranty_clients.php?action=get&key=${encodeURIComponent(key)}${fresh ? '&fresh=1' : ''}`),

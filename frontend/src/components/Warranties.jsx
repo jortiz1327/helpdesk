@@ -9,6 +9,7 @@ import { FichaDispositivo } from './Devices.jsx'
 import WarrantyDocuments from './WarrantyDocuments.jsx'
 import { GuiasRelacionadas } from './WarrantyGuides.jsx'
 import { leerCodigos } from '../barcode.js'
+import { TicketModal } from './Tickets.jsx'
 
 /* -------------------------------------------------------------------------
  * GARANTÍAS (Gestión de garantías). Expedientes G-AAAA-NNNN.
@@ -574,16 +575,17 @@ function diagnostico(r) {
   const ref = (r.checked_at && aFecha(r.checked_at)) || new Date()
   const min = r.last_commu_at ? (ref - aFecha(r.last_commu_at)) / 60000 : null
   if (r.battery != null && r.battery < BATERIA_PILAS) {
-    return { tone: 'warn', key: 'pilas', text: `Batería al ${r.battery} %: seguramente son las pilas. Que el cliente las cambie (Beidongli, HenliMax o NSN) antes de enviarla.` }
+    return { tone: 'warn', key: 'pilas', corto: 'Seguramente las pilas', text: `Batería al ${r.battery} %: casi seguro son las pilas. Pide al cliente que las cambie (Beidongli, HenliMax o NSN) antes de que la envíe.` }
   }
   if (r.ap_signal != null && r.ap_signal < SENAL_MALA) {
-    return { tone: 'warn', key: 'senal', text: `Señal con la antena al ${r.ap_signal} %: llega mal. Suele ser cobertura o la antena, no la etiqueta: revisa dónde está antes de pedir el envío.` }
+    return { tone: 'warn', key: 'senal', corto: 'Llega mala señal', text: `Señal con la antena al ${r.ap_signal} %: llega mal. Suele ser la cobertura o la antena, no la etiqueta: mira dónde está colocada antes de pedir que la envíe.` }
   }
   if (!r.online || min == null || min > 24 * 60) {
-    return { tone: 'bad', key: 'muda', text: 'No comunica con el servidor: encaja con una avería. Seguir con el envío.' }
+    const d = r.last_commu_at ? Math.floor(min / 1440) : null
+    return { tone: 'bad', key: 'muda', corto: 'Parece averiada', text: `No se conecta al Cloud${d ? ` desde hace ${d} ${d === 1 ? 'día' : 'días'}` : ''}. Lo normal es que esté averiada: pide al cliente que la envíe para revisarla.` }
   }
   if (min <= RECIENTE_MIN && (r.battery == null || r.battery >= BATERIA_PILAS) && (r.ap_signal == null || r.ap_signal >= SENAL_JUSTA)) {
-    return { tone: 'info', key: 'bien', text: 'Comunica bien con el servidor (batería y señal correctas). Aun así puede fallar la pantalla: pide una foto o fuérzala antes de pedir el envío.' }
+    return { tone: 'info', key: 'bien', corto: 'Se conecta bien', text: 'Se conecta bien al Cloud, con batería y señal correctas. Aun así la pantalla puede fallar: pide una foto o fuérzala antes de pedir que la envíe.' }
   }
   return null
 }
@@ -593,7 +595,7 @@ function Diagnostico({ r, onPilas }) {
   if (!d) return null
   return (
     <p className={`wr-diag t-${d.tone}`}>
-      {d.tone === 'info' ? <Icon.check /> : <Icon.warn />}<span><b>ZKONG:</b> {d.text}</span>
+      {d.tone === 'info' ? <Icon.check /> : <Icon.warn />}<span><b>Qué indica el Cloud:</b> {d.text}</span>
       {d.key === 'pilas' && onPilas && r.resolution === 'pendiente'
         ? <button className="dev-btn" onClick={onPilas}>Marcar «Batería baja»</button> : null}
     </p>
@@ -601,7 +603,7 @@ function Diagnostico({ r, onPilas }) {
 }
 
 function Donde({ r }) {
-  if (r.lookup_state === 'not_found') return <span className="wr-st bad">No aparece en los servidores</span>
+  if (r.lookup_state === 'not_found') return <span className="wr-st bad">No aparece en el Cloud</span>
   if (r.lookup_state !== 'found') return <span className="wr-st warn">Sin comprobar</span>
   const d = dias(r.last_commu_at)
   return (
@@ -636,7 +638,7 @@ function Modelo({ r, onPick }) {
     <div className="wr-modelo">
       <span><b>{r.aeme_ref || r.server_model || '—'}</b>{r.model_manual ? <em className="wr-mano-tag">a mano</em> : null}
         {onPick ? <button className="icon-btn sm" title={r.aeme_ref ? 'Cambiar producto' : 'Elegir el producto del portal'} onClick={abrir}><Icon.pencil /></button> : null}</span>
-      <small>{r.aeme_ref ? r.product_name || '' : r.server_model ? 'Modelo de ZKONG · sin producto del portal' : ''}</small>
+      <small>{r.aeme_ref ? r.product_name || '' : r.server_model ? 'Modelo del Cloud · sin producto del portal' : ''}</small>
     </div>
   )
 }
@@ -935,8 +937,8 @@ function antiguedad(d) {
 /* Plazo de garantía de un dispositivo: la fecha de alta SIEMPRE (dato informativo, para
    tenerlo en cuenta al revisar) y, si está fuera de plazo, la marca. */
 function Plazo({ t }) {
-  if (!t) return <em className="wr-term alta none" title="ZKONG no da la fecha de alta de este dispositivo">Alta: sin fecha</em>
-  const desde = t.source === 'manual' ? 'Instalada (fecha de la garantía)' : 'Alta en ZKONG'
+  if (!t) return <em className="wr-term alta none" title="El Cloud no da la fecha de alta de este dispositivo">Alta: sin fecha</em>
+  const desde = t.source === 'manual' ? 'Instalada (fecha de la garantía)' : 'Alta en el Cloud'
   const tit = `${desde} el ${fecha(t.installed_at)} (${antiguedad(t.installed_at)}) · hardware hasta el ${fecha(t.hardware_until)} · pilas hasta el ${fecha(t.battery_until)}`
   return (
     <>
@@ -951,9 +953,9 @@ function Plazo({ t }) {
 function AltaZkong({ items }) {
   const fechas = items.map((i) => i.term?.installed_at).filter(Boolean).sort()
   const sin = items.length - fechas.length
-  if (!fechas.length) return <p className="wr-rev-alta dev-mute"><Icon.clock /> ZKONG no da la fecha de alta {items.length === 1 ? 'de este dispositivo' : 'de estos dispositivos'}.</p>
+  if (!fechas.length) return <p className="wr-rev-alta dev-mute"><Icon.clock /> El Cloud no da la fecha de alta {items.length === 1 ? 'de este dispositivo' : 'de estos dispositivos'}.</p>
   const manual = items.some((i) => i.term?.source === 'manual')
-  const que = manual ? 'Instalación (fecha de la garantía)' : 'Alta en ZKONG'
+  const que = manual ? 'Instalación (fecha de la garantía)' : 'Alta en el Cloud'
   return (
     <p className="wr-rev-alta"><Icon.clock /> <span>{que}: <b>{fechas[0] === fechas[fechas.length - 1] ? fecha(fechas[0]) : `del ${fecha(fechas[0])} al ${fecha(fechas[fechas.length - 1])}`}</b>
       {' '}<span className="dev-mute">({fechas[0] === fechas[fechas.length - 1] ? antiguedad(fechas[0]) : `la más antigua, ${antiguedad(fechas[0])}`}{sin ? ` · ${sin} sin fecha` : ''})</span></span></p>
@@ -988,7 +990,8 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
   const [activo, setActivo] = useState(null)       // «itemId|tipo» al que van las fotos pegadas o elegidas
   const [subiendo, setSubiendo] = useState('')
   const set = (c) => setF((s) => ({ ...s, ...c }))
-  const conFotos = items.filter((it) => pideFotos(rv, it))
+  // Las fotos las pide la solución ELEGIDA (aún sin guardar), no la que tenía guardada.
+  const conFotos = rv.resolutions[f.resolution]?.photos ? items : []
   const res = rv.resolutions[f.resolution]
 
   useEffect(() => { if (paso === 'fotos' && galeria === null) api.warrantyTicketImages(w.id, true).then((r) => setGaleria(!r.ok ? [] : r.visible === false ? false : r.images)) }, [paso, galeria, w.id])
@@ -1022,8 +1025,14 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
     return () => window.removeEventListener('paste', pegar)
   })
 
+  /*
+   * Una solución con fotos no se guarda hasta tenerlas todas: primero las fotos y luego
+   * «Guardar revisión». Si se sale antes, la etiqueta sigue como estaba (pendiente de
+   * revisar); las fotos subidas se quedan para la próxima vez.
+   */
   const guardar = async () => {
     if (!f.resolution) return
+    if (res?.photos && pendientes > 0) { setActivo(null); setPaso('fotos'); return }
     setGuardando(true)
     const r = await api.reviewWarrantyItems({ id: w.id, item_ids: items.map((x) => x.id), ...f })
     setGuardando(false)
@@ -1032,8 +1041,10 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
     const nuevos = r.items.filter((x) => items.some((y) => y.id === x.id))
     setItems(nuevos)
     toast(`${nuevos.length === 1 ? nuevos[0].code : `${nuevos.length} dispositivos`}: ${res.label}`)
-    if (res.photos) { setActivo(null); setPaso('fotos') } else { onSaved(); onClose() }
+    onSaved(); onClose()
   }
+  // Lo elegido aún no está guardado en alguno de los dispositivos.
+  const sinGuardar = !!f.resolution && items.some((it) => it.resolution !== f.resolution)
   const cerrar = () => { if (cambios) onSaved(); onClose() }
   const pendientes = huecos.filter((h) => !h.lleno).length
 
@@ -1175,13 +1186,17 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
             <>
               <button className="btn ghost" onClick={cerrar}>Cancelar</button>
               <button className="btn" disabled={guardando || faltaAlgo} onClick={guardar}>
-                {guardando ? 'Guardando…' : res?.photos ? <>Guardar y añadir fotos <Icon.arrowRight /></> : items.length > 1 ? `Marcar ${items.length}` : 'Guardar'}
+                {guardando ? 'Guardando…' : res?.photos && pendientes ? <>Siguiente: fotos <Icon.arrowRight /></> : items.length > 1 ? `Marcar ${items.length}` : 'Guardar'}
               </button>
             </>
           ) : (
             <>
-              <span className={`wr-fotos-sum${pendientes ? '' : ' ok'}`}>{pendientes ? `Faltan ${pendientes} ${pendientes === 1 ? 'foto' : 'fotos'}` : <><Icon.check /> Todas las fotos</>}</span>
-              <button className="btn" onClick={cerrar}>{pendientes ? 'Seguir luego' : 'Listo'}</button>
+              <span className={`wr-fotos-sum${pendientes ? '' : ' ok'}`}>{pendientes
+                ? <>Faltan {pendientes} {pendientes === 1 ? 'foto' : 'fotos'}{sinGuardar ? <small> · sin todas, sigue pendiente de revisar</small> : null}</>
+                : <><Icon.check /> Todas las fotos</>}</span>
+              {pendientes ? <button className={sinGuardar ? 'btn ghost' : 'btn'} onClick={cerrar}>{sinGuardar ? 'Salir sin guardar' : 'Seguir luego'}</button>
+                : sinGuardar ? <button className="btn" disabled={guardando || faltaAlgo} onClick={guardar}>{guardando ? 'Guardando…' : <><Icon.check /> Guardar revisión</>}</button>
+                : <button className="btn" onClick={cerrar}>Listo</button>}
             </>
           )}
         </div>
@@ -1189,6 +1204,132 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
     </div>
   )
 }
+
+/*
+ * Estado de una etiqueta = su revisión (lo que decide el técnico), nunca lo que dice el
+ * Cloud: «Sin revisar» en gris hasta que alguien la revisa. Lo del Cloud va aparte.
+ */
+function EstadoRev({ rv, it }) {
+  const ui = RES_UI[it.resolution] || RES_UI.pendiente
+  const Ic = ui.ic
+  const f = pideFotos(rv, it) ? fotosDe(rv, it) : null
+  return (
+    <span className={`wr-estado c-${ui.c}${it.resolution === 'pendiente' ? ' pend' : ''}`}>
+      <Ic /> {it.resolution === 'pendiente' ? 'Sin revisar' : rv?.resolutions?.[it.resolution]?.label || it.resolution}
+      {f ? <em className={f.hay < f.total ? 'falta' : ''} title={f.hay < f.total ? 'Faltan fotos' : 'Fotos completas'}><Icon.image /> {f.hay}/{f.total}</em> : null}
+    </span>
+  )
+}
+
+// El botón que dice qué hacer con la etiqueta: «Revisar» si está pendiente, «Cambiar» si no.
+function AccionRev({ it, onRevisar, sm }) {
+  if (!onRevisar) return null
+  return it.resolution === 'pendiente'
+    ? <button className={`btn${sm ? ' sm' : ''} wr-revisar`} onClick={onRevisar}><Icon.eye /> Revisar</button>
+    : <button className={`dev-btn${sm ? ' sm' : ''}`} onClick={onRevisar} title="Cambiar la revisión"><Icon.pencil /> Cambiar</button>
+}
+
+// El estado en el Cloud, corto: punto + conectada/desconectada/no aparece.
+function CloudCorto({ r }) {
+  if (r.lookup_state === 'not_found') return <span className="wr-cl bad"><i />No aparece en el Cloud</span>
+  if (r.lookup_state !== 'found') return <span className="wr-cl warn"><i />Sin comprobar</span>
+  const d = dias(r.last_commu_at)
+  return <span className={`wr-cl ${r.online ? 'on' : 'off'}`} title={`${r.server} · ${r.store_name || '—'}${r.battery != null ? ` · batería ${r.battery} %` : ''}${r.ap_signal != null ? ` · señal ${r.ap_signal} %` : ''}`}>
+    <i />{r.online ? 'Conectada' : 'Desconectada'}{r.last_commu_at ? <small> · {haceDias(d)}</small> : null}</span>
+}
+
+/*
+ * Lo que contó el cliente desde el portal: lo que se repite en varias etiquetas se dice
+ * una vez (con a cuáles afecta); en cada etiqueta solo queda lo que es solo suyo.
+ */
+function agruparDichos(items) {
+  const m = new Map()
+  items.forEach((i) => { const t = (i.reported_issue || '').trim(); if (t) m.set(t, [...(m.get(t) || []), i.code]) })
+  return [...m.entries()].map(([texto, codes]) => ({ texto, codes })).sort((a, b) => b.codes.length - a.codes.length)
+}
+
+/* «Opción elegida — comentario»: lo que eligió el cliente en el portal y, debajo, en negrita
+   y cursiva, lo que escribió él. */
+function Dicho({ texto }) {
+  const i = texto.indexOf(' — ')
+  const sel = i >= 0 ? texto.slice(0, i).trim() : texto
+  const com = i >= 0 ? texto.slice(i + 3).trim() : ''
+  return <><span className="wr-dicho-sel">{sel}</span>{com ? <span className="wr-dicho-com">“{com.replace(/^["“”]+|["“”]+$/g, '')}”</span> : null}</>
+}
+
+function DiceCliente({ grupos, total }) {
+  const [todo, setTodo] = useState(false)
+  if (!grupos.length) return null
+  const ver = todo ? grupos : grupos.slice(0, 3)
+  return (
+    <div className="wr-dice-box">
+      <h4><Icon.quote /> Lo que dice el cliente</h4>
+      <ul>
+        {ver.map((g) => (
+          <li key={g.texto}>
+            <p><Dicho texto={g.texto} /></p>
+            <small>{g.codes.length === total && total > 1 ? `Todas las etiquetas (${total})` : g.codes.length > 4 ? `${g.codes.length} etiquetas: ${g.codes.slice(0, 4).join(', ')}…` : g.codes.join(', ')}</small>
+          </li>
+        ))}
+      </ul>
+      {grupos.length > 3 ? <button className="wf-link" onClick={() => setTodo((x) => !x)}>{todo ? 'Ver menos' : `Ver los ${grupos.length} comentarios`}</button> : null}
+    </div>
+  )
+}
+
+function EtiquetaCarta({ i, rv, p, sel, propio, onSel, onFicha, onRevisar, onPilas, onModelo, onQuitar }) {
+  const ui = RES_UI[i.resolution] || RES_UI.pendiente
+  return (
+    <li className={`wr-card c-${ui.c}${i.resolution === 'pendiente' ? ' pend' : ''}${sel ? ' sel' : ''}`}>
+      <div className="wr-card-h">
+        {onSel ? <input type="checkbox" className="wr-pick" checked={sel} onChange={onSel} aria-label={`Seleccionar ${i.code}`} /> : null}
+        <button className="link mono wr-card-code" title="Ver ficha e historial" onClick={onFicha}>{i.code}</button>
+        {i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}
+        {i.other_warranties?.length ? <button className="wr-rep" onClick={onFicha} title={`También en: ${i.other_warranties.map((o) => o.code).join(', ')}`}><Icon.refresh /> En {i.other_warranties.length + 1} garantías</button> : null}
+        <span className="spacer" />
+        {onQuitar ? <button className="icon-btn sm" title="Quitar de la garantía" onClick={onQuitar}><Icon.trash /></button> : null}
+      </div>
+      <div className="wr-card-st">{rv ? <EstadoRev rv={rv} it={i} /> : null}<AccionRev it={i} onRevisar={onRevisar} sm /></div>
+      {propio ? <blockquote className="wr-dice" title="Lo que contó el cliente de esta etiqueta"><Dicho texto={propio} /></blockquote> : null}
+      <dl className="wr-card-dl">
+        <div><dt>Producto</dt><dd><Modelo r={i} onPick={onModelo} /></dd></div>
+        <div><dt>Cloud</dt><dd><Donde r={i} /></dd></div>
+        <div><dt>Alta</dt><dd className="wr-card-alta"><Plazo t={i.term} /></dd></div>
+      </dl>
+      <Diagnostico r={i} onPilas={onPilas} />
+      <Avisos list={i.warnings} />
+      {rv ? <ResDetalle rv={rv} it={i} /> : null}
+    </li>
+  )
+}
+
+function EtiquetaFila({ i, rv, sel, propio, comun, onSel, onFicha, onRevisar, onQuitar }) {
+  const ui = RES_UI[i.resolution] || RES_UI.pendiente
+  const d = diagnostico(i)
+  const avisos = (i.warnings || []).filter((a) => a.tone !== 'info')
+  return (
+    <tr className={`c-${ui.c}${i.resolution === 'pendiente' ? ' pend' : ''}${sel ? ' sel' : ''}`}>
+      {onSel !== undefined ? <td className="wr-lt-ck">{onSel ? <input type="checkbox" className="wr-pick" checked={sel} onChange={onSel} aria-label={`Seleccionar ${i.code}`} /> : null}</td> : null}
+      <td className="wr-lt-code">
+        <button className="link mono" title="Ver ficha e historial" onClick={onFicha}>{i.code}</button>
+        {i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}
+        {i.other_warranties?.length ? <em className="wr-rep" title={`También en: ${i.other_warranties.map((o) => o.code).join(', ')}`}><Icon.refresh /> {i.other_warranties.length + 1}</em> : null}
+      </td>
+      <td className="wr-lt-prod"><b>{productoDe(i)}</b>{i.term && !i.term.hardware_ok ? <em className="wr-term out"><Icon.clock /> Fuera de plazo</em> : null}</td>
+      <td className="wr-lt-cloud">
+        <CloudCorto r={i} />
+        {d ? <span className={`wr-lt-pista t-${d.tone}`} title={d.text}>{d.tone === 'info' ? <Icon.check /> : <Icon.warn />}{d.corto}</span> : null}
+        {avisos.length ? <span className="wr-lt-pista t-warn" title={avisos.map((a) => a.text).join('\n')}><Icon.warn />{avisos.length === 1 ? '1 aviso' : `${avisos.length} avisos`}</span> : null}
+      </td>
+      <td className="wr-lt-dice">{propio ? <span className="wr-lt-dicho" title={propio}><Dicho texto={propio} /></span> : comun ? <span className="dev-mute" title={comun}>Ver arriba</span> : <span className="dev-mute">—</span>}</td>
+      <td className="wr-lt-rev">{rv ? <EstadoRev rv={rv} it={i} /> : null}</td>
+      <td className="wr-lt-acc"><AccionRev it={i} onRevisar={onRevisar} sm />{onQuitar ? <button className="icon-btn sm" title="Quitar de la garantía" onClick={onQuitar}><Icon.trash /></button> : null}</td>
+    </tr>
+  )
+}
+
+const VISTA_KEY = 'wr_etiquetas_vista'
+const leerVista = () => { try { return localStorage.getItem(VISTA_KEY) } catch { return null } }
 
 function Productos({ w, items, opts, onReload, onChanged }) {
   const toast = useToast()
@@ -1201,6 +1342,9 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   const [rev, setRev] = useState('')               // filtro por revisión
   const [sel, setSel] = useState(() => new Set())
   const [revisar, setRevisar] = useState(null)     // { items, preset }
+  // Lista o cartas: lo que eligió el agente; si no, cartas con pocas y lista con muchas.
+  const [vista, setVistaSt] = useState(() => leerVista() || (items.length > 6 ? 'lista' : 'cartas'))
+  const setVista = (v) => { setVistaSt(v); try { localStorage.setItem(VISTA_KEY, v) } catch { /* sin almacenamiento */ } }
   const rv = opts?.review
   const p = opts?.perms || {}
 
@@ -1217,7 +1361,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
     setOcupado('recheck')
     const r = await api.recheckWarrantyLabels(w.id)
     setOcupado('')
-    if (r.ok) { toast('Etiquetas comprobadas de nuevo'); onReload() } else toast(r.error || 'Error', 'err')
+    if (r.ok) { toast('Etiquetas comprobadas en el Cloud'); onReload(); onChanged() } else toast(r.error || 'Error', 'err')
   }
   const cambiarModelo = async (it, ref) => {
     const r = await api.setWarrantyLabelModel(it.id, ref)
@@ -1255,6 +1399,11 @@ function Productos({ w, items, opts, onReload, onChanged }) {
   const listado = items.filter((i) => (!filtro || (filtro === 'avisos' ? estadoEtiqueta(i) !== 'ok' : filtro === 'repetidos' ? i.other_warranties?.length > 0 : filtro === 'plazo' ? i.term?.hardware_ok === false : productoDe(i) === filtro))
     && (!rev || (rev === 'fotos' ? faltanFotos(rv, i) : i.resolution === rev)))
   const nuevas = comp.results && comp.checked === comp.text ? comp.results.filter((r) => !r.blocked && !r.already).length : null
+  // Lo que contó el cliente: lo repetido arriba una vez; en cada etiqueta, solo lo suyo.
+  const comunes = agruparDichos(items).filter((g) => g.codes.length > 1)
+  const txtComun = new Set(comunes.map((g) => g.texto))
+  const propioDe = (i) => { const t = (i.reported_issue || '').trim(); return t && !txtComun.has(t) ? t : '' }
+  const comunDe = (i) => { const t = (i.reported_issue || '').trim(); return t && txtComun.has(t) ? t : '' }
 
   const elegidas = items.filter((i) => sel.has(i.id))
   const todasVisibles = listado.length > 0 && listado.every((i) => sel.has(i.id))
@@ -1270,8 +1419,14 @@ function Productos({ w, items, opts, onReload, onChanged }) {
           {items.length ? <span className="dev-mute"> · {conectadas} conectadas{conAvisos ? ` · ${conAvisos} con avisos` : ''}</span> : null}
         </div>
         <div className="spacer" />
-        {items.length && p.edit ? <button className="dev-btn" disabled={!!ocupado} onClick={recomprobar}><Icon.refresh /> {ocupado === 'recheck' ? 'Comprobando…' : 'Volver a comprobar'}</button> : null}
-        {items.length ? <button className="dev-btn" onClick={exportar}><Icon.download /> CSV</button> : null}
+        {items.length > 0 && (
+          <div className="dc-seg wr-vista" role="group" aria-label="Vista">
+            <button className={vista === 'lista' ? 'on' : ''} onClick={() => setVista('lista')} title="Lista"><Icon.list /> Lista</button>
+            <button className={vista === 'cartas' ? 'on' : ''} onClick={() => setVista('cartas')} title="Cartas"><Icon.dashboard /> Cartas</button>
+          </div>
+        )}
+        {items.length && p.edit ? <button className="dev-btn" disabled={!!ocupado} onClick={recomprobar} title="Vuelve a mirar en el Cloud si cada etiqueta se conecta, su batería, señal y tienda"><Icon.refresh /> {ocupado === 'recheck' ? 'Comprobando…' : 'Comprobar en el Cloud'}</button> : null}
+        {items.length ? <button className="dev-btn" onClick={exportar} title="Descargar en CSV"><Icon.download /> CSV</button> : null}
         {p.edit ? <button className="btn" onClick={() => setPanel((x) => !x)}><Icon.plus /> Añadir etiquetas</button> : null}
       </div>
 
@@ -1289,6 +1444,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
 
       {items.length > 0 && (
         <>
+          <DiceCliente grupos={comunes} total={items.length} />
           {rv && (
             <div className="wr-revbar">
               <div className="wr-revbar-h">
@@ -1296,6 +1452,15 @@ function Productos({ w, items, opts, onReload, onChanged }) {
                 <span>{revisadas} de {items.length} revisadas</span>
                 {sinFotos ? <button className="wr-revbar-warn" onClick={() => setRev('fotos')}><Icon.image /> Faltan fotos en {sinFotos}</button> : null}
               </div>
+              {p.review ? (
+                <p className={`wr-revbar-next${revisadas === items.length && !sinFotos ? ' ok' : ''}`}>
+                  {revisadas < items.length
+                    ? <><Icon.arrowRight /> <span>Quedan <b>{items.length - revisadas}</b> por revisar. Pulsa <b>Revisar</b> en cada una{items.length > 1 ? <>, o márcalas y elige el resultado para todas a la vez</> : null}.</span>
+                        {porRes.pendiente && rev !== 'pendiente' ? <button className="dev-btn sm" onClick={() => setRev('pendiente')}>Ver solo las pendientes</button> : null}</>
+                    : sinFotos ? <><Icon.image /> <span>Todas revisadas; faltan fotos en {sinFotos}.</span></>
+                    : <><Icon.check /> <span>Todas revisadas. Ya puedes preparar los <b>Documentos</b>.</span></>}
+                </p>
+              ) : null}
               <div className="wr-revbar-bar">
                 {Object.keys(rv.resolutions).filter((k) => k !== 'pendiente' && porRes[k]).map((k) => (
                   <i key={k} className={`c-${RES_UI[k]?.c || 'gray'}`} style={{ width: `${(porRes[k] / items.length) * 100}%` }} title={`${rv.resolutions[k].label}: ${porRes[k]}`} />
@@ -1319,31 +1484,38 @@ function Productos({ w, items, opts, onReload, onChanged }) {
               <button key={k} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(filtro === k ? '' : k)}>{k} ×{n}</button>
             ))}
           </div>
-          {rv && p.review && listado.length > 0 && (
+          {rv && p.review && listado.length > 0 && vista === 'cartas' && (
             <label className="wr-selall"><input type="checkbox" checked={todasVisibles} onChange={marcarVisibles} />
               {todasVisibles ? 'Quitar la selección' : `Seleccionar ${listado.length === items.length ? 'todas' : `las ${listado.length} que se ven`}`}</label>
           )}
           {!listado.length ? <p className="dev-mute">Ninguna con este filtro.</p> : null}
-          <ul className={`wr-lbls big${rv ? ' rev' : ''}`}>
-            {listado.map((i) => (
-              <li key={i.id} className={`st-${estadoEtiqueta(i)}${sel.has(i.id) ? ' sel' : ''}`}>
-                {rv && p.review ? <input type="checkbox" className="wr-pick" checked={sel.has(i.id)} onChange={() => marcar(i.id)} aria-label={`Seleccionar ${i.code}`} /> : null}
-                <span className="wr-lbl-code mono"><button className="link" title="Ver ficha e historial" onClick={() => setFicha(i.code)}>{i.code}</button>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}
-                  {i.other_warranties?.length ? <button className="wr-rep" onClick={() => setFicha(i.code)}
-                    title={`También en: ${i.other_warranties.map((o) => [o.code, fecha(o.received_at), o.client, rv?.resolutions?.[o.resolution]?.label].filter(Boolean).join(' · ')).join('\n')}`}>
-                    <Icon.refresh /> En {i.other_warranties.length + 1} garantías</button> : null}
-                  <Plazo t={i.term} /></span>
-                <Donde r={i} />
-                <Modelo r={i} onPick={p.edit ? (ref) => cambiarModelo(i, ref) : null} />
-                {rv ? <ResPill rv={rv} it={i} onClick={p.review ? () => setRevisar({ items: [i] }) : null} /> : null}
-                {p.edit ? <button className="icon-btn" title="Quitar de la garantía" onClick={() => quitar(i)}><Icon.trash /></button> : null}
-                <div className="full"><Avisos list={i.warnings} />
-                  <Diagnostico r={i} onPilas={rv && p.review ? () => setRevisar({ items: [i], preset: 'bateria' }) : null} />
-                  {i.reported_issue ? <p className="wr-cliente-dijo" title="Lo que contó el cliente al pedir la garantía desde el portal"><Icon.chat /> <span>{i.reported_issue}</span></p> : null}
-                  {rv ? <ResDetalle rv={rv} it={i} /> : null}</div>
-              </li>
-            ))}
-          </ul>
+          {listado.length > 0 && vista === 'cartas' ? (
+            <ul className="wr-cards">
+              {listado.map((i) => (
+                <EtiquetaCarta key={i.id} i={i} rv={rv} p={p} sel={sel.has(i.id)} propio={propioDe(i)}
+                  onSel={rv && p.review ? () => marcar(i.id) : null} onFicha={() => setFicha(i.code)}
+                  onRevisar={rv && p.review ? () => setRevisar({ items: [i] }) : null}
+                  onPilas={rv && p.review ? () => setRevisar({ items: [i], preset: 'bateria' }) : null}
+                  onModelo={p.edit ? (ref) => cambiarModelo(i, ref) : null} onQuitar={p.edit ? () => quitar(i) : null} />
+              ))}
+            </ul>
+          ) : listado.length > 0 ? (
+            <div className="wr-lt-wrap">
+              <table className="wr-lt">
+                <thead><tr>
+                  {rv && p.review ? <th className="wr-lt-ck"><input type="checkbox" className="wr-pick" checked={todasVisibles} onChange={marcarVisibles} aria-label="Seleccionar todas" /></th> : null}
+                  <th>Etiqueta</th><th>Producto</th><th>Cloud</th><th>Qué dice el cliente</th><th>Revisión</th><th />
+                </tr></thead>
+                <tbody>
+                  {listado.map((i) => (
+                    <EtiquetaFila key={i.id} i={i} rv={rv} sel={sel.has(i.id)} propio={propioDe(i)} comun={comunDe(i)}
+                      onSel={rv && p.review ? () => marcar(i.id) : undefined} onFicha={() => setFicha(i.code)}
+                      onRevisar={rv && p.review ? () => setRevisar({ items: [i] }) : null} onQuitar={p.edit ? () => quitar(i) : null} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
           {elegidas.length > 0 && (
             <div className="wr-selbar">
               <b title="Marcar como…">{elegidas.length} {elegidas.length === 1 ? 'seleccionada' : 'seleccionadas'}:</b>
@@ -1521,11 +1693,12 @@ function MensajeCliente({ text }) {
  * de la garantía. Se escribe o se escanea su código y se empareja con el producto de la
  * garantía; se puede cambiar por otra o quitar. Solo si está configurada (Servidores ZKONG).
  */
-function EtiquetaAlmacen({ w, enabled, puede, onChanged }) {
+function EtiquetaAlmacen({ w, enabled, usual, puede, onChanged }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [code, setCode] = useState('')
   const [abierto, setAbierto] = useState(false)
+  const [otra, setOtra] = useState(false)          // sin etiqueta: escribir otra en vez de la de siempre
   const [ocupado, setOcupado] = useState('')       // 'pair' | 'remove' | 'scan'
   const foto = useRef(null)
   const actual = w.cloud_label || ''
@@ -1536,13 +1709,17 @@ function EtiquetaAlmacen({ w, enabled, puede, onChanged }) {
 
   const emparejar = async (c = limpio) => {
     if (!/^[A-Z0-9]{9}$/.test(c)) { toast('El código de una etiqueta tiene 9 letras o números', 'err'); return }
-    if (actual && c !== actual && !(await confirm({ title: 'Cambiar la etiqueta de almacén', message: `${actual} dejará de enseñar ${w.code} y la enseñará ${c}.`, confirmText: 'Cambiar' }))) return
+    // Si la enseña otra garantía, se le quita a aquella: se avisa antes.
+    const enOtra = usual?.warranty_code && usual.code === c ? usual.warranty_code : null
+    if (enOtra) {
+      if (!(await confirm({ title: 'Mover la etiqueta de almacén', message: `${c} enseña ahora la garantía ${enOtra}. Se desvinculará de ${enOtra} y pasará a enseñar ${w.code}.${actual && actual !== c ? ` ${actual} dejará de enseñar ${w.code}.` : ''}`, confirmText: `Mover a ${w.code}` }))) return
+    } else if (actual && c !== actual && !(await confirm({ title: 'Cambiar la etiqueta de almacén', message: `${actual} dejará de enseñar ${w.code} y la enseñará ${c}.`, confirmText: 'Cambiar' }))) return
     setOcupado('pair')
     const r = await api.warrantyCloudLabel(w.id, c).catch(() => ({ ok: false, error: 'No se pudo conectar' }))
     setOcupado('')
     if (!r.ok) { toast(r.error || 'No se pudo emparejar', 'err'); return }
-    toast(`Etiqueta ${r.cloud_label} emparejada con ${w.code}`)
-    setCode(''); setAbierto(false)
+    toast(enOtra ? `Etiqueta ${r.cloud_label} movida de ${enOtra} a ${w.code}` : `Etiqueta ${r.cloud_label} emparejada con ${w.code}`)
+    setCode(''); setAbierto(false); setOtra(false)
     onChanged?.()
   }
   const quitar = async () => {
@@ -1597,16 +1774,31 @@ function EtiquetaAlmacen({ w, enabled, puede, onChanged }) {
             ) : null}
             {abierto ? form : null}
           </>
+        ) : puede && usual?.code && !otra ? (
+          <>
+            <p className="dev-mute">Elige la etiqueta que enseñará la pegatina de esta garantía (se actualiza sola con cada cambio).</p>
+            <div className="wf-alm-op">
+              <button className="wf-alm-usual" disabled={!!ocupado} onClick={() => emparejar(usual.code)}>
+                <span><small>La de siempre</small><code>{usual.code}</code></span>
+                <em>{ocupado === 'pair' ? 'Emparejando…' : usual.warranty_code ? `Ahora en ${usual.warranty_code}` : 'Libre'}</em>
+              </button>
+              <button className="dev-btn" disabled={!!ocupado} onClick={() => setOtra(true)}>Otra</button>
+            </div>
+            {usual.warranty_code ? <p className="wf-alm-aviso"><Icon.info /> Al usarla aquí se desvincula de {usual.warranty_code}.</p> : null}
+          </>
         ) : puede ? (
           <>
             <p className="dev-mute">Escribe o escanea el código de una etiqueta de la tienda del almacén: enseñará la pegatina de esta garantía y se actualiza sola con cada cambio.</p>
             {form}
+            {usual?.code && otra ? <button className="ws-txt" onClick={() => { setOtra(false); setCode('') }}>Usar la de siempre ({usual.code})</button> : null}
           </>
         ) : <p className="dev-mute">Aún no tiene etiqueta de almacén.</p>}
       </div>
     </section>
   )
 }
+
+const PASO_AUTO = { cloud: 'al comprobar las etiquetas en el Cloud', revision: 'al revisar todas las etiquetas' }
 
 function Pasos({ w, listas, puede, onChanged }) {
   const toast = useToast()
@@ -1637,7 +1829,9 @@ function Pasos({ w, listas, puede, onChanged }) {
                   <input type="checkbox" checked={!!s.done_at} disabled={!puede || ocupado === `${l.id}|${s.id}`} onChange={() => marcar(l, s)} />
                   <span>{s.text}</span>
                 </label>
-                {s.done_at ? <small>{s.done_by || 'Alguien'} · {fechaHora(s.done_at)}</small> : null}              </li>
+                {s.done_at ? <small>{s.done_by || 'Automático'} · {fechaHora(s.done_at)}</small>
+                  : s.auto ? <small className="wf-pasos-auto"><Icon.bolt /> Se marca solo {PASO_AUTO[s.auto] || ''}</small> : null}
+              </li>
             ))}
           </ul>
         </div>
@@ -1646,7 +1840,10 @@ function Pasos({ w, listas, puede, onChanged }) {
   )
 }
 
-function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }) {
+function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, user = null, onOpenWarranty = null }) {
+  const [chat, setChat] = useState(null)           // ticket abierto encima de la garantía
+  const [meta, setMeta] = useState(null)
+  const tabsRef = useRef(null)
   const p = opts?.perms || {}
   const toast = useToast()
   const confirm = useConfirm()
@@ -1704,8 +1901,11 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
     if (r.ok) { setNota({ type: nota.type, body: '' }); cargar(); onChanged() } else toast(r.error || 'Error', 'err')
   }
 
+  // El ticket se abre aquí mismo, encima de la garantía; al cerrarlo se sigue en ella.
+  const puedeChat = !!(user && onOpenTicket)
+  const abrirTicket = puedeChat ? (tid) => { setChat(tid); if (!meta) api.ticketMeta().then(setMeta) } : onOpenTicket
   const ticket = w.ticket_code
-    ? (onOpenTicket ? <button className="wr-tklink mono" title={w.ticket_subject || 'Abrir ticket'} onClick={() => onOpenTicket(w.ticket_id)}>{w.ticket_code}</button> : <span className="mono">{w.ticket_code}</span>)
+    ? (abrirTicket && w.ticket_visible !== false ? <button className="wr-tklink mono" title={w.ticket_subject || 'Abrir ticket'} onClick={() => abrirTicket(w.ticket_id)}>{w.ticket_code}</button> : <span className="mono">{w.ticket_code}</span>)
     : null
   // Seguimiento (notas del equipo), historial (cambios automáticos) y lo que escribe el
   // cliente en el ticket, en una sola línea de tiempo.
@@ -1720,49 +1920,102 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
   const revisadas = d.items.filter((i) => i.resolution && i.resolution !== 'pendiente').length
   const estados = Object.entries(opts?.status_meta || {}).filter(([k, m]) => m.active || k === w.status).map(([k, m]) => ({ value: k, label: m.label, color: m.color }))
 
+  // Con pocas etiquetas el historial va debajo de ellas; con muchas, en el lateral.
+  const pocas = d.items.length < 5
+  const historial = <Historial w={w} d={d} opts={opts} puede={!!p.edit} hist={hist} setHist={setHist} nota={nota} setNota={setNota}
+    notaRef={notaRef} enviando={enviando} enviarNota={enviarNota} linea={linea} mensajes={mensajes} />
+
+  // Documentos se abren cuando todas las etiquetas están revisadas (o la garantía cerrada).
+  const docsLock = abierta && (!d.items.length || revisadas < d.items.length)
+  const irA = (t) => { setTab(t); tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+  const sinFotos = d.items.filter((i) => faltanFotos(opts?.review, i)).length
+  // Qué toca ahora, en una frase.
+  const siguiente = !abierta ? null
+    : !d.items.length ? { tone: 'warn', text: 'añade las etiquetas que manda el cliente.', btn: 'Ir a etiquetas', go: () => irA('productos') }
+    : revisadas < d.items.length ? { tone: 'warn', text: `revisa ${d.items.length - revisadas === 1 ? 'la etiqueta que falta' : `las ${d.items.length - revisadas} etiquetas que faltan`}.`, btn: 'Ir a etiquetas', go: () => irA('productos') }
+    : sinFotos ? { tone: 'warn', text: `faltan fotos en ${sinFotos} ${sinFotos === 1 ? 'etiqueta' : 'etiquetas'}.`, btn: 'Ir a etiquetas', go: () => irA('productos') }
+    : { tone: 'ok', text: 'todas las etiquetas revisadas: prepara los documentos y cierra la garantía.', btn: 'Ir a documentos', go: () => irA('documentos') }
+
   return (
     <>
       <button className="wr-back" onClick={onBack}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> Garantías</button>
 
       <div className="wf-head" data-tour="wf-head">
-        <div className="wf-id">
-          <div className="wf-t">
-            <span className="wf-code">{w.code}</span>
+        <div className="wf-h-top">
+          <div className="wf-id">
+            <div className="wf-t">
+              <span className="wf-code">{w.code}</span>
+              <EstadoPill s={w.status} opts={opts} />
+              <UrgPill u={w.urgency} opts={opts} />
+              {w.alerts?.length ? <Alertas list={w.alerts} full /> : stale ? <span className="wr-flag"><Icon.warn /> Sin actividad {diasSin} días</span> : null}
+            </div>
             <h2>{w.client_name || <span className="dev-mute">Sin cliente</span>}</h2>
-            <EstadoPill s={w.status} opts={opts} />
-            <UrgPill u={w.urgency} opts={opts} />
-            {w.alerts?.length ? <Alertas list={w.alerts} full /> : stale ? <span className="wr-flag"><Icon.warn /> Sin actividad {diasSin} días</span> : null}
+            <p className="wf-sub">{w.project_name || <span className="dev-mute">Sin proyecto</span>}{w.category ? <> · {w.category}</> : null}</p>
           </div>
-          <div className="wf-meta">
-            <span>{w.project_name || <span className="dev-mute">Sin proyecto</span>}</span>
-            <span className="wl-resp">{w.responsible_name ? <><i>{iniciales(w.responsible_name)}</i>{w.responsible_name}</> : <span className="wf-warn">Sin responsable</span>}</span>
-            {ticket ? <span>Ticket {ticket}</span> : null}
-            <span className={abierta && diasAbierta >= 30 ? 'wf-warn' : ''}>{abierta ? `Abierta ${diasAbierta ?? 0} ${diasAbierta === 1 ? 'día' : 'días'}` : `Cerrada en ${diasAbierta ?? 0} días`}</span>
-            <span className={stale ? 'wf-warn' : ''}>Última actividad {haceDias(diasSin)}</span>
+          <div className="wf-acts">
+            {w.ticket_id && puedeChat && w.ticket_visible ? (
+              <button className="btn wf-chat-btn" onClick={() => abrirTicket(w.ticket_id)} title={`Abrir la conversación del ticket ${w.ticket_code || ''}`}>
+                <Icon.chat /> Conversación{mensajes.length ? <em>{mensajes.length}</em> : null}
+              </button>
+            ) : null}
+            {w.ticket_id && fotos !== false ? (
+              <button className="dev-btn" onClick={() => setVerFotos(null)} disabled={!fotos?.length} title={fotos && !fotos.length ? 'El cliente no ha mandado imágenes en sus tickets' : 'Lo que ha mandado el cliente por correo, WhatsApp o adjunto'}>
+                <Icon.image /> Fotos del cliente{fotos === null ? null : <em className="fc-n">{fotos.filter((x) => x.from === 'cliente').length}</em>}
+              </button>
+            ) : null}
+            {p.edit ? <button className="icon-btn" title="Editar los datos" onClick={() => onEdit(w)}><Icon.pencil /></button> : null}
+            {p.delete ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
           </div>
         </div>
-        <div className="wf-acts">
-          {p.edit ? <>
-            <Select value={w.status} onChange={cambiarEstado} options={estados} />
-            {abierta
-              ? <button className="btn dark" onClick={cerrar}><Icon.lock /> Cerrar</button>
-              : <button className="btn ghost" onClick={() => setCierre({ modo: 'reabrir', status: opts?.status_reopen || 'en_curso' })}><Icon.refresh /> Reabrir</button>}
-          </> : null}
-          {w.ticket_id && fotos !== false ? (
-            <button className="dev-btn" onClick={() => setVerFotos(null)} disabled={!fotos?.length} title={fotos && !fotos.length ? 'El cliente no ha mandado imágenes en sus tickets' : 'Lo que ha mandado el cliente por correo, WhatsApp o adjunto'}>
-              <Icon.image /> Fotos del cliente{fotos === null ? null : <em className="fc-n">{fotos.filter((x) => x.from === 'cliente').length}</em>}
-            </button>
-          ) : null}
-          {p.edit ? <button className="dev-btn" onClick={() => onEdit(w)}><Icon.pencil /> Editar</button> : null}
-          {p.delete ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
+
+        <div className="wf-facts">
+          <div className="wf-fact">
+            <span>Estado</span>
+            {p.edit ? (
+              <div className="wf-fact-st">
+                <Select sm value={w.status} onChange={cambiarEstado} options={estados} />
+                {abierta
+                  ? <button className="btn sm dark" onClick={cerrar}><Icon.lock /> Cerrar</button>
+                  : <button className="btn sm ghost" onClick={() => setCierre({ modo: 'reabrir', status: opts?.status_reopen || 'en_curso' })}><Icon.refresh /> Reabrir</button>}
+              </div>
+            ) : <b>{opts?.statuses?.[w.status] || w.status}</b>}
+          </div>
+          <div className="wf-fact">
+            <span>Responsable</span>
+            <b className="wl-resp">{w.responsible_name ? <><i>{iniciales(w.responsible_name)}</i>{w.responsible_name}</> : <span className="wf-warn">Sin responsable</span>}</b>
+          </div>
+          <div className="wf-fact">
+            <span>Etiquetas revisadas</span>
+            <b>{d.items.length ? <>{revisadas}/{d.items.length}<i className="wf-mini"><i style={{ width: `${(revisadas / d.items.length) * 100}%` }} /></i></> : <span className="dev-mute">Ninguna aún</span>}</b>
+          </div>
+          <div className="wf-fact">
+            <span>{abierta ? 'Abierta' : 'Duró'}</span>
+            <b className={abierta && diasAbierta >= 30 ? 'wf-warn' : ''}>{diasAbierta ?? 0} {diasAbierta === 1 ? 'día' : 'días'}</b>
+          </div>
+          <div className="wf-fact">
+            <span>Última actividad</span>
+            <b className={stale ? 'wf-warn' : ''}>{haceDias(diasSin)}</b>
+          </div>
+          {ticket ? <div className="wf-fact"><span>Ticket</span><b>{ticket}</b></div> : null}
         </div>
+
+        {siguiente ? (
+          <div className={`wf-next t-${siguiente.tone}`}>
+            <Icon.arrowRight /><span><b>Siguiente:</b> {siguiente.text}</span>
+            {siguiente.go ? <button className="dev-btn sm" onClick={siguiente.go}>{siguiente.btn}</button> : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="wf-grid">
         <div className="wf-main">
           <section className="wf-card">
             <header><h3><Icon.doc /> Qué le pasa al cliente</h3>
-              {ticket ? <span className="dev-mute wf-orig">Ticket {ticket}{w.ticket_subject ? ` · ${w.ticket_subject}` : ''}</span> : null}
+              {w.ticket_id && puedeChat && w.ticket_visible ? (
+                <button className="dev-btn wf-open-chat" onClick={() => abrirTicket(w.ticket_id)} title={w.ticket_subject || 'Abrir la conversación del ticket'}>
+                  <Icon.chat /> Abrir conversación <span className="mono">{w.ticket_code}</span>
+                </button>
+              ) : ticket ? <span className="dev-mute wf-orig">Ticket {ticket}</span> : null}
             </header>
             {w.description ? <p className="wf-desc">{w.description}</p> : <p className="dev-mute wf-desc-none">Sin descripción.{p.edit ? <> <button className="wf-link" onClick={() => onEdit(w)}>Añadirla</button></> : null}</p>}
             {fotos?.some((x) => x.from === 'cliente') ? (
@@ -1777,23 +2030,32 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
             ) : null}
           </section>
 
-          <section className="wf-card wf-tabs-card" data-tour="wf-tabs">
+          <section className="wf-card wf-tabs-card" data-tour="wf-tabs" ref={tabsRef}>
             <div className="wr-tabs" role="tablist">
-              {[['productos', `Etiquetas${d.items.length ? ` (${d.items.length})` : ''}`, Icon.tag], ['documentos', 'Documentos', Icon.file]].map(([k, l, Ic]) => (
-                <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Ic /> {l}</button>
-              ))}
-              {tab === 'productos' && d.items.length ? <span className="wf-tab-sum dev-mute">{revisadas} de {d.items.length} revisadas</span> : null}
+              <button className={tab === 'productos' ? 'on' : ''} onClick={() => setTab('productos')}><Icon.tag /> Etiquetas{d.items.length ? ` (${d.items.length})` : ''}
+                {d.items.length ? <em className={revisadas === d.items.length ? 'ok' : ''}>{revisadas}/{d.items.length}</em> : null}</button>
+              <button className={`${tab === 'documentos' ? 'on' : ''}${docsLock ? ' locked' : ''}`} onClick={() => setTab('documentos')}
+                title={docsLock ? 'Se desbloquea al revisar todas las etiquetas' : ''}>{docsLock ? <Icon.lock /> : <Icon.file />} Documentos</button>
             </div>
             <div className="wf-tab-body">
               {tab === 'productos' && <Productos w={w} items={d.items} opts={opts} onReload={cargar} onChanged={onChanged} />}
-              {tab === 'documentos' && <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} onEditWarranty={p.edit ? () => onEdit(w) : null} onChanged={cargar} onOpenTicket={onOpenTicket} />}
+              {tab === 'documentos' && (docsLock ? (
+                <div className="wf-lock">
+                  <span className="wf-lock-ic"><Icon.lock /></span>
+                  <h4>Primero, las etiquetas</h4>
+                  <p>Los documentos (presupuesto, informe, pegatina…) se preparan cuando todas las etiquetas están revisadas.
+                    {d.items.length ? <> Llevas <b>{revisadas} de {d.items.length}</b>.</> : ' Todavía no hay etiquetas.'}</p>
+                  <button className="btn" onClick={() => setTab('productos')}><Icon.tag /> {d.items.length ? 'Seguir revisando' : 'Añadir etiquetas'}</button>
+                </div>
+              ) : <WarrantyDocuments w={w} opts={opts} onGoReview={() => setTab('productos')} onEditWarranty={p.edit ? () => onEdit(w) : null} onChanged={cargar} onOpenTicket={abrirTicket} />)}
             </div>
           </section>
+          {pocas ? historial : null}
         </div>
 
         <aside className="wf-side">
           <EnviosCliente list={d.shipments} />
-          <EtiquetaAlmacen w={w} enabled={!!d.cloud?.enabled} puede={!!p.edit} onChanged={cargar} />
+          <EtiquetaAlmacen w={w} enabled={!!d.cloud?.enabled} usual={d.cloud?.usual} puede={!!p.edit} onChanged={cargar} />
           <Pasos w={w} listas={d.steps} puede={!!p.edit} onChanged={cargar} />
           <GuiasRelacionadas w={w} onGoAll={onGoGuides} />
           <section className="wf-card">
@@ -1810,7 +2072,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
                 : '—'}</dd></div>
               <div><dt>Primer contacto</dt><dd>{fecha(w.first_contact_at)}</dd></div>
               <div><dt>Recepción</dt><dd>{w.received_at ? fecha(w.received_at) : <span className="dev-mute">Pendiente de recibir</span>}</dd></div>
-              <div><dt>Instalación</dt><dd>{w.installed_at ? fecha(w.installed_at) : <span className="dev-mute" title="Cada dispositivo cuenta desde su alta en ZKONG">Alta en ZKONG</span>}</dd></div>
+              <div><dt>Instalación</dt><dd>{w.installed_at ? fecha(w.installed_at) : <span className="dev-mute" title="Cada dispositivo cuenta desde su alta en el Cloud">Alta en el Cloud</span>}</dd></div>
               {w.closed_at ? <div><dt>Cierre</dt><dd>{fecha(w.closed_at)}</dd></div> : null}
               {!abierta && w.close_reason ? <div><dt>Motivo de cierre</dt><dd>{motivoDe(opts, w.close_reason)}</dd></div> : null}
               {!abierta && w.close_resolution ? <div className="wf-dl-largo"><dt>Resolución</dt><dd>{w.close_resolution}</dd></div> : null}
@@ -1818,7 +2080,40 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
             </dl>
           </section>
 
-          <section className="wf-card" data-tour="wf-hist">
+          {!pocas ? historial : null}
+        </aside>
+      </div>
+      {cierre ? (
+        <CierreModal modo={cierre.modo} opts={opts} onClose={() => setCierre(null)} conFecha={cierre.modo === 'cerrar'}
+          titulo={`${cierre.modo === 'cerrar' ? 'Cerrar' : 'Reabrir'} ${w.code}`}
+          estados={estados.filter((e) => cerradaEn(opts, e.value) === (cierre.modo === 'cerrar'))}
+          agentes={cierre.modo === 'reabrir' ? (opts?.agents || []).map((a) => ({ value: String(a.id), label: a.name })) : null}
+          inicial={{ status: cierre.status, closed_at: hoy(), responsible_id: w.responsible_id ? String(w.responsible_id) : '' }}
+          onOk={async (v) => {
+            const extra = cierre.modo === 'cerrar'
+              ? { close_reason: v.close_reason, close_resolution: v.close_resolution || '', closed_at: v.closed_at || '' }
+              : { reopen_reason: v.reopen_reason, responsible_id: v.responsible_id || '' }
+            const r = await api.saveWarranty({ ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '', first_contact_at: w.first_contact_at || '', installed_at: w.installed_at || '', closed_at: '', status: v.status, ...extra })
+            if (!r.ok) { toast(r.error || 'Error', 'err'); return false }
+            toast(cierre.modo === 'cerrar' ? 'Garantía cerrada' : 'Garantía reabierta'); cargar(); onChanged()
+            return true
+          }} />
+      ) : null}
+      {verFotos !== undefined && fotos?.length ? <FotosCliente w={w} fotos={fotos} inicio={verFotos} onClose={() => setVerFotos(undefined)} onOpenTicket={abrirTicket} /> : null}
+      {chat && meta ? (
+        <TicketModal id={chat} meta={meta} user={user} scope="garantias" onClose={() => { setChat(null); cargar() }} onChange={() => {}}
+          onOpenTicket={(tid) => setChat(tid)}
+          onOpenWarranty={(gid) => { setChat(null); if (gid !== w.id) onOpenWarranty?.(gid) }} />
+      ) : null}
+    </>
+  )
+}
+
+/* Seguimiento e historial: notas del equipo, cambios automáticos y lo que escribe el cliente. */
+function Historial({ w, d, opts, puede, hist, setHist, nota, setNota, notaRef, enviando, enviarNota, linea, mensajes }) {
+  const p = { edit: puede }
+  return (
+          <section className="wf-card wf-hist" data-tour="wf-hist">
             <header><h3><Icon.clock /> Seguimiento e historial</h3></header>
             {p.edit ? <div className="wf-compose">
               <textarea ref={notaRef} rows={2} value={nota.body} onChange={(e) => setNota((s) => ({ ...s, body: e.target.value }))}
@@ -1855,30 +2150,10 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides }
               </ol>
             )}
           </section>
-        </aside>
-      </div>
-      {cierre ? (
-        <CierreModal modo={cierre.modo} opts={opts} onClose={() => setCierre(null)} conFecha={cierre.modo === 'cerrar'}
-          titulo={`${cierre.modo === 'cerrar' ? 'Cerrar' : 'Reabrir'} ${w.code}`}
-          estados={estados.filter((e) => cerradaEn(opts, e.value) === (cierre.modo === 'cerrar'))}
-          agentes={cierre.modo === 'reabrir' ? (opts?.agents || []).map((a) => ({ value: String(a.id), label: a.name })) : null}
-          inicial={{ status: cierre.status, closed_at: hoy(), responsible_id: w.responsible_id ? String(w.responsible_id) : '' }}
-          onOk={async (v) => {
-            const extra = cierre.modo === 'cerrar'
-              ? { close_reason: v.close_reason, close_resolution: v.close_resolution || '', closed_at: v.closed_at || '' }
-              : { reopen_reason: v.reopen_reason, responsible_id: v.responsible_id || '' }
-            const r = await api.saveWarranty({ ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '', first_contact_at: w.first_contact_at || '', installed_at: w.installed_at || '', closed_at: '', status: v.status, ...extra })
-            if (!r.ok) { toast(r.error || 'Error', 'err'); return false }
-            toast(cierre.modo === 'cerrar' ? 'Garantía cerrada' : 'Garantía reabierta'); cargar(); onChanged()
-            return true
-          }} />
-      ) : null}
-      {verFotos !== undefined && fotos?.length ? <FotosCliente w={w} fotos={fotos} inicio={verFotos} onClose={() => setVerFotos(undefined)} onOpenTicket={onOpenTicket} /> : null}
-    </>
   )
 }
 
-export default function Warranties({ openId = null, onOpened, onOpenTicket, onGoGuides, filtro = null }) {
+export default function Warranties({ openId = null, onOpened, onOpenTicket, onGoGuides, filtro = null, user = null }) {
   const [opts, setOpts] = useState(null)
   const [sel, setSel] = useState(openId)
   // Llegar con una garantía concreta (desde la ficha de un ticket o ZKONG).
@@ -1906,7 +2181,7 @@ export default function Warranties({ openId = null, onOpened, onOpenTicket, onGo
         {sel
           ? <Ficha key={`${sel}-${reload}`} id={sel} opts={opts} onBack={() => setSel(null)}
               onEdit={(w) => setForm({ ...VACIA, ...w, responsible_id: w.responsible_id || '', urgency: w.urgency || '', ticket_code: w.ticket_code || '' })}
-              onChanged={() => {}} onOpenTicket={onOpenTicket} onGoGuides={onGoGuides} />
+              onChanged={() => {}} onOpenTicket={onOpenTicket} onGoGuides={onGoGuides} user={user} onOpenWarranty={setSel} />
           : <Lista opts={opts} reload={reload} filtro={filtro} onOpen={setSel} onNew={() => setForm({ ...VACIA })} />}
       </div></div>
 

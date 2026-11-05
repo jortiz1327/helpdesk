@@ -92,6 +92,39 @@ class AemePortal
     }
 
     /**
+     * Etiquetas y antenas facturadas (facturas que no son borrador), para sacar tasas de
+     * fallo sobre lo vendido: ['by_ref' => [ref => [año => uds]], 'by_client' => [cliente
+     * del portal => [ref => uds]]]. Null si el portal no está o no responde.
+     */
+    public static function sales(): ?array
+    {
+        if (! self::configured()) {
+            return null;
+        }
+        return Cache::remember('portal_aeme.sales', now()->addMinutes(30), function () {
+            try {
+                $refs = DB::connection('portal_aeme')->table('items')->whereIn('item_categoryid', [self::CAT_ESL, self::CAT_AP])
+                    ->where('item_ref', '!=', '')->pluck('item_ref')->map(fn ($r) => strtoupper(trim($r)))->unique()->values()->all();
+                $filas = DB::connection('portal_aeme')->table('lineitems as l')->join('invoices as i', 'i.bill_invoiceid', '=', 'l.lineitemresource_id')
+                    ->where('l.lineitemresource_type', 'invoice')->where('i.bill_status', '!=', 'draft')->whereIn('l.lineitem_ref', $refs)
+                    ->selectRaw('UPPER(TRIM(l.lineitem_ref)) as ref, YEAR(i.bill_date) as y, i.bill_clientid as c, SUM(l.lineitem_quantity) as q')
+                    ->groupBy('ref', 'y', 'c')->get();
+            } catch (Throwable $e) {
+                Log::warning('Portal AEME: no se pudieron leer las ventas: ' . $e->getMessage());
+                return null;
+            }
+            $out = ['by_ref' => [], 'by_client' => []];
+            foreach ($filas as $f) {
+                $q = (int) round((float) $f->q);
+                if ($q <= 0) continue;
+                $out['by_ref'][$f->ref][(int) $f->y] = ($out['by_ref'][$f->ref][(int) $f->y] ?? 0) + $q;
+                $out['by_client'][(int) $f->c][$f->ref] = ($out['by_client'][(int) $f->c][$f->ref] ?? 0) + $q;
+            }
+            return $out;
+        });
+    }
+
+    /**
      * Productos del portal por su referencia: [ref => ['name', 'stock']]. Vacío si el
      * portal no está o no responde (la garantía se guarda igual, sin el nombre).
      */

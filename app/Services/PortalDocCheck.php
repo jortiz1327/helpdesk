@@ -228,7 +228,7 @@ class PortalDocCheck
         return [$suelta, $n];
     }
 
-    private static function tipo(float $importe, Collection $lineas): string
+    public static function tipo(float $importe, Collection $lineas): string
     {
         $t = fn ($v) => Str::lower(Str::ascii((string) $v));
         if ($importe == 0.0) return 'garantia';
