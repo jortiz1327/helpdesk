@@ -184,7 +184,7 @@ export default function WarrantyTour({ can, onGo, onClose, onHelp }) {
     <div className="tour" role="dialog" aria-modal="true" aria-label="Tour guiado">
       <div className="tour-block" />
       {p.sel && rect && listo
-        ? <div className="tour-spot" style={{ top: rect.top, left: rect.left, width: rect.right - rect.left, height: rect.bottom - rect.top }} />
+        ? <div className="tour-spot" style={{ transform: `translate(${rect.left}px, ${rect.top}px)`, width: rect.right - rect.left, height: rect.bottom - rect.top }} />
         : <div className="tour-dim" />}
       <div ref={pop} className={`tour-pop${listo && pos ? ' on' : ''}`} style={pos || { left: -9999, top: -9999 }} key={p.id}>
         <div className="tour-bar"><i style={{ width: `${((i + 1) / pasos.length) * 100}%` }} /></div>

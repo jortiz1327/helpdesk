@@ -94,7 +94,7 @@ export default function SupportCenter({ onGo, user }) {
                   {crones.fails} {crones.fails === 1 ? 'ejecución fallida' : 'ejecuciones fallidas'} acumuladas
                 </small>
               </span>
-              <span className="sc-cron-go">Ver crones →</span>
+              <span className="sc-cron-go">Ver crones <Icon.arrowRight className="ic-arrow" aria-hidden="true" /></span>
             </button>
           )}
 

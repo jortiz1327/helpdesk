@@ -126,7 +126,7 @@ function Detail({ id, onBack }) {
                         <span className="pb-avatar">{(c.name || c.wa_id).slice(0, 1).toUpperCase()}</span>
                         <div className="pb-meta"><b>{c.name || '—'}</b><span className="muted">+{c.wa_id}</span></div>
                         <button className="btn ghost sm" disabled={busy || ya} style={{ marginLeft: 'auto' }} onClick={() => addOne(c)}>
-                          {ya ? '✓ Añadido' : <><Icon.plus /> Añadir</>}
+                          {ya ? <><Icon.check /> Añadido</> : <><Icon.plus /> Añadir</>}
                         </button>
                       </div>
                     )

@@ -124,7 +124,7 @@ function Builder({ form, onClose, onSaved }) {
         <span className="fb-ico"><Icon.forms /></span>
         <h1>{idRef ? 'Editar formulario' : 'Nuevo formulario de WhatsApp'}</h1>
         <div className="spacer" style={{ flex: 1 }} />
-        <button className="icon-btn" onClick={onClose} title="Cerrar">✕</button>
+        <button className="icon-btn" onClick={onClose} title="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
       </header>
 
       <div className="fb-body">

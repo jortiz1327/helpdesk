@@ -5,6 +5,7 @@ import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
 import DateRange from './DateRange.jsx'
 import { WarrantyReports } from './WarrantyTeam.jsx'
+import { SkStats } from './Esqueleto.jsx'
 
 /* -------------------------------------------------------------------------
  * ESTADÍSTICAS de Gestión de garantías, en cinco pestañas:
@@ -256,7 +257,7 @@ function Fallos({ desde, hasta }) {
     return () => { vivo = false }
   }, [desde, hasta, kind, cliente])
 
-  if (!d) return <div className="center-load"><div className="spinner" /></div>
+  if (!d) return <SkStats />
   if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
   const k = d.kpis
   const unCliente = !!cliente
@@ -377,7 +378,7 @@ function Fases({ desde, hasta, onOpenWarranty }) {
     return () => { vivo = false }
   }, [desde, hasta])
 
-  if (!d) return <div className="center-load"><div className="spinner" /></div>
+  if (!d) return <SkStats />
   if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
   const k = d.kpis
   const atascadas = k.warn + k.crit
@@ -462,7 +463,7 @@ function Satisfaccion({ desde, hasta, onOpenWarranty }) {
     return () => { vivo = false }
   }, [desde, hasta])
 
-  if (!d) return <div className="center-load"><div className="spinner" /></div>
+  if (!d) return <SkStats />
   if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
   const k = d.kpis
   const series = d.scores.map((s) => [`s${s.score}`, `${s.score} · ${s.label}`, s.color]).reverse()
@@ -531,7 +532,7 @@ function Portal({ desde, hasta }) {
     return () => { vivo = false }
   }, [desde, hasta, cliente])
 
-  if (!d) return <div className="center-load"><div className="spinner" /></div>
+  if (!d) return <SkStats />
   if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
   const k = d.kpis
   const series = Object.entries(TIPO).map(([key, [l, c]]) => [key, l, c])

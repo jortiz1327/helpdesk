@@ -77,7 +77,7 @@ export default function InteractiveBuilder({ mode, onClose, onSend }) {
               ? <><Icon.list style={{ width: 16, height: 16, fill: 'var(--primary)' }} /> Mensaje de lista</>
               : <><Icon.checkSquare style={{ width: 16, height: 16, fill: 'var(--primary)' }} /> Mensaje con botones</>}
           </h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
 
         <div className="modal-body ib">

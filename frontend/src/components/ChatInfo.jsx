@@ -89,7 +89,7 @@ export default function ChatInfo({ contact, messages, onClose, onUpdated, onSend
   return (
     <>
       <aside className="info-panel">
-        <div className="info-head"><h3>Información del chat</h3><button className="icon-btn x" onClick={onClose} title="Cerrar">✕</button></div>
+        <div className="info-head"><h3>Información del chat</h3><button className="icon-btn x" onClick={onClose} title="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="info-scroll">
           <div className="info-hero">
             <div className="avatar xl" style={{ background: avatarBg(contact.wa_id || '') }}>{initials(contact)}</div>
@@ -143,7 +143,7 @@ export default function ChatInfo({ contact, messages, onClose, onUpdated, onSend
                 return (
                   <span key={l.id} className="lbl-pick" onClick={() => toggleLabel(l.id)}
                     style={{ background: on ? l.color : 'transparent', color: on ? '#0b141a' : l.color, borderColor: l.color }}>
-                    {on && <span className="check">✓</span>}{l.name}
+                    {on && <span className="check"><Icon.check className="ic-x" aria-hidden="true" /></span>}{l.name}
                   </span>
                 )
               })}
@@ -171,7 +171,7 @@ export default function ChatInfo({ contact, messages, onClose, onUpdated, onSend
           <div className="info-sec">
             <div className="sec-t"><Icon.note /> Notas</div>
             <textarea className="note-area" placeholder="Escribe una nota interna…" value={note} onChange={(e) => onNoteChange(e.target.value)} />
-            {noteState !== 'idle' && <div className="note-save">{noteState === 'saving' ? 'Guardando…' : '✓ Guardado'}</div>}
+            {noteState !== 'idle' && <div className="note-save">{noteState === 'saving' ? 'Guardando…' : <><Icon.check className="ic-x" aria-hidden="true" /> Guardado</>}</div>}
           </div>
 
           {/* Shared files */}

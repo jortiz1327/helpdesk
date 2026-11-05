@@ -142,13 +142,13 @@ function Features({ onGoto }) {
               <div className="feat-tx">
                 <b>{it.label}</b>
                 <span>{it.desc}</span>
-                {it.note && <span className="feat-note">⚠️ {it.note}</span>}
+                {it.note && <span className="feat-note"><Icon.warn className="ic-x" aria-hidden="true" /> {it.note}</span>}
               </div>
               {it.type === 'status' && (
                 <div className="feat-state">
                   <span className={`feat-badge ${it.on ? 'ok' : 'muted'}`}>{it.value}</span>
                   {it.goto && onGoto && (
-                    <button type="button" className="feat-goto" onClick={() => onGoto(it.goto)}>{it.gotoLabel} →</button>
+                    <button type="button" className="feat-goto" onClick={() => onGoto(it.goto)}>{it.gotoLabel} <Icon.arrowRight className="ic-arrow" aria-hidden="true" /></button>
                   )}
                 </div>
               )}
@@ -540,7 +540,7 @@ function KeywordsInput({ value, onChange }) {
   return (
     <div className="kw-input" onClick={(e) => e.currentTarget.querySelector('input')?.focus()}>
       {tags.map((t) => (
-        <span key={t} className="kw-chip">{t}<button type="button" onClick={() => remove(t)} aria-label={`Quitar ${t}`}>✕</button></span>
+        <span key={t} className="kw-chip">{t}<button type="button" onClick={() => remove(t)} aria-label={`Quitar ${t}`}><Icon.x className="ic-x" aria-hidden="true" /></button></span>
       ))}
       <input value={txt} placeholder={tags.length ? '' : 'no cargan, en blanco, piloto rojo…'}
         onChange={(e) => setTxt(e.target.value)}
@@ -1177,7 +1177,7 @@ function BusinessHours() {
               {d.holidays.map((f) => (
                 <span key={f.id} className="bh-fest">
                   <b>{fmtDia(f.date)}</b>{f.name && <i>· {f.name}</i>}
-                  <button className="icon-btn" title="Quitar" onClick={() => delFestivo(f)}>✕</button>
+                  <button className="icon-btn" title="Quitar" onClick={() => delFestivo(f)}><Icon.x className="ic-x" aria-hidden="true" /></button>
                 </span>
               ))}
             </div>
@@ -1725,7 +1725,7 @@ function OptionsEditor({ value, onChange }) {
   return (
     <div className="kw-input" onClick={(e) => e.currentTarget.querySelector('input')?.focus()}>
       {opts.map((t) => (
-        <span key={t} className="kw-chip">{t}<button type="button" onClick={() => remove(t)} aria-label={`Quitar ${t}`}>✕</button></span>
+        <span key={t} className="kw-chip">{t}<button type="button" onClick={() => remove(t)} aria-label={`Quitar ${t}`}><Icon.x className="ic-x" aria-hidden="true" /></button></span>
       ))}
       <input value={txt} placeholder={opts.length ? '' : 'Baja, Media, Alta…'}
         onChange={(e) => setTxt(e.target.value)}
@@ -1912,7 +1912,7 @@ function Modal({ title, children, onClose, onSave, saveLabel, width = 560 }) {
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: width }}>
-        <div className="modal-h"><h3>{title}</h3><button className="icon-btn" onClick={onClose}>✕</button></div>
+        <div className="modal-h"><h3>{title}</h3><button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">{children}</div>
         <div className="modal-foot">
           <button className="btn ghost" onClick={onClose}>Cancelar</button>

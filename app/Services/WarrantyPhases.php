@@ -91,4 +91,64 @@ class WarrantyPhases
             'oldest' => $abiertas->sortByDesc('days')->values()->take(15)->all(),
         ];
     }
+
+    /**
+     * Los pasos de una garantía para la barra de la ficha: los estados abiertos en su orden y,
+     * al final, el cierre. Cada uno con los días que ha pasado en él (sumando si volvió),
+     * y el actual con lo que lleva y su nivel según la regla que lo vigila.
+     *   state: done (ya pasó por él) · current · todo (aún no, o se saltó)
+     */
+    public static function forWarranty(Warranty $w): array
+    {
+        $estados = Warranty::statusRows();
+        $porNombre = [];
+        foreach ($estados as $k => $s) $porNombre[mb_strtolower($s['label'])] = $k;
+        $clave = fn ($v) => $v === null ? null : ($porNombre[mb_strtolower(trim((string) $v))] ?? (isset($estados[$v]) ? $v : null));
+        $dias = fn ($a, $b) => max(0, (strtotime((string) $b) - strtotime((string) $a)) / 86400);
+
+        $pasado = [];   // key => [días, veces]
+        $inicio = $w->created_at;
+        foreach (DB::table('warranty_events')->where('warranty_id', $w->id)->where('field', 'status')
+            ->orderBy('created_at')->orderBy('id')->get(['from_value', 'created_at']) as $e) {
+            $st = $clave($e->from_value);
+            if ($st && $inicio) {
+                $pasado[$st][0] = ($pasado[$st][0] ?? 0) + $dias($inicio, $e->created_at);
+                $pasado[$st][1] = ($pasado[$st][1] ?? 0) + 1;
+            }
+            $inicio = $e->created_at;
+        }
+
+        $actual = (string) $w->status;
+        $cerrada = ! empty($estados[$actual]['closed']);
+        $ahora = (int) floor($dias($w->status_changed_at ?? $w->created_at, now()));
+        $reglas = $cerrada ? [] : (new WarrantyAlerts)->rules();
+
+        $pasos = [];
+        foreach ($estados as $k => $s) {
+            if ($s['closed']) continue;
+            $es = $k === $actual;
+            if (! $s['active'] && ! $es && ! isset($pasado[$k])) continue;
+            $p = ['key' => $k, 'label' => $s['label'], 'color' => $s['color'],
+                'days' => isset($pasado[$k]) ? round($pasado[$k][0], 1) : null, 'visits' => $pasado[$k][1] ?? 0,
+                'state' => $es ? 'current' : (isset($pasado[$k]) ? 'done' : 'todo')];
+            if ($es) {
+                $r = $reglas[WarrantyAlerts::ruleForStatus($k)] ?? null;
+                $warn = $r && $r['active'] ? $r['warn_days'] : null;
+                $crit = $r && $r['active'] ? $r['crit_days'] : null;
+                $p += ['now' => $ahora, 'warn' => $warn, 'crit' => $crit,
+                    'level' => $crit !== null && $ahora >= $crit ? 'crit' : ($warn !== null && $ahora >= $warn ? 'warn' : null)];
+            }
+            $pasos[] = $p;
+        }
+        // El cierre: el estado cerrado en el que está, o «Cerrada» por venir.
+        $pasos[] = $cerrada
+            ? ['key' => $actual, 'label' => $estados[$actual]['label'], 'color' => $estados[$actual]['color'], 'days' => null, 'visits' => 0, 'state' => 'current', 'closed' => true, 'now' => $ahora]
+            : ['key' => '_cierre', 'label' => 'Cerrada', 'color' => null, 'days' => null, 'visits' => 0, 'state' => 'todo', 'closed' => true];
+
+        return [
+            'steps' => $pasos,
+            'total' => round($dias($w->created_at, $cerrada ? ($w->closed_at ?? $w->status_changed_at ?? now()) : now()), 1),
+            'closed' => $cerrada,
+        ];
+    }
 }

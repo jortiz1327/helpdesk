@@ -624,7 +624,7 @@ function ModalElegirArea({ data, onClose, onMoved }) {
     <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 420 }}>
         <div className="modal-h"><h3>¿A qué categoría lo mueves?</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button></div>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <p className="cfg-hint"><b>{data.agentName}</b> atiende varias áreas. Elige a cuál mover este ticket.</p>
           <div className="area-choices">
@@ -650,7 +650,7 @@ function ModalReasignarArea({ data, onClose, onDone }) {
     <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 440 }}>
         <div className="modal-h"><h3>El agente no lleva esa área</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button></div>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <p className="cfg-hint"><b>{data.agentName}</b> no atiende «{data.catName}». ¿Qué hacemos con la asignación?</p>
           {data.cands.length > 0 ? (
@@ -981,7 +981,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                 {v.shared ? <span className="tkv-team" aria-label="Vista del equipo">👥</span> : <span className="tkv-dot" />}
                 {v.name}
                 {(!v.shared || canShare) && (
-                  <span className="tkv-x" title="Borrar vista" onClick={(e) => borrarVista(v, e)}>×</span>
+                  <span className="tkv-x" title="Borrar vista" onClick={(e) => borrarVista(v, e)}><Icon.x className="ic-x" aria-hidden="true" /></span>
                 )}
               </button>
             ))}
@@ -1000,7 +1000,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                   </label>
                 )}
                 <button className="tkv-save-ok" onClick={guardarVista}>Guardar</button>
-                <button className="tkv-save-no" onClick={() => { setNaming(false); setNewName(''); setShareNew(false) }}>✕</button>
+                <button className="tkv-save-no" onClick={() => { setNaming(false); setNewName(''); setShareNew(false) }} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
               </span>
             ) : refined ? (
               <button className="tkv add" onClick={() => setNaming(true)} title="Guardar los filtros actuales como una vista rápida">
@@ -1286,7 +1286,7 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                             {!['resuelto', 'cerrado'].includes(t.status) && (waiting || t.last_direction === 'out') && (
                               waiting
                                 ? <span className={`st-ind pend ${density === 'compacta' ? 'sm' : ''}`} title="Sin responder: el cliente escribió lo último y aún no le hemos contestado">!</span>
-                                : <span className={`st-ind resp ${density === 'compacta' ? 'sm' : ''}`} title="Respondido: ya hemos contestado y esperamos al cliente">✓</span>
+                                : <span className={`st-ind resp ${density === 'compacta' ? 'sm' : ''}`} title="Respondido: ya hemos contestado y esperamos al cliente"><Icon.check className="ic-x" aria-hidden="true" /></span>
                             )}
                           </span>
                         </td>
@@ -1425,7 +1425,7 @@ function BulkMergeDialog({ n, onCancel, onConfirm }) {
     <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && !yendo && onCancel()}>
       <div className="modal" style={{ maxWidth: 460 }}>
         <div className="modal-h"><h3>Fusionar {n} tickets</h3>
-          <button className="icon-btn" onClick={onCancel}>✕</button></div>
+          <button className="icon-btn" onClick={onCancel} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <p className="cfg-hint">Los {n} tickets (del mismo cliente) pasan a ser <b>una sola conversación</b>,
             ordenada por fecha. El más antiguo se queda como principal.</p>
@@ -1493,7 +1493,7 @@ function ModalFusion({ id, preselect = null, meta, onClose, onDone }) {
     <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && !yendo && onClose()}>
       <div className="modal fus-dlg">
         <div className="modal-h"><h3>Fusionar tickets</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button></div>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
 
         <div className="modal-body">
           {!datos ? <div className="center-load"><div className="spinner" /></div>
@@ -2175,7 +2175,7 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
                   </button>
                 </div>
               </div>
-              <button className="icon-btn tk-close" onClick={onClose} title="Cerrar (Esc)">✕</button>
+              <button className="icon-btn tk-close" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
 
               {/* --- DEL CLIENTE: sus otros tickets, localizados por su correo --- */}
               {view === 'client' ? (
@@ -2380,7 +2380,7 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
                               return c
                                 ? <a className="tk-loc" href={`https://www.google.com/maps?q=${c[1]},${c[2]}`} target="_blank" rel="noreferrer">
                                     <span className="tk-loc-pin">📍</span>
-                                    <span className="tk-loc-tx"><b>Ubicación compartida</b><small>Ver en el mapa →</small></span>
+                                    <span className="tk-loc-tx"><b>Ubicación compartida</b><small>Ver en el mapa <Icon.arrowRight className="ic-arrow" aria-hidden="true" /></small></span>
                                   </a>
                                 : m.body
                             })()
@@ -2432,7 +2432,7 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
                             m.status === 'failed'
                               ? <span className="wa-ack fail" title={m.delivery_error || 'No entregado'}><Icon.warn /> No entregado</span>
                               : <span className={`wa-ack ${m.status}`} title={m.status === 'read' ? 'Leído' : m.status === 'delivered' ? 'Entregado' : 'Enviado'}>
-                                  {m.status === 'sent' ? '✓' : '✓✓'}
+                                  {m.status === 'sent' ? <Icon.check className="ic-x" aria-hidden="true" /> : <Icon.checks className="ic-x" aria-hidden="true" />}
                                 </span>
                           )}
                         </div>
@@ -2610,7 +2610,7 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
         <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setNotaEstado(false)}>
           <div className="modal" style={{ maxWidth: 420 }}>
             <div className="modal-h"><h3>¿Cambiar el estado del ticket?</h3>
-              <button className="icon-btn" onClick={() => setNotaEstado(false)}>✕</button></div>
+              <button className="icon-btn" onClick={() => setNotaEstado(false)} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
             <div className="modal-body">
               <p className="cfg-hint">Acabas de añadir una nota. ¿Quieres marcar el ticket como…?</p>
               <div className="area-choices">
@@ -2662,7 +2662,7 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
           <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setEditReq(null)}>
             <div className="modal" style={{ maxWidth: 440 }}>
               <div className="modal-h"><h3>Datos del cliente</h3>
-                <button className="icon-btn" onClick={() => setEditReq(null)}>✕</button></div>
+                <button className="icon-btn" onClick={() => setEditReq(null)} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
               <div className="modal-body">
                 <p className="cfg-hint">Ponle nombre al cliente de <b>+{t?.contact_wa}</b>. Se guarda en su ficha y lo verás en todos sus tickets.</p>
                 <label className="field"><span className="lbl">Nombre</span>
@@ -2692,7 +2692,7 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
         <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setEditReq(null)}>
           <div className="modal" style={{ maxWidth: 440 }}>
             <div className="modal-h"><h3>Cambiar solicitante</h3>
-              <button className="icon-btn" onClick={() => setEditReq(null)}>✕</button></div>
+              <button className="icon-btn" onClick={() => setEditReq(null)} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
             <div className="modal-body">
               <p className="cfg-hint">Corrige el <b>correo del cliente</b> de esta incidencia (p. ej. si se escribió mal).
                 Solo cambia en este ticket; el contacto anterior se queda con los suyos.</p>
@@ -2720,7 +2720,7 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
         <div className="modal-bg" onMouseDown={(e) => e.target.classList.contains('modal-bg') && setJustificar(false)}>
           <div className="modal jst-dlg">
             <div className="modal-h"><h3>Se cerró fuera de plazo</h3>
-              <button className="icon-btn" onClick={() => setJustificar(false)}>✕</button></div>
+              <button className="icon-btn" onClick={() => setJustificar(false)} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
 
             <div className="modal-body">
               <p className="cfg-hint">

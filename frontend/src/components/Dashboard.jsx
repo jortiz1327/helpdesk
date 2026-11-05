@@ -105,7 +105,7 @@ export default function Dashboard({ user, onOpen }) {
               <div className="panel">
                 <div className="panel-h"><Icon.message /> <div><b>Sin leer</b></div></div>
                 {s.unread_chats === 0 ? (
-                  <div className="all-caught"><span className="ac-check">✓</span><b>¡Todo al día!</b><p>No tienes mensajes sin leer.</p></div>
+                  <div className="all-caught"><span className="ac-check"><Icon.check aria-hidden="true" /></span><b>¡Todo al día!</b><p>No tienes mensajes sin leer.</p></div>
                 ) : (
                   <div className="recent-list">
                     {s.recent.filter((c) => parseInt(c.unread) > 0).map((c) => (

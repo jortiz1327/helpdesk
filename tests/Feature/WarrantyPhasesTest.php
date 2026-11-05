@@ -75,4 +75,37 @@ class WarrantyPhasesTest extends TestCase
         $this->getJson('/api/warranties.php?action=phases', ['X-App-Token' => TokenService::make($u)])
             ->assertOk()->assertJsonPath('kpis.open', 2);
     }
+
+    public function test_recorrido_de_una_garantia_para_la_ficha(): void
+    {
+        // Alta hace 30 días: 4 en «En curso», 2 en «Pte. cliente», vuelve 3 a «En curso» y lleva 21 en «Pte. presupuesto».
+        $w = $this->garantia('pte_presupuesto', 21, 'G-1');
+        DB::table('warranties')->where('id', $w->id)->update(['created_at' => now()->subDays(30)]);
+        foreach ([[26, 'En curso', 'Pte. cliente'], [24, 'Pte. cliente', 'En curso'], [21, 'En curso', 'Pte. presupuesto']] as [$hace, $de, $a]) {
+            DB::table('warranty_events')->insert(['warranty_id' => $w->id, 'field' => 'status', 'from_value' => $de, 'to_value' => $a, 'created_at' => now()->subDays($hace)]);
+        }
+
+        $p = collect(WarrantyPhases::forWarranty($w->fresh())['steps'])->keyBy('key');
+        $this->assertSame(['done', 7.0, 2], [$p['en_curso']['state'], (float) $p['en_curso']['days'], $p['en_curso']['visits']]);
+        $this->assertSame(['done', 2.0], [$p['pte_cliente']['state'], (float) $p['pte_cliente']['days']]);
+        $this->assertSame(['current', 21, 'crit'], [$p['pte_presupuesto']['state'], $p['pte_presupuesto']['now'], $p['pte_presupuesto']['level']]);
+        $this->assertSame(['todo', null], [$p['enviada']['state'], $p['enviada']['days']]);
+        $this->assertSame(['_cierre', 'todo'], [$p->last()['key'], $p->last()['state']]);
+
+        // Cerrada: el último paso es su estado de cierre, y ya no hay nivel.
+        DB::table('warranties')->where('id', $w->id)->update(['status' => 'cerrada', 'closed_at' => now(), 'status_changed_at' => now()]);
+        DB::table('warranty_events')->insert(['warranty_id' => $w->id, 'field' => 'status', 'from_value' => 'Pte. presupuesto', 'to_value' => 'Cerrada', 'created_at' => now()]);
+        $c = WarrantyPhases::forWarranty($w->fresh());
+        $this->assertSame([true, 'cerrada', 'current'], [$c['closed'], end($c['steps'])['key'], end($c['steps'])['state']]);
+        $pp = collect($c['steps'])->firstWhere('key', 'pte_presupuesto');
+        $this->assertSame(['done', 21], [$pp['state'], (int) round($pp['days'])]);
+        $this->assertArrayNotHasKey('level', $pp);
+
+        // Y la ficha lo trae.
+        $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
+        $u = User::create(['name' => 'Ve', 'email' => 've@x.com', 'password' => bcrypt('x')]);
+        $u->givePermissionTo('warranties.access');
+        $this->getJson("/api/warranties.php?action=get&id={$w->id}", ['X-App-Token' => TokenService::make($u)])
+            ->assertOk()->assertJsonPath('warranty.phases.closed', true);
+    }
 }

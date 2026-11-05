@@ -221,7 +221,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
               <Icon.send /> {sending ? 'Enviando…' : 'Enviar respuesta'}
             </button>
             <button className="btn cmp-split-caret" disabled={disabled || empty || sending}
-              onClick={() => setSchedOpen((v) => !v)} title="Programar el envío">▾</button>
+              onClick={() => setSchedOpen((v) => !v)} title="Programar el envío" aria-label="Programar el envío"><Icon.chevron className="ic-x" aria-hidden="true" /></button>
             {schedOpen && (
               <div className="cmp-sched">
                 <div className="cmp-sched-h"><b>¿Cuándo sale?</b><small>Se guarda y se envía sola.</small></div>
@@ -274,7 +274,7 @@ function Direcciones({ etiqueta, valor, onChange, disabled, pista }) {
         {valor.map((d) => (
           <span key={d} className="cmp-cc-chip">
             {d}
-            <button type="button" onClick={() => onChange(valor.filter((x) => x !== d))} title="Quitar">✕</button>
+            <button type="button" onClick={() => onChange(valor.filter((x) => x !== d))} title="Quitar"><Icon.x className="ic-x" aria-hidden="true" /></button>
           </span>
         ))}
         <input

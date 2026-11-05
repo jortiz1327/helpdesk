@@ -4,6 +4,8 @@ import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import { useDialog } from './a11y.js'
+import Vacio from './Vacio.jsx'
+import { SkLista } from './Esqueleto.jsx'
 
 /* -------------------------------------------------------------------------
  * PROTOCOLOS Y GUÍAS de garantías: documentación operativa (cómo se trabaja, condiciones
@@ -40,7 +42,7 @@ export function VisorGuia({ g, onClose }) {
         <div className="modal-head">
           <h3>{g.title}{g.version ? <small className="dev-mute"> · v{g.version}</small> : null}</h3>
           <a className="dev-btn" href={api.warrantyGuideUrl(g.id, true)}><Icon.download /> Descargar</a>
-          <button className="x" onClick={onClose}>×</button>
+          <button className="x" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
         {seVe(g)
           ? (g.mime === 'application/pdf' ? <iframe title={g.title} src={url} /> : <div className="gd-visor-img"><img src={url} alt={g.title} /></div>)
@@ -88,7 +90,7 @@ function Formulario({ g, meta, onClose, onSaved }) {
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 640 }} {...dlg}>
-        <div className="modal-head"><h3>{g?.id ? 'Editar documento' : 'Nuevo documento'}</h3><button className="x" onClick={onClose}>×</button></div>
+        <div className="modal-head"><h3>{g?.id ? 'Editar documento' : 'Nuevo documento'}</h3><button className="x" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body gd-form">
           <label className="field"><span className="lbl">Título <em>*</em></span>
             <input value={f.title} maxLength={160} onChange={set('title')} placeholder="Procedimiento de garantías Expofarm" /></label>
@@ -203,13 +205,13 @@ export default function WarrantyGuides() {
         {d?.manage ? <button className="btn" onClick={() => setForm(null)}><Icon.plus /> Nuevo documento</button> : null}
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
-        {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
+        {!d ? <SkLista rows={5} label="Cargando la documentación…" /> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
           <>
             <div className="dev-card gd-filtros">
               <div className="wi-bar">
                 <div className="dev-search"><Icon.search />
                   <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por título, descripción, palabras clave o cliente…" />
-                  {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+                  {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
                 </div>
                 <Select value={tipo} onChange={setTipo} options={[{ value: '', label: 'Todos los tipos' }, ...Object.entries(d.kinds).map(([k, l]) => ({ value: k, label: l }))]} />
                 <Select value={donde} onChange={setDonde} searchable options={[{ value: '', label: 'Cualquier ámbito' }, { value: '_general', label: 'General' }, ...ambitos.map((a) => ({ value: a, label: a }))]} />
@@ -218,9 +220,12 @@ export default function WarrantyGuides() {
               </div>
             </div>
             {!d.guides.length ? (
-              <div className="dev-card gd-vacio"><Icon.file /><p>Aún no hay documentación.{d.manage ? ' Sube el primer documento con «Nuevo documento».' : ''}</p></div>
+              <div className="dev-card"><Vacio icon={Icon.file} title="Aún no hay documentación"
+                actions={d.manage ? <button className="btn" onClick={() => setForm(null)}><Icon.plus /> Subir el primer documento</button> : null}>
+                Manuales, fichas técnicas y guías de reparación, para tenerlos a mano al revisar cada garantía.</Vacio></div>
             ) : !filtradas.length ? (
-              <div className="dev-card gd-vacio"><Icon.search /><p>Ningún documento coincide con el filtro.</p></div>
+              <div className="dev-card"><Vacio icon={Icon.search} title="Ningún documento coincide"
+                actions={<button className="dev-btn" onClick={() => { setQ(''); setTipo(''); setDonde(''); setIdioma('') }}><Icon.x /> Quitar los filtros</button>} /></div>
             ) : grupos.map(([k, l]) => (
               <section key={k} className="gd-grupo">
                 <h3><TipoIc kind={k} sm /> {d.kinds[k]} <span className="dev-mute">{l.length}</span></h3>
@@ -263,7 +268,7 @@ export function GuiasRelacionadas({ w, onGoAll }) {
       {d.general.length ? <><h4 className="gd-rel-h">General</h4><ul>{generales.map((g) => fila(g, false))}</ul></> : null}
       <div className="gd-rel-f">
         {d.general.length > MAX_GEN && !todas ? <button className="wf-link" onClick={() => setTodas(true)}>{d.general.length - MAX_GEN} más</button> : null}
-        {onGoAll ? <button className="wf-link" onClick={onGoAll}>Ver toda la documentación →</button> : null}
+        {onGoAll ? <button className="wf-link" onClick={onGoAll}>Ver toda la documentación <Icon.arrowRight className="ic-arrow" aria-hidden="true" /></button> : null}
       </div>
       {ver ? <VisorGuia g={ver} onClose={() => setVer(null)} /> : null}
     </section>

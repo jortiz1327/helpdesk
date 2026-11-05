@@ -293,7 +293,7 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
           <div className="stepper">
             {STEPS.map((s, i) => (
               <div className={`stp ${i === step ? 'cur' : ''} ${i < step ? 'done' : ''}`} key={s} onClick={() => i < step && setStep(i)}>
-                <span className="stp-dot">{i < step ? '✓' : i + 1}</span><span className="stp-lbl">{s}</span>
+                <span className="stp-dot">{i < step ? <Icon.check className="ic-x" aria-label="Hecho" /> : i + 1}</span><span className="stp-lbl">{s}</span>
               </div>
             ))}
           </div>
@@ -352,7 +352,7 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
                     <div className="upload-zone" style={{ marginTop: 16 }}>
                       <input type="file" id="mediafile" hidden onChange={(e) => onFile(e, 'header')} accept={f.header.mediaFormat === 'IMAGE' ? 'image/*' : f.header.mediaFormat === 'VIDEO' ? 'video/mp4' : 'application/pdf'} />
                       <label htmlFor="mediafile" className="btn ghost"><Icon.upload /> {f.header.uploading ? 'Subiendo…' : f.header.handle ? 'Cambiar archivo' : 'Subir archivo'}</label>
-                      {f.header.handle && <span className="ok-tag">✓ Subido</span>}
+                      {f.header.handle && <span className="ok-tag"><Icon.check className="ic-x" aria-hidden="true" /> Subido</span>}
                     </div>
                   </>
                 )}
@@ -480,7 +480,7 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
                       <div className="upload-zone">
                         <input type="file" id={`card${i}`} hidden accept="image/png,image/jpeg" onChange={(e) => onCardFile(i, e)} />
                         <label htmlFor={`card${i}`} className="btn ghost"><Icon.upload /> {c.uploading ? 'Subiendo…' : c.handle ? 'Cambiar imagen' : 'Subir imagen'}</label>
-                        {c.handle && <span className="ok-tag">✓ Subida</span>}
+                        {c.handle && <span className="ok-tag"><Icon.check className="ic-x" aria-hidden="true" /> Subida</span>}
                       </div>
                       <label className="field" style={{ marginTop: 14 }}><span className="lbl">Texto de la tarjeta <span style={{ color: 'var(--danger)' }}>*</span></span>
                         <textarea maxLength={160} value={c.body} onChange={(e) => updCard(i, { body: e.target.value })} placeholder="Describe esta tarjeta…" style={{ minHeight: 70 }} />
@@ -503,7 +503,7 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
                 <div className="upload-zone">
                   <input type="file" id="thumb" hidden accept="image/*" onChange={(e) => onFile(e, 'thumb')} />
                   <label htmlFor="thumb" className="btn ghost"><Icon.upload /> {f.catalog.thumbUploading ? 'Subiendo…' : f.catalog.thumbHandle ? 'Cambiar miniatura' : 'Subir miniatura'}</label>
-                  {f.catalog.thumbHandle && <span className="ok-tag">✓ Subida</span>}
+                  {f.catalog.thumbHandle && <span className="ok-tag"><Icon.check className="ic-x" aria-hidden="true" /> Subida</span>}
                 </div>
                 <label className="field" style={{ marginTop: 18 }}><span className="lbl">Cuerpo del mensaje <span style={{ color: 'var(--danger)' }}>*</span></span>
                   <textarea className="big-area" style={{ minHeight: 110 }} maxLength={1024} value={f.catalog.body} onChange={(e) => updCat({ body: e.target.value })} placeholder="ej. Explora nuestra colección y compra directamente en WhatsApp." />

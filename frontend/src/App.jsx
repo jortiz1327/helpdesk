@@ -936,7 +936,7 @@ function VersionModal({ onClose }) {
                         <h3>Novedades</h3>
                         <span className="ver-modal-sub">v{cur.version} · {cur.date}</span>
                     </div>
-                    <button className="ver-modal-x" onClick={onClose} aria-label="Cerrar">✕</button>
+                    <button className="ver-modal-x" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
                 </div>
                 <div className="ver-modal-body">
                     {cur.resumen && <p className="ver-resumen">{cur.resumen}</p>}

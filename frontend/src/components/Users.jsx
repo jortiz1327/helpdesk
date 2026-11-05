@@ -288,7 +288,7 @@ export default function Users() {
           <div className="modal" style={{ maxWidth: 560 }}>
             <div className="modal-h">
               <h3>{form.id ? 'Editar usuario' : 'Nuevo usuario'}</h3>
-              <button className="icon-btn" onClick={() => setForm(null)} title="Cerrar (Esc)">✕</button>
+              <button className="icon-btn" onClick={() => setForm(null)} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
             <div className="modal-body">
               <div className="grid2">
@@ -361,7 +361,7 @@ export default function Users() {
           <div className="modal" style={{ maxWidth: 640 }}>
             <div className="modal-h">
               <h3>{roleForm.name ? 'Editar rol' : 'Nuevo rol'}</h3>
-              <button className="icon-btn" onClick={() => setRoleForm(null)} title="Cerrar (Esc)">✕</button>
+              <button className="icon-btn" onClick={() => setRoleForm(null)} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
             <div className="modal-body">
               <div className="grid2">

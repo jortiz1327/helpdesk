@@ -295,7 +295,7 @@ function ContactDuplicates({ pairs, onClose, onMerge, onIgnored }) {
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 680 }}>
-        <div className="modal-h"><h3>Posibles duplicados</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-h"><h3>Posibles duplicados</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <p className="ct-hint" style={{ marginTop: 0 }}>
             Mismo nombre: una ficha escribió por <b>WhatsApp</b> y otra por <b>correo</b>. Si es la misma persona, únelas:
@@ -390,7 +390,7 @@ function ContactMerge({ pair: pair0, onClose, onMerged }) {
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 560 }}>
-        <div className="modal-h"><h3>Unir en una sola ficha</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-h"><h3>Unir en una sola ficha</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <p className="ct-hint" style={{ marginTop: 0 }}>Las dos fichas pasan a ser una: <b>se suman sus datos y todos sus tickets</b>, mensajes y etiquetas.</p>
 
@@ -496,7 +496,7 @@ function ContactEdit({ contact, onClose, onSaved }) {
       <div className="modal" style={{ maxWidth: 520 }}>
         <div className="modal-h">
           <h3>{isNew ? 'Nuevo contacto' : 'Editar contacto'}</h3>
-          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
+          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
         <div className="modal-body">
           <label className="field"><span className="lbl">Nombre</span>
@@ -574,7 +574,7 @@ function BulkAddContacts({ area, onClose, onDone }) {
       <div className="modal" style={{ maxWidth: 560 }}>
         <div className="modal-h">
           <h3>Agregar contactos en masa</h3>
-          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
+          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
         <div className="modal-body">
           <div className="kb-seg" style={{ marginBottom: 12 }}>
@@ -641,7 +641,7 @@ function ImportContacts({ onClose, onDone }) {
       <div className="modal" style={{ maxWidth: 560 }}>
         <div className="modal-h">
           <h3>Importar contactos de Excel/CSV</h3>
-          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
+          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
         <div className="modal-body">
           <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Sube un <b>.xlsx</b> o <b>.csv</b> con estas columnas (por su nombre; el orden da igual). La columna <b>Sector</b> se convierte en <b>etiqueta</b> (se crea si no existe). Si un contacto ya existe (mismo correo o teléfono), se reutiliza y se le añade la etiqueta.</p>
@@ -650,7 +650,7 @@ function ImportContacts({ onClose, onDone }) {
           </div>
           <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] || null)}
             style={{ display: 'block', width: '100%', fontSize: 13.5, marginBottom: 8 }} />
-          <button className="link-btn" onClick={plantilla} style={{ fontSize: 12.5 }}>↓ Descargar plantilla de ejemplo</button>
+          <button className="link-btn" onClick={plantilla} style={{ fontSize: 12.5 }}><Icon.download className="ic-x" aria-hidden="true" /> Descargar plantilla de ejemplo</button>
         </div>
         <div className="modal-foot">
           <button className="btn ghost" onClick={onClose}>Cancelar</button>

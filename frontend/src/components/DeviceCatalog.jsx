@@ -92,7 +92,7 @@ function Editor({ inicial, d, onClose, onSaved }) {
   return (
     <div className="modal-bg wr-over" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal wd-modal wide dc-modal" onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
-        <div className="modal-h"><h3>{m.id ? 'Editar modelo' : 'Nuevo modelo'}</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-h"><h3>{m.id ? 'Editar modelo' : 'Nuevo modelo'}</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <div className="dc-grid">
             <div className="field"><span className="lbl">Tamaño <span className="hint">— pulgadas</span></span><input inputMode="decimal" value={m.size} placeholder="2,6" onChange={(e) => set({ size: e.target.value })} /></div>

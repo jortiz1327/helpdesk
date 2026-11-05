@@ -235,7 +235,7 @@ export default function ZkongServers() {
           <div className="modal" style={{ maxWidth: 540 }}>
             <div className="modal-head">
               <h3>{form.id ? 'Editar servidor' : 'Añadir servidor ZKONG'}</h3>
-              <button className="x" onClick={() => setForm(null)}>×</button>
+              <button className="x" onClick={() => setForm(null)} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
             <div className="modal-body">
               <div className="grid2">

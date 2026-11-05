@@ -217,7 +217,7 @@ function NodeKeywords({ value, onChange }) {
       {list.map((w, i) => (
         <div className="nd-kw-row" key={i}>
           <input className="nd-in nodrag" value={w} placeholder="palabra…" onChange={(e) => upd(list.map((x, j) => (j === i ? e.target.value : x)))} />
-          <button className="nd-kw-x" onClick={() => upd(list.length > 1 ? list.filter((_, j) => j !== i) : [''])} title="Quitar">×</button>
+          <button className="nd-kw-x" onClick={() => upd(list.length > 1 ? list.filter((_, j) => j !== i) : [''])} title="Quitar"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
       ))}
       <button className="nd-kw-add" onClick={() => upd([...list, ''])}>+ palabra clave</button>
@@ -272,7 +272,7 @@ function InteractiveNodeBody({ data, set }) {
                 <input className="nd-in nodrag" value={o.title ?? ''} placeholder={`Opción ${i + 1}`} onChange={(e) => setOpt(i, { title: e.target.value })} />
                 {isList && <input className="nd-in nodrag nd-opt-desc" value={o.description ?? ''} placeholder="Descripción (opcional)" onChange={(e) => setOpt(i, { description: e.target.value })} />}
               </div>
-              {opts.length > 1 && <button className="nd-kw-x" title="Quitar" onClick={() => delOpt(i)}>×</button>}
+              {opts.length > 1 && <button className="nd-kw-x" title="Quitar" onClick={() => delOpt(i)}><Icon.x className="ic-x" aria-hidden="true" /></button>}
             </div>
           ))}
           {opts.length < max && <button className="nd-kw-add" onClick={addOpt}>+ opción</button>}
@@ -307,7 +307,7 @@ function HttpNodeBody({ data, set }) {
                 <input className="nd-in nodrag" value={h.key ?? ''} placeholder="Clave (ej. Authorization)" onChange={(e) => setH(i, { key: e.target.value })} />
                 <input className="nd-in nodrag nd-opt-desc" value={h.value ?? ''} placeholder="Valor" onChange={(e) => setH(i, { value: e.target.value })} />
               </div>
-              <button className="nd-kw-x" title="Quitar" onClick={() => set('headers', headers.filter((_, k) => k !== i))}>×</button>
+              <button className="nd-kw-x" title="Quitar" onClick={() => set('headers', headers.filter((_, k) => k !== i))}><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
           ))}
           <button className="nd-kw-add" onClick={() => set('headers', [...headers, { key: '', value: '' }])}>+ cabecera</button>
@@ -325,7 +325,7 @@ function HttpNodeBody({ data, set }) {
                 <input className="nd-in nodrag" value={s.variable ?? ''} placeholder="Variable (ej. precio)" onChange={(e) => setS(i, { variable: e.target.value })} />
                 <input className="nd-in nodrag nd-opt-desc" value={s.path ?? ''} placeholder="Ruta JSON (ej. data.precio) — vacío = todo" onChange={(e) => setS(i, { path: e.target.value })} />
               </div>
-              <button className="nd-kw-x" title="Quitar" onClick={() => set('saveTo', saveTo.filter((_, k) => k !== i))}>×</button>
+              <button className="nd-kw-x" title="Quitar" onClick={() => set('saveTo', saveTo.filter((_, k) => k !== i))}><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
           ))}
           <button className="nd-kw-add" onClick={() => set('saveTo', [...saveTo, { variable: '', path: '' }])}>+ variable</button>
@@ -428,7 +428,7 @@ function CustomNode({ id, data }) {
 
   return (
     <div className={`flow-node ${isLoose ? 'loose' : ''}`} style={{ '--nc': def.color }}>
-      {isLoose && <span className="nd-loose-badge" title="Este nodo no está conectado al flujo">⚠ sin conectar</span>}
+      {isLoose && <span className="nd-loose-badge" title="Este nodo no está conectado al flujo"><Icon.warn className="ic-x" aria-hidden="true" /> sin conectar</span>}
       {!def.fixed && <Handle type="target" position={Position.Left} />}
       <div className="nd-head">
         <span className="nd-ic" style={{ background: def.color + '22' }}><Ico style={{ width: 16, height: 16, fill: def.color }} /></span>
@@ -437,7 +437,7 @@ function CustomNode({ id, data }) {
           : (
             <span className="nd-head-actions">
               <button className="nd-copy" title="Duplicar nodo" onClick={() => duplicateNode?.(id)}><Icon.copy style={{ width: 14, height: 14, fill: 'currentColor' }} /></button>
-              <button className="nd-del" onClick={() => removeNode(id)}>✕</button>
+              <button className="nd-del" onClick={() => removeNode(id)} aria-label="Quitar"><Icon.x className="ic-x" aria-hidden="true" /></button>
             </span>
           )}
       </div>
@@ -502,7 +502,7 @@ function NodeMenu({ onAdd, onClose }) {
     && (!q || d.label.toLowerCase().includes(q.toLowerCase())))
   return (
     <div className="node-menu">
-      <div className="nm-head"><span className="nm-title"><Icon.bolt style={{ width: 18, height: 18, fill: 'var(--primary)' }} /> Menú de nodos</span><button className="x" onClick={onClose}>✕</button></div>
+      <div className="nm-head"><span className="nm-title"><Icon.bolt style={{ width: 18, height: 18, fill: 'var(--primary)' }} /> Menú de nodos</span><button className="x" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
       <div className="nm-search"><Icon.search /><input placeholder="Buscar nodos…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       <div className="nm-tabs">{CATS.map(([k, t]) => <button key={k} className={`nm-tab ${cat === k ? 'on' : ''}`} onClick={() => setCat(k)}>{t}</button>)}</div>
       <div className="nm-list">
@@ -620,7 +620,7 @@ function SimPanel({ nodes, edges, labels, onClose }) {
 
   return (
     <div className="sim-panel">
-      <div className="sim-head"><span><Icon.play style={{ width: 16, height: 16, fill: 'var(--primary)' }} /> Simulación</span><button className="x" onClick={onClose}>✕</button></div>
+      <div className="sim-head"><span><Icon.play style={{ width: 16, height: 16, fill: 'var(--primary)' }} /> Simulación</span><button className="x" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
       <div className="sim-form">
         <label className="field" style={{ margin: 0 }}><span className="lbl">Nombre del remitente</span><input value={senderName} onChange={(e) => setSenderName(e.target.value)} /></label>
         <label className="field" style={{ margin: '12px 0 0' }}><span className="lbl">Mensaje entrante</span><input value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run()} /></label>
@@ -721,7 +721,7 @@ function ImportModal({ onClose, onPick }) {
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 520 }}>
-        <div className="modal-head"><h3>Importar plantilla de flujo</h3><button className="icon-btn" onClick={onClose}>✕</button></div>
+        <div className="modal-head"><h3>Importar plantilla de flujo</h3><button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           {FLOW_TEMPLATES.map((t, i) => (
             <div key={i} className="pick" onClick={() => onPick(t)}>

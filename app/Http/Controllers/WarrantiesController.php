@@ -299,6 +299,7 @@ class WarrantiesController extends Controller
             'alerts'          => $this->alertas()->alerts([$w])[$w->id] ?? [],
             'status_changed_at' => $w->status_changed_at?->toDateTimeString(),
             'rating'          => \App\Services\WarrantySurvey::forWarranty($w->id),
+            'phases'          => \App\Services\WarrantyPhases::forWarranty($w),
             'description'     => $w->description,
             // El asunto es del Helpdesk: solo para quien puede ver ese ticket.
             'ticket_subject'  => $w->ticketVisibleTo($request->user()) ? $w->ticket_subject : null,

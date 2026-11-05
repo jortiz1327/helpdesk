@@ -417,7 +417,7 @@ const RichInput = forwardRef(function RichInput({
             if (e.key === 'Enter') { e.preventDefault(); ponerEnlace() }
           }}>
             <div className="modal-h"><h3><Icon.link /> Insertar enlace</h3>
-              <button type="button" className="icon-btn" onClick={() => setEnlace(null)}>✕</button></div>
+              <button type="button" className="icon-btn" onClick={() => setEnlace(null)} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
 
             <div className="modal-body">
               <label className="field"><span className="lbl">Dirección <em>*</em></span>
@@ -451,7 +451,7 @@ const RichInput = forwardRef(function RichInput({
               {f.preview ? <img src={f.preview} alt="" /> : <span className="cf-ic"><Icon.file /></span>}
               <span className="cf-tx"><b>{f.name}</b><small>{(f.size / 1024).toFixed(0)} KB</small></span>
               <button type="button" className="cf-x" title="Quitar"
-                onClick={() => setFiles((s) => s.filter((_, j) => j !== i))}>✕</button>
+                onClick={() => setFiles((s) => s.filter((_, j) => j !== i))}><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
           ))}
         </div>

@@ -7,6 +7,7 @@ import LoadError from './LoadError.jsx'
 import { TicketModal, Paginador, prChip } from './Tickets.jsx'
 import { NuevaGarantia } from './Warranties.jsx'
 import { filaClic } from './a11y.js'
+import { SkTabla } from './Esqueleto.jsx'
 
 /*
  * «Tickets de garantías»: bandeja propia de Gestión de garantías. Lista los tickets de la
@@ -94,7 +95,7 @@ export default function WarrantyInbox({ user, initialTicket = null, onOpenWarran
             <button className="btn ghost" onClick={load} title="Volver a cargar"><Icon.refresh /> Actualizar</button>
           </div>
 
-          {err ? <LoadError onRetry={load} /> : !d ? <div className="center-load"><div className="spinner" /></div> : !rows.length ? (
+          {err ? <LoadError onRetry={load} /> : !d ? <SkTabla rows={7} cols={5} label="Cargando los tickets…" /> : !rows.length ? (
             <div className="wi-empty"><Icon.inbox /><span>{q ? 'Nada coincide con la búsqueda.' : tab === 'pendientes' ? 'No hay tickets de garantías esperando: todos tienen su garantía o están cerrados.' : 'No hay tickets en esta vista.'}</span></div>
           ) : (
             <div className="dev-table-wrap keep">

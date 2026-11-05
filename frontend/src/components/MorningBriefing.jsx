@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Icon } from '../icons.jsx'
 import { api } from '../api.js'
 
 /*
@@ -70,7 +71,7 @@ export default function MorningBriefing({ user, onOpen, onGoInbox }) {
                     <span className={`mb-${r.cls}`}>{r.icon} {r.text}</span>
                   </span>
                 </span>
-                <span className="mb-go">Ver →</span>
+                <span className="mb-go">Ver <Icon.arrowRight className="ic-arrow" aria-hidden="true" /></span>
               </button>
             )
           })}

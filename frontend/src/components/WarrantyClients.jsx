@@ -4,6 +4,8 @@ import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
 import { filaClic } from './a11y.js'
+import Vacio from './Vacio.jsx'
+import { SkTabla, SkStats } from './Esqueleto.jsx'
 
 /* -------------------------------------------------------------------------
  * CLIENTES Y PROYECTOS de Gestión de garantías. Solo consulta.
@@ -73,7 +75,7 @@ function Lista({ onOpen }) {
   }, [])
   useEffect(() => setPag(0), [q, filtro, orden])
 
-  if (!d) return <div className="center-load"><div className="spinner" /></div>
+  if (!d) return <div className="dev-card"><SkTabla rows={8} cols={6} label="Cargando los clientes…" /></div>
   if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
 
   const todas = d.rows || []
@@ -131,7 +133,7 @@ function Lista({ onOpen }) {
           <div className="dev-search wl-search">
             <Icon.search />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente, nombre comercial, CIF, ciudad o garantía…" />
-            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
           </div>
           <div className="dc-seg zk-seg">{pestañas.map(([key, l, n]) => <button key={key || 'todos'} className={filtro === key ? 'on' : ''} onClick={() => setFiltro(key)}>{l}<em>{n}</em></button>)}</div>
           <Select sm value={orden} onChange={setOrden} options={ORDENES} />
@@ -176,8 +178,12 @@ function Lista({ onOpen }) {
             </tbody>
           </table>
           {!lista.length && (
-            <div className="act-empty"><Icon.building style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
-              <p>{filtro === 'open' && !busca ? 'Ningún cliente tiene garantías abiertas.' : 'Ningún cliente con este filtro.'}</p></div>
+            filtro === 'open' && !busca
+              ? <Vacio icon={Icon.check} title="Ningún cliente tiene garantías abiertas"
+                  actions={todas.length ? <button className="dev-btn" onClick={() => { setFiltro(''); setPag(0) }}>Ver todos ({todas.length})</button> : null}>
+                  Todo al día.</Vacio>
+              : <Vacio icon={Icon.search} title="Ningún cliente coincide"
+                  actions={<button className="dev-btn" onClick={() => { setQ(''); setFiltro(''); setPag(0) }}><Icon.x /> Quitar los filtros</button>} />
           )}
         </div>
         {lista.length ? (
@@ -218,7 +224,7 @@ function Ficha({ k, onBack, onOpenWarranty }) {
   useEffect(() => { cargar() }, [k])
 
   const volver = <button className="wr-back" onClick={onBack}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> Clientes</button>
-  if (!d) return <div className="center-load"><div className="spinner" /></div>
+  if (!d) return <SkStats label="Cargando el cliente…" />
   if (d.error) return <>{volver}<div className="dev-error"><Icon.warn /> {d.error}</div></>
 
   const c = d.client
@@ -306,12 +312,12 @@ function Ficha({ k, onBack, onOpenWarranty }) {
                 <div className="dev-search wl-search">
                   <Icon.search />
                   <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar garantía, hotel, responsable o estado…" />
-                  {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+                  {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
                 </div>
                 <div className="dc-seg zk-seg">
                   {[['', 'Todas'], ['open', 'Abiertas'], ['closed', 'Cerradas']].map(([key, l]) => <button key={key || 'all'} className={estado === key ? 'on' : ''} onClick={() => setEstado(key)}>{l}</button>)}
                 </div>
-                {lugar ? <span className="cl-filtro">{lugar.name} <button className="dev-x" onClick={() => setLugar(null)} title="Quitar">×</button></span> : null}
+                {lugar ? <span className="cl-filtro">{lugar.name} <button className="dev-x" onClick={() => setLugar(null)} title="Quitar"><Icon.x className="ic-x" aria-hidden="true" /></button></span> : null}
               </div>
               <div className="dev-table-wrap keep">
                 <table className="dev-table cl-t">

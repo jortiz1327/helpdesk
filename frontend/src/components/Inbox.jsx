@@ -28,10 +28,10 @@ function Avatar({ c, size = 'md' }) {
 }
 
 function Ticks({ status }) {
-  if (status === 'read') return <span className="tick read">✓✓</span>
-  if (status === 'delivered') return <span className="tick">✓✓</span>
-  if (status === 'failed') return <span className="tick failed">✕</span>
-  return <span className="tick">✓</span>
+  if (status === 'read') return <span className="tick read" title="Leído"><Icon.checks className="ic-x" aria-hidden="true" /></span>
+  if (status === 'delivered') return <span className="tick" title="Entregado"><Icon.checks className="ic-x" aria-hidden="true" /></span>
+  if (status === 'failed') return <span className="tick failed" title="No se pudo entregar"><Icon.x className="ic-x" aria-hidden="true" /></span>
+  return <span className="tick" title="Enviado"><Icon.check className="ic-x" aria-hidden="true" /></span>
 }
 
 // Vista previa de un mensaje interactivo saliente (botones o lista)
@@ -658,7 +658,7 @@ export default function Inbox({ user, onUnread, initialContactId, onOpened }) {
           <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-h">
               <h3>{newConv.mode === 'new' ? 'Contacto nuevo' : newConv.mode === 'saved' ? 'Contacto guardado' : 'Nueva conversación'}</h3>
-              <button className="icon-btn" onClick={closeNewConv} title="Cerrar (Esc)">✕</button>
+              <button className="icon-btn" onClick={closeNewConv} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
 
             {/* Cara 0: ¿nuevo o de la agenda? */}
@@ -746,7 +746,7 @@ export default function Inbox({ user, onUnread, initialContactId, onOpened }) {
           <div className="modal mpv">
             <div className="modal-head">
               <h3>Enviar {ATTACH.find((a) => a.type === mediaPreview.type)?.label.toLowerCase() || 'archivo'}</h3>
-              <button className="icon-btn" onClick={cancelMedia}>✕</button>
+              <button className="icon-btn" onClick={cancelMedia} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
             <div className="modal-body">
               <div className="mpv-preview">
@@ -837,7 +837,7 @@ function ToTicketModal({ contact, scope: scope0, msg, onClose, onDone }) {
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 520 }}>
-        <div className="modal-h"><h3>Crear ticket de soporte</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-h"><h3>Crear ticket de soporte</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Convierte esta conversación de WhatsApp en un ticket del Helpdesk. El soporte lo seguirá por correo.</p>
           <label className="field"><span className="lbl">Correo del cliente <span className="hint">(para el ticket)</span></span>

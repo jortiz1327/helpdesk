@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Icon } from '../icons.jsx'
 import { api } from '../api.js'
 
 const headerTextComp = (t) => (t.components || []).find((c) => c.type === 'HEADER' && c.format === 'TEXT')
@@ -43,7 +44,7 @@ export default function TemplatePicker({ onClose, onPick }) {
       <div className="modal">
         <div className="modal-head">
           <h3>{sel ? `Plantilla · ${sel.t.name}` : 'Enviar plantilla'}</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
 
         {!sel ? (

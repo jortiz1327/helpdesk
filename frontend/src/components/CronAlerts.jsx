@@ -178,7 +178,7 @@ function Aviso({ a, abierto, onToggle, onResolver, resuelto, marcado, onMarcar }
         <span className="cr-reason">{a.last_reason || 'Fallo'}</span>
         <span className="cr-fails" title={`${a.fails} ejecuciones fallidas`}>{a.fails}</span>
         <span className="cr-when">{fmt(a.last_at)}</span>
-        <span className={`cr-chev ${abierto ? 'on' : ''}`}>▾</span>
+        <span className={`cr-chev ${abierto ? 'on' : ''}`}><Icon.chevron className="ic-x" aria-hidden="true" /></span>
       </button>
 
       {abierto && (
@@ -210,7 +210,7 @@ function Aviso({ a, abierto, onToggle, onResolver, resuelto, marcado, onMarcar }
                 {det.runs.map((r) => (
                   <div key={r.id} className="cr-run">
                     <span className="cr-run-t">{fmt(r.created_at)}</span>
-                    <span className="cr-run-x">✕</span>
+                    <span className="cr-run-x"><Icon.x className="ic-x" aria-hidden="true" /></span>
                     <span className="cr-run-s">{r.resumen}</span>
                   </div>
                 ))}

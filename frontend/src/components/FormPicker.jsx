@@ -55,7 +55,7 @@ export default function FormPicker({ onClose, onSend }) {
             <Icon.forms style={{ width: 16, height: 16, fill: 'var(--primary)' }} />
             {sel ? `Formulario · ${sel.name}` : 'Enviar formulario'}
           </h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
 
         {!sel ? (

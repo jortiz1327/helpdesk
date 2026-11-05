@@ -4,6 +4,7 @@ import { csvCell } from '../csv.js'
 import { Icon } from '../icons.jsx'
 import Select from './Select.jsx'
 import DateRange from './DateRange.jsx'
+import { SkTabla } from './Esqueleto.jsx'
 
 /* -------------------------------------------------------------------------
  * EQUIPO e INFORMES de Gestión de garantías.
@@ -92,7 +93,7 @@ export function WarrantyTeam({ onFilter }) {
           <div className="dev-search wl-search">
             <Icon.search />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar responsable…" />
-            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
           </div>
           <div className="dc-seg">{PERIODOS.map(([k, l]) => <button key={k} className={periodo === k ? 'on' : ''} onClick={() => setPeriodo(k)}>{l}</button>)}</div>
           <span className="spacer" />
@@ -103,7 +104,7 @@ export function WarrantyTeam({ onFilter }) {
           ) : null}
           <button className="dev-btn" disabled={!todas.length} onClick={exportar} title="Exportar la tabla a CSV"><Icon.download /> Exportar</button>
         </div>
-        {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
+        {!d ? <SkTabla rows={6} cols={6} label="Cargando el equipo…" /> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
           <div className="dev-card wt-card">
             {cargando && <div className="dev-progress" />}
             <div className="dev-table-wrap keep wt-wrap">

@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
+import { SkLista } from './Esqueleto.jsx'
 
 
 /* -------------------------------------------------------------------------
@@ -467,7 +468,7 @@ function PasosCliente({ lists, categorias, hacer }) {
                 {l.steps.map((s, k) => (
                   <li key={s.id}><div className="ws-pl-row">
                     <input value={s.text} maxLength={160} placeholder="Qué hay que hacer" onChange={(e) => setL(i, { steps: l.steps.map((x, j) => (j === k ? { ...x, text: e.target.value } : x)) })} />
-                    <button className="icon-btn" title="Quitar el paso" onClick={() => setL(i, { steps: l.steps.filter((_, j) => j !== k) })}>✕</button>
+                    <button className="icon-btn" title="Quitar el paso" onClick={() => setL(i, { steps: l.steps.filter((_, j) => j !== k) })}><Icon.x className="ic-x" aria-hidden="true" /></button>
                   </div></li>
                 ))}
               </ol>
@@ -703,7 +704,7 @@ export default function WarrantySettings() {
         <span className="sub">· Estados, categorías, urgencias, alertas y sus avisos, pasos, motivos de cierre, plantillas, plazos, documentos, texto para Finanzas, sustituciones y tour guiado de Gestión de garantías</span>
       </header>
       <div className="page-scroll"><div className="page dev-page wr-page">
-        {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
+        {!d ? <SkLista rows={4} label="Cargando los ajustes…" /> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
           <div className="ws-layout">
             <nav className="dev-card ws-nav">
               {SECCIONES.map(([grupo, items]) => (

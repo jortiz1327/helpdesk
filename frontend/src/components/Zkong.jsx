@@ -149,7 +149,7 @@ function Bandeja({ rv, puede, onOpenWarranty, onBatch }) {
           <div className="dev-search wl-search">
             <Icon.search />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar garantía, cliente, nº de serie, modelo o fallo…" />
-            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
           </div>
           <Select sm value={orden} onChange={setOrden} options={ORDENES} />
           <span className="spacer" />
@@ -158,7 +158,7 @@ function Bandeja({ rv, puede, onOpenWarranty, onBatch }) {
             <span className="zk-elegidas">
               <b>{plural(elegidas.length, 'elegida', 'elegidas')}</b> de {plural(gruposSel, 'garantía', 'garantías')}
               {sinFotosSel ? <span className="zk-falta" title="Sin todas las fotos"><Icon.image /> {sinFotosSel}</span> : null}
-              <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button>
+              <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}><Icon.x className="ic-x" aria-hidden="true" /></button>
             </span>
           ) : <span className="dev-mute zk-ayuda">Marca las etiquetas que van juntas</span>}
           {puede && d.drafts.length > 0 && elegidas.length > 0 && (
@@ -248,7 +248,7 @@ function Ventana({ titulo, campos, inicial, boton, peligro, onClose, onOk }) {
   return (
     <div className="modal-bg wr-over" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal wd-modal zk-ventana" onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
-        <div className="modal-h"><h3>{titulo}</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-h"><h3>{titulo}</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <div className="zk-form">
             {campos.map((c) => (
@@ -354,7 +354,7 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
           <div className="dev-search wl-search">
             <Icon.search />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar remesa, garantía, cliente, tracking o albarán…" />
-            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+            {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
           </div>
           <div className="dc-seg zk-seg">{pestañas.map(([k, l, n]) => <button key={k || 'todas'} className={filtro === k ? 'on' : ''} onClick={() => setFiltro(k)}>{l}<em>{n}</em></button>)}</div>
           {transportistas.length > 1 ? <Select sm value={transp} onChange={setTransp} options={[{ value: '', label: 'Todos los transportistas' }, ...transportistas.map((t) => ({ value: t, label: t }))]} /> : null}
@@ -551,7 +551,7 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
           <span className="spacer" />
           {sel.size > 0 ? (
             <>
-              <span className="zk-elegidas"><b>{plural(sel.size, 'elegida', 'elegidas')}</b><button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button></span>
+              <span className="zk-elegidas"><b>{plural(sel.size, 'elegida', 'elegidas')}</b><button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}><Icon.x className="ic-x" aria-hidden="true" /></button></span>
               {puede && borrador && <button className="dev-btn" disabled={ocupado} onClick={quitar}><Icon.x /> Quitar de la remesa</button>}
               {puede && conRespuesta && (
                 <>

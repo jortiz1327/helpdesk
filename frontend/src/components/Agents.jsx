@@ -186,7 +186,7 @@ function HistoryModal({ agent, onClose }) {
             <small>{agent.email}</small>
           </div>
           <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
+          <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </header>
 
         <div className="hist-body">

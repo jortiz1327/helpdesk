@@ -11,6 +11,8 @@ import { GuiasRelacionadas } from './WarrantyGuides.jsx'
 import { leerCodigos } from '../barcode.js'
 import { TicketModal } from './Tickets.jsx'
 import { useDialog, filaClic } from './a11y.js'
+import Vacio from './Vacio.jsx'
+import { SkFicha } from './Esqueleto.jsx'
 
 /* -------------------------------------------------------------------------
  * GARANTÍAS (Gestión de garantías). Expedientes G-AAAA-NNNN.
@@ -63,7 +65,7 @@ function CierreModal({ modo, titulo, estados, inicial, opts, agentes, conFecha, 
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 520 }} {...dlg}>
-        <div className="modal-head"><h3>{titulo}</h3><button className="x" onClick={onClose}>×</button></div>
+        <div className="modal-head"><h3>{titulo}</h3><button className="x" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">
           <div className={conFecha ? 'grid2' : ''}>
             <div className="field"><span className="lbl">{modo === 'cerrar' ? 'Queda como' : 'Vuelve a'}</span>
@@ -225,7 +227,7 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
               <button className={paso === 'etiquetas' ? 'on' : ''} onClick={siguiente}><b>2</b> Etiquetas</button>
             </div>
           )}
-          <button className="x" onClick={onClose}>×</button>
+          <button className="x" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
         {enEtiquetas ? (
           <div className="modal-body wr-alta-body">
@@ -384,6 +386,7 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
   const filas = data?.rows || []
   const counts = data?.counts || {}
   const filtrando = !!(q || resp || cat || MAS_FILTROS.some(([k]) => k === chip))
+  const quitarFiltros = () => { setQLive(''); setQ(''); setResp(''); setCat(''); if (MAS_FILTROS.some(([k]) => k === chip)) setChip('open'); setPage(0) }
   const todasMarcadas = filas.length > 0 && filas.every((w) => sel.has(w.id))
   const marcar = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const marcarTodas = () => setSel(todasMarcadas ? new Set() : new Set(filas.map((w) => w.id)))
@@ -423,7 +426,7 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
         <div className="dev-search wl-search">
           <Icon.search />
           <input value={qLive} onChange={(e) => setQLive(e.target.value)} placeholder="Buscar expediente, cliente, proyecto o ticket…" />
-          {qLive ? <button className="dev-x" onClick={() => setQLive('')} title="Borrar">×</button> : null}
+          {qLive ? <button className="dev-x" onClick={() => setQLive('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
         </div>
         <div className="dc-seg wi-tabs">
           {PESTANAS.map(([k, l]) => (
@@ -491,24 +494,24 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
           </tr></thead>
           <tbody>
             {data === null
-              ? Array.from({ length: 6 }, (_, i) => <tr key={i}>{Array.from({ length: 10 }, (_, j) => <td key={j}><span className="dev-skel" /></td>)}</tr>)
+              ? Array.from({ length: 6 }, (_, i) => <tr key={i} className="wl-skel">{Array.from({ length: 10 }, (_, j) => <td key={j}><span className="dev-skel" /></td>)}</tr>)
               : filas.map((w) => (
                 <tr key={w.id} className={`wr-row ${sel.has(w.id) ? 'wl-on' : ''}`} {...filaClic(() => onOpen(w.id))}>
                   <td className="wl-ck" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(w.id)} onChange={() => marcar(w.id)} /></td>
-                  <td><span className="wr-code">{w.code}</span><Alertas list={w.alerts} /></td>
+                  <td className="wl-c-code"><span className="wr-code">{w.code}</span><Alertas list={w.alerts} /></td>
                   <td className="wl-cli">
                     <b>{w.client_name || <span className="dev-mute">Sin cliente</span>}</b>
                     <span>{[w.project_name, w.category].filter(Boolean).join(' · ') || '—'}</span>
                   </td>
-                  <td>{w.ticket_code ? <span className="wl-tk">{w.ticket_code}</span> : <span className="dev-mute">—</span>}</td>
-                  <td className="r">{w.labels_count ? <b>{num(w.labels_count)}</b> : <span className="dev-mute">—</span>}
+                  <td className="wl-c-tk">{w.ticket_code ? <span className="wl-tk">{w.ticket_code}</span> : <span className="dev-mute">—</span>}</td>
+                  <td className="r wl-c-n">{w.labels_count ? <><b>{num(w.labels_count)}</b><span className="wl-m">{w.labels_count === 1 ? ' etiqueta' : ' etiquetas'}</span></> : <span className="dev-mute">—</span>}
                     {w.repeated ? <span className="wr-rep sm" title={`${w.repeated} ${w.repeated === 1 ? 'dispositivo ya ha estado' : 'dispositivos ya han estado'} en otra garantía`}><Icon.refresh /> {w.repeated}</span> : null}</td>
-                  <td>{w.responsible_name
+                  <td className="wl-c-resp">{w.responsible_name
                     ? <span className="wl-resp"><i>{iniciales(w.responsible_name)}</i>{w.responsible_name}</span>
                     : <span className="dev-mute">Sin asignar</span>}</td>
-                  <td><EstadoPill s={w.status} opts={opts} /></td>
-                  <td><UrgPill u={w.urgency} opts={opts} /></td>
-                  <td>{w.coverages?.length
+                  <td className="wl-c-st"><EstadoPill s={w.status} opts={opts} /></td>
+                  <td className="wl-c-urg"><UrgPill u={w.urgency} opts={opts} /></td>
+                  <td className="wl-c-cob">{w.coverages?.length
                     ? <span className="wl-cob">{w.coverages.map((c) => <em key={c} className={`c-${c}`}>{COB_CORTO[c] || c}</em>)}</span>
                     : <span className="dev-mute" title="Se decide al revisar las etiquetas">—</span>}</td>
                   <td className="wl-act" title={fechaHora(w.last_activity_at)}>{relativo(w.last_activity_at)}</td>
@@ -516,9 +519,23 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
               ))}
           </tbody>
         </table>
-        {data && !filas.length && (
-          <div className="act-empty"><Icon.shield style={{ width: 30, height: 30, fill: 'var(--ink-3)' }} />
-            <p>{data.all ? 'Ninguna garantía coincide con el filtro.' : 'Aún no hay garantías. Crea la primera con «Nueva garantía».'}</p></div>
+        {data && !filas.length && !data.error && (
+          !data.all ? (
+            <Vacio icon={Icon.shield} title="Aún no hay garantías"
+              actions={opts?.perms?.edit ? <button className="btn" onClick={onNew}><Icon.plus /> Nueva garantía</button> : null}>
+              Cada garantía reúne las etiquetas del cliente, su revisión y los documentos. También se crean desde un ticket.
+            </Vacio>
+          ) : filtrando ? (
+            <Vacio icon={Icon.search} title="Ninguna garantía coincide"
+              actions={<button className="dev-btn" onClick={quitarFiltros}><Icon.x /> Quitar los filtros</button>}>
+              {q ? <>No hay resultados para «{q}» con estos filtros.</> : 'Prueba con otros filtros o quítalos para ver todas.'}
+            </Vacio>
+          ) : (
+            <Vacio icon={chip === 'open' ? Icon.check : Icon.shield} title={chip === 'open' ? 'No hay garantías abiertas' : chip === 'mine' ? 'No tienes garantías asignadas' : 'Nada en esta pestaña'}
+              actions={<button className="dev-btn" onClick={() => { setChip(''); setPage(0) }}>Ver todas ({num(data.all)})</button>}>
+              {chip === 'open' ? 'Todo al día: las demás están cerradas.' : 'Las demás garantías están en las otras pestañas.'}
+            </Vacio>
+          )
         )}
       </div>
       {total > 0 && (
@@ -633,7 +650,7 @@ function Modelo({ r, onPick }) {
         <Select sm block searchable value={r.aeme_ref || ''} placeholder={r.kind === 'ap' ? 'Elegir antena del portal…' : 'Elegir producto del portal…'}
           options={[...cat].sort((a, b) => (a.kind === r.kind ? 0 : 1) - (b.kind === r.kind ? 0 : 1)).map((m) => ({ value: m.ref, label: m.ref, sub: [m.kind === 'ap' ? 'Antena' : null, m.product_name || m.description].filter(Boolean).join(' · ') }))}
           onChange={(v) => { setEditar(false); onPick(v, cat.find((m) => m.ref === v)) }} />
-        {editar && r.aeme_ref ? <button className="icon-btn" title="Cancelar" onClick={() => setEditar(false)}>×</button> : null}
+        {editar && r.aeme_ref ? <button className="icon-btn" title="Cancelar" onClick={() => setEditar(false)}><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
       </div>
     )
   }
@@ -784,7 +801,7 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
                     })()}
                   </li>
                 ))}
-                {!vista.length ? <li className="wr-cs-none">Ninguna en este filtro.</li> : null}
+                {!vista.length ? <li className="wr-cs-none">Ninguna en este filtro. <button type="button" className="st-link" onClick={() => setFiltro('')}>Ver todas</button></li> : null}
               </ul>
             </>
           )}
@@ -1078,7 +1095,7 @@ function Revisar({ w, rv, diag, items: iniciales, preset, onClose, onSaved }) {
       <div className={`modal wr-rev${paso === 'fotos' ? ' wide' : ''}`} {...dlg}>
         <div className="modal-h">
           <h3>{uno ? <>Revisar <span className="mono">{uno.code}</span></> : `Revisar ${items.length} dispositivos`}</h3>
-          <button className="icon-btn" onClick={cerrar} title="Cerrar (Esc)">✕</button>
+          <button className="icon-btn" onClick={cerrar} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
         {(res?.photos || conFotos.length > 0) && (
           <div className="wr-steps">
@@ -1355,7 +1372,15 @@ const leerVista = () => { try { return localStorage.getItem(VISTA_KEY) } catch {
 function Productos({ w, items, opts, onReload, onChanged }) {
   const toast = useToast()
   const confirm = useConfirm()
-  const [panel, setPanel] = useState(!items.length)
+  const [panel, setPanel] = useState(false)
+  // «Pegar desde Excel»: lee el portapapeles (el navegador puede pedir permiso); si no deja, abre el cuadro para pegar a mano.
+  const pegarExcel = async () => {
+    let t = ''
+    try { t = (await navigator.clipboard?.readText?.()) || '' } catch { /* sin permiso */ }
+    setPanel(true)
+    if (t.trim()) { setComp({ ...COMP_VACIO, text: t.replace(/\r/g, '').trim() }); toast('Lista pegada: pulsa «Comprobar y añadir»') }
+    else toast('Pega la columna de Excel en el cuadro (Ctrl+V)')
+  }
   const [comp, setComp] = useState(COMP_VACIO)
   const [ocupado, setOcupado] = useState('')
   const [ficha, setFicha] = useState(null)
@@ -1509,7 +1534,10 @@ function Productos({ w, items, opts, onReload, onChanged }) {
             <label className="wr-selall"><input type="checkbox" checked={todasVisibles} onChange={marcarVisibles} />
               {todasVisibles ? 'Quitar la selección' : `Seleccionar ${listado.length === items.length ? 'todas' : `las ${listado.length} que se ven`}`}</label>
           )}
-          {!listado.length ? <p className="dev-mute">Ninguna con este filtro.</p> : null}
+          {!listado.length ? (
+            <Vacio compact icon={Icon.search} title="Ninguna con este filtro"
+              actions={<button className="dev-btn sm" onClick={() => { setFiltro(''); setRev('') }}>Ver todas ({items.length})</button>} />
+          ) : null}
           {listado.length > 0 && vista === 'cartas' ? (
             <ul className="wr-cards">
               {listado.map((i) => (
@@ -1545,13 +1573,21 @@ function Productos({ w, items, opts, onReload, onChanged }) {
                 return <button key={k} className={`wr-res c-${RES_UI[k].c}`} onClick={() => setRevisar({ items: elegidas, preset: k })}><Ic /> <span>{rv.resolutions[k]?.label}</span></button>
               })}
               <button className="dev-btn" onClick={() => setRevisar({ items: elegidas })}>Otra…</button>
-              <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}>✕</button>
+              <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
           )}
           {items[0]?.checked_at ? <p className="dev-mute wr-prod-foot">Comprobadas por última vez {fechaHora(items.reduce((a, i) => (i.checked_at > a ? i.checked_at : a), ''))}.</p> : null}
         </>
       )}
-      {!items.length && !panel ? <p className="dev-mute">Todavía no hay etiquetas.{p.edit ? ' Añádelas con su código.' : ''}</p> : null}
+      {!items.length && !panel ? (
+        <Vacio icon={Icon.tag} title="Sin etiquetas"
+          actions={p.edit ? <>
+            <button className="btn" onClick={() => setPanel(true)}><Icon.plus /> Añadir etiquetas</button>
+            <button className="dev-btn" onClick={pegarExcel} title="Una columna con el código y, al lado, el problema"><Icon.copy /> Pegar desde Excel</button>
+          </> : null}>
+          {p.edit ? 'Añade los códigos de las etiquetas o las MAC de las antenas: se comprueban en el Cloud y luego se revisan una a una. Desde Excel puedes pegar el código con su problema.' : 'Todavía no hay etiquetas en esta garantía.'}
+        </Vacio>
+      ) : null}
       {ficha && <FichaDispositivo code={ficha} servers={[]} onClose={() => setFicha(null)} onOpen={setFicha} />}
       {revisar && <Revisar w={w} rv={rv} diag={opts?.diagnosis} items={revisar.items} preset={revisar.preset} onClose={() => setRevisar(null)} onSaved={trasRevisar} />}
     </>
@@ -1559,6 +1595,124 @@ function Productos({ w, items, opts, onReload, onChanged }) {
 }
 
 const CANAL = { correo: ['Correo', Icon.mail], whatsapp: ['WhatsApp', Icon.whatsapp], adjunto: ['Adjunto', Icon.file] }
+
+/**
+ * Barra de fases de la ficha: los estados en su orden, dónde está ahora y cuántos días
+ * ha pasado en cada uno (sumando si volvió a él). Los que no ha tocado quedan apagados:
+ * el recorrido no es fijo y una garantía puede saltarse fases.
+ */
+const dd = (n) => (n == null ? null : n < 1 ? '<1 d' : `${Math.round(n)} d`)
+function PasosFase({ ph }) {
+  const caja = useRef(null)
+  useEffect(() => {
+    // En pantallas estrechas la barra se desplaza: que se vea el paso actual.
+    const id = requestAnimationFrame(() => {
+      const c = caja.current, el = c?.querySelector('.now')
+      if (el && c.scrollWidth > c.clientWidth) c.scrollLeft = el.offsetLeft - c.clientWidth / 2 + el.offsetWidth / 2
+    })
+    return () => cancelAnimationFrame(id)
+  }, [ph])
+  const actual = ph.steps.find((s) => s.state === 'current')
+  return (
+    <div className="wf-steps-w">
+      <div className="wf-steps-h">
+        <b>Recorrido</b>
+        {actual ? <span>{ph.closed ? 'Terminó en' : 'Ahora en'} <b>{actual.label}</b> · días en cada fase</span> : null}
+      </div>
+      <ol className="wf-steps" ref={caja} aria-label="Fases de la garantía">
+        {ph.steps.map((s) => {
+          const now = s.state === 'current'
+          const dias = now && !s.closed ? s.now : s.days
+          const tit = [s.label,
+            now && !s.closed ? `ahora: ${s.now} ${s.now === 1 ? 'día' : 'días'}${s.warn != null ? ` (aviso a los ${s.warn}, crítico a los ${s.crit})` : ''}` : null,
+            s.days != null ? `antes: ${Math.round(s.days * 10) / 10} días${s.visits > 1 ? ` en ${s.visits} veces` : ''}` : null,
+            s.state === 'todo' && !s.closed ? 'no ha pasado por aquí' : null].filter(Boolean).join(' · ')
+          return (
+            <li key={s.key} className={`${s.state === 'done' ? 'done' : now ? 'now' : 'todo'}${now && s.level ? ` lv-${s.level}` : ''}${s.closed ? ' end' : ''}`}
+              style={s.color ? { '--sc': s.color } : null} title={tit} aria-current={now ? 'step' : undefined}>
+              <i className="bar" />
+              <span className="lb">{s.state === 'done' ? <Icon.check /> : null}{s.label}</span>
+              <span className="dy">
+                {now && !s.closed ? <>{s.now === 0 ? 'Desde hoy' : `${s.now} ${s.now === 1 ? 'día' : 'días'}`}{s.level ? <em>{s.level === 'crit' ? 'Atascada' : 'Aviso'}</em> : null}</>
+                  : dias != null ? <>{dd(dias)}{s.visits > 1 ? <small> ×{s.visits}</small> : null}</>
+                  : now ? 'Terminada' : '—'}
+                {now && !s.closed && s.days ? <small> (+{dd(s.days)} antes)</small> : null}
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
+}
+
+/**
+ * «⋯» de la cabecera de la ficha: lo que se usa poco (editar) y lo que no tiene vuelta
+ * atrás (borrar) va aquí, para que la cabecera tenga una sola acción principal.
+ */
+function MasAcciones({ code, onEdit, onDelete }) {
+  const [pos, setPos] = useState(null)
+  const btn = useRef(null)
+  const menu = useRef(null)
+
+  useEffect(() => {
+    if (!pos) return
+    menu.current?.querySelector('[role="menuitem"]')?.focus()
+    const fuera = (e) => { if (!menu.current?.contains(e.target) && !btn.current?.contains(e.target)) setPos(null) }
+    const tecla = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); setPos(null); btn.current?.focus() }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const items = [...menu.current.querySelectorAll('[role="menuitem"]')]
+        const i = items.indexOf(document.activeElement)
+        items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus()
+      }
+    }
+    const cerrar = () => setPos(null)
+    document.addEventListener('mousedown', fuera)
+    document.addEventListener('keydown', tecla)
+    window.addEventListener('scroll', cerrar, true)
+    window.addEventListener('resize', cerrar)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      document.removeEventListener('keydown', tecla)
+      window.removeEventListener('scroll', cerrar, true)
+      window.removeEventListener('resize', cerrar)
+    }
+  }, [pos])
+
+  const abrir = () => {
+    if (pos) { setPos(null); return }
+    const b = btn.current.getBoundingClientRect()
+    const right = Math.max(8, window.innerWidth - b.right)
+    setPos(b.bottom + 160 > window.innerHeight ? { bottom: window.innerHeight - b.top + 4, right } : { top: b.bottom + 4, right })
+  }
+  const elegir = (fn) => () => { setPos(null); fn() }
+
+  return (
+    <>
+      <button ref={btn} type="button" className={`icon-btn wf-more ${pos ? 'on' : ''}`} onClick={abrir}
+        title="Más acciones" aria-label="Más acciones" aria-haspopup="menu" aria-expanded={!!pos}>
+        <Icon.dots />
+      </button>
+      {pos && createPortal(
+        <div ref={menu} className="dev-acc-menu wf-more-menu" role="menu" aria-label={`Acciones de ${code}`} style={pos}>
+          {onEdit ? (
+            <button role="menuitem" onClick={elegir(onEdit)}>
+              <Icon.pencil /><span><b>Editar los datos</b><small>Cliente, proyecto, fechas…</small></span>
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button role="menuitem" className="bad" onClick={elegir(onDelete)}>
+              <Icon.trash /><span><b>Borrar garantía</b><small>Pide confirmación antes de borrarla.</small></span>
+            </button>
+          ) : null}
+        </div>,
+        document.body,
+      )}
+    </>
+  )
+}
 
 /**
  * Fotos del cliente: lo que ha mandado por correo, WhatsApp o adjunto en el ticket de la
@@ -1601,11 +1755,13 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
                 <button key={k} className={filtro === k ? 'on' : ''} onClick={() => { setFiltro(k); setSel(null) }}>{l}</button>
               ))}
             </div>
-            <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button>
+            <button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
           </div>
         </div>
         <div className="modal-body fc-body">
-          {!lista.length ? <p className="dev-mute fc-none">{filtro === 'cliente' ? 'El cliente no ha mandado imágenes. En «Todas» están también las del equipo.' : 'No hay imágenes en los tickets de este cliente.'}</p> : grupos.map(([tid, xs]) => (
+          {!lista.length ? <Vacio icon={Icon.image} title={filtro === 'cliente' ? 'El cliente no ha mandado imágenes' : 'No hay imágenes'}
+            actions={filtro === 'cliente' && fotos.length ? <button className="dev-btn" onClick={() => { setFiltro('todas'); setSel(null) }}>Ver todas ({fotos.length})</button> : null}>
+            {filtro === 'cliente' ? 'En «Todas» están también las que ha subido el equipo.' : 'Ni el cliente ni el equipo han adjuntado imágenes en los tickets de este cliente.'}</Vacio> : grupos.map(([tid, xs]) => (
             <section key={tid} className="fc-grupo">
               <header>
                 <Icon.ticket /> <span className="mono">{xs[0][0].ticket}</span>
@@ -1630,7 +1786,7 @@ function FotosCliente({ w, fotos, inicio, onClose, onOpenTicket }) {
 
         {g ? (
           <div className="fc-visor" onMouseDown={(e) => e.target === e.currentTarget && setSel(null)}>
-            <button className="fc-cerrar" onClick={() => setSel(null)} title="Volver (Esc)">✕</button>
+            <button className="fc-cerrar" onClick={() => setSel(null)} title="Volver (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button>
             {lista.length > 1 ? <button className="fc-nav prev" onClick={() => setSel((i) => (i - 1 + lista.length) % lista.length)} title="Anterior (←)"><Icon.chevron /></button> : null}
             <img key={g.src} src={api.warrantyTicketImageUrl(w.id, g.src)} alt={g.name} />
             {lista.length > 1 ? <button className="fc-nav next" onClick={() => setSel((i) => (i + 1) % lista.length)} title="Siguiente (→)"><Icon.chevron /></button> : null}
@@ -1887,7 +2043,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, 
     if (wid && tid) api.warrantyTicketImages(wid, true).then((r) => setFotos(!r.ok ? [] : r.visible === false ? false : r.images))
   }, [wid, tid])
 
-  if (d === null) return <div className="center-load"><div className="spinner" /></div>
+  if (d === null) return <SkFicha />
   if (d.error) return <><button className="wr-back" onClick={onBack}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /> Garantías</button><div className="dev-error"><Icon.warn /> {d.error}</div></>
 
   const w = d.warranty
@@ -1984,8 +2140,7 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, 
                 <Icon.image /> Fotos del cliente{fotos === null ? null : <em className="fc-n">{fotos.filter((x) => x.from === 'cliente').length}</em>}
               </button>
             ) : null}
-            {p.edit ? <button className="icon-btn" title="Editar los datos" onClick={() => onEdit(w)}><Icon.pencil /></button> : null}
-            {p.delete ? <button className="icon-btn" title="Borrar garantía" style={{ color: 'var(--danger)' }} onClick={borrar}><Icon.trash /></button> : null}
+            {p.edit || p.delete ? <MasAcciones code={w.code} onEdit={p.edit ? () => onEdit(w) : null} onDelete={p.delete ? borrar : null} /> : null}
           </div>
         </div>
 
@@ -2030,6 +2185,8 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, 
             </div>
           ) : null}
         </div>
+
+        {w.phases?.steps?.length ? <PasosFase ph={w.phases} /> : null}
 
         {siguiente ? (
           <div className={`wf-next t-${siguiente.tone}`}>

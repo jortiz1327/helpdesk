@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import { useDialog } from './a11y.js'
+import { SkLista } from './Esqueleto.jsx'
 
 /* -------------------------------------------------------------------------
  * DOCUMENTOS de una garantía (pestaña de la ficha). Presupuestos, pedidos y albaranes
@@ -35,7 +36,7 @@ function Modal({ title, wide, onClose, children, foot }) {
   return (
     <div className="modal-bg wr-over" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className={`modal wd-modal${wide ? ' wide' : ''}`} {...dlg}>
-        <div className="modal-h"><h3>{title}</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)">✕</button></div>
+        <div className="modal-h"><h3>{title}</h3><button className="icon-btn" onClick={onClose} title="Cerrar (Esc)"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">{children}</div>
         {foot ? <div className="modal-foot">{foot}</div> : null}
       </div>
@@ -439,7 +440,7 @@ function Pegatina({ w, onClose }) {
                 <div key={i} className="wd-peg-prod">
                   <input value={p.name} maxLength={40} placeholder="Referencia o modelo" onChange={(e) => setP(i, { name: e.target.value })} />
                   <input type="number" min={1} value={p.qty} onChange={(e) => setP(i, { qty: e.target.value })} aria-label="Cantidad" />
-                  <button className="icon-btn" title="Quitar" onClick={() => set({ products: d.products.filter((_, j) => j !== i) })}>✕</button>
+                  <button className="icon-btn" title="Quitar" onClick={() => set({ products: d.products.filter((_, j) => j !== i) })}><Icon.x className="ic-x" aria-hidden="true" /></button>
                 </div>
               ))}
             </div>
@@ -543,7 +544,7 @@ export default function WarrantyDocuments({ w, opts, onGoReview, onEditWarranty,
   const cargar = useCallback(() => api.warrantyDocs(w.id).then((r) => setD(r.ok ? r : { error: r.error })), [w.id])
   useEffect(() => { cargar() }, [cargar])
 
-  if (!d || !opts) return <div className="center-load"><div className="spinner" /></div>
+  if (!d || !opts) return <SkLista rows={4} label="Cargando los documentos…" />
   if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
 
   const { summary, report, replacements: sus } = d

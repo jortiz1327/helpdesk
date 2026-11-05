@@ -124,7 +124,7 @@ export default function WhatsAppNumbers({ funcion = null }) {
           <div className="modal" style={{ maxWidth: 560 }}>
             <div className="modal-head">
               <h3>{form.id ? 'Editar número' : 'Añadir número de WhatsApp'} <span className="wa-num-func" style={{ marginLeft: 6 }}>{funcOf(form.funcion).label}</span></h3>
-              <button className="x" onClick={() => setForm(null)}>×</button>
+              <button className="x" onClick={() => setForm(null)} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
             <div className="modal-body">
               <div className="grid2">

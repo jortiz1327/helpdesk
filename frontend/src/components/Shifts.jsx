@@ -447,7 +447,7 @@ function PanelDia({ dia, d, puedeEditar, onClose, onRecargar, onVariosDias, toas
       <div className="modal cal-panel">
         <div className="modal-h">
           <h3>{fecha[0].toUpperCase() + fecha.slice(1)}</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button>
         </div>
 
         <div className="modal-body">
@@ -560,7 +560,7 @@ function PanelDia({ dia, d, puedeEditar, onClose, onRecargar, onVariosDias, toas
                         <span key={h.user_id} className="cal-chip">
                           <Avatar id={h.user_id} name={h.name} size={18} /> {h.name}
                           <button title={`Quitar a ${h.name} de toda la semana`}
-                            onClick={() => guardarTitulares(k, ids.filter((x) => x !== h.user_id))}>✕</button>
+                            onClick={() => guardarTitulares(k, ids.filter((x) => x !== h.user_id))}><Icon.x className="ic-x" aria-hidden="true" /></button>
                         </span>
                       ))}
                       <Select sm value="" placeholder={tit.length ? '+ Añadir' : 'Elegir…'}
@@ -837,7 +837,7 @@ function ModalRotar({ desde, agents, onClose, onDone, onIr }) {
               <Select block sm value={p.morning} options={opciones} onChange={(v) => cambiar(i, 'morning', v)} />
               <Select block sm value={p.afternoon} options={opciones} onChange={(v) => cambiar(i, 'afternoon', v)} />
               <button type="button" className="icon-btn sm" title="Quitar semana"
-                disabled={patron.length < 2} onClick={() => quitar(i)}>✕</button>
+                disabled={patron.length < 2} onClick={() => quitar(i)}><Icon.x className="ic-x" aria-hidden="true" /></button>
             </div>
           ))}
         </div>
@@ -947,7 +947,7 @@ function Modal({ title, children, onClose, onSave, saveLabel, saveDisabled = fal
   return (
     <div className="modal-bg" onClick={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: width }}>
-        <div className="modal-h"><h3>{title}</h3><button className="icon-btn" onClick={onClose}>✕</button></div>
+        <div className="modal-h"><h3>{title}</h3><button className="icon-btn" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body">{children}</div>
         <div className="modal-foot">
           <button className="btn ghost" onClick={onClose}>Cancelar</button>

@@ -434,7 +434,7 @@ function Lista({ kind, server, stats, onOpen, canActions = false }) {
           <div className="dev-search">
             <Icon.search />
             <input value={codeLive} onChange={(e) => setCodeLive(e.target.value)} placeholder={kind === 'ap' ? 'Buscar por MAC…' : 'Buscar por código de etiqueta…'} />
-            {codeLive ? <button className="dev-x" onClick={() => setCodeLive('')} title="Borrar">×</button> : null}
+            {codeLive ? <button className="dev-x" onClick={() => setCodeLive('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
           </div>
           <Select sm multiple searchable value={f.stores} onChange={set('stores')} options={opts?.stores || []} placeholder={opts ? `Todas las tiendas${opts.stores?.length ? ` (${num(opts.stores.length)})` : ''}` : 'Cargando tiendas…'} />
           <Select sm multiple value={f.models} onChange={set('models')} options={(opts?.models || []).map((m) => ({ value: m, label: m }))} placeholder="Modelos: todos" />

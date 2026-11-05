@@ -4,6 +4,7 @@ import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import { useDialog } from './a11y.js'
+import { SkLista } from './Esqueleto.jsx'
 
 /* -------------------------------------------------------------------------
  * CENTRO DE AYUDA de Gestión de garantías: artículos por apartado, con buscador y
@@ -91,7 +92,7 @@ function Editor({ a, d, onClose, onSaved }) {
   return (
     <div className="modal-bg wr-over" onMouseDown={(e) => e.target.classList.contains('modal-bg') && onClose()}>
       <div className="modal" style={{ maxWidth: 760 }} {...dlg}>
-        <div className="modal-head"><h3 className="hc-ed-h"><Icon.pencil /> {a ? 'Editar artículo' : 'Nuevo artículo'}</h3><button className="x" onClick={onClose}>×</button></div>
+        <div className="modal-head"><h3 className="hc-ed-h"><Icon.pencil /> {a ? 'Editar artículo' : 'Nuevo artículo'}</h3><button className="x" onClick={onClose} aria-label="Cerrar"><Icon.x className="ic-x" aria-hidden="true" /></button></div>
         <div className="modal-body gd-form">
           <div className="grid2">
             <label className="field"><span className="lbl">Título <em>*</em></span>
@@ -187,7 +188,7 @@ export default function WarrantyHelpCenter({ articulo = null, onOpened }) {
         {d?.manage ? <button className="btn" onClick={() => setEd(null)}><Icon.plus /> Nuevo artículo</button> : null}
       </header>
       <div className="page-scroll" ref={main}><div className="page dev-page wr-page">
-        {!d ? <div className="center-load"><div className="spinner" /></div> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
+        {!d ? <SkLista rows={5} label="Cargando la ayuda…" /> : d.error ? <div className="dev-error"><Icon.warn /> {d.error}</div> : (
           <div className="hc-layout">
             <nav className="dev-card hc-nav" aria-label="Apartados">
               <button className={`hc-nav-home${!a && !q ? ' on' : ''}`} onClick={() => { setAbierto(null); setQ('') }}><Icon.home /> Inicio</button>
@@ -207,7 +208,7 @@ export default function WarrantyHelpCenter({ articulo = null, onOpened }) {
               <div className="dev-card hc-buscar">
                 <div className="dev-search"><Icon.search />
                   <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Busca en la ayuda: cerrar, remesa, sustitución, permisos…" />
-                  {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar">×</button> : null}
+                  {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
                 </div>
               </div>
 
