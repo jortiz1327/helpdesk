@@ -65,6 +65,7 @@ class WarrantiesController extends Controller
             'report'            => $this->report($request),
             'failures'          => $this->failures($request),
             'portal_stats'      => $this->portalStats($request),
+            'phases'            => $this->phases($request),
             'step'              => $this->step($request),
             'cloud_label'       => $this->cloudLabel($request),
             'tour'              => $this->tour($request),
@@ -1063,6 +1064,13 @@ class WarrantiesController extends Controller
         $r = \App\Services\PortalWarrantyFailures::report($f);
         return $r === null ? response()->json(['ok' => false, 'error' => 'El portal AEME no responde ahora mismo. Prueba en un rato.'], 502)
             : response()->json(['ok' => true] + $r);
+    }
+
+    /** Estadísticas: días de cada garantía en su estado y la media por fase. */
+    private function phases(Request $request)
+    {
+        $d = fn ($k) => $this->esFecha($v = (string) $request->query($k, '')) ? $v : null;
+        return response()->json(['ok' => true] + \App\Services\WarrantyPhases::report($d('from'), $d('to')));
     }
 
     /** Estadísticas: presupuestos, envíos y facturas de los proyectos de garantía del portal. */

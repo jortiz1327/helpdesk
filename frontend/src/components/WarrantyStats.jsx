@@ -7,11 +7,12 @@ import DateRange from './DateRange.jsx'
 import { WarrantyReports } from './WarrantyTeam.jsx'
 
 /* -------------------------------------------------------------------------
- * ESTADÍSTICAS de Gestión de garantías, en tres pestañas:
+ * ESTADÍSTICAS de Gestión de garantías, en cuatro pestañas:
  *   · Fallos de dispositivos: lo repuesto en los albaranes de los proyectos de garantía del
  *     portal, por modelo, año de venta (el lote aproximado), cliente y mes, frente a lo
  *     vendido en sus facturas.
  *   · Presupuestos y envíos: los documentos de los proyectos de garantía del portal.
+ *   · Tiempo por fase: días de cada garantía en su estado, media por fase y atascadas.
  *   · Expedientes: el informe de garantías de siempre.
  * Gráficos en SVG/HTML propios; el color dice la categoría y siempre va con su texto.
  * ---------------------------------------------------------------------- */
@@ -360,6 +361,94 @@ function Fallos({ desde, hasta }) {
   )
 }
 
+/* ---------- Pestaña: tiempo en cada fase ---------- */
+const dias = (n) => (n == null ? '—' : `${num(n)} ${Number(n) === 1 ? 'día' : 'días'}`)
+const NIVEL = { crit: ['Crítica', 'crit'], warn: ['Aviso', 'warn'] }
+
+function Fases({ desde, hasta, onOpenWarranty }) {
+  const [d, setD] = useState(null)
+  const [tip, nodoTip] = useTip()
+
+  useEffect(() => {
+    let vivo = true
+    setD((x) => (x && !x.error ? { ...x, busy: true } : null))
+    api.warrantyPhases({ from: desde, to: hasta }).then((r) => { if (vivo) setD(r.ok ? r : { error: r.error || 'No se pudo cargar' }) })
+    return () => { vivo = false }
+  }, [desde, hasta])
+
+  if (!d) return <div className="center-load"><div className="spinner" /></div>
+  if (d.error) return <div className="dev-error"><Icon.warn /> {d.error}</div>
+  const k = d.kpis
+  const atascadas = k.warn + k.crit
+  // Escala común: lo más largo entre medias, lo que llevan ahora y los límites.
+  const tope = Math.max(5, ...d.phases.flatMap((f) => [f.avg, f.now_max, f.limit.crit].filter((v) => v != null)))
+  const x = (v) => `${Math.min(100, (v / tope) * 100)}%`
+
+  return (
+    <div className={`st-body${d.busy ? ' busy' : ''}`}>
+      <div className="st-hero">
+        <div className={`st-hero-main${k.crit ? ' bad' : ''}`}>
+          <span className="k">Garantías atascadas</span>
+          <b className="v">{num(atascadas)}</b>
+          <span className="h">{atascadas ? <><b>{num(k.crit)}</b> críticas · {num(k.warn)} en aviso · de {num(k.open)} abiertas</> : (k.open === 0 ? 'No hay garantías abiertas' : k.open === 1 ? 'La única abierta va dentro de sus días' : `Ninguna de las ${num(k.open)} abiertas pasa de sus días`)}</span>
+        </div>
+        <div className="st-kpis">
+          <Kpi k="Abiertas" v={num(k.open)} h={`Llevan ${dias(k.median_now)} en su estado (mediana)`} />
+          <Kpi k="Del alta al cierre" v={k.cycle_avg == null ? '—' : num(k.cycle_avg)} de={k.cycle_avg == null ? null : 'días'} h={k.closed ? `Media de ${num(k.closed)} cerradas · mediana ${dias(k.cycle_median)}` : 'Ninguna cerrada en el periodo'} />
+          <Kpi k="Críticas" v={num(k.crit)} tone={k.crit ? 'bad' : 'ok'} h="Pasan de los días de crítico" />
+          <Kpi k="En aviso" v={num(k.warn)} tone={k.warn ? 'warn' : 'ok'} h="Pasan de los días de aviso" />
+        </div>
+      </div>
+
+      <Tarjeta title="Días en cada fase" sub="La barra es la media de lo que duró cada estado; el punto, lo que llevan de media las que están ahí ahora. Las marcas son los días de aviso y de crítico (se cambian en Configuración → Alertas).">
+        <div className="st-fases">
+          <div className="st-fase h"><span>Fase</span><span /><span className="n">Media</span><span className="n">Ahora</span><span>Atascadas</span></div>
+          {d.phases.map((f) => (
+            <div key={f.key} className="st-fase">
+              <span className="l"><i style={{ background: f.color || '#94a3b8' }} />{f.label}</span>
+              <span className="t" {...tip(<><b>{f.label}</b>
+                <span>Media {dias(f.avg)} · mediana {dias(f.median)} ({num(f.stays)} {f.stays === 1 ? 'vez' : 'veces'})</span>
+                <span>Ahora {num(f.now)} {f.now === 1 ? 'garantía' : 'garantías'}{f.now ? `: media ${dias(f.now_avg)}, la que más ${dias(f.now_max)}` : ''}</span>
+                <span>{f.limit.warn != null ? `Aviso a los ${f.limit.warn} días · crítico a los ${f.limit.crit}` : 'Sin alerta para este estado'}</span></>)}>
+                {f.avg != null ? <i className="b" style={{ width: x(f.avg), background: f.color || '#94a3b8' }} /> : null}
+                {f.limit.warn != null ? <i className="m warn" style={{ left: x(f.limit.warn) }} /> : null}
+                {f.limit.crit != null ? <i className="m crit" style={{ left: x(f.limit.crit) }} /> : null}
+                {f.now ? <i className={`p${f.crit ? ' crit' : f.warn ? ' warn' : ''}`} style={{ left: x(f.now_avg) }} /> : null}
+              </span>
+              <span className="n">{dias(f.avg)}</span>
+              <span className="n">{f.now ? <><b>{num(f.now)}</b> · {dias(f.now_avg)}</> : <span className="dev-mute">—</span>}</span>
+              <span className="c">
+                {f.crit ? <em className="st-lvl crit">{num(f.crit)} {f.crit === 1 ? 'crítica' : 'críticas'}</em> : null}
+                {f.warn ? <em className="st-lvl warn">{num(f.warn)} aviso</em> : null}
+                {!f.crit && !f.warn && f.now ? <span className="dev-mute">Al día</span> : null}
+              </span>
+            </div>
+          ))}
+          <div className="st-fase-k"><span><i className="m warn" /> Días de aviso</span><span><i className="m crit" /> Días de crítico</span><span><i className="p" /> Media de las que están ahora</span></div>
+        </div>
+      </Tarjeta>
+
+      <Tarjeta title="Las que más llevan en su estado" sub="Garantías abiertas, de la que más días lleva a la que menos">
+        {d.oldest.length ? (
+          <div className="dev-table-wrap keep"><table className="dev-table st-table">
+            <thead><tr><th>Garantía</th><th>Cliente</th><th>Estado</th><th>Responsable</th><th className="c">En el estado</th></tr></thead>
+            <tbody>{d.oldest.map((w) => (
+              <tr key={w.id}>
+                <td>{onOpenWarranty ? <button className="st-link" onClick={() => onOpenWarranty(w.id)}>{w.code}</button> : <b>{w.code}</b>}</td>
+                <td className="wr-ell">{w.client || '—'}</td>
+                <td><span className="st-dot"><i style={{ background: w.color || '#94a3b8' }} />{w.status_label}</span></td>
+                <td className={w.responsible ? '' : 'dev-mute'}>{w.responsible || 'Sin responsable'}</td>
+                <td className="c"><b>{dias(w.days)}</b>{w.level ? <em className={`st-lvl ${NIVEL[w.level][1]}`}>{NIVEL[w.level][0]}</em> : null}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        ) : <Vacio text="No hay garantías abiertas." />}
+      </Tarjeta>
+      {nodoTip}
+    </div>
+  )
+}
+
 /* ---------- Pestaña: presupuestos y envíos del portal ---------- */
 function Portal({ desde, hasta }) {
   const [d, setD] = useState(null)
@@ -494,11 +583,12 @@ function Portal({ desde, hasta }) {
 const TABS = [
   ['fallos', 'Fallos de dispositivos', Icon.warn],
   ['portal', 'Presupuestos y envíos', Icon.truck],
+  ['fases', 'Tiempo por fase', Icon.clock],
   ['expedientes', 'Expedientes', Icon.shield],
 ]
 const TAB_KEY = 'st_tab'
 
-export default function WarrantyStats() {
+export default function WarrantyStats({ onOpenWarranty }) {
   const [tab, setTabSt] = useState(() => { try { return localStorage.getItem(TAB_KEY) || 'fallos' } catch { return 'fallos' } })
   const setTab = (t) => { setTabSt(t); try { localStorage.setItem(TAB_KEY, t) } catch { /* sin almacenamiento */ } }
   const [rango, setRango] = useState('todo')
@@ -529,9 +619,11 @@ export default function WarrantyStats() {
         <div className="st-period">
           <div className="st-seg">{RANGOS.map((r) => <button key={r[0]} className={rango === r[0] ? 'on' : ''} onClick={() => { setRango(r[0]); setFechas(r[2]()) }}>{r[1]}</button>)}</div>
           <DateRange from={desde} to={hasta} onChange={(a, b) => { setRango(''); setFechas([a, b]) }} />
-          <span className="st-period-t">{tab === 'fallos' ? 'Por la fecha de envío del albarán' : 'Por la fecha del presupuesto'}</span>
+          <span className="st-period-t">{tab === 'fallos' ? 'Por la fecha de envío del albarán' : tab === 'fases' ? 'Medias por la fecha en que terminó cada estado; «ahora», siempre hoy' : 'Por la fecha del presupuesto'}</span>
         </div>
-        {tab === 'fallos' ? <Fallos desde={desde} hasta={hasta} /> : <Portal desde={desde} hasta={hasta} />}
+        {tab === 'fallos' ? <Fallos desde={desde} hasta={hasta} />
+          : tab === 'fases' ? <Fases desde={desde} hasta={hasta} onOpenWarranty={onOpenWarranty} />
+          : <Portal desde={desde} hasta={hasta} />}
       </div></div>
     </>
   )

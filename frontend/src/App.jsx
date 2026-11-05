@@ -1727,7 +1727,7 @@ export default function App() {
                         {view === "garantias_equipo" && can("warranties.access") && (
                             <WarrantyTeam onFilter={(f) => { setGarantiaFiltro({ ...f }); setView("garantias"); }} />
                         )}
-                        {view === "garantias_informes" && can("warranties.access") && <WarrantyStats />}
+                        {view === "garantias_informes" && can("warranties.access") && <WarrantyStats onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />}
                         {view === "garantias_clientes" && can("warranties.access") && (
                             <WarrantyClients onOpenWarranty={(id) => { setGarantiaAbierta(id); setView("garantias"); }} />
                         )}

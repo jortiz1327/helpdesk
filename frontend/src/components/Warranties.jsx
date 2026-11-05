@@ -1979,6 +1979,11 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, 
                   : <button className="btn sm ghost" onClick={() => setCierre({ modo: 'reabrir', status: opts?.status_reopen || 'en_curso' })}><Icon.refresh /> Reabrir</button>}
               </div>
             ) : <b>{opts?.statuses?.[w.status] || w.status}</b>}
+            {abierta && w.status_changed_at ? (() => {
+              const n = Math.max(0, Math.floor((Date.now() - new Date(String(w.status_changed_at).replace(' ', 'T')).getTime()) / 86400000))
+              return <small className="wf-fact-since" title={`En este estado desde el ${String(w.status_changed_at).slice(0, 10).split('-').reverse().join('/')}`}>
+                {n === 0 ? 'Desde hoy' : `Desde hace ${n} ${n === 1 ? 'día' : 'días'}`}</small>
+            })() : null}
           </div>
           <div className="wf-fact">
             <span>Responsable</span>

@@ -23,7 +23,22 @@ class WarrantyAlerts
         'stock'           => ['Stock',           'En «Falta stock» demasiados días',              'falta_stock', false],
         'inactividad'     => ['Inactividad',     'Sin ningún movimiento demasiados días',         null,          false],
         'rma'             => ['RMA',             'Remesa enviada a ZKONG sin respuesta',          null,          false],
+        // Cualquier estado abierto que no tenga regla propia (las de arriba con estado).
+        'fase'            => ['Fase atascada',   'Demasiados días en un mismo estado (los que no tienen regla propia)', '*', false],
     ];
+
+    /** Estados con regla propia: la de «fase» no los vigila. */
+    public static function ownStatuses(): array
+    {
+        return array_values(array_filter(array_map(fn ($r) => $r[2], self::RULES), fn ($e) => $e !== null && $e !== '*'));
+    }
+
+    /** Regla que vigila el tiempo en un estado: su clave propia o «fase». */
+    public static function ruleForStatus(string $status): string
+    {
+        foreach (self::RULES as $k => $r) if ($r[2] === $status) return $k;
+        return 'fase';
+    }
 
     private ?array $reglas = null;
 
@@ -66,6 +81,7 @@ class WarrantyAlerts
             foreach ($this->activas() as $k => $r) {
                 [$nombre, , $estado, $alMomento] = self::RULES[$k];
                 $desde = match (true) {
+                    $k === 'fase'        => in_array($w->status, self::ownStatuses(), true) ? null : ($w->status_changed_at ?? $w->created_at),
                     $estado !== null    => $w->status === $estado ? ($w->status_changed_at ?? $w->created_at) : null,
                     $k === 'muy_urgente' => $w->urgency === 'muy_urgente' ? true : null,
                     $k === 'sin_responsable' => $w->responsible_id ? null : true,
@@ -79,7 +95,8 @@ class WarrantyAlerts
                 }
                 $dias = (int) floor((time() - strtotime((string) $desde)) / 86400);
                 $nivel = $dias >= $r['crit_days'] ? 'crit' : ($dias >= $r['warn_days'] ? 'warn' : null);
-                if ($nivel) $lista[] = ['key' => $k, 'level' => $nivel, 'text' => "{$nombre}: {$dias} " . ($dias === 1 ? 'día' : 'días')];
+                $etiqueta = $k === 'fase' ? 'En «' . (Warranty::statuses()[$w->status] ?? $w->status) . '»' : $nombre;
+                if ($nivel) $lista[] = ['key' => $k, 'level' => $nivel, 'text' => "{$etiqueta}: {$dias} " . ($dias === 1 ? 'día' : 'días')];
             }
             usort($lista, fn ($a, $b) => ($a['level'] === 'crit' ? 0 : 1) <=> ($b['level'] === 'crit' ? 0 : 1));
             if ($lista) $out[$w->id] = $lista;
@@ -97,6 +114,8 @@ class WarrantyAlerts
                 [, , $estado] = self::RULES[$k];
                 $hasta = now()->subDays($level === 'crit' ? $r['crit_days'] : $r['warn_days']);
                 match (true) {
+                    $k === 'fase'             => $o->orWhere(fn ($w) => $w->whereNotIn('warranties.status', self::ownStatuses())
+                        ->whereRaw('coalesce(warranties.status_changed_at, warranties.created_at) <= ?', [$hasta])),
                     $estado !== null         => $o->orWhere(fn ($w) => $w->where('warranties.status', $estado)
                         ->whereRaw('coalesce(warranties.status_changed_at, warranties.created_at) <= ?', [$hasta])),
                     $k === 'muy_urgente'     => $o->orWhere('warranties.urgency', 'muy_urgente'),

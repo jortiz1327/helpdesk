@@ -51,7 +51,7 @@ class WarrantySettingsTest extends TestCase
 
         $cfg = $this->getJson('/api/warranty_settings.php', $h)->assertOk()->json();
         $this->assertContains('falta_stock', collect($cfg['statuses'])->pluck('key')->all());
-        $this->assertSame(8, count($cfg['alerts']));
+        $this->assertSame(9, count($cfg['alerts']));
         $this->assertNotEmpty($cfg['templates']);
 
         // Estado nuevo que cuenta como cerrada: pone fecha de cierre y sale de «abiertas».
