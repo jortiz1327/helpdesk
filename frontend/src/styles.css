@@ -4649,6 +4649,16 @@ button.dev-code:hover { text-decoration: underline; }
 .wr-cliente-dijo { margin: 2px 0 0; display: flex; gap: 6px; align-items: flex-start; font-size: 12px; line-height: 1.45; color: var(--ink-2); }
 .wr-cliente-dijo svg { width: 13px; height: 13px; fill: var(--ink-3); flex: none; margin-top: 2px; }
 .wr-cliente-dijo span::before { content: 'Cliente: '; font-weight: 700; color: var(--ink-3); }
+/* Diagnóstico de ZKONG por etiqueta (batería, señal, comunicación). */
+.wr-diag { margin: 3px 0 0; display: flex; gap: 6px; align-items: flex-start; flex-wrap: wrap; font-size: 12px; line-height: 1.45; color: #b45309; }
+.wr-diag svg { width: 13px; height: 13px; fill: currentColor; flex: none; margin-top: 2px; }
+.wr-diag span { flex: 1 1 260px; min-width: 0; }
+.wr-diag.t-bad { color: var(--danger); }
+.wr-diag.t-info { color: var(--ink-2); }
+.wr-diag .dev-btn { padding: 2px 9px; font-size: 11.5px; }
+.wr-m-warn { color: #b45309; font-weight: 600; }
+.wr-m-bad { color: var(--danger); font-weight: 600; }
+.wr-m-ok { color: inherit; }
 .spinner.sm { width: 18px; height: 18px; border-width: 2px; }
 .wr-gal { position: sticky; top: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); max-height: 62vh; overflow: auto; }
 .wr-gal h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 12.5px; }

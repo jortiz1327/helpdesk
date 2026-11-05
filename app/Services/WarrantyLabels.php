@@ -258,6 +258,9 @@ class WarrantyLabels
                     'merchant_name' => ($v['merchantName'] ?? null) ?: null,
                     'online'        => $v ? $vivo($v) : null,
                     'last_commu_at' => $ultima?->toDateTimeString(),
+                    // Etiqueta: batería y señal con la antena, en % (para el diagnóstico de la ficha).
+                    'battery'       => $v && ! $ap ? self::pct($v['battery'] ?? null) : null,
+                    'ap_signal'     => $v && ! $ap ? self::pct($v['apSignal'] ?? null) : null,
                     'server_model'  => $v && trim((string) ($v['model'] ?? '')) !== '' ? trim((string) $v['model']) : null,
                     'added_at'      => $v ? self::fecha($v['addTime'] ?? null)?->toDateString() : null,
                     'rows'          => array_map(fn ($x) => [
@@ -455,6 +458,12 @@ class WarrantyLabels
         ]));
     }
 
+    /** Un porcentaje de ZKONG (0-100) o null si no lo da. */
+    private static function pct(mixed $v): ?int
+    {
+        return is_numeric($v) ? max(0, min(100, (int) round((float) $v))) : null;
+    }
+
     /** Lo que se guarda de un resultado. */
     private function fila(array $r): array
     {
@@ -462,6 +471,7 @@ class WarrantyLabels
             'code' => $r['code'], 'kind' => $r['kind'], 'lookup_state' => $r['lookup_state'], 'server' => $r['server'],
             'store_name' => $r['store_name'], 'merchant_name' => $r['merchant_name'], 'online' => $r['online'],
             'last_commu_at' => $r['last_commu_at'], 'server_model' => $r['server_model'],
+            'battery' => $r['battery'] ?? null, 'ap_signal' => $r['ap_signal'] ?? null,
             'device_model_id' => $r['device_model_id'], 'aeme_ref' => $r['aeme_ref'], 'product_name' => $r['product_name'],
             'model_manual' => (bool) $r['model_manual'], 'warnings' => $r['warnings'] ?: null, 'checked_at' => now(),
             'installed_at' => self::instalada($r['code'], $r['added_at'] ?? null),
@@ -482,6 +492,7 @@ class WarrantyLabels
             'code' => $i->code, 'kind' => $i->kind, 'lookup_state' => $i->lookup_state, 'failed' => [], 'server' => $i->server,
             'store_name' => $i->store_name, 'merchant_name' => $i->merchant_name, 'online' => $i->online,
             'last_commu_at' => $i->last_commu_at?->toDateTimeString(), 'server_model' => $i->server_model,
+            'battery' => $i->battery, 'ap_signal' => $i->ap_signal,
             'device_model_id' => $i->device_model_id, 'aeme_ref' => $i->aeme_ref, 'product_name' => $i->product_name,
             'model_manual' => $i->model_manual, 'added_at' => $i->installed_at?->toDateString(),
             // Las filas por servidor no se guardan: el servidor vivo basta para el aviso de app02.

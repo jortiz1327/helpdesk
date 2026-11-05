@@ -330,13 +330,39 @@ class WarrantiesTest extends TestCase
                 foreach ($codes as $c) {
                     $x = $this->e[$c] ?? null;
                     $row = $x ? ['barCode' => $c, 'mac' => $c, 'online' => $x[3] ? 1 : 0, 'offLineTime' => $x[3] ? null : now()->subDays(3)->toDateTimeString(), 'server' => $x[0], 'server_url' => 'https://' . strtolower($x[0]) . '.zkong.com', 'storeName' => $x[1], 'merchantName' => null,
-                        'model' => $x[2], 'state' => $x[3] ? 1 : 0, 'lastCommuTime' => now()->subDays($x[4] ?? 0)->toDateTimeString()] : null;
+                        'model' => $x[2], 'state' => $x[3] ? 1 : 0, 'lastCommuTime' => now()->subDays($x[4] ?? 0)->toDateTimeString(),
+                        'battery' => $x[5] ?? null, 'apSignal' => $x[6] ?? null] : null;
                     $out[$c] = ['rows' => $row ? [$row] : [], 'live' => $row];
                 }
                 return ['labels' => $out, 'failed' => []];
             }
         });
         \Illuminate\Support\Facades\Cache::flush();
+    }
+
+    /** La ficha diagnostica con la batería y la señal que da ZKONG: se guardan con cada etiqueta. */
+    public function test_la_bateria_y_la_senal_de_zkong_se_guardan_con_la_etiqueta(): void
+    {
+        config(['database.connections.portal_aeme.host' => '']);
+        [, $h] = $this->agente();
+        $this->zkong([
+            '8E9749440' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true, 0, 72, 48],
+            '854A49907' => ['APP02', 'Sol Centro', 'ZKC26V-NAE4', true, 0, '100', null],
+        ]);
+
+        $res = collect($this->postJson('/api/warranties.php?action=labels_check', ['codes' => "8E9749440\n854A49907", 'project_name' => 'Sol Centro'], $h)->json('results'))->keyBy('code');
+        $this->assertSame([72, 48], [$res['8E9749440']['battery'], $res['8E9749440']['ap_signal']]);
+        $this->assertSame([100, null], [$res['854A49907']['battery'], $res['854A49907']['ap_signal']]);
+
+        $w = $this->crear($h, ['labels' => "8E9749440\n854A49907"]);
+        $items = collect($this->getJson("/api/warranties.php?action=get&id={$w['id']}", $h)->json('items'))->keyBy('code');
+        $this->assertSame([72, 48], [$items['8E9749440']['battery'], $items['8E9749440']['ap_signal']]);
+        $this->assertSame(100, $items['854A49907']['battery']);
+
+        // Antena: ni batería ni señal.
+        $this->zkong(['A0A3B85B5F7F' => ['APP02', 'Sol Centro', null, true, 0, 90, 90]]);
+        $ap = $this->postJson('/api/warranties.php?action=labels_check', ['codes' => 'A0A3B85B5F7F', 'project_name' => 'Sol Centro'], $h)->json('results.0');
+        $this->assertSame([null, null], [$ap['battery'], $ap['ap_signal']]);
     }
 
     public function test_etiquetas_solo_con_el_codigo_sacan_modelo_producto_y_avisos(): void

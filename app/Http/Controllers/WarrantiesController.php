@@ -557,6 +557,7 @@ class WarrantiesController extends Controller
             'id' => $i->id, 'code' => $i->code, 'kind' => $i->kind, 'lookup_state' => $i->lookup_state, 'server' => $i->server,
             'store_name' => $i->store_name, 'merchant_name' => $i->merchant_name, 'online' => $i->online,
             'last_commu_at' => $i->last_commu_at?->toDateTimeString(), 'server_model' => $i->server_model,
+            'battery' => $i->battery, 'ap_signal' => $i->ap_signal,
             'aeme_ref' => $i->aeme_ref, 'product_name' => $i->product_name, 'model_manual' => $i->model_manual,
             'warnings' => $i->warnings ?? [], 'checked_at' => $i->checked_at?->toDateTimeString(),
             'resolution' => $i->resolution, 'coverage' => $i->coverage, 'resolution_note' => $i->resolution_note,

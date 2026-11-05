@@ -558,6 +558,49 @@ function Avisos({ list }) {
   )
 }
 
+// Cortes del diagnóstico. Señal: los de dialprix (rojo <50, ámbar 50-59, verde ≥60).
+const BATERIA_PILAS = 90     // por debajo: seguramente son las pilas
+const SENAL_MALA = 50
+const SENAL_JUSTA = 60
+const RECIENTE_MIN = 60      // comunicó hace menos de esto (al comprobarla): «comunica bien»
+const tonoSenal = (s) => (s < SENAL_MALA ? 'bad' : s < SENAL_JUSTA ? 'warn' : 'ok')
+
+/*
+ * Lo que dice ZKONG de una etiqueta, con pinzas: estar conectada no quiere decir que la
+ * pantalla funcione. Nunca resuelve sola; propone y el técnico decide. Los minutos desde la
+ * última comunicación se cuentan desde que se comprobó (no desde ahora).
+ */
+function diagnostico(r) {
+  if (r.kind === 'ap' || r.lookup_state !== 'found') return null
+  const ref = (r.checked_at && aFecha(r.checked_at)) || new Date()
+  const min = r.last_commu_at ? (ref - aFecha(r.last_commu_at)) / 60000 : null
+  if (r.battery != null && r.battery < BATERIA_PILAS) {
+    return { tone: 'warn', key: 'pilas', text: `Batería al ${r.battery} %: seguramente son las pilas. Que el cliente las cambie (Beidongli, HenliMax o NSN) antes de enviarla.` }
+  }
+  if (r.ap_signal != null && r.ap_signal < SENAL_MALA) {
+    return { tone: 'warn', key: 'senal', text: `Señal con la antena al ${r.ap_signal} %: llega mal. Suele ser cobertura o la antena, no la etiqueta: revisa dónde está antes de pedir el envío.` }
+  }
+  if (!r.online || min == null || min > 24 * 60) {
+    return { tone: 'bad', key: 'muda', text: 'No comunica con el servidor: encaja con una avería. Seguir con el envío.' }
+  }
+  if (min <= RECIENTE_MIN && (r.battery == null || r.battery >= BATERIA_PILAS) && (r.ap_signal == null || r.ap_signal >= SENAL_JUSTA)) {
+    return { tone: 'info', key: 'bien', text: 'Comunica bien con el servidor (batería y señal correctas). Aun así puede fallar la pantalla: pide una foto o fuérzala antes de pedir el envío.' }
+  }
+  return null
+}
+
+function Diagnostico({ r, onPilas }) {
+  const d = diagnostico(r)
+  if (!d) return null
+  return (
+    <p className={`wr-diag t-${d.tone}`}>
+      {d.tone === 'info' ? <Icon.check /> : <Icon.warn />}<span><b>ZKONG:</b> {d.text}</span>
+      {d.key === 'pilas' && onPilas && r.resolution === 'pendiente'
+        ? <button className="dev-btn" onClick={onPilas}>Marcar «Batería baja»</button> : null}
+    </p>
+  )
+}
+
 function Donde({ r }) {
   if (r.lookup_state === 'not_found') return <span className="wr-st bad">No aparece en los servidores</span>
   if (r.lookup_state !== 'found') return <span className="wr-st warn">Sin comprobar</span>
@@ -565,7 +608,9 @@ function Donde({ r }) {
   return (
     <div className="wr-donde">
       <span><i className={`wr-dot ${r.online ? 'on' : ''}`} /><b>{r.server}</b> · {r.store_name || '—'}</span>
-      <small>{r.online ? 'Conectada' : 'Desconectada'}{r.last_commu_at ? ` · comunicó ${haceDias(d)}` : ''}</small>
+      <small>{r.online ? 'Conectada' : 'Desconectada'}{r.last_commu_at ? ` · comunicó ${haceDias(d)}` : ''}
+        {r.battery != null ? <> · <span className={r.battery < BATERIA_PILAS ? 'wr-m-warn' : ''}>batería {r.battery} %</span></> : null}
+        {r.ap_signal != null ? <> · <span className={`wr-m-${tonoSenal(r.ap_signal)}`}>señal {r.ap_signal} %</span></> : null}</small>
     </div>
   )
 }
@@ -1294,6 +1339,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
                 {rv ? <ResPill rv={rv} it={i} onClick={p.review ? () => setRevisar({ items: [i] }) : null} /> : null}
                 {p.edit ? <button className="icon-btn" title="Quitar de la garantía" onClick={() => quitar(i)}><Icon.trash /></button> : null}
                 <div className="full"><Avisos list={i.warnings} />
+                  <Diagnostico r={i} onPilas={rv && p.review ? () => setRevisar({ items: [i], preset: 'bateria' }) : null} />
                   {i.reported_issue ? <p className="wr-cliente-dijo" title="Lo que contó el cliente al pedir la garantía desde el portal"><Icon.chat /> <span>{i.reported_issue}</span></p> : null}
                   {rv ? <ResDetalle rv={rv} it={i} /> : null}</div>
               </li>
