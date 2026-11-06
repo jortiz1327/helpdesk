@@ -70,6 +70,7 @@ class WarrantiesController extends Controller
             'step'              => $this->step($request),
             'cloud_label'       => $this->cloudLabel($request),
             'tour'              => $this->tour($request),
+            'tracking'          => $this->tracking($request),
             default   => $this->list($request),
         };
     }
@@ -300,6 +301,7 @@ class WarrantiesController extends Controller
             'status_changed_at' => $w->status_changed_at?->toDateTimeString(),
             'rating'          => \App\Services\WarrantySurvey::forWarranty($w->id),
             'phases'          => \App\Services\WarrantyPhases::forWarranty($w),
+            'tracking'        => \App\Services\WarrantyTracking::forAgent($w),
             'description'     => $w->description,
             // El asunto es del Helpdesk: solo para quien puede ver ese ticket.
             'ticket_subject'  => $w->ticketVisibleTo($request->user()) ? $w->ticket_subject : null,
@@ -343,6 +345,21 @@ class WarrantiesController extends Controller
         $error = WarrantySteps::toggle($w, (string) $request->input('list'), (string) $request->input('step'), $request->boolean('done'), $request->user()->id);
         return $error ? response()->json(['ok' => false, 'error' => $error], 400)
             : response()->json(['ok' => true, 'steps' => WarrantySteps::forWarranty($w)]);
+    }
+
+    /**
+     * Seguimiento para el cliente: crea el enlace (o uno nuevo con renew, que anula el
+     * anterior) y lo devuelve con sus visitas. Solo POST: mirar la ficha no crea nada.
+     */
+    private function tracking(Request $request)
+    {
+        if (! $request->isMethod('post')) return response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        $w = Warranty::findOrFail((int) $request->input('id'));
+        if (! \App\Services\WarrantyTracking::settings()['active']) {
+            return response()->json(['ok' => false, 'error' => 'El seguimiento para el cliente está desactivado en Configuración'], 400);
+        }
+        \App\Services\WarrantyTracking::token($w, $request->boolean('renew'), $request->user()->id);
+        return response()->json(['ok' => true, 'tracking' => \App\Services\WarrantyTracking::forAgent($w->fresh())]);
     }
 
     /** Tour guiado: sus textos y si este usuario ya lo ha visto (POST: marcarlo como visto). */
@@ -524,6 +541,10 @@ class WarrantiesController extends Controller
             PortalWarranties::applyToItems($w, $r['added'], $userId);
             // Al añadirlas se buscan en el Cloud: eso ya es «comprobarlas».
             WarrantySteps::auto($w, 'cloud', $userId);
+            // Reincidentes: que conste en el historial, no solo en el aviso de la etiqueta.
+            if ($r['repeat']) {
+                \App\Services\WarrantyDocuments::evento($w->id, $userId, 'Reincidentes (ya estuvieron en otra garantía): ' . $this->lista($r['repeat']));
+            }
         }
         return $r;
     }

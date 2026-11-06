@@ -472,6 +472,13 @@ class WarrantiesTest extends TestCase
         Warranty::whereKey($w['id'])->update(['status' => 'cerrada', 'closed_at' => now()]);
         $add = $this->postJson('/api/warranties.php?action=labels_add', ['id' => $otra['id'], 'codes' => '8E9749440'], $h)->assertOk()->json();
         $this->assertSame(['8E9749440'], $add['added']);
+        // Reincidente: aviso con enlace a la garantía anterior, en la respuesta y en el historial.
+        $this->assertSame(['8E9749440'], $add['repeat']);
+        $av = collect(\App\Models\WarrantyItem::where('warranty_id', $otra['id'])->where('code', '8E9749440')->value('warnings'))->firstWhere('key', 'previous_warranty');
+        $this->assertSame('warn', $av['tone']);
+        $this->assertStringStartsWith("Reincidente: ya pasó por la garantía {$w['code']}", $av['text']);
+        $this->assertSame([['id' => $w['id'], 'code' => $w['code']]], $av['links']);
+        $this->assertTrue(DB::table('warranty_events')->where('warranty_id', $otra['id'])->where('to_value', 'like', 'Reincidentes%8E9749440%')->exists());
 
         // Cambiar el modelo y quitar una etiqueta queda en el historial.
         $item = \App\Models\WarrantyItem::where('warranty_id', $otra['id'])->first();

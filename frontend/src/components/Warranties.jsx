@@ -212,6 +212,7 @@ function Formulario({ inicial, opts, onClose, onSaved }) {
     const n = r.added?.length || 0
     toast(f.id ? 'Garantía guardada' : `Garantía ${r.code} creada${n ? ` con ${n} ${n === 1 ? 'etiqueta' : 'etiquetas'}` : ''}`)
     if (r.skipped?.length) toast(`${r.skipped.length} ${r.skipped.length === 1 ? 'etiqueta no entró' : 'etiquetas no entraron'}: ${r.skipped.slice(0, 3).map((s) => `${s.code} (${s.reason})`).join('; ')}`, 'err')
+    avisarReincidentes(toast, r.repeat)
     onSaved(r.id)
   }
 
@@ -569,11 +570,31 @@ const estadoEtiqueta = (r) => r.blocked || r.warnings?.some((a) => a.blocks) ? '
 // Lo que es: producto del portal o, si no está en el catálogo, el modelo de ZKONG.
 const productoDe = (r) => r.aeme_ref || r.server_model || 'Sin modelo'
 
-function Avisos({ list }) {
+const REINCIDE = ['previous_warranty', 'recent_warranties']
+const avisarReincidentes = (toast, codes) => {
+  if (!codes?.length) return
+  toast(`${codes.length === 1 ? `${codes[0]} ya estuvo` : `${codes.length} etiquetas ya estuvieron`} en otra garantía: lo verás en ${codes.length === 1 ? 'su tarjeta' : 'sus tarjetas'}.`, 'warn')
+}
+const esReincidencia = (a) => REINCIDE.includes(a.key)
+
+/* El texto de un aviso con las garantías que nombra enlazadas (se abren en otra pestaña:
+   quien está dando de alta o revisando no pierde lo que tiene a medias). `otras`: las
+   garantías conocidas de la etiqueta, para los avisos guardados antes de llevar enlaces. */
+function AvisoTexto({ a, otras }) {
+  const links = a.links?.length ? a.links : (otras || []).map((o) => ({ id: o.id, code: o.code }))
+  if (!links.length) return a.text
+  const porCodigo = new Map(links.map((l) => [l.code, l.id]))
+  const re = new RegExp(`(${links.map((l) => l.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g')
+  return a.text.split(re).map((t, i) => porCodigo.has(t)
+    ? <a key={i} className="wr-av-link mono" href={`/agentes/garantias/${porCodigo.get(t)}`} target="_blank" rel="noopener" title={`Abrir la garantía ${t} en otra pestaña`}>{t}</a>
+    : t)
+}
+
+function Avisos({ list, otras }) {
   if (!list?.length) return null
   return (
     <ul className="wr-avisos">
-      {list.map((a, i) => <li key={i} className={`t-${a.tone}`}>{a.tone === 'info' ? <Icon.clock /> : <Icon.warn />}<span>{a.text}</span></li>)}
+      {list.map((a, i) => <li key={i} className={`t-${a.tone}`}>{esReincidencia(a) ? <Icon.refresh /> : a.tone === 'info' ? <Icon.clock /> : <Icon.warn />}<span><AvisoTexto a={a} otras={otras} /></span></li>)}
     </ul>
   )
 }
@@ -673,6 +694,7 @@ function agruparAvisos(res) {
   const silencio = []
   res.forEach((r) => (r.warnings || []).forEach((a) => {
     if (a.blocks) return   // lo que bloquea se queda en su fila, a la vista
+    if (esReincidencia(a)) return   // cada una nombra su garantía: se queda en su fila (arriba va el recuento)
     if (a.key === 'silent') { silencio.push(r); return }
     const k = `${a.key}|${a.text}`
     porTexto.set(k, [...(porTexto.get(k) || []), r.code])
@@ -693,6 +715,9 @@ function agruparAvisos(res) {
     silencio.forEach((r) => dentro.add(`${r.code}|silent`))
   }
   grupos.sort((a, b) => b.n - a.n)
+  // Reincidentes: el recuento va el primero, aunque sea una sola.
+  const rein = res.filter((r) => (r.warnings || []).some(esReincidencia)).length
+  if (rein) grupos.unshift({ id: 'reincide', n: rein, tone: 'warn', rein: true, text: `${rein === 1 ? 'ya estuvo' : 'ya estuvieron'} en otra garantía: mira cómo acabó antes de darla por buena.` })
   const agrupado = (code, a) => dentro.has(a.key === 'silent' ? `${code}|silent` : `${code}|${a.key}|${a.text}`)
   return { grupos, agrupado }
 }
@@ -784,7 +809,7 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
               </div>
               {grupos.length ? (
                 <ul className="wr-cs-grupos">
-                  {grupos.map((g) => <li key={g.id} className={`t-${g.tone}`}><Icon.warn /><b>{g.n} {g.n === 1 ? 'etiqueta' : 'etiquetas'}</b><span>{g.text}</span></li>)}
+                  {grupos.map((g) => <li key={g.id} className={`t-${g.tone}`}>{g.rein ? <Icon.refresh /> : <Icon.warn />}<b>{g.n} {g.n === 1 ? 'etiqueta' : 'etiquetas'}</b><span>{g.text}</span></li>)}
                 </ul>
               ) : null}
               <ul className="wr-cs-list">
@@ -797,7 +822,7 @@ function Comprobador({ contexto, value, onChange, autoFocus, split }) {
                     {r.issue ? <p className="wr-cs-issue" title="Lo que dice el cliente (de la lista pegada)"><Icon.quote /> {r.issue}</p> : null}
                     {(() => {
                       const propios = (r.warnings || []).filter((a) => !agrupado(r.code, a))
-                      return propios.length ? <p className="wr-cs-av">{propios.map((a, i) => <span key={i} className={`t-${a.tone}`}>{a.text}</span>)}</p> : null
+                      return propios.length ? <p className="wr-cs-av">{propios.map((a, i) => <span key={i} className={`t-${a.tone}`}><AvisoTexto a={a} /></span>)}</p> : null
                     })()}
                   </li>
                 ))}
@@ -1348,6 +1373,23 @@ function FotosCarta({ i, rv }) {
   )
 }
 
+/* En la lista: la frontal en miniatura y, si hay más, cuántas. Clic: se abre en grande. */
+function FotosFila({ i, rv }) {
+  const fotos = i.photos || []
+  if (!fotos.length) return <span className="dev-mute">—</span>
+  const tipos = tiposFoto(rv, i)
+  const etiqueta = (t) => tipos.find(([k]) => k === t)?.[1] || t
+  const f = fotos.find((x) => fotoConCodigo(i, x.type)) || fotos[0]
+  const todas = fotos.map((x) => CORTO_FOTO[x.type] || etiqueta(x.type)).join(', ')
+  return (
+    <a className="wr-lt-foto" href={api.warrantyPhotoUrl(f.id)} target="_blank" rel="noreferrer"
+      title={`${fotos.every((x) => x.source) ? 'Fotos del cliente' : 'Fotos'}: ${todas}. Clic: ver la ${(CORTO_FOTO[f.type] || etiqueta(f.type)).toLowerCase()} en grande`}>
+      <img src={api.warrantyPhotoUrl(f.id)} alt={`${etiqueta(f.type)} de ${i.code}`} loading="lazy" />
+      {fotos.length > 1 ? <em>+{fotos.length - 1}</em> : null}
+    </a>
+  )
+}
+
 function EtiquetaCarta({ i, rv, p, sel, propio, onSel, onFicha, onRevisar, onPilas, onModelo, onQuitar }) {
   const ui = RES_UI[i.resolution] || RES_UI.pendiente
   return (
@@ -1369,7 +1411,7 @@ function EtiquetaCarta({ i, rv, p, sel, propio, onSel, onFicha, onRevisar, onPil
         <div><dt>Alta</dt><dd className="wr-card-alta"><Plazo t={i.term} /></dd></div>
       </dl>
       <Diagnostico r={i} onPilas={onPilas} />
-      <Avisos list={i.warnings} />
+      <Avisos list={i.warnings} otras={i.other_warranties} />
       {rv ? <ResDetalle rv={rv} it={i} /> : null}
     </li>
   )
@@ -1378,15 +1420,16 @@ function EtiquetaCarta({ i, rv, p, sel, propio, onSel, onFicha, onRevisar, onPil
 function EtiquetaFila({ i, rv, sel, propio, comun, onSel, onFicha, onRevisar, onQuitar }) {
   const ui = RES_UI[i.resolution] || RES_UI.pendiente
   const d = diagnostico(i)
-  const avisos = (i.warnings || []).filter((a) => a.tone !== 'info')
+  const avisos = (i.warnings || []).filter((a) => a.tone !== 'info' && !esReincidencia(a))   // la reincidencia ya la dice ↻ junto al código
   return (
     <tr className={`c-${ui.c}${i.resolution === 'pendiente' ? ' pend' : ''}${sel ? ' sel' : ''}`}>
       {onSel !== undefined ? <td className="wr-lt-ck">{onSel ? <input type="checkbox" className="wr-pick" checked={sel} onChange={onSel} aria-label={`Seleccionar ${i.code}`} /> : null}</td> : null}
       <td className="wr-lt-code">
         <button className="link mono" title="Ver ficha e historial" onClick={onFicha}>{i.code}</button>
         {i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}
-        {i.other_warranties?.length ? <em className="wr-rep" title={`También en: ${i.other_warranties.map((o) => o.code).join(', ')}`}><Icon.refresh /> {i.other_warranties.length + 1}</em> : null}
+        {i.other_warranties?.length ? <button className="wr-rep" onClick={onFicha} title={`Reincidente, también en: ${i.other_warranties.map((o) => o.code).join(', ')}. Pulsa para ver su historial`}><Icon.refresh /> {i.other_warranties.length + 1}</button> : null}
       </td>
+      <td className="wr-lt-fotos"><FotosFila i={i} rv={rv} /></td>
       <td className="wr-lt-prod"><b>{productoDe(i)}</b>{i.term && !i.term.hardware_ok ? <em className="wr-term out"><Icon.clock /> Fuera de plazo</em> : null}</td>
       <td className="wr-lt-cloud">
         <CloudCorto r={i} />
@@ -1434,6 +1477,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
     setOcupado('')
     if (!r.ok) { toast(r.error || 'Error', 'err'); return }
     if (r.added.length) toast(`${r.added.length} ${r.added.length === 1 ? 'etiqueta añadida' : 'etiquetas añadidas'}`)
+    avisarReincidentes(toast, r.repeat)
     if (r.skipped.length) toast(`${r.skipped.length} no ${r.skipped.length === 1 ? 'entró' : 'entraron'}: ${r.skipped.slice(0, 3).map((s) => `${s.code} (${s.reason})`).join('; ')}${r.skipped.length > 3 ? '…' : ''}`, 'err')
     setComp(COMP_VACIO); setPanel(false); onReload(); onChanged()
   }
@@ -1587,7 +1631,7 @@ function Productos({ w, items, opts, onReload, onChanged }) {
               <table className="wr-lt">
                 <thead><tr>
                   {rv && p.review ? <th className="wr-lt-ck"><input type="checkbox" className="wr-pick" checked={todasVisibles} onChange={marcarVisibles} aria-label="Seleccionar todas" /></th> : null}
-                  <th>Etiqueta</th><th>Producto</th><th>Cloud</th><th>Qué dice el cliente</th><th>Revisión</th><th />
+                  <th>Etiqueta</th><th>Fotos</th><th>Producto</th><th>Cloud</th><th>Qué dice el cliente</th><th>Revisión</th><th />
                 </tr></thead>
                 <tbody>
                   {listado.map((i) => (
@@ -1684,7 +1728,7 @@ function PasosFase({ ph }) {
  * «⋯» de la cabecera de la ficha: lo que se usa poco (editar) y lo que no tiene vuelta
  * atrás (borrar) va aquí, para que la cabecera tenga una sola acción principal.
  */
-function MasAcciones({ code, onEdit, onDelete }) {
+function MasAcciones({ code, onEdit, onDelete, seguimiento = null, onCopiar, onRenovar }) {
   const [pos, setPos] = useState(null)
   const btn = useRef(null)
   const menu = useRef(null)
@@ -1719,7 +1763,7 @@ function MasAcciones({ code, onEdit, onDelete }) {
     if (pos) { setPos(null); return }
     const b = btn.current.getBoundingClientRect()
     const right = Math.max(8, window.innerWidth - b.right)
-    setPos(b.bottom + 160 > window.innerHeight ? { bottom: window.innerHeight - b.top + 4, right } : { top: b.bottom + 4, right })
+    setPos(b.bottom + 320 > window.innerHeight ? { bottom: window.innerHeight - b.top + 4, right } : { top: b.bottom + 4, right })
   }
   const elegir = (fn) => () => { setPos(null); fn() }
 
@@ -1735,6 +1779,23 @@ function MasAcciones({ code, onEdit, onDelete }) {
             <button role="menuitem" onClick={elegir(onEdit)}>
               <Icon.pencil /><span><b>Editar los datos</b><small>Cliente, proyecto, fechas…</small></span>
             </button>
+          ) : null}
+          {seguimiento ? (
+            <>
+              <button role="menuitem" onClick={elegir(onCopiar)}>
+                <Icon.copy /><span><b>Copiar enlace de seguimiento</b><small>{seguimiento.url ? 'Para que el cliente vea en qué fase está' : 'Se crea ahora: el cliente ve en qué fase está'}</small></span>
+              </button>
+              {seguimiento.url ? (
+                <a role="menuitem" href={`${seguimiento.url}?previa=1`} target="_blank" rel="noreferrer" onClick={() => setPos(null)}>
+                  <Icon.eye /><span><b>Ver lo que ve el cliente</b><small>Se abre en otra pestaña (no cuenta como visita)</small></span>
+                </a>
+              ) : null}
+              {seguimiento.url ? (
+                <button role="menuitem" onClick={elegir(onRenovar)}>
+                  <Icon.refresh /><span><b>Nuevo enlace de seguimiento</b><small>El anterior deja de funcionar</small></span>
+                </button>
+              ) : null}
+            </>
           ) : null}
           {onDelete ? (
             <button role="menuitem" className="bad" onClick={elegir(onDelete)}>
@@ -2104,6 +2165,20 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, 
     const r = await api.deleteWarranty(w.id)
     if (r.ok) { toast('Garantía borrada'); onChanged(); onBack() } else toast(r.error || 'Error', 'err')
   }
+  // Seguimiento para el cliente: copia el enlace (lo crea la primera vez). renew: uno nuevo,
+  // y el anterior deja de funcionar (si se ha mandado a quien no debía).
+  const copiarSeguimiento = async (renew = false) => {
+    if (renew && !(await confirm({ title: 'Nuevo enlace de seguimiento', message: 'El enlace que tenga el cliente dejará de funcionar y tendrás que mandarle el nuevo. ¿Seguir?', confirmText: 'Crear otro enlace' }))) return
+    let url = renew ? null : w.tracking?.url
+    if (!url) {
+      const r = await api.warrantyTracking(w.id, renew)
+      if (!r.ok) { toast(r.error || 'No se pudo crear el enlace', 'err'); return }
+      url = r.tracking.url
+      cargar()
+    }
+    try { await navigator.clipboard.writeText(url); toast(renew ? 'Enlace nuevo copiado: el anterior ya no funciona' : 'Enlace de seguimiento copiado: pégalo en el correo o el WhatsApp') }
+    catch { window.prompt('Copia el enlace de seguimiento', url) }
+  }
   const enviarNota = async () => {
     if (!nota.body.trim()) return
     setEnviando(true)
@@ -2174,7 +2249,8 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, 
                 <Icon.image /> Fotos del cliente{fotos === null ? null : <em className="fc-n">{fotos.filter((x) => x.from === 'cliente').length}</em>}
               </button>
             ) : null}
-            {p.edit || p.delete ? <MasAcciones code={w.code} onEdit={p.edit ? () => onEdit(w) : null} onDelete={p.delete ? borrar : null} /> : null}
+            {p.edit || p.delete ? <MasAcciones code={w.code} onEdit={p.edit ? () => onEdit(w) : null} onDelete={p.delete ? borrar : null}
+              seguimiento={p.edit && w.tracking?.active ? w.tracking : null} onCopiar={() => copiarSeguimiento(false)} onRenovar={() => copiarSeguimiento(true)} /> : null}
           </div>
         </div>
 
@@ -2212,6 +2288,16 @@ function Ficha({ id, opts, onBack, onEdit, onChanged, onOpenTicket, onGoGuides, 
             <b className={stale ? 'wf-warn' : ''}>{haceDias(diasSin)}</b>
           </div>
           {ticket ? <div className="wf-fact"><span>Ticket</span><b>{ticket}</b></div> : null}
+          {w.tracking?.url ? (
+            <div className="wf-fact" title={w.tracking.expired ? 'El enlace ha caducado: crea uno nuevo desde «⋯»' : w.tracking.expires ? `El enlace vale hasta el ${fecha(w.tracking.expires)}` : 'El enlace vale mientras la garantía siga abierta'}>
+              <span>Seguimiento del cliente</span>
+              <b className={`wf-fact-trk${w.tracking.expired ? ' wf-warn' : ''}`}>
+                {w.tracking.expired ? 'Enlace caducado'
+                  : w.tracking.views ? <><Icon.eye /> Visto {w.tracking.views} {w.tracking.views === 1 ? 'vez' : 'veces'}</> : <span className="dev-mute">Sin abrir todavía</span>}
+              </b>
+              {!w.tracking.expired && w.tracking.last_view ? <small className="wf-fact-since">Última, {haceDias(dias(w.tracking.last_view))}</small> : null}
+            </div>
+          ) : null}
           {w.rating ? (
             <div className="wf-fact" title={w.rating.comment ? `“${w.rating.comment}”` : 'Sin comentario'}>
               <span>Encuesta del cliente</span>

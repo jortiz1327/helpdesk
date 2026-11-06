@@ -53,6 +53,7 @@ class WarrantySettingsController extends Controller
             'close_reasons_save' => $this->closeReasonsSave($request),
             'notices_save'    => $this->noticesSave($request),
             'client_notices_save' => $this->clientNoticesSave($request),
+            'tracking_save'   => $this->trackingSave($request),
             default           => $this->get(),
         };
     }
@@ -92,6 +93,9 @@ class WarrantySettingsController extends Controller
             'replacements' => WarrantyReplacements::settings(),
             'checklists' => WarrantySteps::settings(),
             'tour' => WarrantyTour::settings(),
+            'tracking' => \App\Services\WarrantyTracking::settings(),
+            'tracking_stages' => collect(\App\Services\WarrantyTracking::STAGES)->map(fn ($s, $k) => ['key' => $k, 'label' => $s[0], 'text' => $s[1]])->values(),
+            'tracking_map_defaults' => \App\Services\WarrantyTracking::MAP,
             'notices' => WarrantyAlertNotices::settings(),
             'client_notices' => WarrantyClientNotices::settings(),
             'client_notice_phases' => collect(WarrantyClientNotices::PHASES)->map(fn ($p, $k) => ['key' => $k, 'label' => $p[0], 'when' => $p[1],
@@ -210,6 +214,16 @@ class WarrantySettingsController extends Controller
     private function clientNoticesSave(Request $request)
     {
         $this->guardar('client_notices', WarrantyClientNotices::clean($request->all()));
+        return response()->json(['ok' => true]);
+    }
+
+    /* --- Seguimiento para el cliente --- */
+
+    private function trackingSave(Request $request)
+    {
+        [$v, $error] = \App\Services\WarrantyTracking::clean($request->all());
+        if ($error) return $this->error($error);
+        $this->guardar('tracking', $v);
         return response()->json(['ok' => true]);
     }
 

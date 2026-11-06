@@ -2027,7 +2027,7 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
                   {(masMio || can('tickets.delete')) && (
                     <div className="tkm-q-wrap" ref={masRef}>
                       <button className="tkm-q" onClick={() => setMasOpen((o) => !o)} title="Más acciones">
-                        <Icon.settings /><small>Más</small>
+                        <Icon.dots /><small>Más</small>
                       </button>
                       {masOpen && (
                         <div className="tkm-mas">

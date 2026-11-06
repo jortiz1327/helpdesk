@@ -34,6 +34,8 @@ class WarrantyLabels
     private const CACHE_MIN = 15;      // lo que dijo el servidor, para no repetir al guardar
     private const NOT_FOUND_MIN = 15;  // «no aparece», solo para la comprobación del portal
     private const NO_ESTA = 'warranty_label_none:';
+    /** Avisos de reincidencia: la etiqueta ya pasó por otra garantía. */
+    public const REINCIDE = ['previous_warranty', 'recent_warranties'];
 
     public function __construct(private ZkongDevices $devices)
     {
@@ -179,7 +181,7 @@ class WarrantyLabels
     public function add(Warranty $w, array $codes, array $manual, ?int $userId): array
     {
         $ya = WarrantyItem::where('warranty_id', $w->id)->pluck('code')->all();
-        $added = $skipped = [];
+        $added = $skipped = $repeat = [];
         $results = $this->check($codes, self::contextOf($w), $userId);
         $models = $this->models();
         foreach ($results as $r) {
@@ -198,8 +200,9 @@ class WarrantyLabels
             }
             WarrantyItem::create($this->fila($r) + ['warranty_id' => $w->id, 'created_by' => $userId]);
             $added[] = $r['code'];
+            if (collect($r['warnings'])->whereIn('key', self::REINCIDE)->isNotEmpty()) $repeat[] = $r['code'];
         }
-        return ['added' => $added, 'skipped' => $skipped];
+        return ['added' => $added, 'skipped' => $skipped, 'repeat' => $repeat];
     }
 
     /** Cambia a mano el modelo (producto) de una etiqueta. */
@@ -427,26 +430,32 @@ class WarrantyLabels
     private function warnings(array $r, array $ctx, array $models): array
     {
         $w = [];
-        $aviso = function (string $key, string $tone, string $text, bool $blocks = false) use (&$w) {
-            $w[] = ['key' => $key, 'tone' => $tone, 'text' => $text, 'blocks' => $blocks];
+        // $links: las garantías que nombra el texto, para enlazarlas (id y código).
+        $aviso = function (string $key, string $tone, string $text, bool $blocks = false, array $links = []) use (&$w) {
+            $w[] = ['key' => $key, 'tone' => $tone, 'text' => $text, 'blocks' => $blocks] + ($links ? ['links' => $links] : []);
         };
+        $enlace = fn ($g) => ['id' => (int) $g->id, 'code' => $g->code];
 
         $otras = DB::table('warranty_items as i')->join('warranties as g', 'g.id', '=', 'i.warranty_id')
             ->where('i.code', $r['code'])
             ->when($ctx['warranty_id'] ?? null, fn ($q, $id) => $q->where('g.id', '!=', $id))
             ->orderByDesc('g.received_at')
-            ->get(['g.id', 'g.code', 'g.status', 'g.received_at', 'g.closed_at']);
+            ->get(['g.id', 'g.code', 'g.status', 'g.received_at', 'g.closed_at', 'i.resolution']);
 
         // 1. Ya está en otra garantía abierta.
         if ($abierta = $otras->firstWhere(fn ($g) => ! in_array($g->status, Warranty::closedStatuses(), true))) {
-            $aviso('open_warranty', 'bad', "Ya está en la garantía abierta {$abierta->code} (" . (Warranty::statuses()[$abierta->status] ?? $abierta->status) . '): no puede entrar hasta que esa se cierre.', true);
+            $aviso('open_warranty', 'bad', "Ya está en la garantía abierta {$abierta->code} (" . (Warranty::statuses()[$abierta->status] ?? $abierta->status) . '): no puede entrar hasta que esa se cierre.', true, [$enlace($abierta)]);
         }
-        // 2. Varias garantías en el último año.
+        // 2. Reincidencia: varias garantías en el último año, o ya pasó por otra (con lo que se decidió allí).
         $recientes = $otras->filter(fn ($g) => $g->received_at && Carbon::parse($g->received_at)->gte(now()->subMonths(self::RECENT_MONTHS)));
         if ($recientes->count() >= 2) {
-            $aviso('recent_warranties', 'warn', $recientes->count() . ' garantías en los últimos ' . self::RECENT_MONTHS . ' meses: ' . $recientes->pluck('code')->join(', ') . '.');
+            $aviso('recent_warranties', 'warn', 'Reincidente: ' . $recientes->count() . ' garantías en los últimos ' . self::RECENT_MONTHS . ' meses (' . $recientes->pluck('code')->join(', ') . ').',
+                false, $recientes->map($enlace)->values()->all());
         } elseif (! $abierta && ($antes = $otras->first())) {
-            $aviso('previous_warranty', 'info', "Ya pasó por la garantía {$antes->code}" . ($antes->closed_at ? ', cerrada el ' . Carbon::parse($antes->closed_at)->format('d/m/Y') : '') . '.');
+            $res = $antes->resolution && $antes->resolution !== 'pendiente' ? (WarrantyItem::RESOLUTIONS[$antes->resolution]['label'] ?? null) : null;
+            $aviso('previous_warranty', 'warn', "Reincidente: ya pasó por la garantía {$antes->code}"
+                . ($antes->closed_at ? ', cerrada el ' . Carbon::parse($antes->closed_at)->format('d/m/Y') : '')
+                . ($res ? " («{$res}»)" : '') . '.', false, [$enlace($antes)]);
         }
 
         // 3. Dónde está.

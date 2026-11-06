@@ -19,6 +19,10 @@ $spa = fn () => response()->file(public_path('index.html'), [
 
 Route::get('/', $spa);
 
+// Seguimiento para el cliente: página pública de solo lectura con la fase de su garantía.
+Route::get('seguimiento/{token}', [\App\Http\Controllers\WarrantyTrackingController::class, 'page'])
+    ->where('token', '[A-Za-z0-9]{32}')->middleware('throttle:30,1')->name('warranty.track');
+
 /*
  * Cualquier otra ruta se resuelve también a la SPA: la vista vive en la URL
  * (`/agentes/tickets`, …), así que recargar ahí tiene que devolver la app.

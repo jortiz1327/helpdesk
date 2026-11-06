@@ -435,6 +435,8 @@ export const api = {
   warrantyGuideUrl: (id, dl = false) => `${BASE}/warranty_guide.php?id=${id}${dl ? '&dl=1' : ''}&token=${encodeURIComponent(getMediaToken())}`,
   warrantyTour: () => req('warranties.php?action=tour'),
   warrantyTourSeen: () => postJson('warranties.php?action=tour', {}),
+  // Seguimiento para el cliente: crea el enlace (renew: uno nuevo, el anterior deja de valer).
+  warrantyTracking: (id, renew = false) => postJson('warranties.php?action=tracking', { id, renew }),
   // Centro de ayuda de garantías: warrantyHelpDo('save' | 'remove', {...}).
   warrantyHelp: () => req('warranty_help.php'),
   warrantyHelpDo: (action, payload) => postJson(`warranty_help.php?action=${action}`, payload),

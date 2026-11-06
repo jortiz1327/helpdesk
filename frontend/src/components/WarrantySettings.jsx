@@ -586,6 +586,62 @@ function AvisosCliente({ cfg, fases, hacer }) {
   )
 }
 
+/* Seguimiento para el cliente: qué fase ve el cliente en cada estado y con qué texto. */
+function SeguimientoCliente({ cfg, fases, estados, hacer }) {
+  const [v, setV] = useState(cfg)
+  useEffect(() => setV(cfg), [cfg])
+  const cambiado = JSON.stringify(v) !== JSON.stringify(cfg)
+  const setFase = (k, c) => setV((x) => ({ ...x, stages: { ...x.stages, [k]: { ...x.stages[k], ...c } } }))
+  const vacio = Object.values(v.stages).some((s) => !s.label.trim() || !s.text.trim())
+  const opciones = fases.map((f) => ({ value: f.key, label: v.stages[f.key]?.label || f.label }))
+  const usados = new Set(Object.values(v.map))
+  return (
+    <Card title="Seguimiento del cliente"
+      sub="Desde el menú «⋯» de la ficha se copia un enlace para que el cliente vea en qué fase está su garantía, sin entrar en ningún sitio. No ve los estados internos: ve la fase que pongas aquí, con su texto, y cuántos dispositivos hay revisados o en el fabricante. Nunca notas, responsable, alertas ni importes."
+      foot={(
+        <div className="ws-foot">
+          <button className="btn ghost sm" onClick={() => hacer('tracking_save', { active: v.active, days: v.days }, 'Fases y textos de serie recuperados')}><Icon.refresh /> Textos de serie</button>
+          <span className="spacer" />
+          {cambiado ? <button className="btn ghost sm" onClick={() => setV(cfg)}>Descartar</button> : null}
+          <button className="btn" disabled={!cambiado || vacio} onClick={() => hacer('tracking_save', v, 'Seguimiento guardado')}><Icon.save /> Guardar</button>
+        </div>
+      )}>
+      <div className="ws-body">
+        <div className="ws-trk-top">
+          <label className="wr-check"><input type="checkbox" checked={v.active} onChange={(e) => setV((x) => ({ ...x, active: e.target.checked }))} /> <b>Enlace de seguimiento activo</b></label>
+          <label className="ws-trk-dias">Vale hasta <input type="number" min={0} max={365} value={v.days} onChange={(e) => setV((x) => ({ ...x, days: Number(e.target.value) || 0 }))} /> días después de cerrar la garantía</label>
+        </div>
+        {!v.active ? <p className="dev-mute">Desactivado, los enlaces que ya tenga algún cliente dicen «no está disponible».</p> : null}
+
+        <h4 className="ws-trk-h">Qué ve el cliente en cada estado</h4>
+        <div className="ws-trk-map">
+          {estados.filter((e) => e.active || v.map[e.key]).map((e) => (
+            <div key={e.key} className="ws-trk-row">
+              <span className="ws-trk-st"><i style={{ background: e.color }} />{e.label}{e.closed ? <small>cerrada</small> : null}</span>
+              <Icon.arrowRight className="ic-arrow" aria-hidden="true" />
+              <Select sm value={v.map[e.key] || 'revision'} onChange={(x) => setV((y) => ({ ...y, map: { ...y.map, [e.key]: x } }))} options={opciones} />
+            </div>
+          ))}
+        </div>
+
+        <h4 className="ws-trk-h">Las fases y su texto</h4>
+        <div className="ws-pasos">
+          {fases.map((f) => (
+            <div key={f.key} className={`ws-pl${usados.has(f.key) ? '' : ' off'}`}>
+              <div className="ws-pl-h">
+                <input className="ws-pl-name" value={v.stages[f.key].label} maxLength={60} placeholder="Nombre de la fase" onChange={(e) => setFase(f.key, { label: e.target.value })} />
+                {!usados.has(f.key) ? <span className="dev-mute">Ningún estado la usa</span> : null}
+              </div>
+              <textarea className="ws-tour-t" rows={2} value={v.stages[f.key].text} maxLength={400} placeholder="Lo que lee el cliente en esta fase" onChange={(e) => setFase(f.key, { text: e.target.value })} />
+            </div>
+          ))}
+        </div>
+        <p className="dev-mute">«{v.stages.tu_respuesta?.label}» sale como aviso destacado, y en la barra la garantía sigue en «{v.stages.revision?.label}». «{v.stages.fabricante?.label}», «{v.stages.envio?.label}» y «{v.stages.enviada?.label}» solo salen en la barra si la garantía pasa por ellas.</p>
+      </div>
+    </Card>
+  )
+}
+
 /* Tour guiado: el título y el texto de cada paso (qué se señala lo fija la app). */
 function TourTextos({ steps, hacer }) {
   const [v, setV] = useState(steps)
@@ -661,6 +717,7 @@ const SECCIONES = [
     ['alertas', 'Alertas', Icon.bell, (d) => d.alerts.filter((r) => r.active).length],
     ['avisos', 'Avisos de alertas', Icon.mail, (d) => [d.notices.bell && 'Campana', d.notices.email && 'Correo'].filter(Boolean).join(' · ') || 'No'],
     ['avisos_cliente', 'Avisos al cliente', Icon.mail, (d) => Object.values(d.client_notices).filter(Boolean).length || 'No'],
+    ['seguimiento', 'Seguimiento del cliente', Icon.eye, (d) => (d.tracking.active ? 'Sí' : 'No')],
     ['pasos', 'Pasos por tipo de cliente', Icon.check, (d) => d.checklists.filter((l) => l.active).length],
     ['motivos', 'Motivos de cierre', Icon.lock, (d) => d.close_reasons.filter((r) => r.active).length],
   ]],
@@ -728,6 +785,7 @@ export default function WarrantySettings() {
               {sec === 'urgencias' && <Urgencias list={d.urgencies} />}
               {sec === 'alertas' && <Alertas list={d.alerts} hacer={hacer} />}
               {sec === 'avisos' && <Avisos cfg={d.notices} users={d.notice_users} porDefecto={d.notice_default_to} hacer={hacer} />}
+              {sec === 'seguimiento' && <SeguimientoCliente cfg={d.tracking} fases={d.tracking_stages} estados={d.statuses} hacer={hacer} />}
               {sec === 'avisos_cliente' && <AvisosCliente cfg={d.client_notices} fases={d.client_notice_phases} hacer={hacer} />}
               {sec === 'plantillas' &&<Plantillas list={d.templates} hacer={hacer} />}
               {sec === 'plazos' && <Plazos terms={d.terms} refs={d.term_references} categorias={d.categories} hacer={hacer} />}

@@ -15,6 +15,8 @@ class Warranty extends Model
     protected $table = 'warranties';
 
     protected $guarded = ['id'];
+    // La clave del enlace de seguimiento del cliente solo sale como enlace (WarrantyTracking).
+    protected $hidden = ['track_token'];
 
     protected $casts = [
         'first_contact_at' => 'date',
