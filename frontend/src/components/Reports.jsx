@@ -13,10 +13,11 @@ const PERIODS = [['today', 'Hoy'], ['7d', '7 días'], ['30d', '30 días'], ['all
 const CHANNEL = { email: 'Correo', whatsapp: 'WhatsApp', web: 'Portal web' }
 const fmtH = (h) => h == null ? '—' : (h < 1 ? Math.round(h * 60) + ' min' : (h % 1 === 0 ? h : h.toFixed(1)) + ' h')
 
-function KPI({ n, label, color, hint }) {
+// `bad`: la cifra es un problema (SLA vencido > 0). Solo entonces lleva color.
+function KPI({ n, label, bad, hint }) {
   return (
-    <div className="stat-card">
-      <div className="stat-num" style={{ marginTop: 0, ...(color ? { color } : {}) }}>{n ?? 0}</div>
+    <div className={`stat-card ${bad ? 'bad' : ''}`}>
+      <div className="stat-num">{n ?? 0}</div>
       <div className="stat-sub">{label}{hint && <span className="rep-hint"> · {hint}</span>}</div>
     </div>
   )
@@ -118,9 +119,9 @@ export default function Reports({ onGo }) {
           <>
             <div className="stat-grid rep-kpis">
               <KPI n={k.total} label="Tickets" />
-              <KPI n={k.abiertos} label="Abiertos" color="#2563eb" />
-              <KPI n={k.resueltos} label="Resueltos" color="#12925a" />
-              {sla && <KPI n={k.vencidos} label="SLA vencido" color={k.vencidos ? '#dc2626' : undefined} />}
+              <KPI n={k.abiertos} label="Abiertos" />
+              <KPI n={k.resueltos} label="Resueltos" />
+              {sla && <KPI n={k.vencidos} label="SLA vencido" bad={k.vencidos > 0} />}
               <KPI n={fmtH(k.resp_h)} label="1ª respuesta" hint="media" />
               <KPI n={fmtH(k.resol_h)} label="Resolución" hint="media" />
             </div>

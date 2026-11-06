@@ -302,9 +302,9 @@
   /* Medallón (cuadrado redondeado, distinto del círculo del éxito): da un foco a la
      pantalla. Cambia de sobre a candado según el paso, con un pop al aparecer. */
   .acc-ico{width:62px;height:62px;border-radius:18px;background:var(--brand-soft);color:var(--brand);
-    display:grid;place-items:center;margin:2px auto 18px;animation:accpop .42s cubic-bezier(.2,1.3,.4,1) both}
+    display:grid;place-items:center;margin:2px auto 18px;animation:accpop .32s var(--ease-out) both}
   .acc-ico svg{width:29px;height:29px}
-  @keyframes accpop{from{transform:scale(.6) rotate(-6deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+  @keyframes accpop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
   .acc-trust{display:flex;align-items:flex-start;gap:9px;background:var(--surface-2);border:1px solid var(--line);
     border-radius:12px;padding:12px 14px;margin-top:16px;font-size:13px;color:var(--ink-2);line-height:1.5;text-align:left}
   .acc-trust svg{width:16px;height:16px;color:var(--ink-3);flex:none;margin-top:1px}
@@ -325,8 +325,8 @@
 
   /* ---- Éxito ---- */
   .ok-mark{width:70px;height:70px;border-radius:50%;background:var(--ok-soft);color:var(--ok);
-    display:grid;place-items:center;margin:0 auto 20px;animation:pop .4s cubic-bezier(.2,1.3,.4,1) both}
-  @keyframes pop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+    display:grid;place-items:center;margin:0 auto 20px;animation:pop .32s var(--ease-out) both}
+  @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
   .ok-mark svg{width:36px;height:36px}
   .tk-code{text-align:center;font-family:ui-monospace,monospace;font-size:26px;font-weight:700;
     letter-spacing:.04em;background:var(--brand-soft);color:var(--brand-deep);
@@ -461,9 +461,7 @@
     padding:24px 26px;box-shadow:var(--shadow-lg);margin-bottom:22px;overflow:hidden}
   .thero.proceso{--acc:var(--wait);--acc-soft:var(--wait-soft)}
   .thero.resuelto{--acc:var(--ok);--acc-soft:var(--ok-soft)}
-  /* Una franja de color arriba: sobrio y suficiente. (Antes había un círculo
-     decorativo que en oscuro salía como un disco de borde duro — parecía un bug.) */
-  .thero::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--acc)}
+  /* Sin franja de color arriba: la fase ya la dicen la píldora y el progreso. */
   .thero-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative}
   .thero-eyebrow{font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink-3);font-weight:600;letter-spacing:.01em}
   .thero-pill{margin-left:auto;display:inline-flex;align-items:center;gap:7px;background:var(--acc-soft);color:var(--acc);

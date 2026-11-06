@@ -771,6 +771,19 @@ const areasFor = (user) => AREAS.filter((a) => allows(user, a));
 const areaOfView = (v) =>
     AREAS.find((a) => a.groups.some((g) => g.items.some((i) => i.key === v)));
 
+/*
+ * UN COLOR POR ÁREA. El área activa se marca en <html data-area="…"> y el CSS
+ * cambia --primary y compañía: Helpdesk azul, Campañas verde (y Garantías violeta
+ * cuando llegue). Va en <html> y no en .app para que los modales y avisos, que se
+ * pintan fuera, también lo hereden.
+ */
+function AreaTheme({ area }) {
+    useEffect(() => {
+        document.documentElement.setAttribute("data-area", area);
+    }, [area]);
+    return null;
+}
+
 function initialsOf(user) {
     const n = (user?.name || user?.email || "HD").trim();
     const parts = n.split(/\s+/).filter(Boolean);
@@ -1285,6 +1298,7 @@ export default function App() {
         <ToastCtx.Provider value={toast}>
             <ConfirmCtx.Provider value={confirm}>
                 <div className="app">
+                    <AreaTheme area={areaKey} />
                     {/* Recibimiento matutino: tickets pospuestos que han despertado. */}
                     <MorningBriefing
                         user={auth.user}
@@ -1375,7 +1389,8 @@ export default function App() {
                                         <button
                                             key={n.key}
                                             className={`rail-btn ${view === n.key ? "active" : ""}`}
-                                            style={{ "--bc": n.color }}
+                                            /* Sin color por entrada: los iconos van en gris y el
+                                               activo toma el color del área (ver AreaTheme). */
                                             onClick={() => setView(n.key)}
                                             onMouseEnter={(e) => {
                                                 if (expanded) return;

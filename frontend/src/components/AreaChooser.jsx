@@ -16,7 +16,7 @@ const META = {
   },
   campaigns: {
     tagline: 'Difusiones, plantillas y chat en vivo',
-    c1: '#0ea5a4', c2: '#16a34a', glow: 'rgba(15,164,146,0.42)',
+    c1: '#22a35a', c2: '#15803d', glow: 'rgba(34,163,90,0.42)',   // el mismo verde que el acento del área
     points: ['Envío de campañas y plantillas', 'Chat en vivo y automatizaciones', 'Agenda de contactos y formularios'],
     art: 'send',
   },

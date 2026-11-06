@@ -70,13 +70,13 @@ function Detail({ id, onBack, onChange }) {
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 980 }}>
           <div className="stat-grid" style={{ marginBottom: 16 }}>
-            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--ink-3)', marginTop: 0 }}>{c.total}</div><div className="stat-sub">Destinatarios</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--primary)', marginTop: 0 }}>{c.sent}</div><div className="stat-sub">Enviados</div></div>
+            <div className="stat-card"><div className="stat-num">{c.total}</div><div className="stat-sub">Destinatarios</div></div>
+            <div className="stat-card"><div className="stat-num">{c.sent}</div><div className="stat-sub">Enviados</div></div>
             {/* Entregado/Leído solo tienen sentido en WhatsApp (los reporta el webhook de Meta). */}
-            {!isEmail && <div className="stat-card"><div className="stat-num" style={{ color: 'var(--info)', marginTop: 0 }}>{delivered}</div><div className="stat-sub">Entregados</div></div>}
-            {!isEmail && <div className="stat-card"><div className="stat-num" style={{ color: 'var(--secondary)', marginTop: 0 }}>{read}</div><div className="stat-sub">Leídos</div></div>}
-            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--danger)', marginTop: 0 }}>{c.failed}</div><div className="stat-sub">Fallidos</div></div>
-            {pending > 0 && <div className="stat-card"><div className="stat-num" style={{ color: 'var(--warn)', marginTop: 0 }}>{pending}</div><div className="stat-sub">En cola</div></div>}
+            {!isEmail && <div className="stat-card"><div className="stat-num">{delivered}</div><div className="stat-sub">Entregados</div></div>}
+            {!isEmail && <div className="stat-card"><div className="stat-num">{read}</div><div className="stat-sub">Leídos</div></div>}
+            <div className="stat-card bad"><div className="stat-num">{c.failed}</div><div className="stat-sub">Fallidos</div></div>
+            {pending > 0 && <div className="stat-card warn"><div className="stat-num">{pending}</div><div className="stat-sub">En cola</div></div>}
           </div>
           <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
             {isEmail ? <>Correo · Asunto <b>{c.subject || '—'}</b></> : <>WhatsApp · Plantilla <b>{c.template_name}</b></>} · Destino <b>{c.source_name || '—'}</b> · {fmt(c.scheduled_at)}
@@ -230,9 +230,9 @@ export default function CampaignDashboard({ onNew, user }) {
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1120 }}>
           <div className="stat-grid">
-            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--primary)', marginTop: 0 }}>{totals.camp}</div><div className="stat-sub">Campañas</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--secondary)', marginTop: 0 }}>{totals.sent}</div><div className="stat-sub">Mensajes enviados</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: 'var(--warn)', marginTop: 0 }}>{totals.pend}</div><div className="stat-sub">En cola</div></div>
+            <div className="stat-card"><div className="stat-num">{totals.camp}</div><div className="stat-sub">Campañas</div></div>
+            <div className="stat-card"><div className="stat-num">{totals.sent}</div><div className="stat-sub">Mensajes enviados</div></div>
+            <div className="stat-card warn"><div className="stat-num">{totals.pend}</div><div className="stat-sub">En cola</div></div>
           </div>
 
           {canManage && <SendSafety />}
