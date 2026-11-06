@@ -4174,9 +4174,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 :root[data-theme="light"] .tk-kpi.red .k-v { color: var(--tone-bad); }
 
 /* --- Filas y tarjetas: sin franjas de color a la izquierda --- */
-.tk-table tbody tr.wait td:first-child { box-shadow: none; }
-.tk-row.internal > td { background: color-mix(in srgb, #f59e0b 6%, transparent); }
-.tk-row.internal > td:first-child { box-shadow: none; }
+/* Las marcas de la izquierda en la lista de tickets SÍ significan algo y se quedan:
+   ámbar = el último mensaje es del cliente (falta respuesta); interno = correo de la empresa. */
+.tk-table tbody tr.wait td:first-child { box-shadow: inset 3px 0 0 var(--warn, #f59e0b); }
+.tk-row.internal > td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
 .tk-msg.note .tk-bub { border-left: 1px solid rgba(245, 158, 11, 0.38); }
 .act-card { border-left: 1px solid var(--line); }
 .tkm-rating-cmt { border-left: 0; border-radius: 8px; }
