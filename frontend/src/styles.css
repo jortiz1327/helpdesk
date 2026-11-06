@@ -5238,28 +5238,50 @@ button.dev-code:hover { text-decoration: underline; }
 .zk-espera { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 20px; font-size: 11px; font-weight: 700; font-style: normal; color: #2563eb; background: rgba(37, 99, 235, .1); white-space: nowrap; }
 .zk-espera.warn { color: var(--warn-ink); background: rgba(217, 119, 6, .12); }
 .zk-espera.bad { color: var(--danger); background: rgba(220, 38, 38, .1); }
-.zk-envio { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 18px; margin: 14px 0 4px; padding: 12px 14px; border-radius: 11px; background: var(--panel-2); border: 1px solid var(--line); }
-.zk-envio div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.zk-envio span { font-size: 11.5px; color: var(--ink-3); }
-.zk-envio b { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
-.zk-envio .zk-espera { margin: 2px 0 0; align-self: flex-start; }
-.zk-envio em.zk-sub { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+/* Ida, en ZKONG y vuelta: tres columnas que cuentan el viaje, sin caja dentro de la caja */
+.zk-ruta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.zk-ruta section { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 0 18px; }
+.zk-ruta section:first-child { padding-left: 0; }
+.zk-ruta section + section { border-left: 1px solid var(--line); }
+.zk-ruta h5 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.zk-ruta h5 svg { width: 14px; height: 14px; fill: currentColor; }
+.zk-ruta section.hecho h5 { color: var(--ok-ink); }
+.zk-ruta b { font-size: 14px; font-weight: 650; color: var(--ink); }
+.zk-ruta section:not(.hecho) b { color: var(--ink-2); font-weight: 600; }
+.zk-ruta span { font-size: 12.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.zk-ruta span.zk-track { align-self: flex-start; max-width: 100%; margin-top: 2px; font-size: 12px; color: var(--ink-2); }
+.zk-ruta em.zk-warn-t { font-style: normal; }
+.zk-ruta .zk-espera { margin: 4px 0 0; align-self: flex-start; }
 
 /* Nº de RMA de ZKONG, junto al estado */
-.zk-rma { display: inline-flex; align-items: center; gap: 5px; padding: 2px 4px 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); font-size: 12px; color: var(--ink-2); }
+.zk-rma { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); font: inherit; font-size: 12px; color: var(--ink-2); }
 .zk-rma b { color: var(--ink); font-size: 12px; }
-.zk-rma.add { padding: 3px 10px; border-style: dashed; cursor: pointer; }
-.zk-rma.add:hover { border-color: var(--primary); color: var(--primary); }
-.zk-rma.add svg { width: 12px; height: 12px; fill: currentColor; }
+.zk-rma svg { width: 12px; height: 12px; fill: currentColor; }
+button.zk-rma { cursor: pointer; transition: border-color 150ms ease, color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+button.zk-rma:not(.add) svg { opacity: .55; transition: opacity 150ms ease; }
+.zk-rma.add { border-style: dashed; }
+@media (hover: hover) {
+  button.zk-rma:hover { border-color: var(--primary); color: var(--primary); }
+  button.zk-rma:hover svg { opacity: 1; }
+}
+button.zk-rma:active { transform: scale(0.97); }
 .zk-rma-s { color: var(--ink-2); }
 
-/* Coste: recuperado (reposición o abono) frente a asumido (rechazadas) */
-.zk-cst { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
-.zk-cst-n { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.zk-cst-n > div { display: flex; flex-direction: column; gap: 2px; padding: 11px 14px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel); }
-.zk-cst-n span { font-size: 11.5px; color: var(--ink-3); }
-.zk-cst-n b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.zk-cst-n small { font-size: 11.5px; color: var(--ink-3); }
+/* Respuesta de ZKONG y lo que vale: un único bloque (cifras, barra y nota) */
+.zk-respb { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.zk-respb-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.zk-respb-h > b { font-size: 14px; font-weight: 700; }
+.zk-respb-h .dev-mute { font-size: 13px; font-variant-numeric: tabular-nums; }
+.zk-respb-p { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.zk-cst { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.zk-cst-n { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.zk-cst-n > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 0 18px; }
+.zk-cst-n > div:first-child { padding-left: 0; }
+.zk-cst-n > div + div { border-left: 1px solid var(--line); }
+.zk-cst-n dt { font-size: 12px; color: var(--ink-3); }
+.zk-cst-n dd { margin: 0; display: flex; flex-direction: column; gap: 1px; }
+.zk-cst-n b { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.015em; line-height: 1.2; }
+.zk-cst-n small { font-size: 12px; color: var(--ink-3); }
 .zk-cst-n .rec b, .zk-cst-c b.rec, .zk-v-rec, .zk-cst-i.rec { color: var(--ok-ink); }
 .zk-cst-n .asu b, .zk-cst-c b.asu, .zk-asu-t, .zk-cst-i.asu { color: var(--danger-ink); }
 .zk-cst-n .pen b { color: var(--ink-2); }
@@ -5277,6 +5299,74 @@ button.dev-code:hover { text-decoration: underline; }
 .zk-cst-i sup { font-size: 9px; margin-left: 2px; color: var(--ink-3); }
 .zk-anulada { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: rgba(220, 38, 38, .07); color: var(--danger-ink); font-size: 13px; font-weight: 600; }
 .zk-anulada svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+
+/* Pasos: la etiqueta en una línea; la raya es la que cede */
+.zk-pasos li { white-space: nowrap; min-width: 0; }
+.zk-pasos li:last-child { flex: none; }
+.zk-pasos li:not(:last-child)::after { min-width: 10px; }
+
+/* Botones de la cabecera de la remesa: responden al pulsar */
+.wr-acts .btn, .wr-acts .dev-btn, .wr-acts .wf-more { transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.wr-acts .btn:active:not(:disabled), .wr-acts .dev-btn:active:not(:disabled), .wr-acts .wf-more:active { transform: scale(0.97); }
+
+.zk-todas { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.zk-todas span { display: none; font-size: 12.5px; font-weight: 600; color: var(--ink-2); text-transform: none; letter-spacing: 0; }
+
+/* Dispositivos de la remesa: cuando el panel no da para 7 columnas, cada etiqueta es un
+   bloque (serie y respuesta arriba, modelo y coste, fallo y fotos) en vez de esconder
+   la respuesta de ZKONG tras un scroll lateral. */
+.zk-det-card { container-type: inline-size; }
+.zk-det-card .dev-table-wrap { max-height: none; min-height: 0; }   /* la página ya hace scroll: nada de scroll dentro del scroll */
+@container (max-width: 900px) {
+  .zk-t, .zk-t thead, .zk-t tbody { display: block; }
+  .zk-t thead tr { display: flex; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .zk-t thead th { display: none; }
+  .zk-t thead th.zk-ck { display: block; width: auto; padding: 0; border: 0; }
+  .zk-todas span { display: inline; }
+  .zk-t tr.zk-gh, .zk-t tr.zk-gh td { display: block; }
+  .zk-t tr.zk-it { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; grid-template-areas: "ck sn res" "ck mod cst" "ck fallo fotos"; gap: 4px 10px; align-items: center; padding: 11px 12px; border-bottom: 1px solid var(--line); }
+  .zk-t.sin-ck tr.zk-it { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "sn res" "mod cst" "fallo fotos"; }
+  .zk-t tr.zk-it td { display: block; height: auto; padding: 0; border: 0; background: none; min-width: 0; white-space: normal; }
+  .zk-t tr.zk-it.zk-on { background: color-mix(in srgb, var(--primary) 6%, var(--panel)); }
+  .zk-t tr.zk-it .zk-ck { grid-area: ck; align-self: start; width: auto; }
+  .zk-t .zk-c-sn { grid-area: sn; }
+  .zk-t .zk-mod { grid-area: mod; }
+  .zk-t .zk-fallo { grid-area: fallo; max-width: none; }
+  .zk-t .zk-c-fotos { grid-area: fotos; justify-self: end; }
+  .zk-t .zk-c-res { grid-area: res; justify-self: end; }
+  .zk-t .zk-c-res .zk-res-l { align-items: flex-end; }
+  .zk-t .zk-cst-i { grid-area: cst; justify-self: end; }
+  .zk-t.sin-res tr.zk-it { grid-template-areas: "ck sn fotos" "ck mod mod" "ck fallo fallo"; }
+  .zk-t .zk-mod b { white-space: normal; }
+  .zk-t .zk-mod small, .zk-t .zk-fallo small { max-width: none; }
+  .zk-t .zk-fallo > span:first-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
+@container (max-width: 460px) {
+  .zk-t tr.zk-it { grid-template-areas: "ck sn res" "ck mod mod" "ck fallo fallo" "ck fotos cst"; }
+  .zk-t.sin-ck tr.zk-it { grid-template-areas: "sn res" "mod mod" "fallo fallo" "fotos cst"; }
+  .zk-t.sin-res tr.zk-it { grid-template-areas: "ck sn sn" "ck mod mod" "ck fallo fallo" "ck fotos fotos"; }
+  .zk-t .zk-c-fotos { justify-self: start; margin-top: 4px; }
+  .zk-t .zk-cst-i { align-self: end; }
+}
+
+@media (max-width: 720px) {
+  .zk-ruta, .zk-cst-n { grid-template-columns: 1fr; gap: 12px; }
+  .zk-ruta section, .zk-cst-n > div { padding: 0; }
+  .zk-ruta section + section, .zk-cst-n > div + div { border-left: 0; border-top: 1px solid var(--line); padding-top: 12px; }
+  .zk-cst-n > div { flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 12px; }
+  .zk-cst-n dd { align-items: flex-end; }
+  .zk-cst-n b { font-size: 18px; }
+  .zk-respb-p { margin-left: 0; }
+  .wr-acts { width: 100%; }
+  .wr-acts .btn { order: -1; flex: 1 1 100%; justify-content: center; }
+  .wr-acts .dev-btn { flex: 1; justify-content: center; }
+  /* Pasos en móvil: círculos y rayas (el estado ya lo dice la etiqueta de arriba) */
+  .zk-pasos { flex-wrap: nowrap; }
+  .zk-pasos li { flex: 1; }
+  .zk-pasos li:not(:last-child)::after { display: block; }
+  .zk-pasos li em { display: none; }
+}
+.zk-pasos li em { font-style: normal; }
 .btn.ghost.zk-anular { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
 .zk-ventana { max-width: 560px; }
 .zk-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
