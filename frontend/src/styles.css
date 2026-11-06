@@ -4233,3 +4233,77 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .rail:not(.expanded) .rail-collapse { width: 36px; height: 32px; margin: 0 auto 4px; padding: 0; color: var(--ink-3); }
 .ra-btn, .rail-collapse, .notif-bell, .ru-card { transition: background-color var(--t) ease, color var(--t) ease; }
 .ra-btn:active, .rail-collapse:active, .notif-bell:active, .ru-card:active { transform: scale(0.97); }
+
+/* ===========================================================================
+   PANEL DE ÁREA (ds-*): el lenguaje de Estadísticas de Garantías llevado a
+   Helpdesk y Campañas. Cabecera con pestañas a la derecha, una cifra
+   protagonista, KPIs con contexto y tendencia, filas en vez de cajas.
+   ======================================================================== */
+:root { --ds-good: #3ccf7a; }
+:root[data-theme="light"] { --ds-good: #15803d; }
+
+.ds-head { gap: 12px; }
+.ds-head-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--primary-soft); flex-shrink: 0; }
+.ds-head-ic svg { width: 18px; height: 18px; fill: var(--primary); }
+.ds-head-tx { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.ds-head-tx h1 { font-size: 16.5px; }
+.ds-head-tx .sub { font-size: 12px; }
+.ds-tabs { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+.ds-tabs button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out); }
+.ds-tabs button svg { width: 15px; height: 15px; fill: currentColor; }
+.ds-tabs button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+@media (hover: hover) { .ds-tabs button:not(.on):hover { color: var(--ink); } }
+@media (max-width: 720px) { .ds-head-tx .sub { display: none; } }
+
+/* Cifra protagonista + KPIs */
+.ds-hero { display: grid; grid-template-columns: minmax(260px, 1.05fr) 2fr; gap: 14px; margin-bottom: 16px; }
+.ds-hero-main { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 22px 24px; border-radius: var(--radius); color: #fff; background: linear-gradient(135deg, var(--primary-2, var(--primary)) 0%, var(--primary) 100%); box-shadow: 0 10px 30px -12px var(--primary-glow); overflow: hidden; cursor: pointer; transition: transform var(--t-fast) var(--ease-out), box-shadow var(--t) var(--ease-out); }
+.ds-hero-main::after { content: ""; position: absolute; right: -60px; top: -60px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 70%); pointer-events: none; }
+.ds-hero-main .k { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.85; }
+.ds-hero-main .v { font-size: 56px; font-weight: 900; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.ds-hero-main .h { font-size: 13px; opacity: 0.9; line-height: 1.45; }
+.ds-hero-main .h b { font-weight: 700; }
+.ds-hero-go { margin-top: auto; padding-top: 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
+.ds-hero-go svg { width: 16px; height: 16px; fill: currentColor; transform: rotate(-90deg); transition: transform var(--t-fast) var(--ease-out); }
+@media (hover: hover) { .ds-hero-main:hover { box-shadow: 0 14px 34px -12px var(--primary-glow); } .ds-hero-main:hover .ds-hero-go svg { transform: translateX(3px) rotate(-90deg); } }
+.ds-hero-main:active { transform: scale(0.985); }
+
+.ds-kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.ds-kpi { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 16px 18px 14px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); overflow: hidden; min-height: 112px; }
+.ds-kpi .k { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.ds-kpi .v { font-size: 28px; font-weight: 800; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ds-kpi .h { font-size: 11.5px; color: var(--ink-3); }
+.ds-kpi.t-bad .v { color: var(--danger); }
+.ds-kpi.t-warn .v { color: var(--warn); }
+.ds-diff { font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
+.ds-diff.good { color: var(--ds-good); }
+.ds-diff.bad { color: var(--danger); }
+.ds-spark { position: absolute; right: 14px; top: 16px; width: 92px; height: 30px; overflow: visible; }
+.ds-spark polyline { stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+@media (max-width: 1000px) { .ds-hero { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .ds-kpis { grid-template-columns: 1fr; } .ds-hero-main .v { font-size: 46px; } }
+
+/* Barras por estado: etiqueta · barra · cifra */
+.ds-bars .sc-bar-row { grid-template-columns: 150px 1fr 48px; }
+.ds-bars .sc-bar-n { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ds-bars .sc-bar { height: 8px; }
+
+/* Filas (movimiento reciente) */
+.ds-rows { display: flex; flex-direction: column; margin: 0 -8px; }
+.ds-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 8px; border-radius: 10px; transition: background var(--t-fast) var(--ease-out); }
+.ds-row + .ds-row { box-shadow: inset 0 1px 0 var(--line); }
+@media (hover: hover) { .ds-row:hover { background: var(--hover); box-shadow: none; } .ds-row:hover + .ds-row { box-shadow: none; } }
+.ds-row:active { transform: scale(0.99); }
+.ds-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ds-row-main b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.ds-row-main small { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-grid > * { min-width: 0; }
+@media (max-width: 520px) {
+  .sc-panel-h { flex-wrap: wrap; row-gap: 8px; }
+  .ds-bars .sc-bar-row { grid-template-columns: 104px 1fr 40px; gap: 10px; }
+}
+@media (max-width: 720px) {
+  .ds-head { height: auto; min-height: var(--topbar-h); flex-wrap: wrap; padding: 10px 16px; row-gap: 10px; }
+  .ds-head > .spacer { flex-basis: 100%; height: 0; }
+  .ds-head .ds-tabs { margin-right: auto; }
+}

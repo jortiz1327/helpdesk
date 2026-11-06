@@ -6,14 +6,12 @@ import { stChip } from './Tickets.jsx'
 import { onTicketActivity } from '../realtime.js'
 
 /* ---------------------------------------------------------------------------
- * CENTRO DE SOPORTE — apartado GENERAL con atajos. Vista del agente.
+ * CENTRO DE SOPORTE — apartado GENERAL. Vista del agente.
  *
- * Es un hub, no una página pesada: de un vistazo, cómo va el soporte y desde
- * dónde saltar a lo demás.
- *
- * Enfoque acordado en reunión (14/07/2026): los tickets llegan por WEB y CORREO.
- * WhatsApp (y convertir sus mensajes en tickets) se aborda después.
- * Guardias, Live Chat y Reportes quedan fuera por ahora.
+ * De un vistazo, cómo va la atención HOY: la cifra que manda (lo que espera
+ * nuestra respuesta), cómo va la semana frente a la anterior y el movimiento
+ * reciente. Sigue el lenguaje de Estadísticas de Garantías: cifra protagonista,
+ * indicadores con contexto y tendencia, filas en vez de cajas.
  * ------------------------------------------------------------------------- */
 
 export default function SupportCenter({ onGo, user }) {
@@ -50,23 +48,28 @@ export default function SupportCenter({ onGo, user }) {
 
   const can = (p) => (user?.permissions || []).includes(p)
   const max = Math.max(1, ...Object.values(s?.by_status || { x: 1 }))
+  const p = s?.pulse
+  const serie = p?.series || []
 
   return (
     <>
-      <header className="page-head">
-        <span className="sc-ic"><Icon.headset style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Centro de Soporte</h1></div>
-        <span className="sub">· Gestión de tickets y atención al cliente</span>
-        {/* Resumen | Informes: los informes viven aquí mismo, sin ocupar sitio en el menú. */}
+      {/* Cabecera común a todas las áreas: icono, título y subtítulo; a la derecha
+          las pestañas de la sección y la acción principal. */}
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.headset /></span>
+        <div className="ds-head-tx">
+          <h1>Centro de Soporte</h1>
+          <span className="sub">Cómo va la atención hoy</span>
+        </div>
+        <div className="spacer" />
         {can('analytics.view') && (
-          <div className="kb-seg" style={{ margin: '0 0 0 18px' }}>
-            <button className="on">Resumen</button>
-            <button onClick={() => onGo?.('reports')}><Icon.chart /> Informes</button>
+          <div className="ds-tabs" role="tablist">
+            <button role="tab" aria-selected="true" className="on">Resumen</button>
+            <button role="tab" aria-selected="false" onClick={() => onGo?.('reports')}><Icon.chart /> Informes</button>
           </div>
         )}
-        <div className="spacer" />
         {can('tickets.create') && (
-          <button className="btn" onClick={() => onGo?.('ticket_new')}><Icon.ticket /> Nuevo ticket</button>
+          <button className="btn" onClick={() => onGo?.('ticket_new')}><Icon.plus /> Nuevo ticket</button>
         )}
       </header>
 
@@ -76,8 +79,7 @@ export default function SupportCenter({ onGo, user }) {
           {/*
             AVISO DE CRONES. Solo existe si hay alguno fallando: un panel permanente
             a cero se convierte en parte del decorado y deja de leerse. Se destaca
-            lo que ha empezado a fallar HOY, que es la noticia — que haya cinco rotos
-            desde hace semanas ya se sabe.
+            lo que ha empezado a fallar HOY, que es la noticia.
           */}
           {crones?.open > 0 && (
             <button className={`sc-cron ${crones.nuevos > 0 ? 'nuevo' : ''}`} onClick={() => onGo?.('tickets', 'cron')}>
@@ -89,7 +91,6 @@ export default function SupportCenter({ onGo, user }) {
                     : `${crones.open} ${crones.open === 1 ? 'cron sigue fallando' : 'crones siguen fallando'}`}
                 </b>
                 <small>
-                  {/* «en total» solo aporta si hay más de los nuevos; si no, repite el número. */}
                   {crones.nuevos > 0 && crones.open > crones.nuevos && <>{crones.open} fallando en total · </>}
                   {crones.fails} {crones.fails === 1 ? 'ejecución fallida' : 'ejecuciones fallidas'} acumuladas
                 </small>
@@ -98,19 +99,33 @@ export default function SupportCenter({ onGo, user }) {
             </button>
           )}
 
-          {/* --- Estado del soporte --- */}
-          <div className="tk-kpis">
-            <Kpi cls="blue"  label="Total tickets" value={s?.total}    sub="En el sistema"        icon={Icon.ticket} />
-            <Kpi cls="amber" label="Abiertos"      value={s?.open}     sub="Requieren atención"   icon={Icon.warn} />
-            <Kpi cls="green" label="Resueltos"     value={s?.resolved} sub="Resueltos y cerrados" icon={Icon.check} />
-            <Kpi cls="red"   label="Urgentes"      value={s?.urgent}   sub="Prioridad urgente"    icon={Icon.clock} />
+          {/* --- La cifra que manda y las que la acompañan --- */}
+          <div className="ds-hero">
+            <button className="ds-hero-main" onClick={() => onGo?.('tickets')}>
+              <span className="k">Esperan nuestra respuesta</span>
+              <b className="v">{p ? nf(p.pending) : '…'}</b>
+              <span className="h">
+                {p ? (
+                  <>de <b>{nf(s.open)}</b> abiertos · {p.stale > 0
+                    ? <><b>{nf(p.stale)}</b> sin movimiento hace más de {p.stale_days} días</>
+                    : 'ninguno atascado'}</>
+                ) : ' '}
+              </span>
+              <span className="ds-hero-go">Ir a la cola <Icon.chevron /></span>
+            </button>
+            <div className="ds-kpis">
+              <DsKpi k="Nuevos esta semana" v={p?.new_week} prev={p?.new_prev} h="Últimos 7 días" spark={serie.map((x) => x.new)} />
+              <DsKpi k="Resueltos esta semana" v={p?.solved_week} prev={p?.solved_prev} good h="Últimos 7 días" spark={serie.map((x) => x.solved)} />
+              <DsKpi k="Urgentes abiertos" v={s?.urgent} tone={s?.urgent > 0 ? 'bad' : null} h="Prioridad urgente" />
+              <DsKpi k="Resueltos en total" v={s?.resolved} h={s ? `de ${nf(s.total)} tickets en el sistema` : ' '} />
+            </div>
           </div>
 
           <div className="sc-grid">
             {/* Tickets por estado */}
             <div className="card sc-panel">
               <div className="sc-panel-h">
-                <Icon.chart /> <b>Tickets por estado</b>
+                <b>Tickets por estado</b>
                 <span className="spacer" />
                 <div className="sc-range">
                   {[['all', 'Todo'], ['today', 'Hoy'], ['7d', '7 días'], ['30d', '30 días'], ['custom', 'Fechas']].map(([k, lb]) => (
@@ -124,24 +139,24 @@ export default function SupportCenter({ onGo, user }) {
                   <label>Hasta <input type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} /></label>
                 </div>
               )}
-              <div className="sc-bars">
+              <div className="sc-bars ds-bars">
                 {Object.entries(meta?.statuses || {}).map(([k, label]) => {
                   const n = s?.by_status?.[k] ?? 0
                   return (
                     <div key={k} className="sc-bar-row">
                       <span className={`chip ${k}`}>{label}</span>
-                      <span className="sc-bar-n">{n} {n === 1 ? 'ticket' : 'tickets'}</span>
                       <span className="sc-bar"><i style={{ width: `${(n / max) * 100}%` }} /></span>
+                      <span className="sc-bar-n">{nf(n)}</span>
                     </div>
                   )
                 })}
               </div>
             </div>
 
-            {/* Tickets recientes */}
+            {/* Movimiento reciente: filas, no cajas */}
             <div className="card sc-panel">
               <div className="sc-panel-h">
-                <Icon.clock /> <b>Tickets recientes</b>
+                <b>Movimiento reciente</b>
                 <span className="spacer" />
                 <button className="lnk" onClick={() => onGo?.('tickets')}>Ver todos</button>
               </div>
@@ -150,17 +165,14 @@ export default function SupportCenter({ onGo, user }) {
                   <p>Aún no hay tickets.</p>
                 </div>
               ) : (
-                <div className="sc-recent">
+                <div className="ds-rows">
                   {s.recent.map((t) => (
-                    <button key={t.id} className="sc-rec" onClick={() => onGo?.('tickets', t.id)}>
-                      <div className="r-main">
-                        <b>{t.subject}</b>
-                        <small>{t.code} · {t.contact_email || t.contact_name || '—'}</small>
-                      </div>
+                    <button key={t.id} className="ds-row" onClick={() => onGo?.('tickets', t.id)}>
                       <ChannelBadge channel={t.channel} source={t.source} />
-                      <span className="chip" style={meta?.priority_meta?.[t.priority]
-                        ? { background: meta.priority_meta[t.priority].color + '22', color: meta.priority_meta[t.priority].color }
-                        : undefined}>{meta?.priorities?.[t.priority] || t.priority}</span>
+                      <span className="ds-row-main">
+                        <b>{t.subject}</b>
+                        <small>{t.code} · {t.contact_name || t.contact_email || 'Sin contacto'}</small>
+                      </span>
                       {stChip(t.status, meta)}
                     </button>
                   ))}
@@ -168,46 +180,41 @@ export default function SupportCenter({ onGo, user }) {
               )}
             </div>
           </div>
-
-          {/* --- Atajos: para eso está este apartado --- */}
-          <div className="fb-set-t" style={{ margin: '24px 0 10px' }}>Atajos</div>
-          <div className="sc-shortcuts">
-            <Shortcut icon={Icon.ticket}   title="Gestión de tickets" desc="Buscar, filtrar y atender todos los tickets" onClick={() => onGo?.('tickets')} />
-            {can('tickets.create') && (
-              <Shortcut icon={Icon.plus}   title="Nuevo ticket"       desc="Dar de alta una solicitud de soporte"        onClick={() => onGo?.('ticket_new')} />
-            )}
-            {/* Solo para quien puede configurar: al resto no se le ofrece un atajo
-                que acabaría en un 403. */}
-            {can('support.config') && (
-              <Shortcut icon={Icon.settings} title="Configuración"    desc="Categorías, SLA y ajustes del soporte"       onClick={() => onGo?.('support_cfg')} />
-            )}
-          </div>
         </div>
       </div>
     </>
   )
 }
 
-function Kpi({ cls, label, value, sub, icon: I }) {
+const nf = (n) => (n == null ? '…' : Number(n).toLocaleString('es-ES'))
+
+// Minigráfica de tendencia (14 días). Solo forma: la cifra ya está escrita al lado.
+function Spark({ data }) {
+  if (!data || data.length < 2) return null
+  const top = Math.max(1, ...data)
+  const pts = data.map((v, i) => `${(i / (data.length - 1)) * 100},${28 - (v / top) * 24}`).join(' ')
   return (
-    <div className={`tk-kpi ${cls}`}>
-      <div className="k-l">{label}</div>
-      <div className="k-v">{value ?? '…'}</div>
-      <div className="k-s">{sub}</div>
-      {I && <I className="k-i" />}
-    </div>
+    <svg className="ds-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points={pts} fill="none" vectorEffect="non-scaling-stroke" />
+    </svg>
   )
 }
 
-function Shortcut({ icon: I, title, desc, onClick, soon }) {
+/* KPI del sistema común: etiqueta, cifra, contexto y, si hay, la comparación con la
+   semana anterior y su minigráfica. `good`: subir es bueno (resueltos). */
+function DsKpi({ k, v, prev, good, h, tone, spark }) {
+  const diff = v != null && prev != null ? v - prev : null
   return (
-    <button className={`sc-sc ${soon ? 'soon' : ''}`} onClick={soon ? undefined : onClick} disabled={soon}>
-      <span className="s-ic"><I /></span>
-      <span className="s-tx">
-        <b>{title} {soon && <em className="s-soon">pendiente</em>}</b>
-        <small>{desc}</small>
-      </span>
-      {!soon && <span className="s-go">›</span>}
-    </button>
+    <div className={`ds-kpi${tone ? ` t-${tone}` : ''}`}>
+      <span className="k">{k}</span>
+      <b className="v">{nf(v)}</b>
+      {diff != null && diff !== 0 && (
+        <span className={`ds-diff ${good ? (diff > 0 ? 'good' : 'bad') : ''}`}>
+          {diff > 0 ? '+' : '−'}{nf(Math.abs(diff))} frente a la semana anterior
+        </span>
+      )}
+      {h ? <span className="h">{h}</span> : null}
+      <Spark data={spark} />
+    </div>
   )
 }

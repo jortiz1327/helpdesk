@@ -825,8 +825,46 @@ class TicketsController extends Controller
                 'c.wa_id as contact_wa',
             ]);
 
+        /*
+         * PULSO del Centro de Soporte (solo lectura): lo que cuenta cómo va el día, no
+         * solo cuántos hay. «Esperan respuesta» = abiertos cuyo último mensaje es del
+         * cliente; «sin movimiento» = la misma regla que el aviso diario de atascados.
+         * Y la serie de 14 días de creados y resueltos para las minigráficas.
+         */
+        $abiertos = TicketService::OPEN_STATUSES;
+        $pending = (clone $this->countQuery($me))->whereIn('t.status', $abiertos)
+            ->where('t.last_direction', 'in')->whereNull('t.merged_into_id')->count();
+        $staleQ = $this->countQuery($me);
+        \App\Services\StaleTickets::filtrar($staleQ);
+        $stale = $staleQ->count();
+
+        $dias = 14;
+        $desde = now()->startOfDay()->subDays($dias - 1);
+        $porDia = fn (string $col) => (clone $this->countQuery($me))->where("t.$col", '>=', $desde)
+            ->selectRaw("DATE(t.$col) d, COUNT(*) n")->groupBy('d')->pluck('n', 'd');
+        $creados = $porDia('created_at');
+        $resueltos = $porDia('resolved_at');
+        $serie = [];
+        for ($i = 0; $i < $dias; $i++) {
+            $d = $desde->copy()->addDays($i)->toDateString();
+            $serie[] = ['d' => $d, 'new' => (int) ($creados[$d] ?? 0), 'solved' => (int) ($resueltos[$d] ?? 0)];
+        }
+        $suma = fn (array $s, string $k) => array_sum(array_column($s, $k));
+        $semana = array_slice($serie, -7);
+        $anterior = array_slice($serie, 0, 7);
+
         return response()->json([
             'ok'        => true,
+            'pulse'     => [
+                'pending'      => $pending,
+                'stale'        => $stale,
+                'stale_days'   => \App\Services\StaleTickets::dias(),
+                'series'       => $serie,
+                'new_week'     => $suma($semana, 'new'),
+                'new_prev'     => $suma($anterior, 'new'),
+                'solved_week'  => $suma($semana, 'solved'),
+                'solved_prev'  => $suma($anterior, 'solved'),
+            ],
             // KPIs SIEMPRE globales (las tarjetas dicen «en el sistema»).
             'total'     => array_sum($byStatusAll),
             'open'      => array_sum(array_intersect_key($byStatusAll, array_flip(TicketService::OPEN_STATUSES))),
