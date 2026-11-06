@@ -29,6 +29,9 @@ class SoporteWhatsApp
     /** Silencio tras el que un mensaje abre conversación (ticket) nueva. Igual que la importación. */
     public const DIAS_CONVERSACION = 7;
 
+    /** Cuándo llegó el evento que se está procesando (ver procesar()). */
+    protected ?Carbon $llegada = null;
+
     public function __construct(protected TicketService $tickets) {}
 
     public static function activo(): bool
@@ -41,8 +44,10 @@ class SoporteWhatsApp
      * mensajes nuevos guardó. Los campos que no son mensajes (history, account_update,
      * smb_app_state_sync…) se quedan solo en wa_raw_events.
      */
-    public function procesar(string $field, array $value): int
+    public function procesar(string $field, array $value, $llegada = null): int
     {
+        // Cuándo nos llegó el evento: ahora, o el de wa_raw_events si se reprocesa más tarde.
+        $this->llegada = $llegada ? Carbon::parse($llegada) : now();
         $n = 0;
         if ($field === 'messages') {
             $nombres = [];
@@ -88,7 +93,8 @@ class SoporteWhatsApp
             'media_url'  => $media['id'] ?? null,
             'media_mime' => $media['mime_type'] ?? null,
             'payload'    => $raw,
-            'created_at' => $cuando,
+            'created_at' => $cuando,      // cuando se escribió (la hora del móvil)
+            'received_at' => $this->llegada ?? now(),   // cuando nos llegó: si el móvil estaba sin conexión, minutos después
         ]);
 
         if ($dir === 'out') {

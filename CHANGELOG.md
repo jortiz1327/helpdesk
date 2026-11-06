@@ -3,6 +3,22 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.19] — 2026-11-06
+
+### Arreglos
+
+- Un WhatsApp escrito con el móvil sin conexión llega minutos después con la hora a la que se
+  escribió, y salía al final de la conversación con una hora anterior a los de encima
+  (TK-2611-0045: escrito a las 17:01, recibido a las 17:16, debajo de un «Ok» de las 17:05).
+  Los tickets de WhatsApp se ordenan ahora por la hora a la que se escribió cada mensaje, como
+  en el móvil (también el PDF). Los correos siguen por orden de llegada.
+
+### Mejoras
+
+- Si un WhatsApp llega más de un minuto tarde, junto a su hora sale «llegó 17:16» en ámbar.
+  Nueva columna `messages.received_at` (cuándo nos llegó), rellenada para los ya guardados a
+  partir de `wa_raw_events`; `wa:process-raw` guarda la hora real de llegada, no la del reproceso.
+
 ## [1.5.18] — 2026-11-05
 
 ### Arreglos

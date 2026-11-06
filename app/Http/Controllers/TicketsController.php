@@ -1093,6 +1093,7 @@ class TicketsController extends Controller
                 'm.status',
                 'm.author_user_id',
                 'm.created_at',
+                'm.received_at',
                 'm.cc',
                 'm.bcc',
                 'm.payload',
@@ -1606,7 +1607,10 @@ class TicketsController extends Controller
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
         $q = DB::table('messages as m')->leftJoin('users as au', 'au.id', '=', 'm.author_user_id')
-            ->where('m.ticket_id', $id)->orderBy('m.id');
+            ->where('m.ticket_id', $id);
+        // WhatsApp, como en el móvil: por la hora a la que se escribió (puede llegar tarde).
+        if ($t->channel === 'whatsapp') $q->orderBy('m.created_at');
+        $q->orderBy('m.id');
         if (!$withNotes) $q->where('m.is_internal_note', 0);
         $messages = $q->get(['m.id', 'm.direction', 'm.body', 'm.is_html', 'm.is_internal_note', 'm.created_at', 'au.name as author_name']);
 

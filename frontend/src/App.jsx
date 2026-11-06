@@ -120,10 +120,21 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.18";
+const APP_VERSION = "1.5.19";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.19",
+        date: "6 nov 2026",
+        resumen: "Los WhatsApp que llegan tarde salen en su sitio de la conversación.",
+        mejoras: [
+            "Si un mensaje llega con retraso (el móvil del cliente estaba sin conexión), junto a su hora pone cuándo llegó.",
+        ],
+        arreglos: [
+            "Un WhatsApp escrito sin conexión ya no sale al final con una hora anterior: va donde se escribió, como en el móvil.",
+        ],
+    },
     {
         version: "1.5.18",
         date: "5 nov 2026",
