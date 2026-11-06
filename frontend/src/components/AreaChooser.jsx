@@ -24,7 +24,8 @@ const META = {
     tagline: 'Garantías de los productos',
     c1: '#f59e0b', c2: '#d97706', glow: 'rgba(245,158,11,0.40)',
     points: ['Centro de dispositivos', 'Etiquetas y antenas de los servidores ZKONG'],
-    art: 'bars',
+    // Su propio dibujo (antes repetía las barras de Helpdesk): escudos con el check.
+    art: 'shield',
   },
 }
 
@@ -36,6 +37,22 @@ function Art({ kind }) {
         {bars.map((h, i) => (
           <rect key={i} x={10 + i * 32} y={100 - h} width="20" height={h} rx="4" opacity={0.25 + i * 0.11} />
         ))}
+      </svg>
+    )
+  }
+  if (kind === 'shield') {
+    // Escudos concéntricos (la garantía que cubre) con el check en el central. Sin
+    // deformar: este dibujo mantiene su proporción, a diferencia de barras y trazos.
+    const escudo = (s) => {
+      const cx = 140, top = 50 - 44 * s, w = 34 * s, h = 88 * s
+      return `M${cx} ${top} L${cx + w} ${top + h * 0.15} V${top + h * 0.45} C${cx + w} ${top + h * 0.75} ${cx + w * 0.5} ${top + h * 0.9} ${cx} ${top + h} C${cx - w * 0.5} ${top + h * 0.9} ${cx - w} ${top + h * 0.75} ${cx - w} ${top + h * 0.45} V${top + h * 0.15} Z`
+    }
+    return (
+      <svg className="chooser-art" viewBox="0 0 200 100" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
+        {[1.5, 1.22, 0.95].map((s, i) => (
+          <path key={i} d={escudo(s)} fill="none" strokeWidth={4 - i * 0.5} strokeLinejoin="round" opacity={0.35 + i * 0.3} />
+        ))}
+        <path d="M125 50 L136 61 L157 39" fill="none" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )
   }

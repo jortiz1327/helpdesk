@@ -6849,14 +6849,15 @@ table, .dev-table,
   --primary: #15803d; --primary-dark: #166534; --primary-2: #22a35a;
   --primary-soft: rgba(21, 128, 61, 0.10); --primary-glow: rgba(21, 128, 61, 0.22);
 }
-/* Garantías (rama warranties): violeta. Se deja definido para cuando se una. */
+/* Garantías: naranja, el mismo de su tarjeta en la pantalla de elegir área. En claro va un
+   tono más oscuro para que el texto blanco de los botones se lea bien. */
 :root[data-area="warranties"] {
-  --primary: #8b5cf6; --primary-dark: #7c3aed; --primary-2: #a78bfa;
-  --primary-soft: rgba(139, 92, 246, 0.16); --primary-glow: rgba(139, 92, 246, 0.32);
+  --primary: #e8850c; --primary-dark: #d97706; --primary-2: #f59e0b;
+  --primary-soft: rgba(245, 158, 11, 0.16); --primary-glow: rgba(245, 158, 11, 0.32);
 }
 :root[data-theme="light"][data-area="warranties"] {
-  --primary: #7c3aed; --primary-dark: #6d28d9; --primary-2: #8b5cf6;
-  --primary-soft: rgba(124, 58, 237, 0.10); --primary-glow: rgba(124, 58, 237, 0.22);
+  --primary: #c2620a; --primary-dark: #a5520a; --primary-2: #f59e0b;
+  --primary-soft: rgba(217, 119, 6, 0.11); --primary-glow: rgba(217, 119, 6, 0.24);
 }
 
 

@@ -929,8 +929,8 @@ const areaOfView = (v) =>
 
 /*
  * UN COLOR POR ÁREA. El área activa se marca en <html data-area="…"> y el CSS
- * cambia --primary y compañía: Helpdesk azul, Campañas verde (y Garantías violeta
- * cuando llegue). Va en <html> y no en .app para que los modales y avisos, que se
+ * cambia --primary y compañía: Helpdesk azul, Campañas verde y Garantías naranja.
+ * Va en <html> y no en .app para que los modales y avisos, que se
  * pintan fuera, también lo hereden.
  */
 function AreaTheme({ area }) {
