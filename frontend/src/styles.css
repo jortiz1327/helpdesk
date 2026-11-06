@@ -5315,8 +5315,45 @@ button.zk-rma:active { transform: scale(0.97); }
 /* Dispositivos de la remesa: cuando el panel no da para 7 columnas, cada etiqueta es un
    bloque (serie y respuesta arriba, modelo y coste, fallo y fotos) en vez de esconder
    la respuesta de ZKONG tras un scroll lateral. */
-.zk-det-card { container-type: inline-size; }
-.zk-det-card .dev-table-wrap { max-height: none; min-height: 0; }   /* la página ya hace scroll: nada de scroll dentro del scroll */
+.zk-bandeja { container-type: inline-size; }
+.zk-bandeja .dev-table-wrap { max-height: none; min-height: 0; }   /* la página ya hace scroll: nada de scroll dentro del scroll */
+
+/* Bandeja: los días de cada etiqueta en texto (la píldora va en la cabecera de la garantía) */
+.zk-dias-t { font-size: 12.5px; font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.zk-dias-t.warn { color: var(--warn-ink); }
+.zk-dias-t.bad { color: var(--danger-ink); }
+.zk-bar .wl-search { flex: 1 1 260px; }
+
+/* Lo elegido y «Crear remesa»: una barra abajo que solo sale con algo marcado */
+.zk-selbar { position: sticky; bottom: 14px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 14px; padding: 10px 12px 10px 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line-2); box-shadow: 0 10px 30px -8px rgb(15 23 42 / .28), 0 2px 6px rgb(15 23 42 / .08);
+  transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1), transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+@starting-style { .zk-selbar { opacity: 0; transform: translateY(8px); } }
+.zk-selbar-n { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13.5px; }
+.zk-selbar-n b { color: var(--ink); }
+.zk-selbar .zk-falta { margin-left: 0; }
+.zk-selbar .zk-falta svg { width: 13px; height: 13px; fill: currentColor; }
+.zk-selbar-x { font-size: 13px; }
+.zk-selbar .spacer { flex: 1; }
+.zk-selbar .btn { padding: 9px 15px; transition: background-color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.zk-selbar .btn:active:not(:disabled) { transform: scale(0.97); }
+.zk-selbar .btn svg { width: 16px; height: 16px; fill: currentColor; }
+:root:not([data-theme="light"]) .zk-selbar { box-shadow: 0 12px 32px -8px rgb(0 0 0 / .6), 0 2px 6px rgb(0 0 0 / .3); }
+@media (prefers-reduced-motion: reduce) { .zk-selbar { transition: none; } }
+@media (max-width: 640px) {
+  .zk-selbar { bottom: 10px; gap: 8px 12px; padding: 10px 12px; }
+  .zk-selbar .spacer, .zk-selbar-n .dev-mute { display: none; }
+  .zk-selbar .btn, .zk-selbar .sel { flex: 1 1 100%; justify-content: center; }
+}
+
+/* Indicadores de la bandeja: tres, también en pantallas medianas */
+.wi-kpis.zk-kpis2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) {
+  .wi-kpis.zk-kpis2 .wi-kpi:nth-child(3) { border-left: 1px solid var(--line); border-top: 0; }
+}
+@media (max-width: 640px) {
+  .wi-kpis.zk-kpis2 { grid-template-columns: 1fr; }
+  .wi-kpis.zk-kpis2 .wi-kpi + .wi-kpi { border-left: 0; border-top: 1px solid var(--line); }
+}
 @container (max-width: 900px) {
   .zk-t, .zk-t thead, .zk-t tbody { display: block; }
   .zk-t thead tr { display: flex; padding: 8px 12px; border-bottom: 1px solid var(--line); }
@@ -5340,6 +5377,16 @@ button.zk-rma:active { transform: scale(0.97); }
   .zk-t .zk-mod b { white-space: normal; }
   .zk-t .zk-mod small, .zk-t .zk-fallo small { max-width: none; }
   .zk-t .zk-fallo > span:first-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  /* Bandeja: serie y días arriba, modelo, fallo y fotos */
+  .zk-t.bandeja tr.zk-it { grid-template-columns: 26px minmax(120px, auto) minmax(0, 1fr) auto; grid-template-areas: "ck sn mod dias" "ck fallo fallo fotos"; column-gap: 16px; }
+  .zk-t.bandeja .zk-c-fotos { justify-self: end; }
+  .zk-t .zk-c-dias { grid-area: dias; justify-self: end; }
+  .zk-t.bandeja tr.zk-gh { display: flex; align-items: center; }
+  .zk-t.bandeja tr.zk-gh td.zk-ck { flex: none; width: auto; padding: 10px 0 10px 12px; height: auto; }
+  .zk-t.bandeja tr.zk-gh td:last-child { flex: 1; min-width: 0; height: auto; }
+  .zk-t.bandeja .zk-gh-in { flex-wrap: wrap; row-gap: 6px; }
+  .zk-t tr.zk-mas, .zk-t tr.zk-mas td { display: block; height: auto; }
+  .zk-t tr.zk-mas td:first-child { display: none; }
 }
 @container (max-width: 460px) {
   .zk-t tr.zk-it { grid-template-areas: "ck sn res" "ck mod mod" "ck fallo fallo" "ck fotos cst"; }
@@ -5347,7 +5394,11 @@ button.zk-rma:active { transform: scale(0.97); }
   .zk-t.sin-res tr.zk-it { grid-template-areas: "ck sn sn" "ck mod mod" "ck fallo fallo" "ck fotos fotos"; }
   .zk-t .zk-c-fotos { justify-self: start; margin-top: 4px; }
   .zk-t .zk-cst-i { align-self: end; }
+  .zk-t.bandeja tr.zk-it { grid-template-columns: 26px minmax(0, 1fr) auto; grid-template-areas: "ck sn dias" "ck mod mod" "ck fallo fallo" "ck fotos fotos"; column-gap: 10px; }
+  .zk-t.bandeja .zk-c-fotos { justify-self: start; }
 }
+/* La ayuda de la barra solo cuando hay sitio para ella */
+@container (max-width: 1000px) { .zk-bar .zk-ayuda { display: none; } }
 
 @media (max-width: 720px) {
   .zk-ruta, .zk-cst-n { grid-template-columns: 1fr; gap: 12px; }

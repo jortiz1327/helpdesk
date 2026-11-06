@@ -243,26 +243,15 @@ function Bandeja({ rv, puede, onOpenWarranty, onBatch }) {
             {q ? <button className="dev-x" onClick={() => setQ('')} title="Borrar"><Icon.x className="ic-x" aria-hidden="true" /></button> : null}
           </div>
           <Select sm value={orden} onChange={setOrden} options={ORDENES} />
+          {puede && etiquetas ? <span className="dev-mute zk-ayuda">Marca las etiquetas que van juntas para crear la remesa</span> : null}
           <span className="spacer" />
           <button className="dev-btn" disabled={!etiquetas} onClick={exportar} title="Descargar la bandeja en CSV"><Icon.download /> Exportar</button>
-          {elegidas.length ? (
-            <span className="zk-elegidas">
-              <b>{plural(elegidas.length, 'elegida', 'elegidas')}</b> de {plural(gruposSel, 'garantía', 'garantías')}
-              {sinFotosSel ? <span className="zk-falta" title="Sin todas las fotos"><Icon.image /> {sinFotosSel}</span> : null}
-              <button className="icon-btn" title="Quitar la selección" onClick={() => setSel(new Set())}><Icon.x className="ic-x" aria-hidden="true" /></button>
-            </span>
-          ) : <span className="dev-mute zk-ayuda">Marca las etiquetas que van juntas</span>}
-          {puede && d.drafts.length > 0 && elegidas.length > 0 && (
-            <Select sm value="" placeholder="Añadir a un borrador…" onChange={(v) => v && meter(v)}
-              options={d.drafts.map((b) => ({ value: b.id, label: `Añadir a ${b.code}` }))} />
-          )}
-          {puede ? <button className="btn" disabled={ocupado || !elegidas.length} onClick={() => meter(null)}><Icon.send /> Crear remesa{elegidas.length ? ` con ${elegidas.length}` : ''}</button> : null}
         </div>
 
         <div className="dev-table-wrap keep">
-          <table className="dev-table zk-t">
+          <table className="dev-table zk-t bandeja">
             <thead><tr>
-              <th className="zk-ck"><input type="checkbox" checked={todasSel} disabled={!vistas.length} onChange={() => marcar(vistas)} aria-label="Elegir todas" /></th>
+              <th className="zk-ck"><label className="zk-todas"><input type="checkbox" checked={todasSel} disabled={!vistas.length} onChange={() => marcar(vistas)} aria-label="Elegir todas" /><span>Elegir todas</span></label></th>
               <th>Nº de serie</th><th>Modelo</th><th>Fallo que se envía a ZKONG</th><th>Fotos</th><th className="r">Días</th>
             </tr></thead>
             {grupos.map((g) => {
@@ -291,14 +280,14 @@ function Bandeja({ rv, puede, onOpenWarranty, onBatch }) {
                     return (
                       <tr key={i.id} className={`zk-it ${sel.has(i.id) ? 'zk-on' : ''}`} onClick={(e) => { if (!e.target.closest('a,button,input')) toggle(setSel, i.id) }}>
                         <td className="zk-ck"><input type="checkbox" checked={sel.has(i.id)} onChange={() => toggle(setSel, i.id)} aria-label={`Elegir ${i.code}`} /></td>
-                        <td><span className="mono zk-sn">{i.code}</span>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</td>
+                        <td className="zk-c-sn"><span className="mono zk-sn">{i.code}</span>{i.kind === 'ap' ? <em className="wr-kind">Antena</em> : null}</td>
                         <td className="zk-mod"><b>{i.model || <span className="dev-mute">Sin modelo</span>}</b>{i.product_name ? <small>{i.product_name}</small> : null}</td>
                         <td className="zk-fallo">
                           {i.issue ? <span title={i.issue}>{i.issue}</span> : <span className="zk-warn-t">Sin fallo descrito</span>}
                           {rv && i.resolution !== 'defectuosa' ? <small>{rv.resolutions?.[i.resolution]?.label}</small> : null}
                         </td>
-                        <td><Fotos it={i} /></td>
-                        <td className="r"><span className={`zk-chip dias ${tono(ni)}`}>{ni == null ? '—' : `${ni} d`}</span></td>
+                        <td className="zk-c-fotos"><Fotos it={i} /></td>
+                        <td className="r zk-c-dias"><span className={`zk-dias-t ${tono(ni)}`} title={ni == null ? undefined : `${plural(ni, 'día', 'días')} en la bandeja`}>{ni == null ? '—' : plural(ni, 'día', 'días')}</span></td>
                       </tr>
                     )
                   })}
@@ -326,6 +315,21 @@ function Bandeja({ rv, puede, onOpenWarranty, onBatch }) {
           </div>
         ) : null}
       </div>
+
+      {elegidas.length > 0 && (
+        <div className="zk-selbar" role="region" aria-label="Etiquetas elegidas">
+          <span className="zk-selbar-n"><b>{plural(elegidas.length, 'etiqueta elegida', 'etiquetas elegidas')}</b>
+            <span className="dev-mute">de {plural(gruposSel, 'garantía', 'garantías')}</span></span>
+          {sinFotosSel ? <span className="zk-falta" title="ZKONG pide las fotos; se pueden subir antes de enviar la remesa"><Icon.image /> {plural(sinFotosSel, 'sin todas las fotos', 'sin todas las fotos')}</span> : null}
+          <button className="link zk-selbar-x" onClick={() => setSel(new Set())}>Quitar la selección</button>
+          <span className="spacer" />
+          {puede && d.drafts.length > 0 && (
+            <Select sm value="" placeholder="Añadir a un borrador…" onChange={(v) => v && meter(v)}
+              options={d.drafts.map((b) => ({ value: b.id, label: `Añadir a ${b.code}` }))} />
+          )}
+          {puede ? <button className="btn" disabled={ocupado} onClick={() => meter(null)}><Icon.send /> Crear remesa con {elegidas.length}</button> : null}
+        </div>
+      )}
     </>
   )
 }
