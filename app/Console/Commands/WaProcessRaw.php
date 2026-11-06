@@ -36,7 +36,7 @@ class WaProcessRaw extends Command
         $mensajes = 0; $errores = 0;
         foreach ($pend->orderBy('id')->cursor() as $e) {
             try {
-                $mensajes += $svc->procesar($e->field, json_decode($e->payload, true) ?: []);
+                $mensajes += $svc->procesar($e->field, json_decode($e->payload, true) ?: [], $e->created_at);
                 DB::table('wa_raw_events')->where('id', $e->id)->update(['processed_at' => now()]);
             } catch (\Throwable $ex) {
                 $errores++;

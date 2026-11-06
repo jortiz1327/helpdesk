@@ -6602,3 +6602,7 @@ table, .dev-table,
 .tour-f { gap: 4px; flex-wrap: wrap; }
 .tour-f .btn { margin-left: 4px; }
 @media (max-width: 420px) { .tour-prev { padding-inline: 2px; } .tour-skip { padding-inline: 6px; } }
+/* WhatsApp que llegó con retraso (escrito antes, recibido minutos después): junto a la hora. */
+.b-tarde { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; color: #b45309; font-weight: 600; cursor: help; }
+.b-tarde svg { width: 11px; height: 11px; fill: currentColor; }
+:root:not([data-theme="light"]) .b-tarde { color: #fbbf24; }

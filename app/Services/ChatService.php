@@ -111,6 +111,8 @@ class ChatService
         // Fecha real del mensaje (p.ej. la del correo entrante). Si no se pasa, la BD
         // usa la hora actual (útil para WhatsApp/web, que llegan en el momento).
         if (!empty($opts['created_at'])) $attrs['created_at'] = $opts['created_at'];
+        // Cuándo nos llegó (WhatsApp de soporte: puede ser bastante después de escribirse).
+        if (!empty($opts['received_at'])) $attrs['received_at'] = $opts['received_at'];
 
         $msg = Message::create($attrs);
 

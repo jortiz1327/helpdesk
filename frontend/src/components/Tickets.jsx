@@ -1935,12 +1935,15 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
   // backend lo autoasigna al enviar).
   const asignadoAOtro = !can('tickets.view_all') && !!t?.assigned_to && Number(t.assigned_to) !== Number(user?.id)
 
-  // Hilo a pintar: los anteriores cargados + la página del detalle, sin duplicar y por id.
+  // Hilo a pintar: los anteriores cargados + la página del detalle, sin duplicar. Por orden
+  // de llegada (id); en WhatsApp, como en el móvil, por la hora a la que se escribió: si el
+  // móvil del cliente estaba sin conexión, un mensaje llega minutos después y va en su sitio.
+  const porHora = t?.channel === 'whatsapp'
   const mensajes = (() => {
     const vistos = new Set()
     return [...older, ...(d?.messages || [])]
       .filter((m) => (vistos.has(m.id) ? false : vistos.add(m.id)))
-      .sort((a, b) => a.id - b.id)
+      .sort((a, b) => (porHora ? (parseDate(a.created_at) - parseDate(b.created_at)) || a.id - b.id : a.id - b.id))
   })()
 
   return (
@@ -2426,6 +2429,12 @@ export function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, o
                             (el día ya lo dice el separador); el título da la fecha completa. */}
                         <div className="b-t" title={esWa ? fmtDiaLegible(m.created_at) : undefined}>
                           <span className="b-hora">{fmtTime(m.created_at)}</span>
+                          {/* Llegó con retraso (más de un minuto después de escribirse): se dice cuándo. */}
+                          {esWa && m.received_at && parseDate(m.received_at) - parseDate(m.created_at) > 60 * 1000 && (
+                            <span className="b-tarde" title={`Se escribió a las ${fmtTime(m.created_at)} y nos llegó a las ${fmtTime(m.received_at)}: ${out ? 'el móvil' : 'el móvil del cliente'} lo envió con retraso (sin conexión). Va en su sitio de la conversación.`}>
+                              <Icon.clock /> llegó {fmtTime(m.received_at)}
+                            </span>
+                          )}
                           {!esWa && <span className="b-fecha"> - {fmtDiaLegible(m.created_at)}</span>}
                           {/* Estado de entrega del WhatsApp saliente: enviado/entregado/leído/fallido */}
                           {out && m.channel === 'whatsapp' && !Number(m.is_internal_note) && m.status && (

@@ -134,10 +134,52 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.15";
+const APP_VERSION = "1.5.19";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.19",
+        date: "6 nov 2026",
+        resumen: "Los WhatsApp que llegan tarde salen en su sitio de la conversación.",
+        mejoras: [
+            "Si un mensaje llega con retraso (el móvil del cliente estaba sin conexión), junto a su hora pone cuándo llegó.",
+        ],
+        arreglos: [
+            "Un WhatsApp escrito sin conexión ya no sale al final con una hora anterior: va donde se escribió, como en el móvil.",
+        ],
+    },
+    {
+        version: "1.5.18",
+        date: "5 nov 2026",
+        resumen: "Un ticket abierto ya no se queda bloqueado si te vas o cierras la web.",
+        mejoras: [
+            "Cuenta atrás en el ticket: ves cuánto falta para que se libere si nadie lo toca.",
+        ],
+        arreglos: [
+            "Si cierras la pestaña o el navegador con un ticket abierto, los demás pueden entrar al momento.",
+            "Si lo dejas abierto sin tocar nada, se libera solo pasados los minutos configurados.",
+        ],
+    },
+    {
+        version: "1.5.17",
+        date: "4 nov 2026",
+        resumen: "Los correos muy largos ya entran y no se repite el aviso de ticket asignado.",
+        mejoras: [],
+        arreglos: [
+            "Un correo muy largo (con todo el hilo de respuestas) no llegaba a convertirse en ticket. Ahora entra entero.",
+            "Mientras fallaba, el agente recibía el aviso «Se te ha asignado» varias veces. Ahora solo llega uno, cuando el ticket ya está creado.",
+        ],
+    },
+    {
+        version: "1.5.16",
+        date: "4 nov 2026",
+        resumen: "Ya se puede enviar solo una foto o un archivo, sin escribir texto.",
+        mejoras: [],
+        arreglos: [
+            "Al responder, con solo un adjunto el botón de enviar se quedaba apagado hasta escribir algo. Ahora se puede enviar la foto sola (WhatsApp y correo).",
+        ],
+    },
     {
         version: "1.5.15",
         date: "2 nov 2026",

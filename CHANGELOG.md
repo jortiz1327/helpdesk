@@ -3,6 +3,59 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.19] — 2026-11-06
+
+### Arreglos
+
+- Un WhatsApp escrito con el móvil sin conexión llega minutos después con la hora a la que se
+  escribió, y salía al final de la conversación con una hora anterior a los de encima
+  (TK-2611-0045: escrito a las 17:01, recibido a las 17:16, debajo de un «Ok» de las 17:05).
+  Los tickets de WhatsApp se ordenan ahora por la hora a la que se escribió cada mensaje, como
+  en el móvil (también el PDF). Los correos siguen por orden de llegada.
+
+### Mejoras
+
+- Si un WhatsApp llega más de un minuto tarde, junto a su hora sale «llegó 17:16» en ámbar.
+  Nueva columna `messages.received_at` (cuándo nos llegó), rellenada para los ya guardados a
+  partir de `wa_raw_events`; `wa:process-raw` guarda la hora real de llegada, no la del reproceso.
+
+## [1.5.18] — 2026-11-05
+
+### Arreglos
+
+- Un ticket abierto en un PC sin nadie delante, o en un navegador ya cerrado, seguía «tomado»
+  para los demás (TK-2611-0037, toda la tarde). Ahora el bloqueo vive 90 s y la ventana del ticket
+  lo renueva cada 30 s mientras el agente esté activo. Se suelta al cerrar el ticket, la pestaña
+  o el navegador, y si se deja abierto sin tocar nada durante los minutos configurados.
+  En Configuración el campo pasa a llamarse «Minutos sin actividad».
+- El latido ya no «toma» un ticket resuelto o cerrado.
+
+### Mejoras
+
+- Cuenta atrás del bloqueo. Quien tiene el ticket ve «Lo tienes tú · se libera en 4:59 si no
+  tocas nada», que vuelve al máximo al tocar algo; al llegar a 0 lo suelta y lo retoma al volver.
+  Los demás ven «Robert está atendiendo este ticket ahora mismo. Se libera en 3:12 si no lo toca».
+  Nueva columna `tickets.locked_active_at`.
+
+## [1.5.17] — 2026-11-04
+
+### Arreglos
+
+- Correos muy largos (Outlook con todo el hilo citado) no entraban: el cuerpo pasaba de los 64 KB
+  de la columna `messages.body` («Data too long»), el correo se reintentaba 5 veces y acababa en
+  cuarentena sin ticket. La columna pasa a MEDIUMTEXT (16 MB) y un cuerpo de más de 15 MB se guarda
+  recortado en texto en vez de fallar.
+- En cada uno de esos reintentos el agente recibía otro «Se te ha asignado el ticket» (correo y
+  campana) de un ticket que luego se borraba. Ahora el aviso de asignación de un ticket que entra por
+  correo sale solo cuando el ticket y su mensaje quedan guardados.
+
+## [1.5.16] — 2026-11-04
+
+### Arreglos
+
+- Responder con solo un adjunto (sin texto): el botón de enviar seguía apagado porque el editor
+  no avisaba al adjuntar o quitar un archivo. El servidor ya lo admitía.
+
 ## [1.5.15] — 2026-11-02
 
 ### Mejoras
