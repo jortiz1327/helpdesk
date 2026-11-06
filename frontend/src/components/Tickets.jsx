@@ -1197,7 +1197,8 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
                       <tr key={t.id} className={`tk-row ${waiting ? 'wait' : ''} ${sleeping ? 'sleeping' : ''} ${esInterno(t.contact_email) ? 'internal' : ''} ${sel.has(t.id) ? 'picked' : ''}`} onClick={() => setOpen(t.id)}
                         tabIndex={0} onKeyDown={teclaAbrir(() => setOpen(t.id))}
                         aria-label={`Ticket ${t.code}, ${nombreContacto(t.contact_name, t.contact_wa, 'sin nombre')}: ${t.subject || 'sin asunto'}. Pulsa Intro para abrir.`}>
-                        <td className="tk-chk" onClick={(e) => e.stopPropagation()}>
+                        <td className="tk-chk" onClick={(e) => e.stopPropagation()}
+                          {...(waiting ? { 'data-tip': 'Esperando respuesta', 'data-tip-tone': 'wait' } : {})}>
                           <input type="checkbox" checked={sel.has(t.id)} onChange={() => toggleSel(t.id)} />
                         </td>
                         <td className="tk-code">{t.code}</td>

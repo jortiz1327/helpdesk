@@ -48,7 +48,7 @@ export default function TipLayer() {
       timer.current = setTimeout(() => {
         if (actual.current !== el || !el.isConnected) return
         const r = el.getBoundingClientRect()
-        setTip({ text, r })
+        setTip({ text, r, tone: el.getAttribute('data-tip-tone') || '' })
       }, RETARDO)
     }
     const fuera = (e) => {
@@ -91,7 +91,7 @@ export default function TipLayer() {
   if (!tip) return null
   return (
     <div ref={ref} role="tooltip"
-      className={`tip-layer${pos ? ' on' : ''}${pos?.abajo ? ' abajo' : ''}`}
+      className={`tip-layer${pos ? ' on' : ''}${pos?.abajo ? ' abajo' : ''}${tip.tone ? ` tone-${tip.tone}` : ''}`}
       style={{ left: pos?.x ?? -9999, top: pos?.y ?? -9999, '--flecha': `${pos?.flecha ?? 0}px` }}>
       {tip.text}
     </div>
