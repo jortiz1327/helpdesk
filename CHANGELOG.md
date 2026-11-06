@@ -3,6 +3,21 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.20] — 2026-11-06
+
+### Mejoras
+
+- Diseño unificado: un color por área (Helpdesk azul, Campañas verde) vía `<html data-area>`,
+  que cambia `--primary` y compañía; el resto de componentes es común a las dos.
+- Una sola forma de KPI (`.tk-kpi` y `.stat-card`): etiqueta arriba, cifra en tinta, color solo
+  en avisos (fallidos, en cola, SLA vencido). Fuera las franjas laterales de color.
+- Menú lateral con iconos neutros y el activo en el color del área; plegado, centrado, sin
+  barra de scroll, con separador entre grupos y el pie compacto.
+- La app usa Lato servida en local (antes Inter desde Google Fonts), la misma del portal.
+- Portal: títulos de sección reales, FAQ sin la insignia «?», votos con iconos, hero sin
+  animaciones en bucle, respuesta al pulsar y ajustes de móvil (cabecera y buscador).
+- Solo diseño: sin cambios de comportamiento ni de datos.
+
 ## [1.5.19] — 2026-11-06
 
 ### Arreglos

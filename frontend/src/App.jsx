@@ -120,10 +120,23 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.19";
+const APP_VERSION = "1.5.20";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.20",
+        date: "6 nov 2026",
+        resumen: "Diseño renovado: Helpdesk y Campañas se ven iguales, cada una con su color.",
+        mejoras: [
+            "Un color por área: Helpdesk en azul y Campañas en verde. Lo demás se ve igual en las dos.",
+            "Los indicadores de arriba tienen la misma forma en todas las pantallas; solo llevan color cuando avisan de algo.",
+            "El menú lateral va en gris y marca en color la pantalla en la que estás. Plegado queda centrado y sin barra de scroll.",
+            "Toda la app usa la tipografía de la casa, la misma del portal.",
+            "Portal del cliente más limpio: títulos más claros, preguntas frecuentes sin adornos y mejor en el móvil.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.5.19",
         date: "6 nov 2026",
