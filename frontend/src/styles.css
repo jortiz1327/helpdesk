@@ -4199,3 +4199,30 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .an-chan + .an-chan { border-left: 1px solid var(--line); padding-left: 16px; }
 /* Las variantes de color de la KPI antigua (blue/amber/green/red) ya no tiñen la tarjeta. */
 .tk-kpi.blue, .tk-kpi.amber, .tk-kpi.green, .tk-kpi.red { background: var(--panel); color: var(--ink); border-color: var(--line); }
+
+/* --- Menú PLEGADO: columna limpia y centrada ---
+   Sin barra de scroll visible (robaba ancho y descentraba los iconos), grupos
+   separados por una raya corta, y el pie compacto: el engranaje sobraba porque
+   el avatar ya abre «Mi cuenta». */
+.rail:not(.expanded) { padding: 12px 0; }
+.rail:not(.expanded) .rail-nav { scrollbar-width: none; gap: 2px; }
+.rail:not(.expanded) .rail-nav::-webkit-scrollbar { display: none; }
+.rail:not(.expanded) .rail-group { align-items: center; gap: 2px; }
+.rail:not(.expanded) .rail-group + .rail-group { margin-top: 0; }
+.rail:not(.expanded) .rail-group + .rail-group::before {
+  content: ''; width: 22px; height: 1px; background: var(--line-2); margin: 7px 0;
+}
+.rail:not(.expanded) .rail-btn { width: 44px; height: 44px; border-radius: 12px; }
+.rail:not(.expanded) .rail-btn svg { width: 21px; height: 21px; }
+.rail:not(.expanded) .rail-btn.active::before { left: -10px; top: 12px; bottom: 12px; }
+.rail:not(.expanded) .area-switch, .rail:not(.expanded) .rail-top { margin-bottom: 10px; }
+.rail:not(.expanded) .notif-bell { width: 44px; height: 44px; border-radius: 12px; }
+.rail:not(.expanded) .rail-user { width: 100%; display: flex; justify-content: center; padding: 8px 0 4px; margin-top: 6px; border-top: 1px solid var(--line); }
+.rail:not(.expanded) .ru-card { width: auto; padding: 5px; border-radius: 12px; }
+.rail:not(.expanded) .rail-actions { gap: 2px; padding: 2px 0 4px; }
+.rail:not(.expanded) .rail-actions .ra-btn:first-child { display: none; }
+.rail:not(.expanded) .ra-btn { width: 36px; height: 36px; border-radius: 10px; color: var(--ink-3); }
+.rail:not(.expanded) .ra-btn svg { width: 18px; height: 18px; }
+.rail:not(.expanded) .rail-collapse { width: 36px; height: 32px; margin: 0 auto 4px; padding: 0; color: var(--ink-3); }
+.ra-btn, .rail-collapse, .notif-bell, .ru-card { transition: background-color var(--t) ease, color var(--t) ease; }
+.ra-btn:active, .rail-collapse:active, .notif-bell:active, .ru-card:active { transform: scale(0.97); }
