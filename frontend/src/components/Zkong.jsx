@@ -26,6 +26,38 @@ const tono = (n) => (n == null ? '' : n >= 30 ? 'bad' : n >= 15 ? 'warn' : '')
 const num = (n) => Number(n || 0).toLocaleString('es-ES')
 const dec = (n) => (n == null ? '—' : String(n).replace('.', ','))
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
+const eur = (n) => (n == null ? '—' : Number(n).toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }))
+const VUELTA = ['recibida', 'respondida', 'cerrada']   // ZKONG ya la tiene: puede haber reposiciones de vuelta
+
+/* Lo que vale lo enviado: recuperado (reposición o abono), asumido (rechazadas) y lo que
+   aún no tiene respuesta. Coste del portal (precio de coste o, si falta, el del proveedor). */
+function Costes({ c, compacto }) {
+  if (!c) return null
+  const base = c.recovered + c.assumed + c.pending
+  const w = (v) => (base ? `${(v / base) * 100}%` : '0%')
+  const avisos = [c.no_cost ? `${plural(c.no_cost, 'etiqueta', 'etiquetas')} sin coste en el portal` : null,
+    c.estimated ? `${c.estimated} con el coste del proveedor ($ a 1,04 €)` : null].filter(Boolean)
+  if (compacto) {
+    return base ? (
+      <div className="zk-cst-c" title={`Recuperado ${eur(c.recovered)} · Asumido ${eur(c.assumed)} · Sin respuesta ${eur(c.pending)}${avisos.length ? `\n${avisos.join(' · ')}` : ''}`}>
+        <span className="zk-cst-bar"><i className="rec" style={{ width: w(c.recovered) }} /><i className="asu" style={{ width: w(c.assumed) }} /></span>
+        <small><b className="rec">{eur(c.recovered)}</b> · <b className="asu">{eur(c.assumed)}</b></small>
+      </div>
+    ) : <span className="dev-mute" title={avisos.join(' · ') || undefined}>{c.no_cost ? 'Sin coste' : '—'}</span>
+  }
+  return (
+    <div className="zk-cst">
+      <div className="zk-cst-n">
+        <div className="rec"><span>Coste recuperado</span><b>{eur(c.recovered)}</b><small>Reposiciones y abonos</small></div>
+        <div className="asu"><span>Coste asumido</span><b>{eur(c.assumed)}</b><small>Rechazadas por ZKONG</small></div>
+        <div className="pen"><span>Sin respuesta aún</span><b>{eur(c.pending)}</b><small>Total enviado {eur(c.total)}</small></div>
+      </div>
+      {base ? <span className="zk-cst-bar big" role="img" aria-label={`Recuperado ${eur(c.recovered)}, asumido ${eur(c.assumed)}, sin respuesta ${eur(c.pending)}`}>
+        <i className="rec" style={{ width: w(c.recovered) }} /><i className="asu" style={{ width: w(c.assumed) }} /></span> : null}
+      {avisos.length ? <p className="zk-cst-av"><Icon.warn /> {avisos.join(' · ')}. Sin portes.</p> : <p className="zk-cst-av mute">Coste de compra del portal · sin portes.</p>}
+    </div>
+  )
+}
 const sinFotos = (i) => i.photos.length < i.photos_total
 
 function Pill({ cls, children }) { return <span className={`wr-pill ${cls}`}><i />{children}</span> }
@@ -299,6 +331,7 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
   const sinResp = fuera.reduce((s, b) => s + (b.items - b.answered), 0)
   const respondidas = d.reduce((s, b) => s + b.answered, 0)
   const aceptadas = d.reduce((s, b) => s + (b.answered - b.rejected), 0)
+  const coste = d.reduce((s, b) => (b.costs ? { rec: s.rec + b.costs.recovered, asu: s.asu + b.costs.assumed } : s), { rec: 0, asu: 0 })
   const llegadas = d.filter((b) => b.sent_at && b.received_at)
   const mediaLlegada = llegadas.length ? Math.round((llegadas.reduce((s, b) => s + Math.max(0, (aFecha(b.received_at) - aFecha(b.sent_at)) / 86400000), 0) / llegadas.length) * 10) / 10 : null
   const transportistas = [...new Set(d.map((b) => b.carrier).filter(Boolean))].sort()
@@ -306,15 +339,18 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
   const busca = q.trim().toLowerCase()
   const lista = d.filter((b) => (filtro === 'abiertas' ? ABIERTAS.includes(b.status) : !filtro || b.status === filtro)
     && (!transp || b.carrier === transp)
-    && (!busca || [b.code, b.tracking, b.shipping_ref, b.carrier, b.note, ...(b.warranty_list || []).flatMap((w) => [w.code, w.client_name])].some((v) => String(v || '').toLowerCase().includes(busca))))
+    && (!busca || [b.code, b.rma_number, b.tracking, b.return_tracking, b.shipping_ref, b.carrier, b.note, ...(b.warranty_list || []).flatMap((w) => [w.code, w.client_name])].some((v) => String(v || '').toLowerCase().includes(busca))))
   const paginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA))
   const visibles = lista.slice(pag * POR_PAGINA, (pag + 1) * POR_PAGINA)
 
   const exportar = () => {
     const esc = csvCell
-    const filas = [['Remesa', 'Estado', 'Etiquetas', 'Garantías', 'Con respuesta', 'Rechazadas', 'Creada', 'Enviada', 'Transportista', 'Tracking', 'Referencia', 'Recibida por ZKONG', 'Cerrada']]
-    lista.forEach((b) => filas.push([b.code, estados[b.status] || b.status, b.status === 'anulada' ? (b.units_sent ?? '') : b.items, (b.warranty_list || []).map((w) => w.code).join(', '),
-      b.answered, b.rejected, fecha(b.created_at), b.sent_at ? fecha(b.sent_at) : '', b.carrier, b.tracking, b.shipping_ref, b.received_at ? fecha(b.received_at) : '', b.closed_at ? fecha(b.closed_at) : '']))
+    const imp = (v) => (v == null ? '' : String(v.toFixed(2)).replace('.', ','))
+    const filas = [['Remesa', 'Nº de RMA', 'Estado', 'Etiquetas', 'Garantías', 'Con respuesta', 'Rechazadas', 'Creada', 'Enviada', 'Transportista', 'Tracking', 'Referencia', 'Recibida por ZKONG',
+      'Vuelta', 'Unidades de vuelta', 'Tracking de vuelta', 'Coste recuperado (€)', 'Coste asumido (€)', 'Sin respuesta (€)', 'Cerrada']]
+    lista.forEach((b) => filas.push([b.code, b.rma_number, estados[b.status] || b.status, b.status === 'anulada' ? (b.units_sent ?? '') : b.items, (b.warranty_list || []).map((w) => w.code).join(', '),
+      b.answered, b.rejected, fecha(b.created_at), b.sent_at ? fecha(b.sent_at) : '', b.carrier, b.tracking, b.shipping_ref, b.received_at ? fecha(b.received_at) : '',
+      b.returned_at ? fecha(b.returned_at) : '', b.units_returned ?? '', b.return_tracking, imp(b.costs?.recovered), imp(b.costs?.assumed), imp(b.costs?.pending), b.closed_at ? fecha(b.closed_at) : '']))
     const blob = new Blob(['﻿' + filas.map((l) => l.map(esc).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob); a.download = `remesas-zkong-${hoyISO()}.csv`; a.click()
@@ -338,9 +374,10 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
           <div className="h">{enZkong ? (sinResp ? <span className="zk-warn-t">{num(sinResp)} sin respuesta aún</span> : 'Todos con respuesta') : 'Nada enviado ahora mismo'}</div>
         </div>
         <div className="wi-kpi">
-          <div className="v">{respondidas ? `${Math.round((aceptadas / respondidas) * 100)} %` : '—'}</div>
-          <div className="k">Aceptadas por ZKONG</div>
-          <div className="h">{respondidas ? `${num(aceptadas)} de ${num(respondidas)} respondidas (reposición o abono)` : 'ZKONG aún no ha respondido nada'}</div>
+          <div className="v zk-v-rec">{coste.rec || coste.asu ? eur(coste.rec) : '—'}</div>
+          <div className="k">Coste recuperado</div>
+          <div className="h">{coste.rec || coste.asu ? <><span className="zk-asu-t">{eur(coste.asu)} asumido</span> · </> : null}
+            {respondidas ? `${Math.round((aceptadas / respondidas) * 100)} % aceptadas (${num(aceptadas)} de ${num(respondidas)})` : 'ZKONG aún no ha respondido nada'}</div>
         </div>
         <div className="wi-kpi">
           <div className="v">{mediaLlegada == null ? '—' : dec(mediaLlegada)}{mediaLlegada == null ? null : <span className="wi-de">días</span>}</div>
@@ -365,7 +402,7 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
         <div className="dev-table-wrap keep">
           <table className="dev-table zk-rt">
             <thead><tr>
-              <th>Remesa</th><th>Estado</th><th className="r">Etiquetas</th><th>Garantías</th><th>Respuesta de ZKONG</th><th>Envío</th><th>Tracking</th><th>Llegada a ZKONG</th><th />
+              <th>Remesa</th><th>Estado</th><th className="r">Etiquetas</th><th>Garantías</th><th>Respuesta de ZKONG</th><th title="Recuperado (reposición o abono) · asumido (rechazadas)">Coste</th><th>Envío</th><th>Tracking</th><th>Llegada a ZKONG</th><th>Vuelta</th><th />
             </tr></thead>
             <tbody>
               {visibles.map((b) => {
@@ -374,7 +411,8 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
                 const pct = b.answered ? Math.round(((b.answered - b.rejected) / b.answered) * 100) : null
                 return (
                   <tr key={b.id} className={`wr-row ${anulada ? 'zk-anul' : ''}`} onClick={(e) => { if (!e.target.closest('button.link')) onOpen(b.id) }}>
-                    <td><span className="wr-code">{b.code}</span><small className="zk-sub">Creada el {fecha(b.created_at)}{b.created_by_name ? ` · ${b.created_by_name}` : ''}</small></td>
+                    <td><span className="wr-code">{b.code}</span>{b.rma_number ? <small className="zk-sub zk-rma-s" title="Nº de RMA de ZKONG">RMA <span className="mono">{b.rma_number}</span></small> : null}
+                      <small className="zk-sub">Creada el {fecha(b.created_at)}{b.created_by_name ? ` · ${b.created_by_name}` : ''}</small></td>
                     <td><Pill cls={ESTADO_CLS[b.status]}>{estados[b.status] || b.status}</Pill></td>
                     <td className="r"><b className="wt-num">{anulada ? (b.units_sent ?? '—') : b.items}</b></td>
                     <td className="zk-gs">
@@ -393,6 +431,7 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
                         </div>
                       )}
                     </td>
+                    <td>{b.costs ? <Costes c={b.costs} compacto /> : <span className="dev-mute">—</span>}</td>
                     <td>{b.sent_at ? <><span>{fecha(b.sent_at)}</span><small className="zk-sub">{b.carrier || 'Sin transportista'}</small></> : <span className="dev-mute">{b.status === 'borrador' ? 'Sin enviar' : '—'}</span>}</td>
                     <td>{b.tracking ? <span className="zk-track mono">{b.tracking}</span> : <span className="dev-mute">—</span>}</td>
                     <td>
@@ -400,6 +439,8 @@ function Remesas({ rv, onOpen, onOpenWarranty }) {
                         : b.waiting_days != null ? <span className={`zk-chip dias ${tono(b.waiting_days) || 'warn'}`} title="Días desde el envío sin que ZKONG confirme que le ha llegado"><i />Esperando · {plural(b.waiting_days, 'día', 'días')}</span>
                         : <span className="dev-mute">—</span>}
                     </td>
+                    <td>{b.returned_at ? <><span className="zk-ok"><Icon.check /> {fecha(b.returned_at)}</span>{b.units_returned != null ? <small className="zk-sub">{plural(b.units_returned, 'unidad', 'unidades')}</small> : null}</>
+                      : <span className="dev-mute">{VUELTA.includes(b.status) ? 'Sin llegar' : '—'}</span>}</td>
                     <td className="wt-ver"><span className="wf-link">Ver <Icon.arrowRight /></span></td>
                   </tr>
                 )
@@ -474,6 +515,8 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
     const ok = tipo === 'envio' ? await accion('send', v, `${b.code} enviada a ZKONG`)
       : tipo === 'editar' ? await accion('shipping', v, 'Envío actualizado')
       : tipo === 'recepcion' ? await accion('receive', v, `${b.code}: recepción de ZKONG apuntada`)
+      : tipo === 'rma' ? await accion('rma', v, v.rma_number?.trim() ? `RMA ${v.rma_number.trim()} apuntado` : 'Nº de RMA quitado')
+      : tipo === 'vuelta' ? await accion('return', v, v.returned_on ? `${b.code}: vuelta apuntada` : `${b.code}: vuelta quitada`)
       : await accion('cancel', v, `${b.code} anulada: sus etiquetas vuelven a la bandeja`)
     if (ok) cargar()
     return ok
@@ -497,7 +540,9 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
         <div className="wr-hero-top">
           <div className="wr-hero-id">
             <h2>{b.code}</h2>
-            <div className="wr-hero-pills"><Pill cls={ESTADO_CLS[b.status]}>{rv?.batch_statuses?.[b.status]}</Pill></div>
+            <div className="wr-hero-pills"><Pill cls={ESTADO_CLS[b.status]}>{rv?.batch_statuses?.[b.status]}</Pill>
+              {b.rma_number ? <span className="zk-rma" title="Nº de RMA de ZKONG">RMA <b className="mono">{b.rma_number}</b>{puede && b.status !== 'anulada' ? <button className="icon-btn sm" title="Cambiar el nº de RMA" onClick={() => setVentana('rma')}><Icon.pencil /></button> : null}</span>
+                : puede && b.status !== 'anulada' ? <button className="zk-rma add" onClick={() => setVentana('rma')}><Icon.plus /> Nº de RMA</button> : null}</div>
             <p>{plural(items.length, 'etiqueta', 'etiquetas')} de {plural(grupos.length, 'garantía', 'garantías')} · creada el {fecha(b.created_at)}{b.created_by_name ? ` por ${b.created_by_name}` : ''}{b.sent_at ? ` · enviada el ${fecha(b.sent_at)}` : ''}</p>
           </div>
           <div className="wr-acts">
@@ -506,6 +551,7 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
             {puede && borrador && <button className="btn" disabled={ocupado || !items.length} onClick={enviar}><Icon.send /> Registrar envío</button>}
             {puede && b.status === 'enviada' && <button className="btn" disabled={ocupado} onClick={() => setVentana('recepcion')}><Icon.check /> Registrar recepción</button>}
             {puede && conRespuesta && <button className="dev-btn" disabled={ocupado} onClick={() => setVentana('editar')}><Icon.pencil /> Envío</button>}
+            {puede && VUELTA.includes(b.status) && <button className={b.returned_at ? 'dev-btn' : 'btn'} disabled={ocupado} onClick={() => setVentana('vuelta')}>{b.returned_at ? <><Icon.pencil /> Vuelta</> : <><Icon.check /> Registrar vuelta</>}</button>}
             {puede && ['enviada', 'recibida'].includes(b.status) && <button className="btn ghost zk-anular" disabled={ocupado} onClick={() => setVentana('anular')}>Anular</button>}
             {puede && conRespuesta && <button className="btn dark" disabled={ocupado} onClick={async () => { if (await confirm({ title: 'Cerrar remesa', message: respondidas < items.length ? `Quedan ${items.length - respondidas} sin respuesta de ZKONG. ¿Cerrar igualmente?` : `¿Cerrar ${b.code}?`, confirmText: 'Cerrar remesa' }) && await accion('close', {}, `${b.code} cerrada`)) cargar() }}><Icon.lock /> Cerrar remesa</button>}
             {puede && b.status === 'cerrada' && <button className="btn ghost" disabled={ocupado} onClick={async () => { if (await accion('reopen', {}, `${b.code} reabierta`)) cargar() }}><Icon.refresh /> Reabrir</button>}
@@ -531,8 +577,11 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
             <div><span>Referencia / albarán</span><b>{b.shipping_ref || '—'}</b></div>
             <div><span>Recibida por ZKONG</span><b>{b.received_at ? `${fecha(b.received_at)}${b.units_received != null ? ` · ${plural(b.units_received, 'unidad', 'unidades')}` : ''}` : '—'}</b>
               {b.waiting_days != null ? <em className={`zk-espera ${tono(b.waiting_days)}`}>Esperando confirmación · {plural(b.waiting_days, 'día', 'días')}</em> : null}</div>
+            <div><span>Vuelta (reposiciones)</span><b>{b.returned_at ? `${fecha(b.returned_at)}${b.units_returned != null ? ` · ${plural(b.units_returned, 'unidad', 'unidades')}` : ''}` : VUELTA.includes(b.status) ? 'Sin llegar todavía' : '—'}</b>
+              {b.returned_at && (b.return_carrier || b.return_tracking) ? <em className="zk-sub">{[b.return_carrier, b.return_tracking].filter(Boolean).join(' · ')}</em> : null}</div>
           </div>
         )}
+        {!borrador && b.status !== 'anulada' && items.length > 0 ? <Costes c={d.costs} /> : null}
         {borrador && faltan > 0 && <p className="zk-falta-txt"><Icon.image /> {plural(faltan, 'etiqueta no tiene', 'etiquetas no tienen')} todas las fotos. Súbelas desde la revisión de su garantía antes de mandar la remesa.</p>}
         {!borrador && items.length > 0 && (
           <div className="zk-resumen">
@@ -541,7 +590,7 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
           </div>
         )}
         <textarea className="zk-nota" rows={2} value={nota} readOnly={!puede} onChange={(e) => setNota(e.target.value)} onBlur={guardarNota}
-          placeholder="Notas de la remesa: nº de RMA de ZKONG, contacto, incidencias…" />
+          placeholder="Notas de la remesa: contacto de ZKONG, incidencias…" />
       </div>
 
       <div className="dev-card zk-bandeja zk-det-card">
@@ -568,11 +617,11 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
             <table className="dev-table zk-t">
               <thead><tr>
                 {borrador || conRespuesta ? <th className="zk-ck"><input type="checkbox" checked={todas} onChange={() => setSel(todas ? new Set() : new Set(items.map((i) => i.id)))} aria-label="Elegir todas" /></th> : null}
-                <th>Nº de serie</th><th>Modelo</th><th>Fallo enviado a ZKONG</th><th>Fotos</th>{!borrador ? <th>Respuesta de ZKONG</th> : null}
+                <th>Nº de serie</th><th>Modelo</th><th>Fallo enviado a ZKONG</th><th>Fotos</th>{!borrador ? <><th>Respuesta de ZKONG</th><th className="r">Coste</th></> : null}
               </tr></thead>
               {grupos.map((g) => (
                 <tbody key={g.warranty_id} className="zk-g">
-                  <tr className="zk-gh"><td colSpan={borrador || conRespuesta ? 6 : 5}>
+                  <tr className="zk-gh"><td colSpan={(borrador || conRespuesta ? 1 : 0) + (borrador ? 4 : 6)}>
                     <div className="zk-gh-in">
                       <button className="link wr-code" onClick={() => onOpenWarranty(g.warranty_id)}>{g.code}</button>
                       <span className="zk-cli">{g.client_name || 'Sin cliente'}</span>
@@ -593,7 +642,12 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
                         </td>
                         <td><Fotos it={i} /></td>
                         {!borrador ? (
-                          <td><span className="zk-res zk-res-l">{i.result ? <Pill cls={RESULT_CLS[i.result]}>{rv?.zkong_results?.[i.result]}</Pill> : <span className="dev-mute">Sin respuesta</span>}{i.result_note ? <small title={i.result_note}>{i.result_note}</small> : null}</span></td>
+                          <>
+                            <td><span className="zk-res zk-res-l">{i.result ? <Pill cls={RESULT_CLS[i.result]}>{rv?.zkong_results?.[i.result]}</Pill> : <span className="dev-mute">Sin respuesta</span>}{i.result_note ? <small title={i.result_note}>{i.result_note}</small> : null}</span></td>
+                            <td className={`r zk-cst-i ${i.result === 'rechazada' ? 'asu' : i.result ? 'rec' : ''}`}>{i.cost == null
+                              ? <span className="dev-mute" title="Este producto no tiene coste en el portal">Sin coste</span>
+                              : <span title={i.cost_source === 'proveedor' ? 'Coste del proveedor ($ a 1,04 €): el producto no tiene precio de coste en el portal' : 'Precio de coste del portal'}>{eur(i.cost)}{i.cost_source === 'proveedor' ? <sup>$</sup> : null}</span>}</td>
+                          </>
                         ) : null}
                       </tr>
                     )
@@ -622,8 +676,9 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
 
       {ventana === 'envio' && (
         <Ventana titulo={`Registrar envío · ${b.code}`} boton="Registrar envío" onClose={() => setVentana(null)} onOk={(v) => guardarVentana('envio', v)}
-          inicial={{ sent_on: hoyISO(), units_sent: items.length }}
+          inicial={{ sent_on: hoyISO(), units_sent: items.length, rma_number: b.rma_number || '' }}
           campos={[{ k: 'sent_on', l: 'Fecha de envío', tipo: 'date', req: true }, { k: 'units_sent', l: 'Unidades enviadas', tipo: 'number', min: 1, req: true },
+            { k: 'rma_number', l: 'Nº de RMA de ZKONG', max: 60, hint: 'si ya lo tienes', ancho: true },
             ...CAMPOS_TRANSPORTE, { k: 'note', l: 'Observaciones', tipo: 'area', hint: 'opcional', ancho: true }]} />
       )}
       {ventana === 'editar' && (
@@ -636,6 +691,20 @@ function Remesa({ id, rv, puede, onBack, onOpenWarranty }) {
           inicial={{ received_on: hoyISO(), units_received: b.units_sent ?? '' }}
           campos={[{ k: 'received_on', l: 'Fecha de recepción', tipo: 'date', req: true, min: aISO(b.sent_at) }, { k: 'units_received', l: 'Unidades recibidas', tipo: 'number', min: 0 },
             { k: 'note', l: 'Observaciones', tipo: 'area', hint: 'opcional', ancho: true, ph: 'Cómo lo confirmó ZKONG (correo, nº de RMA…)' }]} />
+      )}
+      {ventana === 'rma' && (
+        <Ventana titulo={`Nº de RMA · ${b.code}`} boton="Guardar" onClose={() => setVentana(null)} onOk={(v) => guardarVentana('rma', v)}
+          inicial={{ rma_number: b.rma_number || '' }}
+          campos={[{ k: 'rma_number', l: 'Nº de RMA de ZKONG', max: 60, ancho: true, hint: 'vacío para quitarlo', ph: 'El que da ZKONG al aceptar la solicitud' }]} />
+      )}
+      {ventana === 'vuelta' && (
+        <Ventana titulo={`Vuelta de ZKONG · ${b.code}`} boton="Guardar" onClose={() => setVentana(null)} onOk={(v) => guardarVentana('vuelta', v)}
+          inicial={{ returned_on: b.returned_at ? aISO(b.returned_at) : hoyISO(), units_returned: b.units_returned ?? (items.filter((i) => i.result === 'reposicion').length || ''),
+            return_carrier: b.return_carrier || '', return_tracking: b.return_tracking || '' }}
+          campos={[{ k: 'returned_on', l: 'Llegan las reposiciones el', tipo: 'date', req: !b.returned_at, min: aISO(b.received_at), hint: b.returned_at ? 'vacía para quitar la vuelta' : null },
+            { k: 'units_returned', l: 'Unidades que vuelven', tipo: 'number', min: 0 },
+            { k: 'return_carrier', l: 'Transportista', max: 80, ph: 'DHL, SEUR, TNT…' }, { k: 'return_tracking', l: 'Tracking', max: 120 },
+            { k: 'note', l: 'Observaciones', tipo: 'area', hint: 'opcional', ancho: true }]} />
       )}
       {ventana === 'anular' && (
         <Ventana titulo={`Anular ${b.code}`} boton="Anular remesa" peligro onClose={() => setVentana(null)} onOk={(v) => guardarVentana('anular', v)}

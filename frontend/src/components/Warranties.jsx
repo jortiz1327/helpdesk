@@ -407,14 +407,22 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
   }
 
   const [loteCierre, setLoteCierre] = useState(null)   // {modo, status}: cerrar o reabrir las elegidas
+  // Cambios de estado en lote: por defecto se avisa al cliente como en uno a mano; se puede callar.
+  const [loteAvisar, setLoteAvisar] = useState(true)
+  const hechoEnLote = (r) => {
+    toast(r.changed ? `${r.changed} ${r.changed === 1 ? 'garantía cambiada' : 'garantías cambiadas'}${r.silenced ? ` · ${r.silenced} sin avisar al cliente` : ''}` : 'Ya estaban así: no ha cambiado nada')
+    setSel(new Set()); setOtra((x) => x + 1)
+  }
   const enLote = async (cambios, texto) => {
     const n = sel.size
-    if (!(await confirm({ title: `${texto} en ${n} ${n === 1 ? 'garantía' : 'garantías'}`, message: 'Cada cambio queda en el historial de su garantía.', confirmText: 'Aplicar' }))) return
-    const r = await api.bulkWarranties([...sel], cambios)
+    const deEstado = 'status' in cambios
+    const message = 'Cada cambio queda en el historial de su garantía.' + (deEstado ? (loteAvisar
+      ? ' Si la nueva fase tiene aviso, el cliente recibirá su correo.'
+      : ' No se avisará al cliente: quedará anotado en cada una.') : '')
+    if (!(await confirm({ title: `${texto} en ${n} ${n === 1 ? 'garantía' : 'garantías'}`, message, confirmText: 'Aplicar' }))) return
+    const r = await api.bulkWarranties([...sel], deEstado ? { ...cambios, notify: loteAvisar } : cambios)
     if (!r.ok) { toast(r.error || 'No se pudo cambiar', 'err'); return }
-    toast(r.changed ? `${r.changed} ${r.changed === 1 ? 'garantía cambiada' : 'garantías cambiadas'}` : 'Ya estaban así: no ha cambiado nada')
-    setSel(new Set())
-    setOtra((x) => x + 1)
+    hechoEnLote(r)
   }
 
   const estadosActivos = Object.entries(opts?.status_meta || {}).filter(([, m]) => m.active).map(([k, m]) => ({ value: k, label: m.label, color: m.color }))
@@ -450,10 +458,9 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
           estados={estadosActivos.filter((e) => cerradaEn(opts, e.value) === (loteCierre.modo === 'cerrar'))}
           inicial={{ status: loteCierre.status }}
           onOk={async (v) => {
-            const r = await api.bulkWarranties([...sel], { status: v.status, close_reason: v.close_reason, close_resolution: v.close_resolution, reopen_reason: v.reopen_reason })
+            const r = await api.bulkWarranties([...sel], { status: v.status, close_reason: v.close_reason, close_resolution: v.close_resolution, reopen_reason: v.reopen_reason, notify: loteAvisar })
             if (!r.ok) { toast(r.error || 'No se pudo cambiar', 'err'); return false }
-            toast(r.changed ? `${r.changed} ${r.changed === 1 ? 'garantía cambiada' : 'garantías cambiadas'}` : 'Ya estaban así: no ha cambiado nada')
-            setSel(new Set()); setOtra((x) => x + 1)
+            hechoEnLote(r)
             return true
           }} />
       ) : null}
@@ -471,6 +478,10 @@ function Lista({ opts, onOpen, onNew, reload, filtro }) {
             else if (elegidas.some((w) => cerradaEn(opts, w.status))) setLoteCierre({ modo: 'reabrir', status: v })
             else enLote({ status: v }, `Poner «${opts?.statuses?.[v] || v}»`)
           }} options={[{ value: '', label: 'Cambiar estado…' }, ...estadosActivos]} />
+          <label className="wl-bulk-avisar" title="Si la nueva fase tiene aviso por correo al cliente (Configuración › Avisos al cliente), se le manda igual que en un cambio a mano">
+            <input type="checkbox" checked={loteAvisar} onChange={(e) => setLoteAvisar(e.target.checked)} /> Avisar al cliente
+          </label>
+          <span className="sep" />
           <Select sm searchable value="" onChange={(v) => enLote({ responsible_id: v }, v === 'none' ? 'Quitar el responsable' : `Asignar a ${agentes.find((a) => a.value === v)?.label}`)}
             options={[{ value: '', label: 'Asignar a…' }, { value: 'none', label: 'Sin responsable' }, ...agentes]} />
           <button className="dev-btn" onClick={() => exportar(elegidas)}><Icon.download /> Exportar selección</button>

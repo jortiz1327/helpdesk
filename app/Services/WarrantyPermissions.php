@@ -30,6 +30,7 @@ class WarrantyPermissions
             'create' => 'warranties.zkong', 'add' => 'warranties.zkong', 'remove' => 'warranties.zkong', 'send' => 'warranties.zkong',
             'shipping' => 'warranties.zkong', 'receive' => 'warranties.zkong', 'cancel' => 'warranties.zkong', 'result' => 'warranties.zkong',
             'close' => 'warranties.zkong', 'reopen' => 'warranties.zkong', 'note' => 'warranties.zkong', 'delete' => 'warranties.zkong',
+            'rma' => 'warranties.zkong', 'return' => 'warranties.zkong',
         ],
     ];
 

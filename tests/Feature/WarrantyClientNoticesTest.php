@@ -107,6 +107,33 @@ class WarrantyClientNoticesTest extends TestCase
         $this->assertSame([], $this->correos);
     }
 
+    /** Cambio de estado en lote: avisa como uno a mano, salvo que se pida no avisar (y queda anotado). */
+    public function test_en_lote_se_puede_no_avisar_al_cliente(): void
+    {
+        $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
+        $u = User::create(['name' => 'Ana', 'email' => 'a@x.com', 'password' => bcrypt('x'), 'active' => 1]);
+        $u->givePermissionTo(self::GARANTIAS);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $h = ['X-App-Token' => TokenService::make($u)];
+        $w1 = $this->garantia();
+        $w2 = Warranty::create(['code' => 'G-2026-0002', 'status' => 'no_iniciado', 'received_at' => '2026-11-04', 'customer_email' => 'otro@x.com',
+            'last_activity_at' => now(), 'status_changed_at' => now()]);
+        $this->tras();
+        $this->correos = [];   // los de «recibida» del alta
+
+        $r = $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$w1->id, $w2->id], 'status' => 'enviada', 'notify' => false], $h)->assertOk()->json();
+        $this->tras();
+        $this->assertSame([2, 2], [$r['changed'], $r['silenced']]);
+        $this->assertSame([], $this->correos);
+        $this->assertSame(2, DB::table('warranty_events')->where('to_value', 'Cambio de estado en lote sin avisar al cliente')->count());
+
+        // Sin decir nada, se avisa (como siempre).
+        $r = $this->postJson('/api/warranties.php?action=bulk', ['ids' => [$w1->id, $w2->id], 'status' => 'pte_presupuesto'], $h)->assertOk()->json();
+        $this->tras();
+        $this->assertSame([2, 0], [$r['changed'], $r['silenced']]);
+        $this->assertCount(2, $this->correos);
+    }
+
     public function test_apagado_en_configuracion_o_fuera_de_produccion(): void
     {
         $u = User::create(['name' => 'Ana', 'email' => 'a@x.com', 'password' => bcrypt('x'), 'active' => 1]);

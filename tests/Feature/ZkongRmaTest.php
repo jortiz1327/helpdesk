@@ -200,4 +200,57 @@ class ZkongRmaTest extends TestCase
         $this->assertSame(2, count($this->getJson('/api/zkong_rma.php', $h)->json('groups.0.items')));
         $this->rma('result', ['id' => $id, 'item_ids' => [$a['8E9749440']], 'result' => 'abono'], $h)->assertStatus(400);
     }
+
+    /** El coste como el Excel de stock del portal: precio de coste (€) y, si falta o es 0, el del proveedor ($, con coma). */
+    public function test_coste_del_portal_con_la_regla_del_excel_de_stock(): void
+    {
+        $this->assertSame(['cost' => 12.5, 'source' => 'coste'], \App\Services\ZkongCosts::costeDe('12.5', '9'));
+        $this->assertSame(['cost' => 0.23, 'source' => 'proveedor'], \App\Services\ZkongCosts::costeDe('0', '0,22'));   // 0,22 $ × 1,04
+        $this->assertSame(['cost' => 10.4, 'source' => 'proveedor'], \App\Services\ZkongCosts::costeDe(null, '10'));
+        $this->assertNull(\App\Services\ZkongCosts::costeDe('', ''));
+    }
+
+    /** Nº de RMA, vuelta de las reposiciones y coste recuperado frente a asumido. */
+    public function test_rma_vuelta_y_coste_recuperado_frente_a_asumido(): void
+    {
+        // El portal (falso): AMC26V con precio de coste; AMAP-C solo con el del proveedor; AMC42 sin coste.
+        $this->app->instance(\App\Services\ZkongCosts::class, new class extends \App\Services\ZkongCosts {
+            public array $precios = ['AMC26V' => ['cost' => 10.0, 'source' => 'coste'], 'AMAP-C' => ['cost' => 31.2, 'source' => 'proveedor']];
+            public function forRefs(array $refs): array { return array_intersect_key($this->precios, array_flip(array_map('strtoupper', $refs))); }
+        });
+        [, $h] = $this->agente();
+        [$w, $a] = $this->garantia('G-2026-0005', ['8E9749440' => 'esl', '8E9749441' => 'esl', '8E9749442' => 'esl', 'A0A3B85B5F7F' => 'ap']);
+        WarrantyItem::whereKey($a['8E9749442'])->update(['aeme_ref' => 'AMC42']);
+        $this->postJson('/api/warranties.php?action=review', ['id' => $w->id, 'item_ids' => array_values($a), 'resolution' => 'defectuosa', 'zkong_decision' => 'enviar', 'zkong_issue' => 'X'], $h)->assertOk();
+        $id = $this->rma('create', ['item_ids' => array_values($a)], $h)->json('id');
+
+        $this->rma('send', ['id' => $id, 'sent_on' => now()->subDays(10)->toDateString(), 'units_sent' => 4, 'rma_number' => ' RMA-7781 '], $h)->assertOk();
+        // El coste se copia al enviar: si luego cambia en el portal, la remesa no cambia.
+        $this->assertSame(['10.00', 'coste'], [(string) WarrantyItem::find($a['8E9749440'])->zkong_unit_cost, WarrantyItem::find($a['8E9749440'])->zkong_cost_source]);
+        app(\App\Services\ZkongCosts::class)->precios['AMC26V']['cost'] = 99.0;
+
+        // Sin recibir no hay vuelta; después sí, y no antes de la recepción.
+        $this->rma('return', ['id' => $id, 'returned_on' => now()->toDateString()], $h)->assertStatus(400);
+        $this->rma('receive', ['id' => $id, 'received_on' => now()->subDays(6)->toDateString()], $h)->assertOk();
+        $this->rma('result', ['id' => $id, 'item_ids' => [$a['8E9749440']], 'result' => 'reposicion'], $h)->assertOk();
+        $this->rma('result', ['id' => $id, 'item_ids' => [$a['A0A3B85B5F7F']], 'result' => 'abono'], $h)->assertOk();
+        $this->rma('result', ['id' => $id, 'item_ids' => [$a['8E9749441'], $a['8E9749442']], 'result' => 'rechazada'], $h)->assertOk();
+        $this->rma('return', ['id' => $id, 'returned_on' => now()->subDays(8)->toDateString()], $h)->assertStatus(400);
+        $this->rma('return', ['id' => $id, 'returned_on' => now()->subDay()->toDateString(), 'units_returned' => 1, 'return_carrier' => 'DHL', 'return_tracking' => 'BACK1'], $h)->assertOk();
+
+        // Otro nº de RMA (queda en la línea de tiempo).
+        $this->rma('rma', ['id' => $id, 'rma_number' => 'RMA-7782'], $h)->assertOk();
+
+        $d = $this->getJson("/api/zkong_rma.php?action=batch&id={$id}", $h)->assertOk()->json();
+        $this->assertSame(['RMA-7782', 1, 'DHL', 'BACK1'], [$d['batch']['rma_number'], $d['batch']['units_returned'], $d['batch']['return_carrier'], $d['batch']['return_tracking']]);
+        $this->assertSame(now()->subDay()->toDateString(), substr($d['batch']['returned_at'], 0, 10));
+        // Recuperado: reposición (10) + abono (31,2); asumido: la rechazada con coste (10); la AMC42 no tiene coste.
+        $this->assertEquals(['recovered' => 41.2, 'assumed' => 10.0, 'pending' => 0.0, 'total' => 51.2, 'no_cost' => 1, 'estimated' => 1], $d['costs']);
+        $this->assertEquals([10, 'proveedor', null], [collect($d['items'])->firstWhere('code', '8E9749441')['cost'], collect($d['items'])->firstWhere('code', 'A0A3B85B5F7F')['cost_source'], collect($d['items'])->firstWhere('code', '8E9749442')['cost']]);
+        $this->assertContains('Nº de RMA cambiado: RMA-7781 → RMA-7782', array_column($d['events'], 'text'));
+        $this->assertContains('vuelta', array_column($d['events'], 'type'));
+
+        $lista = collect($this->getJson('/api/zkong_rma.php?action=batches', $h)->json('batches'))->firstWhere('id', $id);
+        $this->assertEquals([41.2, 10], [$lista['costs']['recovered'], $lista['costs']['assumed']]);
+    }
 }

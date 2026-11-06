@@ -16,6 +16,7 @@ use App\Services\WarrantyPermissions;
 use App\Services\WarrantyPhotos;
 use App\Services\WarrantySteps;
 use App\Services\WarrantyClosing;
+use App\Services\WarrantyClientNotices;
 use App\Services\WarrantyTour;
 use App\Services\WarrantyTerms;
 use Illuminate\Http\Request;
@@ -207,8 +208,12 @@ class WarrantiesController extends Controller
         }
 
         $tocadas = 0;
+        $calladas = 0;
         $entrada = $request->all();
-        DB::transaction(function () use ($ids, $cambios, $me, &$tocadas, $entrada) {
+        // notify=false: el cambio de estado no manda los avisos de fase al cliente (queda en el historial).
+        $avisar = $request->boolean('notify', true);
+        // Sin «fn»: las flechas copian las variables y los contadores no saldrían de aquí.
+        $aplicar = function () use ($ids, $cambios, $me, &$tocadas, &$calladas, $entrada, $avisar) { DB::transaction(function () use ($ids, $cambios, $me, &$tocadas, &$calladas, $entrada, $avisar) {
             foreach (Warranty::whereIn('id', $ids)->lockForUpdate()->get() as $w) {
                 $hubo = false;
                 foreach ($cambios as $campo => $nuevo) {
@@ -231,10 +236,15 @@ class WarrantiesController extends Controller
                     $w->last_activity_at = now();
                     $w->save();
                     $tocadas++;
+                    if (! $avisar && $w->wasChanged('status') && WarrantyClientNotices::wouldNotify($w)) {
+                        WarrantyDocuments::evento($w->id, $me->id, 'Cambio de estado en lote sin avisar al cliente');
+                        $calladas++;
+                    }
                 }
             }
-        });
-        return response()->json(['ok' => true, 'changed' => $tocadas]);
+        }); };
+        $avisar ? $aplicar() : WarrantyClientNotices::sinAvisar($aplicar);
+        return response()->json(['ok' => true, 'changed' => $tocadas, 'silenced' => $calladas]);
     }
 
     private function row($w): array

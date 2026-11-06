@@ -20,6 +20,7 @@ class ZkongBatch extends Model
         'received_at'  => 'datetime',
         'closed_at'    => 'datetime',
         'cancelled_at' => 'datetime',
+        'returned_at'  => 'datetime',
     ];
 
     public const STATUSES = [

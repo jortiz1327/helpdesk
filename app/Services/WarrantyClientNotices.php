@@ -56,8 +56,31 @@ class WarrantyClientNotices
     }
 
     /** Lo llama el modelo al crearse o cambiar de estado: el correo sale tras la respuesta. */
+    /** Mientras es true no se pone en cola ningún aviso (cambio en lote «sin avisar al cliente»). */
+    private static bool $callados = false;
+
+    /** Hace $fn sin avisar al cliente de los cambios de fase que provoque. */
+    public static function sinAvisar(callable $fn): mixed
+    {
+        $antes = self::$callados;
+        self::$callados = true;
+        try {
+            return $fn();
+        } finally {
+            self::$callados = $antes;
+        }
+    }
+
+    /** ¿Este estado de la garantía llevaría aviso al cliente? (fase con aviso activado). */
+    public static function wouldNotify(Warranty $w): bool
+    {
+        $fase = self::phaseFor($w, false);
+        return $fase && (self::settings()[$fase] ?? false);
+    }
+
     public static function queue(Warranty $w, bool $nueva): void
     {
+        if (self::$callados) return;
         $fase = self::phaseFor($w, $nueva);
         if (! $fase || ! (self::settings()[$fase] ?? false)) return;
         $id = (int) $w->id;

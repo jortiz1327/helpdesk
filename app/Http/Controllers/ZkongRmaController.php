@@ -6,6 +6,7 @@ use App\Models\WarrantyItem;
 use App\Models\ZkongBatch;
 use App\Services\WarrantyPermissions;
 use App\Services\WarrantyPhotos;
+use App\Services\ZkongCosts;
 use App\Services\ZkongRmaXlsx;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,8 @@ class ZkongRmaController extends Controller
             'send'    => $this->send($request),
             'shipping' => $this->shipping($request),
             'receive' => $this->receive($request),
+            'rma'     => $this->rma($request),
+            'return'  => $this->vuelta($request),
             'cancel'  => $this->cancel($request),
             'result'  => $this->result($request),
             'close'   => $this->close($request),
@@ -55,14 +58,15 @@ class ZkongRmaController extends Controller
         return DB::table('warranty_items as i')->join('warranties as w', 'w.id', '=', 'i.warranty_id')
             ->select(['i.id', 'i.code', 'i.kind', 'i.server_model', 'i.aeme_ref', 'i.product_name', 'i.resolution',
                 'i.zkong_issue', 'i.zkong_queued_at', 'i.zkong_batch_id', 'i.zkong_result', 'i.zkong_result_note',
-                'w.id as warranty_id', 'w.code as warranty_code', 'w.client_name', 'w.project_name']);
+                'i.zkong_unit_cost', 'i.zkong_cost_source', 'w.id as warranty_id', 'w.code as warranty_code', 'w.client_name', 'w.project_name']);
     }
 
-    private function fila(object $i, array $fotos): array
+    private function fila(object $i, array $fotos, array $costes = []): array
     {
         $tipos = array_keys(WarrantyItem::photoTypes($i->kind));
         $mias = array_values(array_filter($fotos[$i->id] ?? [], fn ($p) => in_array($p['type'], $tipos, true)));
         return [
+            'cost' => $costes[$i->id]['cost'] ?? null, 'cost_source' => $costes[$i->id]['source'] ?? null,
             'id' => $i->id, 'code' => $i->code, 'kind' => $i->kind,
             'model' => $i->server_model ?: $i->aeme_ref, 'aeme_ref' => $i->aeme_ref, 'product_name' => $i->product_name,
             'resolution' => $i->resolution, 'issue' => $i->zkong_issue, 'queued_at' => $i->zkong_queued_at,
@@ -115,8 +119,11 @@ class ZkongRmaController extends Controller
         $garantias = DB::table('warranty_items as i')->join('warranties as w', 'w.id', '=', 'i.warranty_id')
             ->whereIn('i.zkong_batch_id', $rows->pluck('id'))->distinct()->orderBy('w.code')
             ->get(['i.zkong_batch_id', 'w.id', 'w.code', 'w.client_name'])->groupBy('zkong_batch_id');
+        // Cuentas solo de las enviadas (en preparación aún no hay nada en juego; anuladas, nada).
+        $costes = app(ZkongCosts::class)->summary($rows->whereNotIn('status', ['borrador', 'anulada'])->pluck('id')->all());
 
         return response()->json(['ok' => true, 'batches' => $rows->map(fn ($b) => $this->remesa($b) + [
+            'costs'      => $costes[$b->id] ?? null,
             'items'      => (int) ($cuentas[$b->id]->n ?? 0),
             'warranties' => (int) ($cuentas[$b->id]->w ?? 0),
             'answered'   => (int) ($cuentas[$b->id]->answered ?? 0),
@@ -133,6 +140,9 @@ class ZkongRmaController extends Controller
             'created_at' => $b->created_at?->toDateTimeString(), 'created_by_name' => $b->created_by_name ?? null,
             'units_sent' => $b->units_sent, 'carrier' => $b->carrier, 'tracking' => $b->tracking, 'shipping_ref' => $b->shipping_ref,
             'received_at' => $b->received_at?->toDateTimeString(), 'units_received' => $b->units_received,
+            'rma_number' => $b->rma_number,
+            'returned_at' => $b->returned_at?->toDateTimeString(), 'units_returned' => $b->units_returned,
+            'return_carrier' => $b->return_carrier, 'return_tracking' => $b->return_tracking,
             'cancelled_at' => $b->cancelled_at?->toDateTimeString(), 'cancel_reason' => $b->cancel_reason,
             // Días esperando a que ZKONG confirme que le ha llegado.
             'waiting_days' => $b->status === 'enviada' && $b->sent_at ? (int) $b->sent_at->copy()->startOfDay()->diffInDays(now()->startOfDay()) : null,
@@ -183,14 +193,16 @@ class ZkongRmaController extends Controller
         if (! $b) {
             return response()->json(['ok' => false, 'error' => 'La remesa no existe'], 404);
         }
-        return response()->json(['ok' => true, 'batch' => $this->remesa($b), 'items' => $this->itemsDe($b->id), 'events' => $this->eventos($b->id)]);
+        return response()->json(['ok' => true, 'batch' => $this->remesa($b), 'items' => $this->itemsDe($b->id), 'events' => $this->eventos($b->id),
+            'costs' => app(ZkongCosts::class)->summary([$b->id])[$b->id]]);
     }
 
     private function itemsDe(int $batchId): array
     {
         $rows = $this->dispositivos()->where('i.zkong_batch_id', $batchId)->orderBy('w.code')->orderBy('i.id')->get();
         $fotos = WarrantyPhotos::forItems($rows->pluck('id')->all());
-        return $rows->map(fn ($i) => $this->fila($i, $fotos))->all();
+        $costes = app(ZkongCosts::class)->perItem($rows->all());
+        return $rows->map(fn ($i) => $this->fila($i, $fotos, $costes))->all();
     }
 
     /** Ids pedidos que están de verdad en la bandeja (enviar, sin remesa). */
@@ -262,8 +274,11 @@ class ZkongRmaController extends Controller
         if ($uds < 1 || $uds > 100000) {
             return response()->json(['ok' => false, 'error' => 'Indica cuántas unidades se envían'], 400);
         }
-        $b->forceFill(['status' => 'enviada', 'sent_at' => $cuando, 'units_sent' => $uds] + $this->transporte($request))->save();
-        $b->evento('enviada', 'Enviada a ZKONG' . (($r = $this->resumenEnvio($b)) ? ": {$r}" : ''), $request->user()->id, $request->input('note'), $cuando);
+        $rma = $this->texto($request->input('rma_number'), 60);
+        $b->forceFill(['status' => 'enviada', 'sent_at' => $cuando, 'units_sent' => $uds] + ($rma ? ['rma_number' => $rma] : []) + $this->transporte($request))->save();
+        // El coste de cada etiqueta, del portal, tal como está hoy.
+        app(ZkongCosts::class)->snapshot($b);
+        $b->evento('enviada', 'Enviada a ZKONG' . ($rma ? " (RMA {$rma})" : '') . (($r = $this->resumenEnvio($b)) ? ": {$r}" : ''), $request->user()->id, $request->input('note'), $cuando);
         $this->historial($items, $request->user()->id, "Enviada a ZKONG en la remesa {$b->code}");
         return response()->json(['ok' => true]);
     }
@@ -305,6 +320,53 @@ class ZkongRmaController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** El número de RMA que da ZKONG (suele llegar después de pedirlo). Vacío = quitarlo. */
+    private function rma(Request $request)
+    {
+        $b = ZkongBatch::findOrFail((int) $request->input('id'));
+        if ($b->status === 'anulada') {
+            return response()->json(['ok' => false, 'error' => 'La remesa está anulada'], 400);
+        }
+        $rma = $this->texto($request->input('rma_number'), 60);
+        if ($rma === $b->rma_number) return response()->json(['ok' => true]);
+        $antes = $b->rma_number;
+        $b->forceFill(['rma_number' => $rma])->save();
+        $b->evento('rma', $rma ? ($antes ? "Nº de RMA cambiado: {$antes} → {$rma}" : "Nº de RMA de ZKONG: {$rma}") : 'Nº de RMA quitado', $request->user()->id);
+        $items = WarrantyItem::where('zkong_batch_id', $b->id)->get(['id', 'code', 'warranty_id']);
+        $this->historial($items, $request->user()->id, $rma ? "Remesa {$b->code}: RMA {$rma} de ZKONG" : "Remesa {$b->code}: sin nº de RMA");
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * La vuelta: llegan las reposiciones de ZKONG (fecha, unidades, transportista y
+     * tracking). Se puede corregir; con la fecha vacía se quita.
+     */
+    private function vuelta(Request $request)
+    {
+        $b = ZkongBatch::findOrFail((int) $request->input('id'));
+        if (! in_array($b->status, ['recibida', 'respondida', 'cerrada'], true)) {
+            return response()->json(['ok' => false, 'error' => $b->status === 'enviada' ? 'Primero apunta que ZKONG ha recibido la remesa' : 'Solo se apunta la vuelta de una remesa que ZKONG ha recibido'], 400);
+        }
+        $items = WarrantyItem::where('zkong_batch_id', $b->id)->get(['id', 'code', 'warranty_id']);
+        if (trim((string) $request->input('returned_on', '')) === '') {
+            $b->forceFill(['returned_at' => null, 'units_returned' => null, 'return_carrier' => null, 'return_tracking' => null])->save();
+            $b->evento('vuelta', 'Vuelta quitada', $request->user()->id);
+            return response()->json(['ok' => true]);
+        }
+        $cuando = $this->dia($request->input('returned_on'), 'fecha de vuelta');
+        if ($b->received_at && $cuando->copy()->startOfDay()->lt($b->received_at->copy()->startOfDay())) {
+            return response()->json(['ok' => false, 'error' => 'La vuelta no puede ser anterior a la recepción en ZKONG'], 400);
+        }
+        $uds = $request->filled('units_returned') ? max(0, min(100000, (int) $request->input('units_returned'))) : null;
+        $nueva = ! $b->returned_at;
+        $b->forceFill(['returned_at' => $cuando, 'units_returned' => $uds,
+            'return_carrier' => $this->texto($request->input('return_carrier'), 80), 'return_tracking' => $this->texto($request->input('return_tracking'), 120)])->save();
+        $r = implode(' · ', array_filter([$uds !== null ? "{$uds} unidades" : null, $b->return_carrier, $b->return_tracking ? "tracking {$b->return_tracking}" : null]));
+        $b->evento('vuelta', ($nueva ? 'Llegan las reposiciones de ZKONG' : 'Vuelta actualizada') . ($r ? ": {$r}" : ''), $request->user()->id, $request->input('note'), $cuando);
+        $this->historial($items, $request->user()->id, ($nueva ? 'Llegan las reposiciones de ZKONG' : 'Vuelta actualizada') . " (remesa {$b->code})");
+        return response()->json(['ok' => true]);
+    }
+
     /** Anular una remesa enviada (con motivo): sus etiquetas vuelven a la bandeja. */
     private function cancel(Request $request)
     {
@@ -318,7 +380,8 @@ class ZkongRmaController extends Controller
         }
         $items = WarrantyItem::where('zkong_batch_id', $b->id)->get(['id', 'code', 'warranty_id']);
         DB::transaction(function () use ($b, $motivo, $request) {
-            WarrantyItem::where('zkong_batch_id', $b->id)->update(['zkong_batch_id' => null, 'zkong_result' => null, 'zkong_result_note' => null]);
+            WarrantyItem::where('zkong_batch_id', $b->id)->update(['zkong_batch_id' => null, 'zkong_result' => null, 'zkong_result_note' => null,
+                'zkong_unit_cost' => null, 'zkong_cost_source' => null]);   // en la próxima remesa, el coste de entonces
             $b->forceFill(['status' => 'anulada', 'cancelled_at' => now(), 'cancel_reason' => $motivo])->save();
             $b->evento('anulada', 'Remesa anulada', $request->user()->id, $motivo);
         });
@@ -352,6 +415,8 @@ class ZkongRmaController extends Controller
 
         // Respondida cuando todas tienen respuesta; si se quita alguna, vuelve a Recibida/Enviada.
         $b->forceFill(['status' => $b->estadoAbierto()])->save();
+        // Si al enviarla el portal no respondía, el coste se toma ahora.
+        app(ZkongCosts::class)->snapshot($b);
 
         $texto = 'Respuesta de ZKONG: ' . ($res ? ZkongBatch::RESULTS[$res] : 'sin respuesta') . ' (' . $items->count() . ' ' . ($items->count() === 1 ? 'etiqueta' : 'etiquetas') . ')';
         $b->evento('respuesta', $texto, $request->user()->id, $res ? $request->input('note') : null);
