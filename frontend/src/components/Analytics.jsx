@@ -35,11 +35,11 @@ function Bars({ items, color }) {
 function ChanBox({ label, dot, c }) {
   const line = { ...MROW, padding: '5px 0', border: 0, fontSize: 12.5, color: 'var(--ink-2)' }
   return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 11, padding: '12px 13px', background: 'var(--panel-2)' }}>
+    <div className="an-chan">
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, fontSize: 13, marginBottom: 8 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: dot }} />{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800 }}>{nf(c.sent)}</div>
       <div className="muted" style={{ fontSize: 12 }}>enviados</div>
-      <div style={line}><span>Entregados</span><b style={{ color: 'var(--secondary)' }}>{pct(c.delivered, c.sent)}%</b></div>
+      <div style={line}><span>Entregados</span><b>{pct(c.delivered, c.sent)}%</b></div>
       {label === 'WhatsApp'
         ? <div style={line}><span>Leídos</span><b>{pct(c.read, c.sent)}%</b></div>
         : <div style={line}><span>Fallidos</span><b style={{ color: c.failed ? 'var(--danger)' : 'inherit' }}>{c.failed}</b></div>}
@@ -104,7 +104,7 @@ function Resumen({ d }) {
       <div className="stat-grid">
         {cards.map((c) => (
           <div className="stat-card" key={c.label}>
-            <div className="stat-num" style={{ color: c.color, marginTop: 0 }}>{c.value}</div>
+            <div className="stat-num">{c.value}</div>
             <div className="stat-sub">{c.label}</div>
             <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{c.sub}</div>
           </div>
@@ -205,7 +205,7 @@ function CampaignHistory() {
       <div className="stat-grid">
         {cards.map((c) => (
           <div className="stat-card" key={c.label}>
-            <div className="stat-num" style={{ color: c.color, marginTop: 0 }}>{c.value}</div>
+            <div className="stat-num">{c.value}</div>
             <div className="stat-sub">{c.label}</div>
             <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{c.sub}</div>
           </div>

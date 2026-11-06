@@ -65,6 +65,8 @@ const I = {
   mail: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>,
   clock: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
   phone: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 14l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 2 6a2 2 0 0 1 2-2z" /></svg>,
+  up: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.3a2 2 0 0 0 2-1.7l1.4-9a2 2 0 0 0-2-2.3z" /></svg>,
+  downv: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 2h2.7A2.3 2.3 0 0 1 22 4v7a2.3 2.3 0 0 1-2.3 2H17M10 15v4a3 3 0 0 0 3 3l4-9V2H5.7a2 2 0 0 0-2 1.7l-1.4 9a2 2 0 0 0 2 2.3z" /></svg>,
   info: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5v.5" /></svg>,
   out: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>,
   // Estrella para la valoración (CSAT). Sin fill/stroke fijos: los pone el CSS
@@ -360,8 +362,8 @@ function Top({ onLogo, onSalir, saliendo }) {
             {I.out} {t('logout')}
           </button>
         )}
-        <a className={`ghostlink${onSalir ? ' agentes-corto' : ''}`} href="/agentes" aria-label={t('agent_access')} title={t('agent_access')}>
-          {I.lock} <span>{t('agent_access')}</span>
+        <a className={`ghostlink agentes${onSalir ? ' agentes-corto' : ''}`} href="/agentes" aria-label={t('agent_access')} title={t('agent_access')}>
+          {I.lock} <span className="gl-tx">{t('agent_access')}</span>
         </a>
       </div>
     </div>
@@ -479,9 +481,6 @@ function Home({ go, irCrear }) {
               <circle cx="320" cy="150" r="60" /><circle cx="320" cy="150" r="110" />
               <circle cx="320" cy="150" r="165" /><circle cx="320" cy="150" r="225" />
             </g>
-            <rect x="286" y="132" width="68" height="36" rx="6" fill="var(--brand)" opacity=".9" />
-            <rect x="293" y="139" width="42" height="7" rx="2" fill="#fff" opacity=".9" />
-            <rect x="293" y="150" width="30" height="5" rx="2" fill="#fff" opacity=".6" />
           </svg>
           {/* Estado en vivo: honesto y tranquilizador. Verde si atendemos ahora. */}
           <span className={`eyebrow ${abierto ? '' : 'cerrado'}`}>
@@ -545,7 +544,7 @@ function Home({ go, irCrear }) {
             <div key={f.id} className={`qa ${open === f.id ? 'open' : ''}`} style={{ '--r': i }}>
               <button className="qa-q" onClick={() => abrir(f)}
                 aria-expanded={open === f.id} aria-controls={`qa-a-${f.id}`}>
-                <span className="qmark">?</span>{f.question}
+                <span className="qa-tx">{f.question}</span>
                 <span className="plus">{I.plus}</span>
               </button>
               {/* `inert` cuando está cerrada: sus botones (👍/👎, «abrir incidencia») no
@@ -553,14 +552,14 @@ function Home({ go, irCrear }) {
               <div id={`qa-a-${f.id}`} className="qa-a" style={{ maxHeight: open === f.id ? '600px' : 0 }}
                 {...(open === f.id ? {} : { inert: '' })}>
                 <div className="qa-a-in">
-                  <div className="qa-answer">{renderAnswer(f.answer)}</div>{f.hint && <div className="tip">💡 {f.hint}</div>}
+                  <div className="qa-answer">{renderAnswer(f.answer)}</div>{f.hint && <div className="tip">{I.info}<span>{f.hint}</span></div>}
                   {/* Pie de la respuesta: ¿te ha servido? + salida a incidencia. */}
                   <div className="qa-foot">
                     {voted[f.id]
                       ? <span className="qa-thanks">{I.check} {t('vote_thanks')}</span>
                       : <span className="qa-vote"><b>{t('vote_q')}</b>
-                          <button onClick={() => votar(f, true)} aria-label={t('vote_yes_aria')}>👍</button>
-                          <button onClick={() => votar(f, false)} aria-label={t('vote_no_aria')}>👎</button>
+                          <button onClick={() => votar(f, true)} aria-label={t('vote_yes_aria')}>{I.up}</button>
+                          <button onClick={() => votar(f, false)} aria-label={t('vote_no_aria')}>{I.downv}</button>
                         </span>}
                     <button className="qa-cta" onClick={() => abrirIncidencia(f)}>{t('faq_cta')} {I.arrow}</button>
                   </div>

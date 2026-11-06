@@ -292,7 +292,7 @@ export default function Forms() {
           <div className="stat-grid">
             {CARDS.map((c) => (
               <div className="stat-card" key={c.k}>
-                <div className="stat-num" style={{ color: c.c, marginTop: 0 }}>{c.v}</div>
+                <div className="stat-num">{c.v}</div>
                 <div className="stat-sub">{c.k}</div>
               </div>
             ))}

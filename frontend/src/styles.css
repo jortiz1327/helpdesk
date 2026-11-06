@@ -1,3 +1,9 @@
+/* Tipografía de la casa: Lato (la misma del portal), servida en local. Antes la app
+   usaba Inter desde Google Fonts y el portal Lato: dos caras para la misma marca. */
+@font-face { font-family: 'Lato'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/lato-400.woff2') format('woff2'); }
+@font-face { font-family: 'Lato'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/lato-700.woff2') format('woff2'); }
+@font-face { font-family: 'Lato'; font-style: normal; font-weight: 900; font-display: swap; src: url('/fonts/lato-900.woff2') format('woff2'); }
+
 :root {
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
@@ -71,7 +77,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
 body {
-  font-family: 'Inter', system-ui, 'Segoe UI', sans-serif;
+  font-family: 'Lato', system-ui, 'Segoe UI', sans-serif;
   background: var(--bg); color: var(--ink); font-size: 14px;
   -webkit-font-smoothing: antialiased; overflow: hidden;
 }
@@ -83,7 +89,6 @@ input, textarea, select { font-family: inherit; }
 
 /* ===== Shell ===== */
 .app { display: flex; height: 100vh; position: relative; }
-.app::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--primary), transparent); opacity: 0.6; z-index: 50; }
 
 /* ===== Rail ===== */
 .rail {
@@ -113,7 +118,7 @@ input, textarea, select { font-family: inherit; }
  */
 .rail .logo {
   width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--primary), #3b82f6);
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
   display: grid; place-items: center; box-shadow: 0 4px 16px var(--primary-glow);
 }
 .rail .logo::before {
@@ -132,7 +137,7 @@ input, textarea, select { font-family: inherit; }
 .rail.expanded .area-switch { justify-content: stretch; }
 .area-cur { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink); transition: 0.15s; outline: none; }
 .rail.expanded .area-cur { display: flex; width: 100%; justify-content: flex-start; align-items: center; gap: 10px; padding: 0 8px; height: 48px; }
-.area-cur .area-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(135deg, var(--primary), #3b82f6); box-shadow: 0 2px 8px var(--primary-glow); flex-shrink: 0; }
+.area-cur .area-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(135deg, var(--primary), var(--primary-2)); box-shadow: 0 2px 8px var(--primary-glow); flex-shrink: 0; }
 .area-cur .area-ico svg { width: 18px; height: 18px; fill: #fff; display: block; }
 .area-name { font-size: 14px; font-weight: 700; white-space: nowrap; flex: 1; text-align: left; letter-spacing: -0.01em; line-height: 1; }
 .area-caret { width: 16px; height: 16px; fill: var(--ink-3); transition: transform 0.16s; flex-shrink: 0; display: block; }
@@ -151,7 +156,7 @@ input, textarea, select { font-family: inherit; }
 .area-opt:hover { background: var(--hover); }
 .area-opt:hover .area-ico { background: var(--line-2); }
 .area-opt.area-sel { background: var(--primary-soft); color: var(--primary); }
-.area-opt.area-sel .area-ico { background: linear-gradient(135deg, var(--primary), #3b82f6); box-shadow: 0 2px 8px var(--primary-glow); }
+.area-opt.area-sel .area-ico { background: linear-gradient(135deg, var(--primary), var(--primary-2)); box-shadow: 0 2px 8px var(--primary-glow); }
 .area-opt.area-sel .area-ico svg { fill: #fff; }
 .area-opt .area-tick { width: 17px; height: 17px; fill: var(--primary); flex-shrink: 0; }
 @keyframes areaMenuIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
@@ -206,7 +211,7 @@ input, textarea, select { font-family: inherit; }
 .rail-btn.active { background: rgba(255, 255, 255, 0.06); color: var(--bc, var(--primary)); }
 .rail-btn.active::before { content: ''; position: absolute; left: -9px; top: 11px; bottom: 11px; width: 3px; border-radius: 3px; background: var(--bc, var(--primary)); box-shadow: 0 0 9px var(--bc, var(--primary-glow)); }
 /* Tooltip moderno del rail colapsado (posición FIJA: no lo recorta el scroll del menú) */
-.rail-tip { position: fixed; transform: translateY(-50%); background: #16222b; color: #fff; font-size: 12.5px; font-weight: 600; padding: 8px 12px; border-radius: 9px; white-space: nowrap; box-shadow: 0 8px 22px rgba(0,0,0,0.45); border: 1px solid color-mix(in srgb, var(--bc, var(--primary)) 45%, var(--line-2)); z-index: 300; pointer-events: none; animation: railTipIn 0.14s ease; }
+.rail-tip { position: fixed; transform: translateY(-50%); background: #16222b; color: #fff; font-size: 12.5px; font-weight: 600; padding: 8px 12px; border-radius: 9px; white-space: nowrap; box-shadow: 0 8px 22px rgba(0,0,0,0.45); border: 1px solid var(--line-2); z-index: 300; pointer-events: none; animation: railTipIn 0.14s ease; }
 .rail-tip::before { content: ''; position: absolute; left: -5px; top: 50%; width: 9px; height: 9px; background: #16222b; transform: translateY(-50%) rotate(45deg); border-left: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
 @keyframes railTipIn { from { opacity: 0; transform: translateY(-50%) translateX(-6px); } to { opacity: 1; transform: translateY(-50%) translateX(0); } }
 .rail-btn .dot-badge { position: absolute; top: 6px; right: 6px; min-width: 17px; height: 17px; background: var(--secondary); color: #04130c; border-radius: 9px; font-size: 10px; font-weight: 800; display: grid; place-items: center; padding: 0 4px; border: 2px solid var(--rail); }
@@ -216,7 +221,7 @@ input, textarea, select { font-family: inherit; }
 .rail-foot { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 10px; width: 100%; }
 .rail.expanded .rail-foot { justify-content: space-between; padding: 10px 6px 2px; border-top: 1px solid var(--line); }
 .brand-foot { font-size: 12px; color: var(--ink-3); font-weight: 500; }
-.ver { font-size: 11px; font-weight: 700; color: var(--primary); background: var(--primary-soft); border: 1px solid rgba(37, 99, 235, 0.3); padding: 2px 8px; border-radius: 20px; font-family: inherit; cursor: pointer; transition: 0.12s; }
+.ver { font-size: 11px; font-weight: 700; color: var(--primary); background: var(--primary-soft); border: 1px solid var(--primary-glow); padding: 2px 8px; border-radius: 20px; font-family: inherit; cursor: pointer; transition: 0.12s; }
 .ver:hover { background: var(--primary); color: #fff; }
 
 /* Modal de novedades de la versión */
@@ -264,7 +269,7 @@ input, textarea, select { font-family: inherit; }
 .top-act:hover { background: var(--hover); color: var(--ink); }
 .top-act svg { width: 20px; height: 20px; fill: currentColor; }
 .user-menu { position: relative; }
-.user-chip { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #3b82f6); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 14px; border: 2px solid transparent; transition: 0.14s; }
+.user-chip { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 14px; border: 2px solid transparent; transition: 0.14s; }
 .user-chip:hover { border-color: var(--primary); }
 .dropdown { position: absolute; top: 48px; right: 0; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--shadow); min-width: 200px; overflow: hidden; z-index: 80; animation: drop 0.14s ease; }
 @keyframes drop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
@@ -485,7 +490,7 @@ input, textarea, select { font-family: inherit; }
 .kv .k { color: var(--ink-2); }
 .kv .v { font-weight: 600; text-align: right; word-break: break-word; }
 .info-btn { width: 100%; margin-top: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px; border-radius: 10px; background: var(--primary-soft); color: var(--primary); font-weight: 600; font-size: 13px; transition: 0.14s; }
-.info-btn:hover { background: rgba(37, 99, 235, 0.26); }
+.info-btn:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); }
 .info-btn svg { width: 16px; height: 16px; fill: currentColor; }
 
 .window-box { border-radius: 12px; padding: 14px; text-align: center; }
@@ -741,7 +746,6 @@ input, textarea, select { font-family: inherit; }
 .tk-row.sleeping { opacity: .72; }
 /* Solicitante @aemegroup.com: fila resaltada y triángulo (responder = escribir a un compañero). */
 .tk-row.internal > td { background: rgba(245, 158, 11, .13); }
-.tk-row.internal > td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
 .tk-internal { display: inline-flex; margin-right: 5px; vertical-align: -0.15em; cursor: help; }
 .tk-internal svg { width: 1.05em; height: 1.05em; fill: var(--warn-ink); }
 .tk-internal-mail { color: var(--warn-ink) !important; font-weight: 600; }
@@ -1024,7 +1028,7 @@ input, textarea, select { font-family: inherit; }
 .type-card.sel { border-color: var(--primary); background: var(--primary-soft); }
 .type-card.off { opacity: 0.55; cursor: not-allowed; }
 .type-card .ti { width: 40px; height: 40px; border-radius: 11px; background: var(--panel-2); display: grid; place-items: center; margin-bottom: 12px; }
-.type-card.sel .ti { background: rgba(37, 99, 235, 0.2); }
+.type-card.sel .ti { background: var(--primary-soft); }
 .type-card .ti svg { width: 22px; height: 22px; fill: var(--primary); }
 .type-card b { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .type-card.sel b { color: var(--primary); }
@@ -2373,7 +2377,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ru-card { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 0; border-radius: 10px; background: none; cursor: pointer; text-align: left; transition: background 0.14s; }
 .ru-card:hover { background: rgba(255, 255, 255, 0.06); }
 :root[data-theme="light"] .ru-card:hover { background: var(--hover); }
-.ru-av { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--primary), #3b82f6); }
+.ru-av { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--primary), var(--primary-2)); }
 .ru-tx { min-width: 0; }
 .ru-tx b { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ru-tx small { display: block; font-size: 11px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2412,7 +2416,6 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .btn.sm { padding: 6px 12px; font-size: 12.5px; border-radius: 9px; box-shadow: none; }
 
 /* Fila SIN RESPONDER: el último en hablar fue el cliente → nos toca a nosotros */
-.tk-table tbody tr.wait td:first-child { box-shadow: inset 3px 0 0 var(--warn, #f59e0b); }
 .tk-table tbody tr.wait .tk-subj { font-weight: 700; }
 .dot-wait { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-right: 7px; vertical-align: middle; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
 .chip.answered { background: rgba(16, 185, 129, 0.16); color: #6fdcb0; margin-left: 5px; padding: 3px 7px; }
@@ -2510,7 +2513,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
   color: var(--ink-3); transition: .14s; }
 .tkm-cli-edit:hover { background: var(--hover); color: var(--primary); }
 .tkm-cli-edit svg { width: 15px; height: 15px; fill: currentColor; }
-.tkm-av { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--primary), #3b82f6); }
+.tkm-av { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--primary), var(--primary-2)); }
 .tkm-cli-tx { min-width: 0; }
 .tkm-cli-tx b { display: block; font-size: 14.5px; }
 .tkm-cli-tx small { display: block; font-size: 12px; color: var(--ink-2); word-break: break-all; margin-top: 2px; }
@@ -2783,7 +2786,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ag-card.ag-off:hover { opacity: .9; }
 .chip.ag-off-tag { background: var(--hover); color: var(--ink-3); }
 .ag-head { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
-.ag-av { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--primary), #3b82f6); }
+.ag-av { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--primary), var(--primary-2)); }
 .ag-id { flex: 1; min-width: 0; }
 .ag-id b { display: block; font-size: 13.5px; }
 .ag-id small { display: block; font-size: 11.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3184,7 +3187,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tn-h { font-weight: 600; letter-spacing: 0; text-transform: none; opacity: 0.75; margin-left: 4px; }
 
 /* La semana en curso se ve desde la otra punta del despacho. */
-.tn-row.now { background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
+.tn-row.now { background: var(--primary-soft); }
 .tn-row.past { opacity: 0.5; }
 .tn-row.past:hover { opacity: 1; }
 
@@ -3553,7 +3556,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .fus-jefe .fus-op { flex: 1; }
 .fus-op { display: flex; gap: 9px; align-items: flex-start; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
 .fus-op:hover { border-color: var(--primary); background: var(--hover); }
-.fus-op.on { border-color: var(--primary); background: rgba(37,99,235,0.07); }
+.fus-op.on { border-color: var(--primary); background: var(--primary-soft); }
 .fus-op input { margin-top: 2px; }
 .fus-op-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .fus-op-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -5659,7 +5662,7 @@ button.zk-rma:active { transform: scale(0.97); }
 .wd-pv-t td { height: auto; padding-top: 8px; padding-bottom: 8px; vertical-align: top; }
 .wd-pv-t th.r, .wd-pv-t td.r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wd-pv-t td small { display: block; font-size: 12px; color: var(--ink-3); }
-.wd-pv-t tr.libre td:first-child { box-shadow: inset 3px 0 0 #d97706; }
+.wd-pv-t tr.libre td { background: color-mix(in srgb, #d97706 7%, transparent); }
 .wd-pv-tot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px 22px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .wd-pv-tot b { margin-left: 6px; color: var(--ink); }
 .wd-pv-tot .big b { font-size: 16px; color: var(--primary); }
@@ -5884,7 +5887,7 @@ button.zk-rma:active { transform: scale(0.97); }
 button.wr-rep:hover { background: color-mix(in srgb, #dc2626 16%, transparent); }
 .wr-rep.sm { cursor: default; padding: 0 6px; font-size: 10.5px; }
 /* Plazo de garantía del dispositivo (fuera de plazo: hardware; pilas: solo las pilas). */
-.wr-term { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-style: normal; font-size: 11px; line-height: 1.35; font-weight: 700; font-family: 'Inter', system-ui, 'Segoe UI', sans-serif; letter-spacing: 0; white-space: nowrap; vertical-align: middle; cursor: help; }
+.wr-term { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-style: normal; font-size: 11px; line-height: 1.35; font-weight: 700; font-family: inherit; letter-spacing: 0; white-space: nowrap; vertical-align: middle; cursor: help; }
 .wr-term svg { width: 11px; height: 11px; fill: currentColor; }
 .wr-term.out { border: 1px solid color-mix(in srgb, #c27803 40%, transparent); background: color-mix(in srgb, #c27803 10%, transparent); color: var(--warn-ink); }
 .wr-term.bat { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-3); font-weight: 600; }
@@ -6823,3 +6826,156 @@ table, .dev-table,
 .ws-trk-st small { font-size: 11px; font-weight: 500; color: var(--ink-3); }
 .ws-trk-row .ic-arrow { width: 14px; height: 14px; fill: var(--ink-3); }
 @media (max-width: 520px) { .ws-trk-map { grid-template-columns: 1fr; } }
+/* =====================================================================
+ * SISTEMA COMÚN DE LAS ÁREAS (Helpdesk · Campañas · Garantías)
+ * Una sola forma de KPI, tarjeta, menú y filas en toda la app; lo único que
+ * cambia de un área a otra es el COLOR DE ACENTO, que llega por <html data-area>.
+ * Va al final para mandar sobre las variantes que cada pantalla fue creando.
+ * ===================================================================== */
+:root {
+  --primary-2: #3b82f6;              /* segundo tono del acento (degradados de marca) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --t-fast: 140ms; --t: 180ms;
+  --tone-bad: #f87171; --tone-warn: #fbbf24; --tone-ok: #34d399;
+}
+:root[data-theme="light"] { --tone-bad: #dc2626; --tone-warn: #b45309; --tone-ok: #047857; }
+
+/* --- Acento por área --- */
+:root[data-area="campaigns"] {
+  --primary: #22a35a; --primary-dark: #1a8a4b; --primary-2: #34c26f;
+  --primary-soft: rgba(34, 163, 90, 0.16); --primary-glow: rgba(34, 163, 90, 0.32);
+}
+:root[data-theme="light"][data-area="campaigns"] {
+  --primary: #15803d; --primary-dark: #166534; --primary-2: #22a35a;
+  --primary-soft: rgba(21, 128, 61, 0.10); --primary-glow: rgba(21, 128, 61, 0.22);
+}
+/* Garantías (rama warranties): violeta. Se deja definido para cuando se una. */
+:root[data-area="warranties"] {
+  --primary: #8b5cf6; --primary-dark: #7c3aed; --primary-2: #a78bfa;
+  --primary-soft: rgba(139, 92, 246, 0.16); --primary-glow: rgba(139, 92, 246, 0.32);
+}
+:root[data-theme="light"][data-area="warranties"] {
+  --primary: #7c3aed; --primary-dark: #6d28d9; --primary-2: #8b5cf6;
+  --primary-soft: rgba(124, 58, 237, 0.10); --primary-glow: rgba(124, 58, 237, 0.22);
+}
+
+
+.rail .logo, .area-cur .area-ico, .area-opt.area-sel .area-ico {
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+}
+
+/* --- Menú lateral: iconos en gris, el activo en el color del área --- */
+.rail-btn { color: var(--ink-3); transition: background-color var(--t) ease, color var(--t) ease; }
+.rail-btn svg { fill: currentColor; opacity: 1; transition: transform var(--t-fast) var(--ease-out); }
+.rail-btn:hover svg { transform: none; }
+.rail-btn:hover { color: var(--ink); }
+.rail-btn.active { background: var(--primary-soft); color: var(--primary); }
+.rail-btn.active .rail-text { color: var(--ink); font-weight: 600; }
+.rail-btn.active::before { background: var(--primary); box-shadow: none; }
+.rail-btn:active { transform: scale(0.97); }
+.rail-group-t { color: var(--ink-3); text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 600; }
+.rail-tip { border-left: 1px solid var(--line-2); }
+
+/* --- KPI: UNA sola forma (antes había cuatro) ---
+   Panel neutro, etiqueta arriba, cifra grande en tinta y una línea de contexto.
+   El color solo aparece cuando la cifra es un aviso (bad / warn) o en el icono. */
+.tk-kpis, .stat-grid { gap: 14px; }
+.tk-kpi, .stat-card {
+  position: relative; display: flex; flex-direction: column; gap: 2px;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px;
+  transition: border-color var(--t) ease; transform: none;
+}
+.tk-kpi:hover, .stat-card:hover { transform: none; border-color: var(--line-2); }
+.tk-kpi .k-l, .stat-card .stat-sub, .stat-card .stat-label {
+  order: -1; font-size: 12.5px; font-weight: 600; color: var(--ink-2); opacity: 1; letter-spacing: 0;
+}
+.stat-card:has(.stat-top) .stat-sub { order: 0; }
+.tk-kpi .k-v, .stat-card .stat-num {
+  font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em;
+  color: var(--ink); margin: 4px 0 0; font-variant-numeric: tabular-nums;
+}
+.tk-kpi .k-s, .stat-card .muted { font-size: 12px; color: var(--ink-3); opacity: 1; font-weight: 500; margin-top: 2px; }
+.stat-card.bad .stat-num, .tk-kpi.red .k-v { color: var(--tone-bad); }
+.stat-card.warn .stat-num { color: var(--tone-warn); }
+/* El icono va en una pastilla pequeña; es lo único con el tono de la cifra. */
+.tk-kpi .k-i {
+  top: 14px; right: 14px; width: 30px; height: 30px; padding: 7px; border-radius: 9px; opacity: 1;
+  background: var(--primary-soft); fill: var(--primary);
+}
+.tk-kpi.amber .k-i { background: color-mix(in srgb, var(--tone-warn) 14%, transparent); fill: var(--tone-warn); }
+.tk-kpi.green .k-i { background: color-mix(in srgb, var(--tone-ok) 14%, transparent); fill: var(--tone-ok); }
+.tk-kpi.red   .k-i { background: color-mix(in srgb, var(--tone-bad) 14%, transparent); fill: var(--tone-bad); }
+:root[data-theme="light"] .tk-kpi.blue, :root[data-theme="light"] .tk-kpi.amber,
+:root[data-theme="light"] .tk-kpi.green, :root[data-theme="light"] .tk-kpi.red { background: var(--panel); border-color: var(--line); }
+:root[data-theme="light"] .tk-kpi[class] .k-l { color: var(--ink-2); }
+:root[data-theme="light"] .tk-kpi .k-v { color: var(--ink); }
+:root[data-theme="light"] .tk-kpi.red .k-v { color: var(--tone-bad); }
+
+/* --- Filas y tarjetas: sin franjas de color a la izquierda --- */
+.tk-table tbody tr.wait td:first-child { box-shadow: none; }
+.tk-row.internal > td { background: color-mix(in srgb, #f59e0b 6%, transparent); }
+.tk-row.internal > td:first-child { box-shadow: none; }
+.tk-msg.note .tk-bub { border-left: 1px solid rgba(245, 158, 11, 0.38); }
+.act-card { border-left: 1px solid var(--line); }
+.tkm-rating-cmt { border-left: 0; border-radius: 8px; }
+.cal-dia.con-nota { border-left: 1px solid var(--line); box-shadow: inset 0 0 0 1px var(--primary-soft); }
+.sla-sw { border-left: 1px solid var(--line); }
+.wa-num { border-left: 1px solid var(--line); }
+
+/* --- Tacto común --- */
+.btn:not(:disabled):active, .qf:active, .sc-range button:active, .kb-seg button:active { transform: scale(0.97); }
+.sc-rec, .sc-sc { transition: border-color var(--t) ease, background-color var(--t) ease, box-shadow var(--t) ease, transform var(--t-fast) var(--ease-out); }
+.sc-sc:hover { transform: none; }
+.sc-rec:active, .sc-sc:active { transform: scale(0.99); }
+.sc-bar i { transition: width 0.35s var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .btn:active, .rail-btn:active, .sc-rec:active, .sc-sc:active { transform: none; }
+}
+
+/* Analíticas: los dos canales son columnas de la misma tarjeta, no tarjetas dentro de tarjeta. */
+.an-chan { padding: 2px 0; min-width: 0; }
+.an-chan + .an-chan { border-left: 1px solid var(--line); padding-left: 16px; }
+/* Las variantes de color de la KPI antigua (blue/amber/green/red) ya no tiñen la tarjeta. */
+.tk-kpi.blue, .tk-kpi.amber, .tk-kpi.green, .tk-kpi.red { background: var(--panel); color: var(--ink); border-color: var(--line); }
+
+/* --- Menú PLEGADO: columna limpia y centrada ---
+   Sin barra de scroll visible (robaba ancho y descentraba los iconos), grupos
+   separados por una raya corta, y el pie compacto: el engranaje sobraba porque
+   el avatar ya abre «Mi cuenta». */
+.rail:not(.expanded) { padding: 12px 0; }
+.rail:not(.expanded) .rail-nav { scrollbar-width: none; gap: 2px; }
+.rail:not(.expanded) .rail-nav::-webkit-scrollbar { display: none; }
+.rail:not(.expanded) .rail-group { align-items: center; gap: 2px; }
+.rail:not(.expanded) .rail-group + .rail-group { margin-top: 0; }
+.rail:not(.expanded) .rail-group + .rail-group::before {
+  content: ''; width: 22px; height: 1px; background: var(--line-2); margin: 7px 0;
+}
+.rail:not(.expanded) .rail-btn { width: 44px; height: 44px; border-radius: 12px; }
+.rail:not(.expanded) .rail-btn svg { width: 21px; height: 21px; }
+.rail:not(.expanded) .rail-btn.active::before { left: -10px; top: 12px; bottom: 12px; }
+.rail:not(.expanded) .area-switch, .rail:not(.expanded) .rail-top { margin-bottom: 10px; }
+.rail:not(.expanded) .notif-bell { width: 44px; height: 44px; border-radius: 12px; }
+.rail:not(.expanded) .rail-user { width: 100%; display: flex; justify-content: center; padding: 8px 0 4px; margin-top: 6px; border-top: 1px solid var(--line); }
+.rail:not(.expanded) .ru-card { width: auto; padding: 5px; border-radius: 12px; }
+.rail:not(.expanded) .rail-actions { gap: 2px; padding: 2px 0 4px; }
+.rail:not(.expanded) .rail-actions .ra-btn:first-child { display: none; }
+.rail:not(.expanded) .ra-btn { width: 36px; height: 36px; border-radius: 10px; color: var(--ink-3); }
+.rail:not(.expanded) .ra-btn svg { width: 18px; height: 18px; }
+.rail:not(.expanded) .rail-collapse { width: 36px; height: 32px; margin: 0 auto 4px; padding: 0; color: var(--ink-3); }
+.ra-btn, .rail-collapse, .notif-bell, .ru-card { transition: background-color var(--t) ease, color var(--t) ease; }
+.ra-btn:active, .rail-collapse:active, .notif-bell:active, .ru-card:active { transform: scale(0.97); }
+
+/* Garantías: sus KPI hablan como las del resto (etiqueta arriba, cifra, contexto). */
+.wi-kpi { display: flex; flex-direction: column; }
+.wi-kpi .k { order: -1; margin: 0 0 4px; font-size: 12.5px; font-weight: 600; }
+.wi-kpi .v { font-weight: 800; letter-spacing: -0.02em; }
+
+/* Estadísticas de Garantías: la cifra principal en el color del área (antes azul fijo)
+   y las etiquetas en frase normal, como el resto de KPI. Los tonos bad/ok se quedan. */
+.st-hero-main:not(.bad):not(.ok) {
+  background: radial-gradient(120% 140% at 0% 0%, var(--primary-2) 0%, var(--primary) 45%, color-mix(in srgb, var(--primary) 55%, #000) 100%);
+  box-shadow: 0 10px 30px -12px var(--primary-glow);
+}
+.st-hero-main .k { text-transform: none; letter-spacing: 0; font-size: 13px; }
+.st-kpi .k { text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--ink-2); order: 0; }
