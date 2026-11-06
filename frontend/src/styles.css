@@ -4176,13 +4176,13 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 /* --- Filas y tarjetas: sin franjas de color a la izquierda --- */
 /* Las marcas de la izquierda en la lista de tickets SÍ significan algo y se quedan:
    ámbar = el último mensaje es del cliente (falta respuesta); interno = correo de la empresa. */
-/* Falta respuesta: un degradado ámbar que arranca fuerte en el borde y se apaga hacia el
+/* Falta respuesta: un degradado del color del área que arranca fuerte en el borde y se apaga hacia el
    centro de la celda; al pasar el ratón por él, «Esperando respuesta». */
 .tk-table tbody tr.wait td:first-child { box-shadow: none; position: relative; }
 .tk-table tbody tr.wait td:first-child::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 76px; pointer-events: none;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--warn, #f4b740) 62%, transparent) 0, color-mix(in srgb, var(--warn, #f4b740) 34%, transparent) 4px, color-mix(in srgb, var(--warn, #f4b740) 10%, transparent) 50%, transparent 100%); }
+  background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 62%, transparent) 0, color-mix(in srgb, var(--primary) 34%, transparent) 4px, color-mix(in srgb, var(--primary) 10%, transparent) 50%, transparent 100%); }
 .tk-table tbody tr.wait td:first-child input { position: relative; }
-.tip-layer.tone-wait, :root[data-theme="light"] .tip-layer.tone-wait { background: color-mix(in srgb, var(--warn, #f4b740) 72%, #fff); color: #3b2a05; border-color: rgba(0, 0, 0, 0.08); font-weight: 700; }
+.tip-layer.tone-wait, :root[data-theme="light"] .tip-layer.tone-wait { background: var(--primary); color: #fff; border-color: transparent; font-weight: 700; }
 .tk-row.internal > td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
 .tk-msg.note .tk-bub { border-left: 1px solid rgba(245, 158, 11, 0.38); }
 .act-card { border-left: 1px solid var(--line); }
