@@ -4,6 +4,7 @@ import { Icon } from '../icons.jsx'
 import ChannelBadge from './ChannelBadge.jsx'
 import { stChip } from './Tickets.jsx'
 import { onTicketActivity } from '../realtime.js'
+import { nf, DsKpi, DsHead } from './ds.jsx'
 
 /* ---------------------------------------------------------------------------
  * CENTRO DE SOPORTE — apartado GENERAL. Vista del agente.
@@ -55,13 +56,7 @@ export default function SupportCenter({ onGo, user }) {
     <>
       {/* Cabecera común a todas las áreas: icono, título y subtítulo; a la derecha
           las pestañas de la sección y la acción principal. */}
-      <header className="page-head ds-head">
-        <span className="ds-head-ic"><Icon.headset /></span>
-        <div className="ds-head-tx">
-          <h1>Centro de Soporte</h1>
-          <span className="sub">Cómo va la atención hoy</span>
-        </div>
-        <div className="spacer" />
+      <DsHead icon={Icon.headset} title="Centro de Soporte" sub="Cómo va la atención hoy">
         {can('analytics.view') && (
           <div className="ds-tabs" role="tablist">
             <button role="tab" aria-selected="true" className="on">Resumen</button>
@@ -71,7 +66,7 @@ export default function SupportCenter({ onGo, user }) {
         {can('tickets.create') && (
           <button className="btn" onClick={() => onGo?.('ticket_new')}><Icon.plus /> Nuevo ticket</button>
         )}
-      </header>
+      </DsHead>
 
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1180 }}>
@@ -183,38 +178,5 @@ export default function SupportCenter({ onGo, user }) {
         </div>
       </div>
     </>
-  )
-}
-
-const nf = (n) => (n == null ? '…' : Number(n).toLocaleString('es-ES'))
-
-// Minigráfica de tendencia (14 días). Solo forma: la cifra ya está escrita al lado.
-function Spark({ data }) {
-  if (!data || data.length < 2) return null
-  const top = Math.max(1, ...data)
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * 100},${28 - (v / top) * 24}`).join(' ')
-  return (
-    <svg className="ds-spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
-      <polyline points={pts} fill="none" vectorEffect="non-scaling-stroke" />
-    </svg>
-  )
-}
-
-/* KPI del sistema común: etiqueta, cifra, contexto y, si hay, la comparación con la
-   semana anterior y su minigráfica. `good`: subir es bueno (resueltos). */
-function DsKpi({ k, v, prev, good, h, tone, spark }) {
-  const diff = v != null && prev != null ? v - prev : null
-  return (
-    <div className={`ds-kpi${tone ? ` t-${tone}` : ''}`}>
-      <span className="k">{k}</span>
-      <b className="v">{nf(v)}</b>
-      {diff != null && diff !== 0 && (
-        <span className={`ds-diff ${good ? (diff > 0 ? 'good' : 'bad') : ''}`}>
-          {diff > 0 ? '+' : '−'}{nf(Math.abs(diff))} frente a la semana anterior
-        </span>
-      )}
-      {h ? <span className="h">{h}</span> : null}
-      <Spark data={spark} />
-    </div>
   )
 }

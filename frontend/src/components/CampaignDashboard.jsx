@@ -5,6 +5,9 @@ import { useToast, useConfirm } from '../App.jsx'
 import LockTip from './LockTip.jsx'
 import LoadError from './LoadError.jsx'
 import { fmtDate } from '../util.js'
+import { nf, DsKpi, DsHead } from './ds.jsx'
+
+const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
 
 const STATUS = {
   draft:     { t: 'Borrador', c: 'gray' },
@@ -60,26 +63,25 @@ function Detail({ id, onBack, onChange }) {
 
   return (
     <>
-      <header className="page-head">
-        <button className="btn ghost sm" onClick={onBack}><Icon.send style={{ transform: 'rotate(180deg)' }} /> Volver</button>
-        <div style={{ marginLeft: 8 }}><h1>{c.title}</h1></div>
-        <span className={`pill ${st.c}`} style={{ marginLeft: 4 }}><span className="dot" />{st.t}</span>
+      <header className="page-head ds-head">
+        <button className="icon-btn" title="Volver al panel" onClick={onBack}><Icon.chevron style={{ transform: 'rotate(90deg)' }} /></button>
+        <div className="ds-head-tx">
+          <h1>{c.title}</h1>
+          <span className="sub">{isEmail ? <>Correo · Asunto «{c.subject || '—'}»</> : <>WhatsApp · Plantilla {c.template_name}</>} · {c.source_name || '—'} · {fmt(c.scheduled_at)}</span>
+        </div>
+        <span className={`pill ${st.c}`}><span className="dot" />{st.t}</span>
         <div className="spacer" />
         {pending > 0 && <button className="btn" disabled={busy} onClick={run}><Icon.play /> Procesar pendientes</button>}
       </header>
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 980 }}>
-          <div className="stat-grid" style={{ marginBottom: 16 }}>
-            <div className="stat-card"><div className="stat-num">{c.total}</div><div className="stat-sub">Destinatarios</div></div>
-            <div className="stat-card"><div className="stat-num">{c.sent}</div><div className="stat-sub">Enviados</div></div>
-            {/* Entregado/Leído solo tienen sentido en WhatsApp (los reporta el webhook de Meta). */}
-            {!isEmail && <div className="stat-card"><div className="stat-num">{delivered}</div><div className="stat-sub">Entregados</div></div>}
-            {!isEmail && <div className="stat-card"><div className="stat-num">{read}</div><div className="stat-sub">Leídos</div></div>}
-            <div className="stat-card bad"><div className="stat-num">{c.failed}</div><div className="stat-sub">Fallidos</div></div>
-            {pending > 0 && <div className="stat-card warn"><div className="stat-num">{pending}</div><div className="stat-sub">En cola</div></div>}
-          </div>
-          <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
-            {isEmail ? <>Correo · Asunto <b>{c.subject || '—'}</b></> : <>WhatsApp · Plantilla <b>{c.template_name}</b></>} · Destino <b>{c.source_name || '—'}</b> · {fmt(c.scheduled_at)}
+          {/* Entregado/Leído solo tienen sentido en WhatsApp (los reporta el webhook de Meta). */}
+          <div className="ds-kpis cd-kpis">
+            <DsKpi k="Enviados" v={c.sent} h={`de ${nf(c.total)} destinatarios`} />
+            {!isEmail && <DsKpi k="Entregados" v={delivered} h={`${pct(delivered, c.sent)}% de los enviados`} />}
+            {!isEmail && <DsKpi k="Leídos" v={read} h={`${pct(read, c.sent)}% de los enviados`} />}
+            <DsKpi k="Fallidos" v={c.failed} tone={c.failed > 0 ? 'bad' : null} h={c.failed > 0 ? 'Pasa el ratón por «Fallido» para ver el motivo' : 'Ninguno'} />
+            {pending > 0 && <DsKpi k="En cola" v={pending} tone="warn" h="Pendientes de salir" />}
           </div>
           <div className="card" style={{ padding: 0 }}>
             {(c.recipients || []).map((r, i) => {
@@ -209,15 +211,19 @@ export default function CampaignDashboard({ onNew, user }) {
 
   if (openId) return <Detail id={openId} onBack={() => { setOpenId(null); load() }} onChange={load} />
 
-  const totals = (list || []).reduce((a, c) => ({ camp: a.camp + 1, sent: a.sent + (c.sent || 0), pend: a.pend + Math.max(0, (c.total || 0) - (c.sent || 0) - (c.failed || 0)) }), { camp: 0, sent: 0, pend: 0 })
+  const totals = (list || []).reduce((a, c) => ({
+    camp: a.camp + 1,
+    sent: a.sent + (c.sent || 0),
+    delivered: a.delivered + (c.channel === 'email' ? 0 : (c.delivered || 0)),
+    sentWa: a.sentWa + (c.channel === 'email' ? 0 : (c.sent || 0)),
+    failed: a.failed + (c.failed || 0),
+    pend: a.pend + Math.max(0, (c.total || 0) - (c.sent || 0) - (c.failed || 0)),
+    activas: a.activas + ((c.status === 'sending' || c.status === 'scheduled') ? 1 : 0),
+  }), { camp: 0, sent: 0, delivered: 0, sentWa: 0, failed: 0, pend: 0, activas: 0 })
 
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.dashboard style={{ width: 17, height: 17, fill: 'var(--primary)' }} /></span>
-        <div><h1>Panel de campañas</h1></div>
-        <span className="sub">· Historial y estado de tus difusiones</span>
-        <div className="spacer" />
+      <DsHead icon={Icon.dashboard} title="Panel de campañas" sub="Historial y estado de tus difusiones">
         {waLocked ? (
           <span className="gated-wrap">
             <button className="btn gated" disabled><Icon.lock /> Nueva campaña</button>
@@ -226,14 +232,29 @@ export default function CampaignDashboard({ onNew, user }) {
         ) : (
           <button className="btn" onClick={onNew}><Icon.plus /> Nueva campaña</button>
         )}
-      </header>
+      </DsHead>
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1120 }}>
-          <div className="stat-grid">
-            <div className="stat-card"><div className="stat-num">{totals.camp}</div><div className="stat-sub">Campañas</div></div>
-            <div className="stat-card"><div className="stat-num">{totals.sent}</div><div className="stat-sub">Mensajes enviados</div></div>
-            <div className="stat-card warn"><div className="stat-num">{totals.pend}</div><div className="stat-sub">En cola</div></div>
-          </div>
+          {/* La cifra que manda: lo que aún tiene que salir */}
+          {list && !listErr && (
+            <div className="ds-hero">
+              <div className="ds-hero-main static">
+                <span className="k">Pendientes de enviar</span>
+                <b className="v">{nf(totals.pend)}</b>
+                <span className="h">
+                  {totals.pend > 0
+                    ? <>mensajes en cola en <b>{totals.activas}</b> {totals.activas === 1 ? 'campaña activa' : 'campañas activas'}</>
+                    : totals.activas > 0 ? <><b>{totals.activas}</b> {totals.activas === 1 ? 'campaña programada' : 'campañas programadas'}, nada en cola ahora</> : 'Nada en cola: todas las campañas han terminado'}
+                </span>
+              </div>
+              <div className="ds-kpis">
+                <DsKpi k="Campañas" v={totals.camp} h={totals.activas ? `${totals.activas} en marcha` : 'Ninguna en marcha'} />
+                <DsKpi k="Mensajes enviados" v={totals.sent} h="Entre todas las campañas" />
+                <DsKpi k="Entregados en WhatsApp" v={totals.delivered} h={`${pct(totals.delivered, totals.sentWa)}% de los enviados por WhatsApp`} />
+                <DsKpi k="Fallidos" v={totals.failed} tone={totals.failed > 0 ? 'bad' : null} h={totals.failed > 0 ? `${pct(totals.failed, totals.sent + totals.failed)}% de los intentos` : 'Ninguno'} />
+              </div>
+            </div>
+          )}
 
           {canManage && <SendSafety />}
 
@@ -260,13 +281,13 @@ export default function CampaignDashboard({ onNew, user }) {
                         <span className="muted" style={{ fontSize: 12.5 }}>{(c.channel === 'email' ? c.subject : c.template_name) || '—'} · {c.source_name || '—'} · {fmt(c.scheduled_at || c.created_at)}{c.daily_limit ? ` · ${c.daily_limit} al día` : ''}</span>
                         <div className="camp-bar"><span style={{ width: pct + '%' }} /></div>
                       </div>
-                      <div className="camp-nums">
-                        <span title="Enviados"><b style={{ color: 'var(--primary)' }}>{c.sent}</b></span>
-                        <span title="Entregados"><b style={{ color: 'var(--info)' }}>{c.delivered ?? 0}</b></span>
-                        <span title="Leídos"><b style={{ color: 'var(--secondary)' }}>{c.read_count ?? 0}</b></span>
-                        <span title="Fallidos"><b style={{ color: 'var(--danger)' }}>{c.failed}</b></span>
-                        <span title="Total"><b className="muted">/ {c.total}</b></span>
-                      </div>
+                      {/* Cifras con su etiqueta: se leen sin pasar el ratón */}
+                      <dl className="cd-nums">
+                        <div><dt>Enviados</dt><dd>{nf(c.sent)}<small> / {nf(c.total)}</small></dd></div>
+                        <div><dt>Entregados</dt><dd>{nf(c.delivered ?? 0)}</dd></div>
+                        <div><dt>Leídos</dt><dd>{c.channel === 'email' ? '—' : nf(c.read_count ?? 0)}</dd></div>
+                        <div><dt>Fallidos</dt><dd className={c.failed ? 'bad' : ''}>{nf(c.failed)}</dd></div>
+                      </dl>
                       <div className="camp-acts" onClick={(e) => e.stopPropagation()}>
                         {pending > 0 && (c.status === 'sending' || c.status === 'scheduled') && <button className="icon-btn" title="Procesar pendientes" onClick={() => run(c.id)}><Icon.play /></button>}
                         {(c.status === 'sending' || c.status === 'scheduled') && <button className="icon-btn" title="Cancelar" onClick={() => cancel(c.id)} style={{ color: 'var(--warn)' }}><Icon.warn /></button>}
