@@ -75,10 +75,12 @@ export default function SupportSettings({ user }) {
 
   return (
     <>
-      <header className="page-head">
-        <span className="sc-ic"><Icon.settings style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Configuración</h1></div>
-        {actual && <span className="sub">· {actual.desc}</span>}
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.settings /></span>
+        <div className="ds-head-tx">
+          <h1>Configuración</h1>
+          {actual && <span className="sub">{actual.desc}</span>}
+        </div>
         <div className="spacer" />
       </header>
 

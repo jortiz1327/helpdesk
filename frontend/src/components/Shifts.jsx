@@ -105,10 +105,12 @@ export default function Shifts() {
 
   return (
     <>
-      <header className="page-head">
-        <span className="sc-ic"><Icon.calendar style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Turnos de soporte</h1></div>
-        <span className="sub">· Quién cubre cada día. Los tickets nuevos se reparten solos al de guardia.</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.calendar /></span>
+        <div className="ds-head-tx">
+          <h1>Turnos de soporte</h1>
+          <span className="sub">Quién cubre cada día. Los tickets nuevos se reparten solos al de guardia.</span>
+        </div>
         <div className="spacer" />
       </header>
 

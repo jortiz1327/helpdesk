@@ -195,10 +195,12 @@ export default function Users() {
 
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.user style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Usuarios</h1></div>
-        <span className="sub">· Equipo, roles y permisos</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.user /></span>
+        <div className="ds-head-tx">
+          <h1>Usuarios</h1>
+          <span className="sub">Equipo, roles y permisos</span>
+        </div>
         <div className="spacer" />
         {tab === 'users'
           ? <button className="btn" onClick={() => setForm({ ...blank })}><Icon.plus /> Nuevo usuario</button>

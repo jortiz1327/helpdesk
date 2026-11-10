@@ -83,13 +83,17 @@ export default function Reports({ onGo }) {
 
   return (
     <>
-      <header className="page-head">
-        <span className="sc-ic"><Icon.headset style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Centro de Soporte</h1></div>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.headset /></span>
+        <div className="ds-head-tx">
+          <h1>Centro de Soporte</h1>
+          <span className="sub">Informes del equipo</span>
+        </div>
+        <div className="spacer" />
         {/* Misma pestaña que en el Centro de Soporte: aquí «Informes» está activo. */}
-        <div className="kb-seg" style={{ margin: '0 0 0 18px' }}>
-          <button onClick={() => onGo?.('support')}>Resumen</button>
-          <button className="on"><Icon.chart /> Informes</button>
+        <div className="ds-tabs" role="tablist">
+          <button role="tab" aria-selected="false" onClick={() => onGo?.('support')}>Resumen</button>
+          <button role="tab" aria-selected="true" className="on"><Icon.chart /> Informes</button>
         </div>
       </header>
 

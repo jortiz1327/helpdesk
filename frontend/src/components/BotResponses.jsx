@@ -27,10 +27,12 @@ export default function BotResponses({ onOpen }) {
 
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.note style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <h1>Respuestas del bot</h1>
-        <span className="sub">· Datos capturados por tus chatbots</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.note /></span>
+        <div className="ds-head-tx">
+          <h1>Respuestas del bot</h1>
+          <span className="sub">Datos capturados por tus chatbots</span>
+        </div>
         <div className="spacer" />
         <div className="search" style={{ maxWidth: 260 }}>
           <Icon.search />

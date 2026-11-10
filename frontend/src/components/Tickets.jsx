@@ -886,17 +886,18 @@ export default function Tickets({ user, onGo, initialTab = 'tickets', initialTic
 
   return (
     <>
-      <header className="page-head">
-        <span className="sc-ic"><Icon.ticket style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Gestión de tickets</h1></div>
-        {tab === 'tickets'
-          ? <WaUsageMeter />
-          : <span className="sub">
-              · {tab === 'agents' ? 'Carga de trabajo y disponibilidad del equipo' : 'Tareas programadas que fallan, agrupadas por cron'}
-            </span>}
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.ticket /></span>
+        <div className="ds-head-tx">
+          <h1>Gestión de tickets</h1>
+          {tab !== 'tickets' && <span className="sub">
+            {tab === 'agents' ? 'Carga de trabajo y disponibilidad del equipo' : 'Tareas programadas que fallan, agrupadas por cron'}
+          </span>}
+        </div>
+        {tab === 'tickets' && <WaUsageMeter />}
         <div className="spacer" />
 
-        <div className="seg">
+        <div className="ds-tabs" role="tablist">
           <button className={tab === 'tickets' ? 'on' : ''} onClick={() => setTab('tickets')}><Icon.ticket /> Tickets</button>
           {/* Solo un encargado ve la carga de trabajo del equipo */}
           {can('agents.view') && (

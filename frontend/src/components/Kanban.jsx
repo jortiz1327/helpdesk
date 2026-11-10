@@ -87,12 +87,12 @@ export default function Kanban({ onOpen, embedded = false, area = '' }) {
     <>
       {/* Cabecera propia solo cuando NO va embebido dentro de Contactos. */}
       {!embedded && (
-        <header className="page-head">
-          <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.kanban style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-          <div>
+        <header className="page-head ds-head">
+          <span className="ds-head-ic"><Icon.kanban /></span>
+          <div className="ds-head-tx">
             <h1>Kanban</h1>
+            <span className="sub">Arrastra los chats entre columnas de etiqueta</span>
           </div>
-          <span className="sub">· Arrastra los chats entre columnas de etiqueta</span>
           <div className="spacer" />
           <span className="muted" style={{ fontSize: 12.5 }}>Mostrando <b style={{ color: 'var(--ink)' }}>{filtered.length}</b> de <b style={{ color: 'var(--ink)' }}>{convs?.length || 0}</b> chats</span>
         </header>

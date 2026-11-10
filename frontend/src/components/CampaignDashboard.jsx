@@ -47,7 +47,7 @@ function Detail({ id, onBack, onChange }) {
 
   if (err && !c) return (
     <>
-      <header className="page-head"><button className="btn ghost sm" onClick={onBack}><Icon.send style={{ transform: 'rotate(180deg)' }} /> Volver</button></header>
+      <header className="page-head ds-head"><button className="btn ghost sm" onClick={onBack}><Icon.send style={{ transform: 'rotate(180deg)' }} /> Volver</button></header>
       <LoadError onRetry={load} msg="No se pudo cargar la campaña" />
     </>
   )

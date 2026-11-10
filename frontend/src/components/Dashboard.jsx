@@ -47,8 +47,11 @@ export default function Dashboard({ user, onOpen }) {
 
   return (
     <>
-      <header className="page-head">
-        <h1>Dashboard</h1>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.dashboard /></span>
+        <div className="ds-head-tx">
+          <h1>Dashboard</h1>
+        </div>
         <div className="spacer" />
         <button className="icon-btn" title="Actualizar" onClick={load}><Icon.dashboard /></button>
       </header>

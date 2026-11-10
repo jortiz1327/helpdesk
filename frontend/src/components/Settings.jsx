@@ -67,9 +67,12 @@ export default function Settings({ embedded = false, area = 'campanas' }) {
       {/* Cabecera propia solo como pantalla independiente; embebido en Configuración
           de Soporte va sin ella (la pone el contenedor). */}
       {!embedded && (
-        <header className="page-head">
-          <h1>Configuración</h1>
-          <span className="sub">· API de WhatsApp Cloud</span>
+        <header className="page-head ds-head">
+          <span className="ds-head-ic"><Icon.settings /></span>
+          <div className="ds-head-tx">
+            <h1>Configuración</h1>
+            <span className="sub">API de WhatsApp Cloud</span>
+          </div>
           <div className="spacer" />
         </header>
       )}

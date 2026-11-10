@@ -59,9 +59,12 @@ export default function Templates() {
 
   return (
     <>
-      <header className="page-head">
-        <h1>Plantillas</h1>
-        <span className="sub">· Mensajes preaprobados por Meta</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.doc /></span>
+        <div className="ds-head-tx">
+          <h1>Plantillas</h1>
+          <span className="sub">Mensajes preaprobados por Meta</span>
+        </div>
         <div className="spacer" />
         {gate?.features?.wa_template ? (
           <span className="gated-wrap">

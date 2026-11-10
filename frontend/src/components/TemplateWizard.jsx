@@ -280,10 +280,12 @@ export default function TemplateWizard({ onClose, onCreated, editing }) {
 
   return (
     <>
-      <header className="page-head">
+      <header className="page-head ds-head">
         <button className="icon-btn" onClick={onClose} title="Volver">‹</button>
-        <h1>{isEdit ? 'Editar plantilla' : 'Crear plantilla de Meta'}</h1>
-        <span className="sub">· {isEdit ? 'El nombre y el idioma no se pueden cambiar' : 'Construye y envía plantillas de WhatsApp'}</span>
+        <div className="ds-head-tx">
+          <h1>{isEdit ? 'Editar plantilla' : 'Crear plantilla de Meta'}</h1>
+          <span className="sub">{isEdit ? 'El nombre y el idioma no se pueden cambiar' : 'Construye y envía plantillas de WhatsApp'}</span>
+        </div>
         <div className="spacer" />
         <button className="btn ghost sm" onClick={() => setShowPreview((p) => !p)}>{showPreview ? 'Ocultar vista previa' : 'Mostrar vista previa'}</button>
       </header>

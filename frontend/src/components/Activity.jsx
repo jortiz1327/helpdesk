@@ -119,10 +119,12 @@ export default function Activity() {
 
   return (
     <>
-      <header className="page-head">
-        <span className="sc-ic"><Icon.activity style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Acciones</h1></div>
-        <span className="sub">· Registro de actividad{meta.total ? ` · ${meta.total.toLocaleString('es-ES')} evento${meta.total === 1 ? '' : 's'}` : ''}</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.activity /></span>
+        <div className="ds-head-tx">
+          <h1>Acciones</h1>
+          <span className="sub">Registro de actividad{meta.total ? ` · ${meta.total.toLocaleString('es-ES')} evento${meta.total === 1 ? '' : 's'}` : ''}</span>
+        </div>
       </header>
 
       <div className="page-scroll"><div className="page" style={{ maxWidth: 860 }}>

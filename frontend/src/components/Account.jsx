@@ -39,9 +39,12 @@ export default function Account({ user, onAccountChange, onSignedOut }) {
 
   return (
     <>
-      <header className="page-head">
-        <h1>Cuenta</h1>
-        <span className="sub">· Tus datos de acceso</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.user /></span>
+        <div className="ds-head-tx">
+          <h1>Cuenta</h1>
+          <span className="sub">Tus datos de acceso</span>
+        </div>
       </header>
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 760 }}>

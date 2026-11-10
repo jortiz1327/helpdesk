@@ -80,10 +80,12 @@ export default function NewTicket({ user, onCreated, onCancel, onOpenTicket }) {
 
   return (
     <>
-      <header className="page-head">
-        <span className="sc-ic"><Icon.ticket style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Nuevo ticket</h1></div>
-        <span className="sub">· Alta interna de una solicitud de soporte</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.ticket /></span>
+        <div className="ds-head-tx">
+          <h1>Nuevo ticket</h1>
+          <span className="sub">Alta interna de una solicitud de soporte</span>
+        </div>
         <div className="spacer" />
       </header>
 
