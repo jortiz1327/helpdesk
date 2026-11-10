@@ -3,6 +3,22 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.21] — 2026-11-10
+
+### Mejoras
+
+- Lista de tickets: los que esperan nuestra respuesta (último mensaje del cliente) llevan un
+  degradado en el `--primary` del área a la izquierda y el tooltip «Esperando respuesta»
+  (`data-tip-tone` en TipLayer). Vuelve la franja de los tickets internos.
+
+### Arreglos
+
+- Bloqueo de tickets: el servidor da el candado por caducado en cuanto el dueño cumple los
+  minutos sin actividad (`locked_active_at`), sin esperar al «soltar» de su ventana.
+- La ventana que esperaba TOMA el ticket al liberarse si el agente está activo; antes solo lo
+  veía como suyo y el dueño anterior lo recuperaba al mover el ratón, bloqueándole a mitad
+  de respuesta. Recomprobación a los 1,5 s en vez de 6 s.
+
 ## [1.5.20] — 2026-11-06
 
 ### Mejoras

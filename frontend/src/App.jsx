@@ -120,10 +120,23 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.20";
+const APP_VERSION = "1.5.21";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.21",
+        date: "10 nov 2026",
+        resumen: "Quien coge un ticket al liberarse ya no lo pierde, y vuelve la marca de «falta respuesta».",
+        mejoras: [
+            "En la lista de tickets, los que esperan nuestra respuesta llevan a la izquierda un degradado en el azul de Helpdesk; al pasar el ratón pone «Esperando respuesta».",
+            "Los tickets internos vuelven a llevar su franja a la izquierda.",
+        ],
+        arreglos: [
+            "Al terminar la cuenta atrás de un ticket ocupado, quien lo esperaba lo coge en el acto y ya no se lo quita el compañero anterior al mover el ratón.",
+            "El ticket queda libre justo al llegar la cuenta a 0, no unos segundos después.",
+        ],
+    },
     {
         version: "1.5.20",
         date: "6 nov 2026",
