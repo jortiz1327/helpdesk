@@ -50,7 +50,7 @@ class TicketLockService
             $t = DB::table('tickets')->where('id', $ticketId)->lockForUpdate()->first(self::COLS);
             if (!$t) return null;
 
-            $vivo = $this->vigente($t->locked_by, $t->locked_at);
+            $vivo = $this->vigente($t->locked_by, $t->locked_at, $t->locked_active_at);
 
             // Libre, caducado o ya es mío → lo tomo (y renuevo la marca de tiempo).
             if (!$vivo || (int) $t->locked_by === $userId) {
@@ -88,7 +88,7 @@ class TicketLockService
         if (!$t) return null;
 
         // Solo se considera ocupado si el candado de OTRO sigue vigente.
-        if ($this->vigente($t->locked_by, $t->locked_at) && (int) $t->locked_by !== $userId) {
+        if ($this->vigente($t->locked_by, $t->locked_at, $t->locked_active_at) && (int) $t->locked_by !== $userId) {
             return $this->deOtro($t);
         }
         // Libre, caducado o mío: se informa como «mío» pero NO se renueva locked_at.
@@ -128,17 +128,25 @@ class TicketLockService
     {
         if (!$this->enabled()) return null;
 
-        $t = DB::table('tickets')->where('id', $ticketId)->first(['locked_by', 'locked_at']);
-        if (!$t || !$this->vigente($t->locked_by, $t->locked_at)) return null;
+        $t = DB::table('tickets')->where('id', $ticketId)->first(self::COLS);
+        if (!$t || !$this->vigente($t->locked_by, $t->locked_at, $t->locked_active_at)) return null;
         if ((int) $t->locked_by === $userId) return null;
 
         return DB::table('users')->where('id', $t->locked_by)->value('name') ?: 'otro agente';
     }
 
-    /** ¿Sigue vigente el bloqueo (ha latido hace menos de LEASE_SECONDS) o ya ha caducado? */
-    protected function vigente(?int $lockedBy, ?string $lockedAt): bool
+    /**
+     * ¿Sigue vigente el bloqueo? Caduca por cualquiera de las dos vías:
+     *   · sin latido en LEASE_SECONDS (navegador cerrado o colgado);
+     *   · su dueño lleva los minutos configurados sin tocar nada. Esto lo decide el
+     *     servidor en el segundo exacto en que la cuenta atrás llega a 0, sin esperar a que
+     *     la ventana del dueño mande el «soltar» (iba con unos segundos de retraso).
+     */
+    protected function vigente(?int $lockedBy, ?string $lockedAt, ?string $activeAt = null): bool
     {
         if (!$lockedBy || !$lockedAt) return false;
-        return strtotime($lockedAt) > time() - self::LEASE_SECONDS;
+        if (strtotime($lockedAt) <= time() - self::LEASE_SECONDS) return false;
+        $activo = strtotime($activeAt ?: $lockedAt);
+        return $activo > time() - $this->minutes() * 60;
     }
 }

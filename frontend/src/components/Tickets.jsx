@@ -1698,7 +1698,15 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   const lockLease = d?.lock?.lease || 90
   const tkCerrado = ['resuelto', 'cerrado'].includes(d?.ticket?.status)
   // Última actividad del agente en esta ventana: la usan el latido y su cuenta atrás.
+  // Se cuenta SIEMPRE, también mientras el ticket lo tiene otro: así, cuando se libera,
+  // sabemos si este agente está delante (y lo toma) o se fue (y no lo acapara).
   const ultimaRef = useRef(Date.now())
+  useEffect(() => {
+    const marcar = () => { ultimaRef.current = Date.now() }
+    const EVENTOS = ['keydown', 'pointerdown', 'pointermove', 'wheel', 'touchstart']
+    EVENTOS.forEach((ev) => window.addEventListener(ev, marcar, { passive: true }))
+    return () => EVENTOS.forEach((ev) => window.removeEventListener(ev, marcar))
+  }, [])
   useEffect(() => {
     if (!lockMine || !lockMin || tkCerrado) return
     const inactivo = lockMin * 60 * 1000
@@ -1728,6 +1736,12 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
       if (Date.now() - ultimoLatido >= cada) latir()
     }
     const iv = setInterval(tic, 5000)
+    /* Al pasar a «mío» se TOMA en el acto si el agente está delante. Un refresco de fondo
+       dice «mío» cuando el ticket queda libre, pero eso no lo reserva: antes, quien
+       esperaba empezaba a escribir sin tenerlo, y si el dueño anterior movía el ratón lo
+       recuperaba y le volvía a bloquear a mitad de respuesta. */
+    if (Date.now() - ultimaRef.current < inactivo) latir()
+    else soltado = true
     // Al volver a la pestaña, renovar ya: el navegador frena los temporizadores en 2º plano.
     const alVolver = () => { if (document.visibilityState === 'visible') { marca(); latir() } }
     document.addEventListener('visibilitychange', alVolver)
@@ -2439,7 +2453,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   <Icon.lock />
                   <span><b>{d.lock.user_name || 'Otro agente'}</b> está atendiendo este ticket ahora mismo.{' '}
                     {lockHasta
-                      ? <>Se libera en <CuentaAtras hasta={lockHasta} onCero={() => setTimeout(() => load(true), 6000)} /> si no lo toca.</>
+                      ? <>Se libera en <CuentaAtras hasta={lockHasta} onCero={() => setTimeout(() => load(true), 1500)} /> si no lo toca.</>
                       : 'Se liberará solo en unos minutos si deja de mirarlo.'}</span>
                 </div>
               )}

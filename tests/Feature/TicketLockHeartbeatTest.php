@@ -124,12 +124,42 @@ class TicketLockHeartbeatTest extends TestCase
         $quedan = $r->json('lock.remaining');
         $this->assertTrue($quedan >= 238 && $quedan <= 240, "quedan {$quedan} s, se esperaban ~240");
 
-        // Un idle disparatado no deja la cuenta en negativo ni por encima de los minutos.
+        // Un idle disparatado se recorta a los minutos: la cuenta llega a 0 y el ticket
+        // queda libre en ese mismo instante (no unos segundos después).
         $this->withHeader('X-App-Token', TokenService::make($a))
             ->postJson('/api/tickets.php?action=heartbeat', ['id' => $id, 'idle' => 99999])->assertOk();
         $this->withHeader('X-App-Token', TokenService::make($b))
             ->getJson("/api/tickets.php?action=detail&id={$id}&bg=1")
-            ->assertJson(['lock' => ['mine' => false, 'remaining' => 0]]);
+            ->assertJson(['lock' => ['mine' => true]]);
+    }
+
+    /**
+     * El caso de Ian: A lo deja quieto los minutos, B espera, lo toma y empieza a contestar.
+     * Si entonces A mueve el ratón, su latido NO se lo quita: le dice que ahora es de B.
+     */
+    public function test_quien_lo_toma_al_liberarse_no_lo_pierde_si_el_anterior_vuelve(): void
+    {
+        \App\Models\Setting::put('ticket_lock_minutes', '5');
+        $a = $this->superadmin('a@x.com');
+        $b = $this->superadmin('b@x.com');
+        $id = $this->ticket();
+
+        // A lo tiene, con el latido al día pero 5 min sin tocar nada.
+        DB::table('tickets')->where('id', $id)->update([
+            'locked_by' => $a->id, 'locked_at' => now()->subSeconds(20), 'locked_active_at' => now()->subSeconds(301),
+        ]);
+
+        // B no tiene que esperar a que la ventana de A lo suelte: ya está libre y lo toma.
+        $this->withHeader('X-App-Token', TokenService::make($b))
+            ->postJson('/api/tickets.php?action=heartbeat', ['id' => $id])
+            ->assertOk()->assertJson(['lock' => ['mine' => true]]);
+        $this->assertSame((int) $b->id, (int) DB::table('tickets')->where('id', $id)->value('locked_by'));
+
+        // A vuelve y mueve el ratón: su latido le informa de que lo tiene B, sin quitárselo.
+        $this->withHeader('X-App-Token', TokenService::make($a))
+            ->postJson('/api/tickets.php?action=heartbeat', ['id' => $id])
+            ->assertOk()->assertJson(['lock' => ['mine' => false, 'user_id' => $b->id]]);
+        $this->assertSame((int) $b->id, (int) DB::table('tickets')->where('id', $id)->value('locked_by'));
     }
 
     public function test_el_latido_no_toma_un_ticket_cerrado(): void
