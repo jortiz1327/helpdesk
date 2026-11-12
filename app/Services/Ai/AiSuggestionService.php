@@ -73,6 +73,10 @@ class AiSuggestionService
                 'manuals' => DB::table('ai_documents')->where('source_type', 'manual')->count(),
                 'last'    => DB::table('ai_documents')->max('indexed_at'),
             ],
+            // Donde la IA se rinde o falla: consultas sin base suficiente y errores técnicos.
+            'gaps' => DB::table('ai_suggestions as a')->leftJoin('tickets as t', 't.id', '=', 'a.ticket_id')
+                ->whereIn('a.status', ['abstained', 'failed'])->orderByDesc('a.id')->limit(10)
+                ->get(['a.id', 'a.status', 'a.error', 't.code as ticket_code', 't.subject', 'a.created_at'])->all(),
             'corrections' => DB::table('ai_suggestions as a')->leftJoin('tickets as t', 't.id', '=', 'a.ticket_id')
                 ->where('a.rating', 'down')->whereNotNull('a.correction')->orderByDesc('a.rated_at')->limit(8)
                 ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.rated_at'])->all(),

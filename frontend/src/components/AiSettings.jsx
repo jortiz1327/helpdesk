@@ -87,6 +87,18 @@ export default function AiSettings() {
         <button className="btn" disabled={busy} onClick={indexar}><Icon.refresh /> {busy ? 'Actualizando…' : 'Actualizar conocimiento'}</button>
       </div>
 
+      <div className="card em-card" style={{ marginTop: 12 }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Lo que la IA no ha sabido hacer</h3>
+        <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>Consultas en las que se ha rendido por falta de base, o que han fallado. Son las pistas de qué documentar o corregir: añade la respuesta como FAQ o en la documentación y se reducirán.</p>
+        {(d.gaps || []).length === 0 ? <p className="muted" style={{ margin: 0, fontSize: 13 }}>Aún no hay casos.</p> : (
+          <ul className="ai-corr">
+            {d.gaps.map((g) => (
+              <li key={g.id}><b className="mono">{g.ticket_code}</b> <small>{fmtDate(g.created_at)} · {g.status === 'abstained' ? 'No tenía base para contestar' : 'Error: ' + (g.error || 'desconocido')}</small><q>{g.subject}</q></li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {d.corrections.length > 0 && (
         <div className="card em-card" style={{ marginTop: 12 }}>
           <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Últimas correcciones de los agentes</h3>
