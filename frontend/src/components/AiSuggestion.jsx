@@ -47,7 +47,7 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, i
     )
   }
   if (s.status === 'abstained') {
-    return <div className="ai-box ai-soft"><span>La IA no tiene base para contestar esto con fiabilidad. Respóndelo tú; si quieres que aprenda, anótalo en una FAQ.</span></div>
+    return <div className="ai-box ai-soft"><span><b>Derivado a una persona.</b> La IA no está segura de esto y no ha querido inventar: respóndelo tú. Si quieres que aprenda, anótalo en una FAQ o corrígela con 👎 en la próxima.</span></div>
   }
 
   const usar = () => { api.aiUsed(s.id); onUse(s.body, false); setS({ ...s, used: true }) }

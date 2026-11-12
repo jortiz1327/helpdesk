@@ -309,7 +309,10 @@ class AiSuggestionService
            . "FORMATO DE SALIDA\n"
            . "- Texto plano, sin Markdown ni HTML. Entrega solo el texto del borrador para el cliente.\n"
            . "- Si el cliente indica su nombre y procede, puedes usarlo en el saludo.\n"
-           . "- Solo si no hay nada que responder ni que preguntar con fiabilidad (ni siquiera pedir un dato), responde únicamente con " . self::NO_SABE . "\n"
+           . "REGLA DE DERIVACIÓN A UN HUMANO (prevalece sobre todo lo demás)\n"
+           . "- No sabes todo y no tienes que contestar siempre. Si no estás seguro, si la consulta no encaja con el contexto de abajo, si la respuesta exigiría suponer algo, o si hay riesgo de dar una instrucción incorrecta: NO respondas ni improvises; responde únicamente con " . self::NO_SABE . " y una persona del equipo se hará cargo.\n"
+           . "- Lo mismo en garantías, precios o condiciones comerciales, acceso remoto (AnyDesk) y cualquier cambio interno no documentado: responde solo con " . self::NO_SABE . "\n"
+           . "- Es preferible derivar que dar una respuesta dudosa. Nunca inventes procedimientos, datos, estados ni plazos. Solo puedes pedir datos al cliente cuando el contexto indique claramente cuáles hacen falta.\n"
            . "- Usa solo la información de este ticket y de las secciones de contexto siguientes; el contexto de otros casos son patrones para orientarte, nunca datos para citar.\n\n";
 
         $s .= 'TICKET: ' . ($t->subject ?? '') . ($t->category_name ? ' (categoría: ' . $t->category_name . ')' : '') . ' · canal ' . ($t->channel ?? '') . "\n";
