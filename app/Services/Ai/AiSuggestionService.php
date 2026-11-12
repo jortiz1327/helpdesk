@@ -177,6 +177,8 @@ class AiSuggestionService
             'rating' => $rating, 'correction' => $rating === 'down' ? mb_substr($correction, 0, 4000) : null,
             'rated_by' => $userId, 'rated_at' => now(), 'updated_at' => now(),
         ]);
+        // La corrección pasa a ser conocimiento buscable (y deja de serlo si cambia a 👍).
+        $this->knowledge->indexarCorreccion($id);
         return DB::table('ai_suggestions')->where('id', $id)->first();
     }
 
@@ -289,6 +291,16 @@ class AiSuggestionService
 
         $s .= "\nBASE DE CONOCIMIENTO (preguntas frecuentes publicadas)\n";
         $s .= $faqs ? implode("\n\n", array_map(fn ($f) => '• ' . $f['question'] . "\n" . $f['answer'], $faqs)) : '(ninguna coincide con esta consulta)';
+
+        // Las correcciones parecidas (indexadas) van aparte y primero; las que ya salen en «errores anteriores» no se repiten.
+        $correcciones = array_values(array_filter($casos, fn ($d) => $d->source_type === 'correccion' && ! in_array((int) $d->source_id, array_column($ejemplos, 'id'), true)));
+        $casos = array_values(array_filter($casos, fn ($d) => $d->source_type !== 'correccion'));
+        if ($correcciones) {
+            $s .= "\n\nCORRECCIONES DEL EQUIPO A CONSULTAS PARECIDAS (lo que se dio por correcto; síguelo)\n";
+            foreach ($correcciones as $d) {
+                $s .= mb_substr((string) $d->content, 0, 1800) . "\n\n";
+            }
+        }
 
         if ($casos) {
             $s .= "\n\nCASOS ANTERIORES Y MANUALES (úsalos solo si encajan con esta consulta: de ahí sacas el criterio y el tono del equipo; no copies datos de otros clientes ni mezcles casos distintos)\n";

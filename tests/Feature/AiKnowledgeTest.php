@@ -85,6 +85,41 @@ class AiKnowledgeTest extends TestCase
         $this->assertSame(0, (new AiKnowledge())->indexarTickets()[0]);   // incremental: no repite
     }
 
+    public function test_una_correccion_se_indexa_sin_datos_personales_y_se_usa_ante_algo_parecido(): void
+    {
+        $fake = new class implements AiProvider {
+            public string $sistema = '';
+            public function configured(): bool { return true; }
+            public function complete(string $system, array $messages): array { $this->sistema = $system; return ['text' => 'Borrador', 'model' => 'f', 'input_tokens' => 1, 'output_tokens' => 1]; }
+        };
+        $svc = new AiSuggestionService($fake);
+
+        $t1 = $this->ticket('abierto', 'Etiqueta electrónica sin conexión', 'Soy Marta Gómez. Mi etiqueta electrónica no conecta con la antena de la tienda.', null);
+        $svc->forTicket($t1, $this->uid);
+        $id = (int) DB::table('ai_suggestions')->where('ticket_id', $t1)->value('id');
+        $svc->rate($id, 'down', 'Debía pedir el código de la etiqueta antes de nada, Marta.', $this->uid);
+
+        $doc = DB::table('ai_documents')->where('source_type', 'correccion')->first();
+        $this->assertNotNull($doc);
+        $this->assertStringContainsString('pedir el código de la etiqueta', $doc->content);
+        $this->assertStringNotContainsString('Marta', $doc->content . $doc->title);
+
+        // Llegan 4 correcciones más recientes sobre otros temas: la nuestra ya no está entre las 4 últimas.
+        for ($i = 0; $i < 4; $i++) {
+            DB::table('ai_suggestions')->insert(['ticket_id' => $t1, 'trigger_message_id' => null, 'status' => 'ready', 'body' => 'x', 'rating' => 'down',
+                'correction' => 'Otra cosa distinta número ' . $i, 'rated_at' => now()->addMinutes(5 + $i), 'created_at' => now(), 'updated_at' => now()]);
+        }
+
+        // Otra consulta parecida: por parecido sí la encuentra, y va en su apartado.
+        $t2 = $this->ticket('abierto', 'Etiqueta electrónica sin conexión', 'Mi etiqueta electrónica tampoco conecta con la antena de la tienda.', null);
+        $svc->forTicket($t2, $this->uid);
+        $this->assertStringContainsString('CORRECCIONES DEL EQUIPO', $fake->sistema);
+
+        // Si el agente cambia de opinión (👍), deja de ser conocimiento.
+        $svc->rate($id, 'up', null, $this->uid);
+        $this->assertSame(0, DB::table('ai_documents')->where('source_type', 'correccion')->count());
+    }
+
     public function test_tapa_enlaces_con_parametros(): void
     {
         $t = \App\Services\Ai\Scrub::tapar('Mira https://aemegroup.com/ayuda y https://x.cloud/portal?token=abc123 ok');

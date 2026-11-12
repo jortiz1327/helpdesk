@@ -32,6 +32,9 @@ class AiIndexar extends Command
             [$nuevos, $saltados] = $k->indexarTickets((bool) $this->option('rehacer'), $this->option('limite') !== null ? (int) $this->option('limite') : null);
             $this->line("Tickets: $nuevos indexados, $saltados saltados (ya estaban o no valían).");
         }
+        if ($solo === '') {
+            $this->line('Correcciones de agentes: ' . $k->indexarCorrecciones() . '.');
+        }
         if ($solo !== 'tickets') {
             $this->line('Manuales: ' . $k->indexarManuales() . ' trozos.');
         }

@@ -84,6 +84,49 @@ class AiKnowledge
         ];
     }
 
+    /**
+     * Guarda una corrección de un agente como conocimiento buscable: así, ante una pregunta
+     * PARECIDA, la IA ve lo que el equipo dijo que era lo correcto (no solo las últimas
+     * correcciones, que no tienen por qué venir al caso). Datos personales tapados.
+     */
+    public function indexarCorreccion(int $suggestionId): void
+    {
+        $s = DB::table('ai_suggestions as a')->join('tickets as t', 't.id', '=', 'a.ticket_id')
+            ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+            ->where('a.id', $suggestionId)
+            ->first(['a.id', 'a.body', 'a.correction', 'a.rating', 'a.trigger_message_id', 't.subject', 'c.name as contact_name']);
+        if (! $s || $s->rating !== 'down' || trim((string) $s->correction) === '') {
+            $this->quitarCorreccion($suggestionId);
+            return;
+        }
+
+        $nombre = (string) ($s->contact_name ?? '');
+        $pregunta = Scrub::tapar(Scrub::plano((string) DB::table('messages')->where('id', $s->trigger_message_id)->value('body')), $nombre);
+        $content = "Pregunta del cliente:\n" . mb_substr($pregunta, 0, 1200)
+            . "\n\nLo que la IA respondió y estaba mal:\n" . mb_substr(Scrub::tapar((string) $s->body, $nombre), 0, 800)
+            . "\n\nLo correcto, según el equipo:\n" . mb_substr(Scrub::tapar((string) $s->correction, $nombre), 0, 2000);
+
+        DB::table('ai_documents')->updateOrInsert(
+            ['source_type' => 'correccion', 'source_id' => (string) $suggestionId],
+            ['title' => mb_substr(Scrub::tapar((string) $s->subject, $nombre), 0, 255), 'content' => $content, 'quality' => null, 'indexed_at' => now()],
+        );
+    }
+
+    public function quitarCorreccion(int $suggestionId): void
+    {
+        DB::table('ai_documents')->where('source_type', 'correccion')->where('source_id', (string) $suggestionId)->delete();
+    }
+
+    /** Pasa a la base de conocimiento todas las correcciones guardadas (idempotente). */
+    public function indexarCorrecciones(): int
+    {
+        $ids = DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->pluck('id');
+        foreach ($ids as $id) {
+            $this->indexarCorreccion((int) $id);
+        }
+        return $ids->count();
+    }
+
     /** Indexa los manuales declarados. Devuelve el número de trozos escritos. */
     public function indexarManuales(): int
     {
@@ -141,7 +184,7 @@ class AiKnowledge
      * El documento viene sin datos personales. Solo cuentan los que puntúan al menos el 40 % del mejor
      * (y más que config('ai.knowledge_min_score'), 0 por defecto).
      */
-    public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 2): array
+    public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 2, int $nCorrecciones = 2): array
     {
         $q = trim(mb_substr(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $texto), 0, 600));
         if (mb_strlen($q) < 6) {
@@ -151,7 +194,7 @@ class AiKnowledge
 
         $buscar = function (string $tipo, int $n) use ($q, $ticketId, $min) {
             $f = DB::table('ai_documents')->where('source_type', $tipo)
-                ->selectRaw('id, source_id, title, content, quality, MATCH(title, content) AGAINST(? IN NATURAL LANGUAGE MODE) AS score', [$q])
+                ->selectRaw('id, source_type, source_id, title, content, quality, MATCH(title, content) AGAINST(? IN NATURAL LANGUAGE MODE) AS score', [$q])
                 ->whereRaw('MATCH(title, content) AGAINST(? IN NATURAL LANGUAGE MODE)', [$q]);
             if ($tipo === 'ticket' && $ticketId) {
                 $f->where('source_id', '!=', (string) $ticketId);
@@ -163,6 +206,6 @@ class AiKnowledge
                 ->take($n)->values()->all();
         };
 
-        return array_merge($buscar('ticket', $nTickets), $buscar('manual', $nManuales));
+        return array_merge($buscar('correccion', $nCorrecciones), $buscar('ticket', $nTickets), $buscar('manual', $nManuales));
     }
 }

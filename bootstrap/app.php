@@ -46,6 +46,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // semanas) y borrado a los 6 meses para no llenar el disco.
         $schedule->command('wa:media guardar')->everyMinute()->withoutOverlapping();
         $schedule->command('wa:media purgar')->dailyAt('04:10')->withoutOverlapping();
+        // Asistente IA: cada noche mete en su base de conocimiento los tickets resueltos del día
+        // y las correcciones de los agentes. Solo copia texto limpio en nuestra BD (no llama a
+        // ningún proveedor) y solo corre con el asistente encendido.
+        $schedule->command('ai:indexar')->dailyAt('04:30')->withoutOverlapping()
+            ->when(fn () => \App\Models\Setting::get('ai_suggestions_enabled', '0') === '1');
     })
     ->withMiddleware(function (Middleware $middleware): void {
         /*
