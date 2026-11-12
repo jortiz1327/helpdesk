@@ -281,6 +281,22 @@ class AiSuggestionService
         })->all();
     }
 
+    /** Saludo según la hora y si el equipo ya contestó en este ticket (entonces no se repite presentación ni saludo). */
+    private function saludo(object $t): string
+    {
+        $yaRespondio = DB::table('messages')->where('ticket_id', $t->id)->where('direction', 'out')
+            ->where('is_internal_note', 0)->whereNotNull('author_user_id')->exists();
+        if ($yaRespondio) {
+            return "SALUDO Y PRESENTACIÓN (anula lo que digan las instrucciones anteriores)\n"
+                . "- El equipo ya contestó antes en esta conversación: NO saludes, NO te presentes ni repitas «le hablo de AEME Group». Entra directamente en la respuesta.\n"
+                . "- Tampoco repitas la firma ni la despedida larga; basta una frase breve de cierre si procede.";
+        }
+        $h = (int) now()->format('G');
+        $f = $h >= 6 && $h < 14 ? 'Buenos días' : ($h < 21 && $h >= 14 ? 'Buenas tardes' : 'Buenas noches');
+        return "SALUDO Y PRESENTACIÓN (anula lo que digan las instrucciones anteriores)\n"
+            . "- Es el primer mensaje del equipo en esta conversación. Ahora mismo toca «{$f}»: empieza con «{$f}, le hablo de AEME Group.» (en el idioma del cliente, manteniendo el saludo adecuado a la hora).";
+    }
+
     private function instrucciones(object $t, array $faqs, array $ejemplos, array $casos = []): string
     {
         $ruta = resource_path('ai/prompt-soporte.md');
@@ -289,6 +305,7 @@ class AiSuggestionService
             $base = "Eres el asistente del equipo de soporte de AEME. Tratas al cliente de usted, en su idioma, con frases cortas y sin inventar nada. Redactas solo borradores para revisión humana.";
         }
         $s = $base . "\n\n"
+           . $this->saludo($t) . "\n\n"
            . "FORMATO DE SALIDA\n"
            . "- Texto plano, sin Markdown ni HTML. Entrega solo el texto del borrador para el cliente.\n"
            . "- Si el cliente indica su nombre y procede, puedes usarlo en el saludo.\n"
