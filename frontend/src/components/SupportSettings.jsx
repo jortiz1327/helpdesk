@@ -5,6 +5,7 @@ import { Icon } from '../icons.jsx'
 import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import Settings from './Settings.jsx'
+import AiSettings from './AiSettings.jsx'
 
 /* ---------------------------------------------------------------------------
  * CONFIGURACIÓN — solo superadmin / encargado (permiso support.config). Hub con
@@ -46,6 +47,7 @@ const SECCIONES = [
     { key: 'canned',     label: 'Respuestas predefinidas', icon: Icon.quote,  desc: 'Textos que se insertan con «/» al responder.' },
     { key: 'faqs',       label: 'Portal y FAQ',            icon: Icon.globe,  desc: 'Lo que ve el cliente: Centro de atención y Preguntas frecuentes.' },
     { key: 'csat',       label: 'Satisfacción',            icon: Icon.star,   desc: 'Encuesta CSAT del portal (1-5★) al resolver una incidencia.' },
+    { key: 'ai',         label: 'Asistente IA',            icon: Icon.bolt,   desc: 'Sugerencias de respuesta para los agentes, su acierto y su base de conocimiento.' },
   ] },
   { grupo: 'Correo', items: [
     { key: 'email', label: 'Buzón y envío',       icon: Icon.mail,   desc: 'Entrada, salida, pie y diagnóstico.' },
@@ -111,6 +113,7 @@ export default function SupportSettings({ user }) {
           {tab === 'behavior' && <TicketBehavior />}
           {tab === 'sla' && <SlaSettings />}
           {tab === 'csat' && <CsatSettings />}
+          {tab === 'ai' && <AiSettings />}
           {tab === 'hours' && <BusinessHours />}
           {tab === 'security' && <SecuritySettings />}
           {tab === 'cron' && <CronStatus />}

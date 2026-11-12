@@ -39,6 +39,46 @@ class AiSuggestionService
         return Setting::get('ai_suggestions_enabled', '0') === '1' && $this->ai->configured();
     }
 
+    /** ¿Hay clave del proveedor activo? (no dice cuál es) */
+    public function configurado(): bool
+    {
+        return $this->ai->configured();
+    }
+
+    /**
+     * Datos del panel de Ajustes: interruptor, proveedor, acierto medido con las valoraciones
+     * de los agentes, conocimiento indexado y las últimas correcciones. Nunca lleva la clave.
+     */
+    public function panel(): array
+    {
+        $prov = (string) config('ai.provider');
+        $s = DB::table('ai_suggestions');
+        $cuenta = fn (string $estado) => (clone $s)->where('status', $estado)->count();
+        $arriba = (clone $s)->where('rating', 'up')->count();
+        $abajo = (clone $s)->where('rating', 'down')->count();
+
+        return [
+            'enabled'    => Setting::get('ai_suggestions_enabled', '0') === '1',
+            'configured' => $this->ai->configured(),
+            'provider'   => $prov,
+            'model'      => (string) config("ai.providers.$prov.model"),
+            'stats'      => [
+                'total' => (clone $s)->count(), 'ready' => $cuenta('ready'), 'abstained' => $cuenta('abstained'), 'failed' => $cuenta('failed'),
+                'up' => $arriba, 'down' => $abajo, 'used' => (clone $s)->whereNotNull('used_at')->count(),
+                // Acierto = útiles / valoradas. Solo tiene sentido con algunas valoraciones.
+                'accuracy' => ($arriba + $abajo) > 0 ? round($arriba / ($arriba + $abajo) * 100) : null,
+            ],
+            'knowledge'  => [
+                'tickets' => DB::table('ai_documents')->where('source_type', 'ticket')->count(),
+                'manuals' => DB::table('ai_documents')->where('source_type', 'manual')->count(),
+                'last'    => DB::table('ai_documents')->max('indexed_at'),
+            ],
+            'corrections' => DB::table('ai_suggestions as a')->leftJoin('tickets as t', 't.id', '=', 'a.ticket_id')
+                ->where('a.rating', 'down')->whereNotNull('a.correction')->orderByDesc('a.rated_at')->limit(8)
+                ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.rated_at'])->all(),
+        ];
+    }
+
     /**
      * La sugerencia vigente para el último mensaje del cliente; si no hay, se genera.
      * Si el cliente aún no ha escrito nada que contestar, devuelve null.

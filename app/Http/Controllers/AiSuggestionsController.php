@@ -17,6 +17,9 @@ use InvalidArgumentException;
  *   POST ?action=regenerate  ticket      → pide otra
  *   POST ?action=rate  id, rating, correction → 👍 / 👎 (con corrección obligatoria)
  *   POST ?action=used  id                → el agente la usó de base
+ *   GET  ?action=admin                   → panel de Ajustes: estado, acierto, conocimiento (support.config)
+ *   POST ?action=admin_save  enabled     → enciende/apaga el asistente (support.config)
+ *   POST ?action=admin_index             → actualiza la base de conocimiento (support.config)
  */
 class AiSuggestionsController extends Controller
 {
@@ -31,8 +34,43 @@ class AiSuggestionsController extends Controller
             'regenerate' => $this->post($request) ?? $this->suggest($request, true),
             'rate'       => $this->post($request) ?? $this->rate($request),
             'used'       => $this->post($request) ?? $this->used($request),
+            'admin'      => $this->admin($request),
+            'admin_save' => $this->post($request) ?? $this->adminSave($request),
+            'admin_index' => $this->post($request) ?? $this->adminIndex($request),
             default      => response()->json(['ok' => true, 'enabled' => $this->ai->enabled()]),
         };
+    }
+
+    /** Estado del asistente para Ajustes. Nunca devuelve la clave: solo si hay una. */
+    private function admin(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        return response()->json(['ok' => true] + $this->ai->panel());
+    }
+
+    private function adminSave(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        $quiere = filter_var($request->input('enabled'), FILTER_VALIDATE_BOOLEAN);
+        if ($quiere && ! $this->ai->configurado()) {
+            return response()->json(['ok' => false, 'error' => 'Falta la clave del proveedor de IA en el servidor (.env)'], 422);
+        }
+        \App\Models\Setting::put('ai_suggestions_enabled', $quiere ? '1' : '0');
+        return response()->json(['ok' => true] + $this->ai->panel());
+    }
+
+    private function adminIndex(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        $k = app(\App\Services\Ai\AiKnowledge::class);
+        [$nuevos] = $k->indexarTickets();
+        $trozos = $k->indexarManuales();
+        return response()->json(['ok' => true, 'nuevos' => $nuevos, 'trozos' => $trozos] + $this->ai->panel());
+    }
+
+    private function soloConfig(Request $request)
+    {
+        return $request->user()?->can('support.config') ? null : response()->json(['ok' => false, 'error' => 'No tienes permiso'], 403);
     }
 
     private function post(Request $request)

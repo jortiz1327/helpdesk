@@ -129,6 +129,48 @@ class AiSuggestionsTest extends TestCase
         $this->withHeader('X-App-Token', $token)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$ajeno")->assertStatus(404);
         $this->assertSame(0, $this->fake->llamadas);
     }
+
+    private function encargado(): string
+    {
+        $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
+        $u = User::create(['name' => 'Eva', 'email' => 'eva@x.com', 'password' => bcrypt('x')]);
+        $u->assignRole('encargado_soporte');
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        return TokenService::make($u);
+    }
+
+    public function test_el_panel_solo_lo_ve_quien_configura_el_soporte(): void
+    {
+        $token = $this->agente();
+        $this->withHeader('X-App-Token', $token)->getJson('/api/ai_suggestions.php?action=admin')->assertStatus(403);
+        $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=admin_save', ['enabled' => true])->assertStatus(403);
+        $this->assertNull(Setting::get('ai_suggestions_enabled'));
+    }
+
+    public function test_el_panel_enciende_apaga_y_cuenta_el_acierto(): void
+    {
+        $token = $this->encargado();
+        $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=admin_save', ['enabled' => true])
+            ->assertOk()->assertJsonPath('enabled', true)->assertJsonPath('configured', true);
+
+        $tk = $this->ticket('Mi etiqueta no conecta');
+        $id = $this->withHeader('X-App-Token', $token)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->json('suggestion.id');
+        $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $id, 'rating' => 'down', 'correction' => 'Debía pedir el código primero.']);
+
+        $r = $this->withHeader('X-App-Token', $token)->getJson('/api/ai_suggestions.php?action=admin')->assertOk();
+        $r->assertJsonPath('stats.total', 1)->assertJsonPath('stats.down', 1)->assertJsonPath('stats.accuracy', 0);
+        $r->assertJsonPath('corrections.0.correction', 'Debía pedir el código primero.');
+        $this->assertArrayNotHasKey('api_key', $r->json());
+
+        $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=admin_save', ['enabled' => false])->assertOk()->assertJsonPath('enabled', false);
+    }
+
+    public function test_no_se_puede_encender_sin_clave(): void
+    {
+        $this->fake->configurada = false;
+        $this->withHeader('X-App-Token', $this->encargado())->postJson('/api/ai_suggestions.php?action=admin_save', ['enabled' => true])->assertStatus(422);
+        $this->assertNotSame('1', Setting::get('ai_suggestions_enabled'));
+    }
 }
 
 class FakeAi implements AiProvider
@@ -137,10 +179,11 @@ class FakeAi implements AiProvider
     public string $ultimoSistema = '';
     public string $respuesta = 'Hola Marta, prueba a reiniciarla.';
     public bool $falla = false;
+    public bool $configurada = true;
 
     public function configured(): bool
     {
-        return true;
+        return $this->configurada;
     }
 
     public function complete(string $system, array $messages): array
