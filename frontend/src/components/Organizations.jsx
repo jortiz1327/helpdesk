@@ -79,14 +79,16 @@ export default function Organizations({ onVerTickets }) {
 
   return (
     <>
-      <header className="page-head">
-        <span className="sc-ic"><Icon.building style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Organización</h1></div>
-        <div className="kb-seg" style={{ marginLeft: 16 }}>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.building /></span>
+        <div className="ds-head-tx">
+          <h1>Organización</h1>
+        </div>
+        <div className="spacer" />
+        <div className="ds-tabs" role="tablist">
           <button className={mode === 'arbol' ? 'on' : ''} onClick={() => setMode('arbol')}>Árbol</button>
           <button className={mode === 'informe' ? 'on' : ''} onClick={() => setMode('informe')}>Informe</button>
         </div>
-        <div className="spacer" />
         {mode === 'arbol' && <button className="btn" onClick={newGrupo}><Icon.plus /> Nuevo grupo</button>}
       </header>
 

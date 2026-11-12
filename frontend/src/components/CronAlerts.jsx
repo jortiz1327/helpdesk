@@ -86,10 +86,12 @@ export default function CronAlerts({ embedded = false, onCount }) {
     <>
       {/* Dentro de «Gestión de tickets» la cabecera ya la pone la pantalla padre. */}
       {!embedded && (
-        <header className="page-head">
-          <span className="sc-ic"><Icon.bolt style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-          <div><h1>Crones</h1></div>
-          <span className="sub">· Tareas programadas que están fallando. Agrupadas por cron, no por correo.</span>
+        <header className="page-head ds-head">
+          <span className="ds-head-ic"><Icon.bolt /></span>
+          <div className="ds-head-tx">
+            <h1>Crones</h1>
+            <span className="sub">Tareas programadas que están fallando. Agrupadas por cron, no por correo.</span>
+          </div>
           <div className="spacer" />
         </header>
       )}

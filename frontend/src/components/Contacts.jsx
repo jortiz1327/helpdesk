@@ -99,10 +99,12 @@ export default function Contacts({ onOpen, area = '' }) {
 
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.user style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Contactos</h1></div>
-        <span className="sub">· Etiqueta por sectores y crea segmentos</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.user /></span>
+        <div className="ds-head-tx">
+          <h1>Contactos</h1>
+          <span className="sub">Etiqueta por sectores y crea segmentos</span>
+        </div>
         <div className="spacer" />
         {/* Conmutador de vista: misma info (contactos + etiquetas), lista o kanban */}
         <div className="view-toggle">

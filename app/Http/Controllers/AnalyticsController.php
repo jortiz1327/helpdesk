@@ -111,8 +111,24 @@ class AnalyticsController extends Controller
             $c->delivered = (int) $c->delivered; $c->read = (int) $c->readed; unset($c->readed);
         }
 
+        // ---- Tendencia: mensajes enviados y entregados por mes (últimos 12, por sent_at) ----
+        $desde = date('Y-m-01 00:00:00', strtotime('-11 months', strtotime(date('Y-m-01'))));
+        $porMes = collect(DB::select("
+            SELECT DATE_FORMAT(sent_at, '%Y-%m') m,
+                   SUM(status IN ('sent','delivered','read')) sent,
+                   SUM(status IN ('delivered','read'))        delivered
+            FROM campaign_recipients WHERE sent_at >= ? GROUP BY m", [$desde]))->keyBy('m');
+        $months = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $m = date('Y-m', strtotime("-{$i} months", strtotime(date('Y-m-01'))));
+            $months[] = ['m' => $m, 'sent' => (int) ($porMes[$m]->sent ?? 0), 'delivered' => (int) ($porMes[$m]->delivered ?? 0)];
+        }
+        $kpi['campaigns_prev'] = (int) DB::table('campaigns')->where('created_at', '>=', date('Y-m-01 00:00:00', strtotime('-1 month', strtotime(date('Y-m-01')))))
+            ->where('created_at', '<', $mes)->count();
+
         return response()->json([
             'ok'        => true,
+            'months'    => $months,
             'kpi'       => $kpi,
             'channels'  => $channels,
             'forms'     => $forms,

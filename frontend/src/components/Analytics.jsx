@@ -3,49 +3,25 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import { fmtDateShort } from '../util.js'
 import LoadError from './LoadError.jsx'
+import { nf, DsKpi, DsHead, DsTabs } from './ds.jsx'
+
+/* ---------------------------------------------------------------------------
+ * ANALÍTICAS del área de Campañas. Mismo lenguaje que el Centro de Soporte y las
+ * Estadísticas de Garantías: cabecera con pestañas a la derecha, una cifra que
+ * manda (la tasa de entrega), KPIs del mes frente al anterior con su tendencia,
+ * WhatsApp frente a correo y tablas limpias.
+ * ------------------------------------------------------------------------- */
 
 const eur = (n) => '€' + Number(n || 0).toFixed(2).replace('.', ',')
-const nf = (n) => Number(n || 0).toLocaleString('es-ES')
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
-const catColor = (c) => ({ MARKETING: 'var(--warn)', UTILITY: 'var(--primary)', AUTHENTICATION: 'var(--info)' }[c] || 'var(--secondary)')
-const ESTADO = { scheduled: 'Programada', sending: 'Enviando', sent: 'Enviada', done: 'Enviada', completed: 'Enviada', canceled: 'Cancelada' }
+const ESTADO = { scheduled: 'Programada', sending: 'Enviando', sent: 'Enviada', done: 'Enviada', completed: 'Enviada', canceled: 'Cancelada', failed: 'Con errores', draft: 'Borrador' }
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
-const MROW = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13.5, padding: '7px 0', borderBottom: '1px solid var(--line)' }
-const TD = { padding: '9px 12px', borderBottom: '1px solid var(--line)', fontSize: 13, whiteSpace: 'nowrap' }
-const TH = { ...TD, textAlign: 'left', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--ink-3, #8a94a3)', fontWeight: 700 }
-
-// Barras horizontales genéricas (para «contactos por etiqueta»)
-function Bars({ items, color }) {
-  const max = Math.max(1, ...items.map((i) => i.v))
-  if (!items.length) return <p className="muted" style={{ fontSize: 12.5 }}>Sin datos todavía.</p>
-  return (
-    <div className="an-bars">
-      {items.map((it, i) => (
-        <div className="an-bar-row" key={i}>
-          <span className="an-bar-label" title={it.k}>{it.k}</span>
-          <div className="an-bar-track"><span className="an-bar-fill" style={{ width: Math.max(2, (it.v / max) * 100) + '%', background: it.c || color || 'var(--primary)' }} /></div>
-          <span className="an-bar-val">{it.v}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// Mini-panel de un canal (WhatsApp / Correo) con sus tasas.
-function ChanBox({ label, dot, c }) {
-  const line = { ...MROW, padding: '5px 0', border: 0, fontSize: 12.5, color: 'var(--ink-2)' }
-  return (
-    <div className="an-chan">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, fontSize: 13, marginBottom: 8 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: dot }} />{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800 }}>{nf(c.sent)}</div>
-      <div className="muted" style={{ fontSize: 12 }}>enviados</div>
-      <div style={line}><span>Entregados</span><b>{pct(c.delivered, c.sent)}%</b></div>
-      {label === 'WhatsApp'
-        ? <div style={line}><span>Leídos</span><b>{pct(c.read, c.sent)}%</b></div>
-        : <div style={line}><span>Fallidos</span><b style={{ color: c.failed ? 'var(--danger)' : 'inherit' }}>{c.failed}</b></div>}
-    </div>
-  )
-}
+const Canal = ({ ch }) => (
+  <span className={`an2-ch ${ch === 'email' ? 'mail' : 'wa'}`}>
+    {ch === 'email' ? <><Icon.mail /> Correo</> : <><Icon.whatsapp /> WhatsApp</>}
+  </span>
+)
 
 export default function Analytics() {
   const [d, setD] = useState(null)
@@ -54,31 +30,19 @@ export default function Analytics() {
   const load = useCallback(() => { setErr(false); api.analytics().then((r) => r.ok ? setD(r) : setErr(true)).catch(() => setErr(true)) }, [])
   useEffect(() => { load() }, [load])
 
-  const tabs = (
-    <div className="kb-seg" style={{ marginBottom: 16 }}>
-      <button className={tab === 'resumen' ? 'on' : ''} onClick={() => setTab('resumen')}>Resumen</button>
-      <button className={tab === 'historial' ? 'on' : ''} onClick={() => setTab('historial')}>Historial de campañas</button>
-    </div>
-  )
-
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.chart style={{ width: 17, height: 17, fill: 'var(--primary)' }} /></span>
-        <div><h1>Analíticas</h1></div>
-        <span className="sub">· Campañas, difusiones y formularios</span>
-        <div className="spacer" />
+      <DsHead icon={Icon.chart} title="Analíticas" sub="Cómo rinden tus campañas">
+        <DsTabs value={tab} onChange={setTab} items={[['resumen', 'Resumen'], ['historial', 'Historial', Icon.send]]} />
         <button className="icon-btn" title="Actualizar" onClick={load}><Icon.refresh /></button>
-      </header>
+      </DsHead>
 
       <div className="page-scroll">
         <div className="page" style={{ maxWidth: 1180 }}>
-          {tabs}
-
           {tab === 'historial' ? <CampaignHistory /> : (
             err && !d ? <LoadError onRetry={load} msg="No se pudieron cargar las analíticas" />
               : !d ? <div className="center-load"><div className="spinner" /></div>
-                : <Resumen d={d} />
+                : <Resumen d={d} onHistorial={() => setTab('historial')} />
           )}
         </div>
       </div>
@@ -87,95 +51,152 @@ export default function Analytics() {
 }
 
 /* --------------------------- Resumen (campañas) --------------------------- */
-function Resumen({ d }) {
+function Resumen({ d, onHistorial }) {
   const k = d.kpi
-  const cards = [
-    { label: 'Campañas lanzadas', value: nf(k.campaigns_total), sub: `${k.campaigns_month} este mes`, color: 'var(--primary)' },
-    { label: 'Mensajes enviados', value: nf(k.msgs_sent), sub: `${nf(k.msgs_delivered)} entregados`, color: 'var(--info)' },
-    { label: 'Tasa de entrega', value: k.delivery_rate + '%', sub: `${k.read_rate}% leídos (WhatsApp)`, color: 'var(--secondary)' },
-    { label: 'Bajas (opt-out)', value: nf(k.optout_total), sub: `+${k.optout_month} este mes`, color: 'var(--danger)' },
-  ]
   const f = d.forms
   const c = d.contacts
+  const meses = d.months || []
+  const este = meses[meses.length - 1]
+  const antes = meses[meses.length - 2]
   const labelsTop = [...(d.by_label || [])].sort((a, b) => Number(b.n) - Number(a.n)).slice(0, 8)
+  const wa = d.channels.whatsapp, em = d.channels.email
 
   return (
     <>
-      <div className="stat-grid">
-        {cards.map((c) => (
-          <div className="stat-card" key={c.label}>
-            <div className="stat-num">{c.value}</div>
-            <div className="stat-sub">{c.label}</div>
-            <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{c.sub}</div>
-          </div>
-        ))}
+      {/* --- La cifra que manda y las que la acompañan --- */}
+      <div className="ds-hero">
+        <button className="ds-hero-main" onClick={onHistorial}>
+          <span className="k">Tasa de entrega</span>
+          <b className="v">{k.delivery_rate}%</b>
+          <span className="h">
+            <b>{nf(k.msgs_delivered)}</b> de {nf(k.msgs_sent)} mensajes entregados · <b>{k.read_rate}%</b> leídos en WhatsApp
+          </span>
+          <span className="ds-hero-go">Ver historial <Icon.chevron /></span>
+        </button>
+        <div className="ds-kpis">
+          <DsKpi k="Mensajes este mes" v={este?.sent ?? 0} prev={antes?.sent} good vs="el mes anterior"
+            h={este ? `${nf(este.delivered)} entregados · últimos 12 meses` : ' '} spark={meses.map((m) => m.sent)} />
+          <DsKpi k="Campañas este mes" v={k.campaigns_month} prev={k.campaigns_prev} good vs="el mes anterior"
+            h={`${nf(k.campaigns_total)} lanzadas en total`} />
+          <DsKpi k="Bajas este mes" v={k.optout_month} tone={k.optout_month > 0 ? 'bad' : null}
+            h={`${nf(k.optout_total)} dados de baja en total`} />
+          <DsKpi k="Contactos nuevos este mes" v={c.new_month} h={`${nf(c.total)} contactos de Campañas`} />
+        </div>
       </div>
 
       <div className="an-grid">
-        {/* Rendimiento por canal */}
+        {/* WhatsApp frente a correo: mismas filas, para comparar de un vistazo */}
         <div className="card an-card">
-          <div className="an-h"><Icon.send /> Rendimiento por canal</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <ChanBox label="WhatsApp" dot="var(--secondary)" c={d.channels.whatsapp} />
-            <ChanBox label="Correo" dot="var(--info)" c={d.channels.email} />
+          <div className="an-h"><Icon.send /> WhatsApp frente a correo</div>
+          <div className="an2-vs">
+            <span />
+            <span className="an2-vs-h"><Icon.whatsapp /> WhatsApp</span>
+            <span className="an2-vs-h"><Icon.mail /> Correo</span>
+
+            <span className="an2-vs-k">Enviados</span>
+            <b>{nf(wa.sent)}</b><b>{nf(em.sent)}</b>
+
+            <span className="an2-vs-k">Entregados</span>
+            <Tasa v={pct(wa.delivered, wa.sent)} /><Tasa v={pct(em.delivered, em.sent)} />
+
+            <span className="an2-vs-k">Leídos</span>
+            <Tasa v={pct(wa.read, wa.sent)} /><span className="an2-na" title="El correo no cuenta aperturas">—</span>
+
+            <span className="an2-vs-k">Fallidos</span>
+            <b className={wa.failed ? 'an2-bad' : ''}>{nf(wa.failed)}</b><b className={em.failed ? 'an2-bad' : ''}>{nf(em.failed)}</b>
           </div>
         </div>
 
         {/* Formularios */}
         <div className="card an-card">
           <div className="an-h"><Icon.forms /> Formularios</div>
-          <div style={MROW}><span>Formularios publicados</span><b>{f.published}</b></div>
-          <div style={MROW}><span>Veces enviado</span><b>{nf(f.sends)}</b></div>
-          <div style={MROW}><span>Respuestas recibidas</span><b style={{ color: 'var(--secondary)' }}>{nf(f.submissions)}</b></div>
-          <div style={{ ...MROW, borderBottom: 0 }}><span>Tasa de respuesta</span><b style={{ color: 'var(--secondary)' }}>{f.response_rate}%</b></div>
+          <div className="an2-big"><b>{f.response_rate}%</b><span>de los formularios enviados se responden</span></div>
+          <dl className="an2-dl">
+            <div><dt>Publicados</dt><dd>{nf(f.published)}</dd></div>
+            <div><dt>Veces enviado</dt><dd>{nf(f.sends)}</dd></div>
+            <div><dt>Respuestas recibidas</dt><dd>{nf(f.submissions)}</dd></div>
+          </dl>
         </div>
 
         {/* Base de contactos */}
         <div className="card an-card">
           <div className="an-h"><Icon.user /> Base de contactos</div>
-          <div style={MROW}><span>Alcanzables por WhatsApp</span><b>{nf(c.whatsapp)}</b></div>
-          <div style={MROW}><span>Alcanzables por correo</span><b>{nf(c.email)}</b></div>
-          <div style={{ ...MROW, borderBottom: 0 }}><span>Dados de baja</span><b style={{ color: c.optout ? 'var(--danger)' : 'inherit' }}>{nf(c.optout)}</b></div>
-          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>+{nf(c.new_month)} contactos nuevos este mes · {nf(c.total)} en total</p>
+          <dl className="an2-dl">
+            <div><dt>Alcanzables por WhatsApp</dt><dd>{nf(c.whatsapp)}</dd></div>
+            <div><dt>Alcanzables por correo</dt><dd>{nf(c.email)}</dd></div>
+            <div><dt>Dados de baja</dt><dd className={c.optout ? 'an2-bad' : ''}>{nf(c.optout)}</dd></div>
+          </dl>
         </div>
 
         {/* Contactos por etiqueta */}
         <div className="card an-card">
           <div className="an-h"><Icon.tag /> Contactos por etiqueta</div>
-          <Bars items={labelsTop.map((l) => ({ k: l.name, v: Number(l.n), c: l.color }))} />
+          {!labelsTop.length ? <p className="muted" style={{ fontSize: 12.5 }}>Sin datos todavía.</p> : (
+            <div className="sc-bars ds-bars">
+              {(() => {
+                const max = Math.max(1, ...labelsTop.map((l) => Number(l.n)))
+                return labelsTop.map((l) => (
+                  <div key={l.name} className="sc-bar-row">
+                    <span className="an2-lbl" title={l.name}><i style={{ background: l.color || 'var(--primary)' }} />{l.name}</span>
+                    <span className="sc-bar"><i style={{ width: `${(Number(l.n) / max) * 100}%` }} /></span>
+                    <span className="sc-bar-n">{nf(l.n)}</span>
+                  </div>
+                ))
+              })()}
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Mensajes por mes: barras simples, una por mes, con la cifra al pasar el ratón */}
+      {meses.some((m) => m.sent) ? (
+        <div className="card an-card an2-mes">
+          <div className="an-h"><Icon.chart /> Mensajes por mes</div>
+          <div className="an2-cols">
+            {(() => {
+              const top = Math.max(1, ...meses.map((m) => m.sent))
+              return meses.map((m) => (
+                <div key={m.m} className="an2-col" title={`${MESES[Number(m.m.slice(5)) - 1]} ${m.m.slice(0, 4)}: ${nf(m.sent)} enviados, ${nf(m.delivered)} entregados`}>
+                  <span className="an2-col-bar"><i style={{ height: `${(m.sent / top) * 100}%` }}><em style={{ height: `${m.sent ? (m.delivered / m.sent) * 100 : 0}%` }} /></i></span>
+                  <small>{MESES[Number(m.m.slice(5)) - 1]}</small>
+                </div>
+              ))
+            })()}
+          </div>
+          <p className="an2-leg"><i className="s" /> Enviados <i className="d" /> Entregados</p>
+        </div>
+      ) : null}
+
       {/* Últimas campañas */}
-      <div className="card" style={{ padding: 0, marginTop: 14, overflowX: 'auto' }}>
-        <div className="an-h" style={{ padding: '14px 16px 0' }}><Icon.send /> Últimas campañas</div>
+      <div className="card an2-tcard">
+        <div className="an-h"><Icon.send /> Últimas campañas <span className="spacer" /><button className="lnk" onClick={onHistorial}>Ver todas</button></div>
         {(!d.recent || d.recent.length === 0) ? (
-          <p className="muted" style={{ padding: '10px 16px 16px', fontSize: 12.5 }}>Aún no has lanzado campañas.</p>
+          <p className="muted" style={{ padding: '0 0 6px', fontSize: 12.5 }}>Aún no has lanzado campañas.</p>
         ) : (
-          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 640, marginTop: 8 }}>
-            <thead><tr>
-              <th style={TH}>Campaña</th><th style={TH}>Canal</th>
-              <th style={{ ...TH, textAlign: 'right' }}>Enviados</th>
-              <th style={{ ...TH, textAlign: 'right' }}>Entrega</th>
-              <th style={{ ...TH, textAlign: 'right' }}>Lectura</th>
-            </tr></thead>
-            <tbody>
-              {d.recent.map((c) => (
-                <tr key={c.id}>
-                  <td style={{ ...TD, fontWeight: 600, whiteSpace: 'normal', maxWidth: 240 }}>{c.title}</td>
-                  <td style={TD}><span className="pill gray sm" style={{ color: c.channel === 'email' ? 'var(--info)' : 'var(--secondary)' }}>{c.channel === 'email' ? 'Correo' : 'WhatsApp'}</span></td>
-                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{nf(c.sent)}</td>
-                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{pct(c.delivered, c.sent)}%</td>
-                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.channel === 'email' ? '—' : pct(c.read, c.sent) + '%'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="an2-scroll">
+            <table className="an2-table">
+              <thead><tr><th>Campaña</th><th>Canal</th><th className="r">Enviados</th><th className="r">Entrega</th><th className="r">Lectura</th></tr></thead>
+              <tbody>
+                {d.recent.map((r) => (
+                  <tr key={r.id}>
+                    <td className="t">{r.title}</td>
+                    <td><Canal ch={r.channel} /></td>
+                    <td className="r">{nf(r.sent)}</td>
+                    <td className="r">{pct(r.delivered, r.sent)}%</td>
+                    <td className="r">{r.channel === 'email' ? '—' : pct(r.read, r.sent) + '%'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </>
   )
 }
+
+// Una tasa con su barrita: la cifra manda, la barra solo da la proporción.
+const Tasa = ({ v }) => <span className="an2-tasa"><b>{v}%</b><i><em style={{ width: `${v}%` }} /></i></span>
 
 /* -------------------- Historial / trazabilidad de campañas --------------------
  * Cada campaña: quién la lanzó, cuándo, destino, plantilla, categoría, resultados
@@ -192,61 +213,57 @@ function CampaignHistory() {
   if (!d) return <div className="center-load"><div className="spinner" /></div>
 
   const t = d.totals
-  const cards = d.show_cost ? [
-    { label: 'Gasto este mes', value: eur(t.month_cost), sub: `${t.month_count} campaña${t.month_count === 1 ? '' : 's'}`, color: 'var(--warn)' },
-    { label: 'Gasto (histórico)', value: eur(t.all_cost), sub: `${t.all_count} campañas`, color: 'var(--primary)' },
-  ] : [
-    { label: 'Campañas este mes', value: t.month_count, sub: 'lanzadas este mes', color: 'var(--primary)' },
-    { label: 'Campañas (histórico)', value: t.all_count, sub: 'en total', color: 'var(--info)' },
-  ]
 
   return (
     <>
-      <div className="stat-grid">
-        {cards.map((c) => (
-          <div className="stat-card" key={c.label}>
-            <div className="stat-num">{c.value}</div>
-            <div className="stat-sub">{c.label}</div>
-            <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{c.sub}</div>
-          </div>
-        ))}
+      <div className="ds-kpis an2-kpis">
+        {d.show_cost ? (
+          <>
+            <DsKpi k="Gasto este mes" v={t.month_cost} fmt={eur} h={`${t.month_count} campaña${t.month_count === 1 ? '' : 's'} este mes`} />
+            <DsKpi k="Gasto histórico" v={t.all_cost} fmt={eur} h={`${nf(t.all_count)} campañas en total`} />
+          </>
+        ) : (
+          <>
+            <DsKpi k="Campañas este mes" v={t.month_count} h="Lanzadas este mes" />
+            <DsKpi k="Campañas en total" v={t.all_count} h="Desde el principio" />
+          </>
+        )}
       </div>
 
       {d.campaigns.length === 0 ? (
         <div className="empty"><div className="ico"><Icon.send /></div><p>Aún no hay campañas.</p></div>
       ) : (
-        <div className="card" style={{ padding: 0, overflowX: 'auto', marginTop: 16 }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 980 }}>
-            <thead>
-              <tr>
-                <th style={TH}>Fecha</th><th style={TH}>Campaña</th><th style={TH}>Canal</th>
-                <th style={TH}>Destino</th><th style={TH}>Plantilla</th><th style={TH}>Categoría</th>
-                <th style={TH}>Lanzó</th><th style={{ ...TH, textAlign: 'right' }}>Dest.</th>
-                <th style={{ ...TH, textAlign: 'right' }}>Entreg.</th><th style={{ ...TH, textAlign: 'right' }}>Leídos</th>
-                <th style={{ ...TH, textAlign: 'right' }}>Fallidos</th><th style={TH}>Estado</th>
-                {d.show_cost && <th style={{ ...TH, textAlign: 'right' }}>Coste</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {d.campaigns.map((c) => (
-                <tr key={c.id}>
-                  <td style={TD}>{fmtDateShort(c.created_at)}</td>
-                  <td style={{ ...TD, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{c.title}</td>
-                  <td style={TD}>{c.channel === 'email' ? 'Correo' : 'WhatsApp'}</td>
-                  <td style={{ ...TD, whiteSpace: 'normal', maxWidth: 160 }}>{c.source_name || '—'}</td>
-                  <td style={TD}>{c.template_name || '—'}</td>
-                  <td style={TD}>{c.category ? <span className="pill gray sm" style={{ color: catColor(c.category) }}>{c.category}</span> : '—'}</td>
-                  <td style={TD}>{c.by_name || <span className="muted">—</span>}</td>
-                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.total}</td>
-                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.delivered}</td>
-                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c.read_count}</td>
-                  <td style={{ ...TD, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: c.failed ? 'var(--danger)' : 'inherit' }}>{c.failed}</td>
-                  <td style={TD}><span className="pill gray sm">{ESTADO[c.status] || c.status}</span></td>
-                  {d.show_cost && <td style={{ ...TD, textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{c.channel === 'email' ? '—' : (c.cost > 0 ? eur(c.cost) : 'Gratis')}</td>}
+        <div className="card an2-tcard">
+          <div className="an2-scroll">
+            <table className="an2-table wide">
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Campaña</th><th>Canal</th><th>Destino</th><th>Plantilla</th><th>Categoría</th><th>Lanzó</th>
+                  <th className="r">Dest.</th><th className="r">Entreg.</th><th className="r">Leídos</th><th className="r">Fallidos</th><th>Estado</th>
+                  {d.show_cost && <th className="r">Coste</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {d.campaigns.map((c) => (
+                  <tr key={c.id}>
+                    <td>{fmtDateShort(c.created_at)}</td>
+                    <td className="t">{c.title}</td>
+                    <td><Canal ch={c.channel} /></td>
+                    <td className="w">{c.source_name || '—'}</td>
+                    <td>{c.template_name || '—'}</td>
+                    <td>{c.category ? <span className="an2-cat">{c.category.toLowerCase()}</span> : '—'}</td>
+                    <td>{c.by_name || <span className="muted">—</span>}</td>
+                    <td className="r">{nf(c.total)}</td>
+                    <td className="r">{nf(c.delivered)}</td>
+                    <td className="r">{nf(c.read_count)}</td>
+                    <td className={`r${c.failed ? ' an2-bad' : ''}`}>{nf(c.failed)}</td>
+                    <td><span className="an2-st">{ESTADO[c.status] || c.status}</span></td>
+                    {d.show_cost && <td className="r b">{c.channel === 'email' ? '—' : (c.cost > 0 ? eur(c.cost) : 'Gratis')}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       {d.show_cost && <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Coste real = entregados × tarifa aplicada al lanzar. Las campañas anteriores a esta función no tienen tarifa guardada (coste €0,00).</p>}

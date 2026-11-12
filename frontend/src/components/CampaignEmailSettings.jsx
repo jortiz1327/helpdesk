@@ -65,10 +65,12 @@ export default function CampaignEmailSettings() {
 
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.mail style={{ width: 17, height: 17, fill: 'var(--primary)' }} /></span>
-        <div><h1>Correo de campañas</h1></div>
-        <span className="sub">· Remitente SMTP para las campañas por correo</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.mail /></span>
+        <div className="ds-head-tx">
+          <h1>Correo de campañas</h1>
+          <span className="sub">Remitente SMTP para las campañas por correo</span>
+        </div>
         <div className="spacer" />
       </header>
 

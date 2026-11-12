@@ -279,10 +279,12 @@ export default function Forms() {
 
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.forms style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <div><h1>Formularios de WhatsApp</h1></div>
-        <span className="sub">· Capta leads con formularios</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.forms /></span>
+        <div className="ds-head-tx">
+          <h1>Formularios de WhatsApp</h1>
+          <span className="sub">Capta leads con formularios</span>
+        </div>
         <div className="spacer" />
         <button className="btn ghost" disabled={syncing} onClick={sync}><Icon.refresh /> {syncing ? 'Sincronizando…' : 'Sincronizar de Meta'}</button>
         <button className="btn" onClick={() => setEditing(null)}><Icon.plus /> Nuevo formulario</button>

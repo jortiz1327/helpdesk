@@ -914,10 +914,12 @@ export default function Automations() {
 
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.bolt style={{ width: 18, height: 18, fill: 'var(--primary)' }} /></span>
-        <h1>Automatizaciones</h1>
-        <span className="sub">· Flujos de chatbot con nodos</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.bolt /></span>
+        <div className="ds-head-tx">
+          <h1>Automatizaciones</h1>
+          <span className="sub">Flujos de chatbot con nodos</span>
+        </div>
         <div className="spacer" />
         <button className="btn" onClick={() => setEditing(null)}><Icon.plus /> Nuevo flujo</button>
       </header>

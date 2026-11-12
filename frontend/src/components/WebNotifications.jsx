@@ -107,10 +107,12 @@ export default function WebNotifications({ user, onUser }) {
 
   return (
     <>
-      <header className="page-head">
-        <span className="ic" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--primary-soft)', display: 'grid', placeItems: 'center' }}><Icon.bell style={{ width: 17, height: 17, fill: 'var(--primary)' }} /></span>
-        <div><h1>Notificaciones</h1></div>
-        <span className="sub">· Avisos del navegador y por correo</span>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.bell /></span>
+        <div className="ds-head-tx">
+          <h1>Notificaciones</h1>
+          <span className="sub">Avisos del navegador y por correo</span>
+        </div>
         <div className="spacer" />
         <button className="btn ghost" onClick={test}><Icon.bell /> Probar</button>
       </header>
