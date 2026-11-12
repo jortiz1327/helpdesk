@@ -5,41 +5,34 @@ namespace App\Services\Ai;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
-/** Proveedor Anthropic (API Messages). La clave sale de config('ai.api_key'). */
+/** Proveedor Anthropic (API Messages). */
 class AnthropicProvider implements AiProvider
 {
-    public function configured(): bool
+    use ConfiguraProveedor;
+
+    public function name(): string
     {
-        return trim((string) config('ai.api_key')) !== '';
+        return 'anthropic';
     }
 
     public function complete(string $system, array $messages): array
     {
-        if (! $this->configured()) {
-            throw new AiException('La IA no está configurada');
-        }
+        $this->exigirClave();
 
         try {
-            $r = Http::timeout((int) config('ai.timeout', 30))
-                ->withHeaders([
-                    'x-api-key'         => (string) config('ai.api_key'),
-                    'anthropic-version' => '2023-06-01',
-                ])
+            $r = Http::timeout($this->timeout())
+                ->withHeaders(['x-api-key' => $this->key(), 'anthropic-version' => '2023-06-01'])
                 ->acceptJson()
-                ->post(rtrim((string) config('ai.base_url'), '/') . '/v1/messages', [
-                    'model'      => config('ai.model'),
-                    'max_tokens' => (int) config('ai.max_tokens', 700),
+                ->post($this->url('/v1/messages'), [
+                    'model'      => $this->model(),
+                    'max_tokens' => $this->maxTokens(),
                     'system'     => $system,
                     'messages'   => $messages,
                 ]);
-        } catch (Throwable $e) {
+        } catch (Throwable) {
             throw new AiException('No se pudo contactar con la IA');
         }
-
-        if (! $r->successful()) {
-            // El cuerpo del error del proveedor no se enseña (puede llevar datos de la petición).
-            throw new AiException('La IA respondió con un error (' . $r->status() . ')');
-        }
+        $this->exigirOk($r);
 
         $text = '';
         foreach ((array) $r->json('content', []) as $bloque) {
@@ -50,7 +43,7 @@ class AnthropicProvider implements AiProvider
 
         return [
             'text'          => trim($text),
-            'model'         => (string) ($r->json('model') ?: config('ai.model')),
+            'model'         => (string) ($r->json('model') ?: $this->model()),
             'input_tokens'  => $r->json('usage.input_tokens'),
             'output_tokens' => $r->json('usage.output_tokens'),
         ];

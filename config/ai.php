@@ -2,17 +2,37 @@
 
 /*
  * Asistente de IA del helpdesk (sugerencias de respuesta y, más adelante, respuesta
- * automática fuera de horario). La clave va SOLO en .env (AI_API_KEY); sin ella el
- * asistente queda apagado y no sale ningún dato hacia fuera.
+ * automática fuera de horario). Las claves van SOLO en .env; sin la del proveedor activo
+ * el asistente queda apagado y no sale ningún dato hacia fuera.
  *
- * El proveedor está detrás de App\Services\Ai\AiProvider, así que cambiar de modelo o de
- * empresa es tocar este archivo (y, si hace falta, escribir otro proveedor).
+ * El proveedor activo (AI_PROVIDER) está detrás de App\Services\Ai\AiProvider: cambiar de
+ * empresa es cambiar AI_PROVIDER. Cada proveedor tiene su clave, modelo y URL, para poder
+ * compararlos a la vez con `php artisan ai:comparar`.
+ *
+ * AI_API_KEY / AI_MODEL / AI_BASE_URL siguen valiendo para el proveedor activo.
  */
+$activo = env('AI_PROVIDER', 'anthropic');
+
 return [
-    'provider'   => env('AI_PROVIDER', 'anthropic'),
-    'api_key'    => env('AI_API_KEY'),
-    'model'      => env('AI_MODEL', 'claude-haiku-5-5'),
-    'base_url'   => env('AI_BASE_URL', 'https://api.anthropic.com'),
+    'provider'   => $activo,
     'max_tokens' => (int) env('AI_MAX_TOKENS', 700),
     'timeout'    => (int) env('AI_TIMEOUT', 30),
+
+    'providers' => [
+        'anthropic' => [
+            'api_key'  => env('AI_KEY_ANTHROPIC', $activo === 'anthropic' ? env('AI_API_KEY') : null),
+            'model'    => env('AI_MODEL_ANTHROPIC', $activo === 'anthropic' ? env('AI_MODEL', 'claude-haiku-5-5') : 'claude-haiku-5-5'),
+            'base_url' => env('AI_BASE_URL_ANTHROPIC', 'https://api.anthropic.com'),
+        ],
+        'gemini' => [
+            'api_key'  => env('AI_KEY_GEMINI', $activo === 'gemini' ? env('AI_API_KEY') : null),
+            'model'    => env('AI_MODEL_GEMINI', $activo === 'gemini' ? env('AI_MODEL', 'gemini-2.5-flash') : 'gemini-2.5-flash'),
+            'base_url' => env('AI_BASE_URL_GEMINI', 'https://generativelanguage.googleapis.com'),
+        ],
+        'mistral' => [
+            'api_key'  => env('AI_KEY_MISTRAL', $activo === 'mistral' ? env('AI_API_KEY') : null),
+            'model'    => env('AI_MODEL_MISTRAL', $activo === 'mistral' ? env('AI_MODEL', 'mistral-small-latest') : 'mistral-small-latest'),
+            'base_url' => env('AI_BASE_URL_MISTRAL', 'https://api.mistral.ai'),
+        ],
+    ],
 ];

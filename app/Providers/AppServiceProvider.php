@@ -25,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
         config(['database.connections.mysql.timezone' => $offset]);
 
         // Proveedor de IA (sugerencias de respuesta). Cambiar de empresa es cambiar esta línea.
-        $this->app->bind(\App\Services\Ai\AiProvider::class, \App\Services\Ai\AnthropicProvider::class);
+        $this->app->bind(\App\Services\Ai\AiProvider::class, fn () => \App\Services\Ai\AiProviders::activo());
     }
 
     public function boot(): void

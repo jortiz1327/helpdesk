@@ -25,6 +25,9 @@ class AiSuggestionService
     private const MAX_EJEMPLOS = 4;
     private const MAX_MENSAJES = 10;
 
+    private bool $anonimizar = false;
+    private string $nombreCliente = '';
+
     public function __construct(protected AiProvider $ai)
     {
     }
@@ -60,40 +63,58 @@ class AiSuggestionService
 
     private function generate(int $ticketId, int $messageId, ?int $userId): object
     {
-        $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
-            ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
-            ->where('t.id', $ticketId)
-            ->first(['t.id', 't.subject', 't.category_id', 't.channel', 'c.name as contact_name', 'cat.name as category_name']);
-
-        $conversacion = $this->conversacion($ticketId);
-        $pregunta = $this->ultimaDelCliente($conversacion);
-        $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
-        $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
-
-        $fila = [
+        $fila = $this->redactar($ticketId, $this->ai) + [
             'ticket_id' => $ticketId, 'trigger_message_id' => $messageId, 'mode' => 'suggest',
-            'sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id')]),
             'created_by' => $userId, 'created_at' => now(), 'updated_at' => now(),
         ];
-
-        try {
-            $r = $this->ai->complete(
-                $this->instrucciones($t, $faqs, $ejemplos),
-                $this->comoTurnos($conversacion),
-            );
-            $texto = trim($r['text']);
-            $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
-            $fila += [
-                'status' => $sabe ? 'ready' : 'abstained', 'body' => $sabe ? $texto : null,
-                'model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens'],
-            ];
-        } catch (Throwable $e) {
-            report($e);
-            $fila += ['status' => 'failed', 'error' => mb_substr($e instanceof AiException ? $e->getMessage() : 'Error inesperado', 0, 250)];
-        }
-
         $id = DB::table('ai_suggestions')->insertGetId($fila);
         return DB::table('ai_suggestions')->where('id', $id)->first();
+    }
+
+    /**
+     * Pide el borrador a un proveedor SIN guardar nada (la fila la compone quien llama).
+     * Lo usa también la comparación entre proveedores. Con $anonimizar se tapan correos,
+     * teléfonos y el nombre del cliente antes de que el texto salga hacia fuera.
+     * Nunca lanza: un fallo vuelve como status «failed».
+     *
+     * @return array{status:string, body:?string, sources:string, model?:?string, input_tokens?:?int, output_tokens?:?int, error?:string}
+     */
+    public function redactar(int $ticketId, AiProvider $ai, bool $anonimizar = false): array
+    {
+        $this->anonimizar = $anonimizar;
+        try {
+            $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
+                ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
+                ->where('t.id', $ticketId)
+                ->first(['t.id', 't.subject', 't.category_id', 't.channel', 'c.name as contact_name', 'cat.name as category_name']);
+            $this->nombreCliente = $anonimizar ? trim((string) ($t->contact_name ?? '')) : '';
+            if ($anonimizar) {
+                $t->subject = $this->plano((string) $t->subject);
+                $t->contact_name = null;
+            }
+
+            $conversacion = $this->conversacion($ticketId);
+            $pregunta = $this->ultimaDelCliente($conversacion);
+            $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
+            $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
+
+            $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id')])];
+            try {
+                $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos), $this->comoTurnos($conversacion));
+                $texto = trim($r['text']);
+                $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
+                return $fila + [
+                    'status' => $sabe ? 'ready' : 'abstained', 'body' => $sabe ? $texto : null,
+                    'model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens'],
+                ];
+            } catch (Throwable $e) {
+                report($e);
+                return $fila + ['status' => 'failed', 'body' => null, 'error' => mb_substr($e instanceof AiException ? $e->getMessage() : 'Error inesperado', 0, 250)];
+            }
+        } finally {
+            $this->anonimizar = false;
+            $this->nombreCliente = '';
+        }
     }
 
     /**
@@ -243,6 +264,13 @@ class AiSuggestionService
     {
         $h = preg_replace('#<(br|/p|/div|/li)\s*/?>#i', "\n", $html);
         $h = html_entity_decode(strip_tags((string) $h), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($this->anonimizar) {
+            $h = preg_replace('/[\w.+-]+@[\w-]+(\.[\w-]+)+/u', '[email]', (string) $h);
+            $h = preg_replace('/\+?\d[\d .\/-]{6,}\d/', '[tel]', (string) $h);
+            if (mb_strlen($this->nombreCliente) >= 3) {
+                $h = str_ireplace($this->nombreCliente, '[cliente]', (string) $h);
+            }
+        }
         $h = preg_replace("/[ \t]+/", ' ', (string) $h);
         $h = trim((string) preg_replace("/\n{3,}/", "\n\n", (string) $h));
         return mb_substr($h, 0, 2000);
