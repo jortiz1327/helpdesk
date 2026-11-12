@@ -4401,3 +4401,6 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .an2-ch.wa svg { fill: #25d366; }
 .an2-cat, .an2-st { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2); }
 .an-h .spacer { flex: 1; }
+
+.ai-spin { width: 14px; height: 14px; border: 2px solid var(--line-2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; flex: none; }
+@media (prefers-reduced-motion: reduce) { .ai-spin { animation-duration: 2s; } }

@@ -11,8 +11,8 @@ import { Icon } from '../icons.jsx'
  * ---------------------------------------------------------------------- */
 export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, inline = false }) {
   const [s, setS] = useState(null)          // sugerencia vigente
-  const [on, setOn] = useState(false)       // ¿asistente activo?
-  const [cargando, setCargando] = useState(false)
+  const [on, setOn] = useState(inline)   // en la pestaña ya sabemos que está activo       // ¿asistente activo?
+  const [cargando, setCargando] = useState(inline)   // en la pestaña arranca «generando» desde el primer pintado
   const [corrigiendo, setCorrigiendo] = useState(false)
   const [texto, setTexto] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -36,7 +36,7 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, i
   useEffect(() => { cargar(); return () => { seq.current++ } }, [ticketId, lastMessageKey])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!on) return null
-  if (cargando && !s) return <div className="ai-box ai-load" aria-busy="true"><Icon.bolt className="ic-x" aria-hidden="true" /> Preparando una sugerencia…</div>
+  if (cargando && (!s || inline)) return <div className="ai-box ai-load" role="status" aria-busy="true"><span className="ai-spin" aria-hidden="true" /> Generando sugerencia…</div>
   if (!s) return null
   if (s.status === 'failed') {
     return (
