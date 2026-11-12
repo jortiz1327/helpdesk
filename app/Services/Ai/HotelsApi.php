@@ -62,6 +62,12 @@ class HotelsApi
         return $defecto;
     }
 
+    /** Los ids del panel son UUID (o números): nada más entra en una ruta. */
+    private static function idValido(string $id): bool
+    {
+        return (bool) preg_match('/^[0-9a-fA-F-]{8,40}$|^\d{1,10}$/', $id);
+    }
+
     private static function nombre($x): string
     {
         return is_array($x) ? (string) self::pick($x, ['nombre', 'name', 'hotel', 'buffet'], '') : (string) $x;
@@ -70,7 +76,7 @@ class HotelsApi
     /**
      * Dónde figura este correo como usuario activo (puede ser en varios buffets).
      *
-     * @return array<int, array{buffet_id:int, buffet:string, hotel:string}>
+     * @return array<int, array{buffet_id:string, buffet:string, hotel:string}>
      */
     public function buscarPorCorreo(?string $email): array
     {
@@ -86,8 +92,8 @@ class HotelsApi
         foreach ((array) ($d['coincidencias'] ?? []) as $c) {
             $hoteles = array_values((array) ($c['hoteles'] ?? []));
             foreach ((array) ($c['buffets'] ?? []) as $b) {
-                $id = is_array($b) ? (int) self::pick($b, ['id', 'buffet_id'], 0) : 0;
-                if ($id <= 0) {
+                $id = is_array($b) ? (string) self::pick($b, ['id', 'buffet_id'], '') : '';
+                if (! self::idValido($id)) {
                     continue;
                 }
                 $hotel = is_array($b) && self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']) !== null
@@ -104,8 +110,8 @@ class HotelsApi
      */
     public function antenas(array $sitio): ?array
     {
-        $id = (int) ($sitio['buffet_id'] ?? 0);
-        if ($id <= 0) {
+        $id = (string) ($sitio['buffet_id'] ?? '');
+        if (! self::idValido($id)) {
             return null;
         }
         $d = Cache::remember("ai_support_antenas_$id", 120, fn () => $this->get("/api/support/v1/buffets/$id/antennas") ?? []);
@@ -127,9 +133,9 @@ class HotelsApi
      */
     public function etiqueta(array $sitio, string $codigo): ?array
     {
-        $id = (int) ($sitio['buffet_id'] ?? 0);
+        $id = (string) ($sitio['buffet_id'] ?? '');
         $codigo = mb_strtoupper(trim($codigo));
-        if ($id <= 0 || $codigo === '') {
+        if (! self::idValido($id) || $codigo === '') {
             return null;
         }
         $d = $this->get("/api/support/v1/buffets/$id/tags", ['code' => $codigo]);

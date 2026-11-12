@@ -84,13 +84,13 @@ class AiSuggestionsTest extends TestCase
         $encontrado = $emailUsuario === 'm@x.com';
         Http::fake([
             'panel.example.com/api/support/v1/users/lookup*' => Http::response(['success' => true, 'data' => $encontrado
-                ? ['encontrado' => true, 'coincidencias' => [['app' => 'sol', 'hoteles' => ['Hotel Sol'], 'buffets' => [['id' => 3, 'nombre' => 'Buffet Principal']]]]]
+                ? ['encontrado' => true, 'coincidencias' => [['app' => 'sol', 'hoteles' => ['Hotel Sol'], 'buffets' => [['id' => 'b3b3b3b3-0000-4000-8000-000000000003', 'nombre' => 'Buffet Principal']]]]]
                 : ['encontrado' => false, 'coincidencias' => []]]),
-            'panel.example.com/api/support/v1/buffets/3/antennas*' => Http::response(['success' => true, 'data' => [
+            'panel.example.com/api/support/v1/buffets/b3b3b3b3-0000-4000-8000-000000000003/antennas*' => Http::response(['success' => true, 'data' => [
                 ['nombre' => 'Antena Frios', 'en_linea' => false, 'caida_desde' => '2026-11-10T09:12:00+01:00', 'etiquetas' => 64],
                 ['nombre' => 'Antena Sala', 'en_linea' => true, 'caida_desde' => null, 'etiquetas' => 10],
             ]]),
-            'panel.example.com/api/support/v1/buffets/3/tags*' => Http::response(['success' => true, 'data' => [
+            'panel.example.com/api/support/v1/buffets/b3b3b3b3-0000-4000-8000-000000000003/tags*' => Http::response(['success' => true, 'data' => [
                 ['codigo' => 'AB12CD345', 'en_linea' => false, 'bateria' => 8, 'senal' => -81, 'actualizada' => '2026-11-09T18:30:44+01:00', 'antena' => ['nombre' => 'Antena Frios', 'en_linea' => false]],
             ]]),
         ]);
