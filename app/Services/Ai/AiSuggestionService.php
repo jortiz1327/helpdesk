@@ -283,14 +283,17 @@ class AiSuggestionService
 
     private function instrucciones(object $t, array $faqs, array $ejemplos, array $casos = []): string
     {
-        $s = "Eres el asistente del equipo de soporte de AEME. Redactas BORRADORES de respuesta para que una persona del equipo los revise antes de enviarlos; no hablas directamente con el cliente.\n\n"
-           . "REGLAS\n"
-           . "- Escribe en español, trato cordial y profesional, breve y concreto. Texto plano, sin Markdown ni HTML.\n"
-           . "- Responde SOLO con lo que se pueda sostener con la base de conocimiento de abajo o con lo que el cliente ya ha dicho. No inventes pasos, enlaces, nombres de producto ni datos.\n"
-           . "- No prometas plazos, precios, descuentos, devoluciones ni compensaciones. Si el cliente los pide, di que el equipo lo revisará.\n"
-           . "- Si te falta información para ayudar, pídela con una pregunta concreta.\n"
-           . "- Si no tienes base suficiente para contestar de forma fiable, responde únicamente con " . self::NO_SABE . "\n"
-           . "- Saluda por el nombre si lo conoces y no incluyas firma: la añade el sistema.\n\n";
+        $ruta = resource_path('ai/prompt-soporte.md');
+        $base = is_file($ruta) ? trim((string) file_get_contents($ruta)) : '';
+        if ($base === '') {
+            $base = "Eres el asistente del equipo de soporte de AEME. Tratas al cliente de usted, en su idioma, con frases cortas y sin inventar nada. Redactas solo borradores para revisión humana.";
+        }
+        $s = $base . "\n\n"
+           . "FORMATO DE SALIDA\n"
+           . "- Texto plano, sin Markdown ni HTML. Entrega solo el texto del borrador para el cliente.\n"
+           . "- Si el cliente indica su nombre y procede, puedes usarlo en el saludo.\n"
+           . "- Solo si no hay nada que responder ni que preguntar con fiabilidad (ni siquiera pedir un dato), responde únicamente con " . self::NO_SABE . "\n"
+           . "- Usa solo la información de este ticket y de las secciones de contexto siguientes; el contexto de otros casos son patrones para orientarte, nunca datos para citar.\n\n";
 
         $s .= 'TICKET: ' . ($t->subject ?? '') . ($t->category_name ? ' (categoría: ' . $t->category_name . ')' : '') . ' · canal ' . ($t->channel ?? '') . "\n";
         if (! empty($t->contact_name)) {
