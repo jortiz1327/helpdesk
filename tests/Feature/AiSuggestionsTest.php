@@ -9,7 +9,9 @@ use App\Services\Ai\AiException;
 use App\Services\TokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
+use Tests\Unit\Code128ReaderTest;
 
 /**
  * Sugerencias de la IA: se genera con las FAQs y las correcciones anteriores, se valora, y
@@ -56,6 +58,21 @@ class AiSuggestionsTest extends TestCase
     private function activar(): void
     {
         Setting::put('ai_suggestions_enabled', '1');
+    }
+
+    public function test_lee_el_codigo_de_barras_de_la_foto_y_se_lo_da_a_la_ia(): void
+    {
+        $this->activar();
+        Storage::fake('local');
+        $tk = $this->ticket('Mi etiqueta no cambia, os mando foto');
+        $m = DB::table('messages')->where('ticket_id', $tk)->value('id');
+        $png = Code128ReaderTest::foto('AB12CD345');
+        Storage::disk('local')->put('attachments/t/foto.png', file_get_contents($png));
+        @unlink($png);
+        DB::table('attachments')->insert(['ticket_id' => $tk, 'message_id' => $m, 'name' => 'foto.png', 'path' => 'attachments/t/foto.png', 'mime' => 'image/png', 'size' => 1000]);
+
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertStringContainsString('AB12CD345', $this->fake->ultimoSistema);
     }
 
     public function test_apagada_no_llama_a_la_ia(): void

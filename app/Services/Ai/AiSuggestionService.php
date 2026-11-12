@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Throwable;
 
@@ -144,6 +145,8 @@ class AiSuggestionService
             $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
             $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId);
 
+            $t->codigos = $this->leerCodigosDeFotos($ticketId);
+
             $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
             try {
                 $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos), $this->comoTurnos($conversacion));
@@ -281,6 +284,36 @@ class AiSuggestionService
         })->all();
     }
 
+    /**
+     * Códigos de barras (Code 128) de las fotos que el cliente ha adjuntado en los últimos
+     * mensajes. Se leen EN LOCAL (la foto no sale del servidor). Devuelve [códigos, nFotos].
+     *
+     * @return array{0:string[], 1:int}
+     */
+    private function leerCodigosDeFotos(int $ticketId): array
+    {
+        try {
+            $ids = DB::table('messages')->where('ticket_id', $ticketId)->where('direction', 'in')->where('is_internal_note', 0)
+                ->orderByDesc('id')->limit(self::MAX_MENSAJES)->pluck('id');
+            $fotos = DB::table('attachments')->whereIn('message_id', $ids)->where('mime', 'like', 'image/%')
+                ->orderByDesc('id')->limit(4)->get(['path']);
+            $lector = new Code128Reader();
+            $codigos = [];
+            foreach ($fotos as $f) {
+                if (! Storage::disk('local')->exists($f->path)) {
+                    continue;
+                }
+                foreach ($lector->leerArchivo(Storage::disk('local')->path($f->path)) as $c) {
+                    $codigos[$c] = true;
+                }
+            }
+            return [array_keys($codigos), $fotos->count()];
+        } catch (Throwable $e) {
+            report($e);
+            return [[], 0];
+        }
+    }
+
     /** Saludo según la hora y si el equipo ya contestó en este ticket (entonces no se repite presentación ni saludo). */
     private function saludo(object $t): string
     {
@@ -315,6 +348,11 @@ class AiSuggestionService
            . "- Es preferible derivar que dar una respuesta dudosa. Nunca inventes procedimientos, datos, estados ni plazos. Solo puedes pedir datos al cliente cuando el contexto indique claramente cuáles hacen falta.\n"
            . "- Usa solo la información de este ticket y de las secciones de contexto siguientes; el contexto de otros casos son patrones para orientarte, nunca datos para citar.\n\n";
 
+        [$codigos, $nFotos] = $t->codigos ?? [[], 0];
+        $leido = $codigos
+            ? "\nCÓDIGO(S) DE BARRAS LEÍDO(S) DE LAS FOTOS DEL CLIENTE (lectura automática fiable): " . implode(', ', $codigos) . ". Úsalo(s) para identificar la etiqueta y menciónalo(s) cuando ayude; no pidas de nuevo el código.\n"
+            : ($nFotos ? "\nEL CLIENTE HA ADJUNTADO " . $nFotos . " FOTO(S) pero NO se ha podido leer ningún código de barras en ellas. Si el código hace falta, pide una foto más cercana y frontal, con el código completo y enfocado, sin reflejos, o que lo escriba; no te inventes ningún código.\n" : '');
+        $s .= $leido;
         $s .= 'TICKET: ' . ($t->subject ?? '') . ($t->category_name ? ' (categoría: ' . $t->category_name . ')' : '') . ' · canal ' . ($t->channel ?? '') . "\n";
         if (! empty($t->contact_name)) {
             $s .= 'CLIENTE: ' . $t->contact_name . "\n";
