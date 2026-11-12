@@ -1,6 +1,7 @@
 const CSRF = document.querySelector('meta[name="csrf-token"]').content
 const $ = (id) => document.getElementById(id)
-let chatId = null, mensajes = [], ocupado = false, corrigiendo = null
+const ESPERA = 20 // segundos sin que el cliente escriba antes de que el agente conteste (como en WhatsApp)
+let chatId = null, mensajes = [], ocupado = false, corrigiendo = null, resta = 0, reloj = null
 
 async function api(url, method = 'GET', body) {
   const r = await fetch('/ia/api' + url, { method, headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
@@ -22,12 +23,14 @@ async function cargarLista() {
 
 async function abrir(id, push = true) {
   const d = await api('/chats/' + id)
+  clearInterval(reloj); resta = 0
   chatId = id; mensajes = d.messages; corrigiendo = null
   if (push) history.pushState({}, '', '/ia/' + id)
   $('titulo').textContent = d.chat.title
   $('meta').textContent = [d.chat.contact_name, d.chat.contact_email].filter(Boolean).join(' · ')
   $('borrar').hidden = false; $('composer').hidden = false
   pintar(); cargarLista(); $('texto').focus()
+  if (mensajes.length && mensajes[mensajes.length - 1].role === 'user') esperar()
 }
 
 function pintar(escribiendo = false) {
@@ -46,6 +49,7 @@ function pintar(escribiendo = false) {
     if (!m.superseded) r.append(...valoracion(m, m === ultimo))
     box.append(r)
   })
+  if (resta > 0 && !escribiendo) { const r = el('div', 'row bot'); const w = el('div', 'bubble warn', 'El agente espera ' + resta + ' s por si el cliente sigue escribiendo… '); const b = el('button', 'btn sm', 'Responder ya'); b.onclick = () => responder(); w.append(b); r.append(w); box.append(r) }
   if (escribiendo) { const r = el('div', 'row bot'); const t = el('div', 'bubble'); t.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>'; r.append(el('div', 'who', 'Agente IA'), t); box.append(r) }
   const s = $('scroll'); s.scrollTop = s.scrollHeight
 }
@@ -84,10 +88,21 @@ async function pedir(url, body) {
   ocupado = false; $('enviar').disabled = false; pintar(); cargarLista()
 }
 const otra = () => pedir('/chats/' + chatId + '/regenerate')
+function esperar() {
+  clearInterval(reloj); resta = ESPERA
+  reloj = setInterval(() => { resta--; if (resta <= 0) { clearInterval(reloj); responder() } else pintar() }, 1000)
+}
+function responder() {
+  clearInterval(reloj); resta = 0
+  if (chatId && mensajes.length && mensajes[mensajes.length - 1].role === 'user') pedir('/chats/' + chatId + '/reply')
+  else pintar()
+}
 async function enviar() {
   const t = $('texto'); const v = t.value.trim(); if (!v || !chatId || ocupado) return
   mensajes.push({ id: 0, role: 'user', body: v }); t.value = ''; t.style.height = 'auto'
-  pedir('/chats/' + chatId + '/send', { text: v })
+  clearInterval(reloj); resta = 0; pintar()
+  try { const d = await api('/chats/' + chatId + '/send', 'POST', { text: v }); mensajes = d.messages } catch (e) { alert(e.message); return }
+  pintar(); cargarLista(); esperar()
 }
 
 $('enviar').onclick = enviar

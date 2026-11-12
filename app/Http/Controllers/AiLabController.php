@@ -62,7 +62,7 @@ class AiLabController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /** El «cliente» escribe: se guarda y el agente contesta. */
+    /** El «cliente» escribe: solo se guarda. El agente contesta cuando la página pide /reply (tras la espera de 20 s sin más mensajes). */
     public function send(Request $r, int $id)
     {
         $texto = trim((string) $r->input('text'));
@@ -71,6 +71,14 @@ class AiLabController extends Controller
         if (DB::table('ai_lab_chats')->where('id', $id)->value('title') === 'Conversación nueva') {
             DB::table('ai_lab_chats')->where('id', $id)->update(['title' => mb_substr($texto, 0, 60)]);
         }
+        return response()->json(['messages' => $this->mensajes($id)]);
+    }
+
+    /** Contesta a lo último que escribió el cliente (todos sus mensajes seguidos cuentan como uno). */
+    public function reply(int $id)
+    {
+        $ult = DB::table('ai_lab_messages')->where('chat_id', $id)->orderByDesc('id')->first();
+        abort_unless($ult && $ult->role === 'user', 422);
         return $this->contestar($id);
     }
 

@@ -29,6 +29,7 @@ Route::prefix('ia')->controller(\App\Http\Controllers\AiLabController::class)->g
     Route::get('/api/chats/{id}', 'show')->whereNumber('id');
     Route::delete('/api/chats/{id}', 'destroy')->whereNumber('id');
     Route::post('/api/chats/{id}/send', 'send')->whereNumber('id');
+    Route::post('/api/chats/{id}/reply', 'reply')->whereNumber('id');
     Route::post('/api/chats/{id}/regenerate', 'regenerate')->whereNumber('id');
     Route::post('/api/messages/{msg}/rate', 'rate')->whereNumber('msg');
 });

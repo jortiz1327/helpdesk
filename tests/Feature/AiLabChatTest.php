@@ -20,10 +20,12 @@ class AiLabChatTest extends TestCase
         config(['ai.lab' => true]);
         $this->fake = new class implements AiProvider {
             public array $sistemas = [];
+            public array $ultimos = [];
             public function configured(): bool { return true; }
             public function complete(string $system, array $messages): array
             {
                 $this->sistemas[] = $system;
+                $this->ultimos = $messages;
                 return ['text' => 'Respuesta ' . count($this->sistemas), 'model' => 'fake', 'input_tokens' => 10, 'output_tokens' => 5];
             }
         };
@@ -42,19 +44,28 @@ class AiLabChatTest extends TestCase
         $this->get('/ia')->assertOk()->assertSee('Chats de prueba de la IA');
         $id = $this->postJson('/ia/api/chats', ['name' => 'Marta', 'email' => 'm@x.com'])->assertOk()->json('id');
 
-        $r = $this->postJson("/ia/api/chats/$id/send", ['text' => 'Mi etiqueta no cambia de precio'])->assertOk();
+        $this->postJson("/ia/api/chats/$id/send", ['text' => 'Mi etiqueta no cambia de precio'])->assertOk();
+        $this->assertCount(0, $this->fake->sistemas);   // enviar solo guarda: contesta cuando la página pide /reply
+        $r = $this->postJson("/ia/api/chats/$id/reply")->assertOk();
         $this->assertSame('Respuesta 1', collect($r->json('messages'))->last()['body']);
         $this->assertStringContainsString('le hablo de AEME Group', $this->fake->sistemas[0]);   // primer mensaje: se presenta
 
-        $this->postJson("/ia/api/chats/$id/send", ['text' => 'Gracias, ¿y la antena?'])->assertOk();
+        $this->postJson("/ia/api/chats/$id/send", ['text' => 'Gracias'])->assertOk();
+        $this->postJson("/ia/api/chats/$id/send", ['text' => '¿y la antena?'])->assertOk();   // varios mensajes seguidos
+        $this->postJson("/ia/api/chats/$id/reply")->assertOk();
+        $this->postJson("/ia/api/chats/$id/reply")->assertStatus(422);   // ya contestó: no hay nada nuevo
+        $this->assertCount(2, $this->fake->sistemas);   // dos mensajes seguidos del cliente = UNA sola respuesta
+        $this->assertStringContainsString('antena', json_encode($this->fake->ultimos, JSON_UNESCAPED_UNICODE));
+        $this->assertStringContainsString('Gracias', json_encode($this->fake->ultimos, JSON_UNESCAPED_UNICODE));
         $this->assertStringContainsString('NO saludes', $this->fake->sistemas[1]);                // ya contestó: no se repite
-        $this->assertSame(4, count($this->getJson("/ia/api/chats/$id")->json('messages')));
+        $this->assertSame(5, count($this->getJson("/ia/api/chats/$id")->json('messages')));
     }
 
     public function test_corregir_guarda_en_la_memoria_y_otra_atenua_la_anterior(): void
     {
         $id = $this->postJson('/ia/api/chats', [])->json('id');
-        $ms = $this->postJson("/ia/api/chats/$id/send", ['text' => 'Hay que eliminar un usuario del hotel y crear otro'])->json('messages');
+        $this->postJson("/ia/api/chats/$id/send", ['text' => 'Hay que eliminar un usuario del hotel y crear otro'])->assertOk();
+        $ms = $this->postJson("/ia/api/chats/$id/reply")->json('messages');
         $bot = collect($ms)->last()['id'];
 
         $this->postJson("/ia/api/messages/$bot/rate", ['rating' => 'down', 'correction' => 'x'])->assertStatus(422);   // sin porqué no se aprende
