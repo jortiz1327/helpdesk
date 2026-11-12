@@ -28,8 +28,9 @@ class AiSuggestionService
     private bool $anonimizar = false;
     private string $nombreCliente = '';
 
-    public function __construct(protected AiProvider $ai)
+    public function __construct(protected AiProvider $ai, protected ?AiKnowledge $knowledge = null)
     {
+        $this->knowledge ??= new AiKnowledge();
     }
 
     /** Interruptor del panel (ajuste) Y clave puesta. Sin las dos, no sale ningún dato. */
@@ -97,10 +98,11 @@ class AiSuggestionService
             $pregunta = $this->ultimaDelCliente($conversacion);
             $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
             $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
+            $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId);
 
-            $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id')])];
+            $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
             try {
-                $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos), $this->comoTurnos($conversacion));
+                $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos), $this->comoTurnos($conversacion));
                 $texto = trim($r['text']);
                 $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
                 return $fila + [
@@ -229,7 +231,7 @@ class AiSuggestionService
         })->all();
     }
 
-    private function instrucciones(object $t, array $faqs, array $ejemplos): string
+    private function instrucciones(object $t, array $faqs, array $ejemplos, array $casos = []): string
     {
         $s = "Eres el asistente del equipo de soporte de AEME. Redactas BORRADORES de respuesta para que una persona del equipo los revise antes de enviarlos; no hablas directamente con el cliente.\n\n"
            . "REGLAS\n"
@@ -248,6 +250,14 @@ class AiSuggestionService
         $s .= "\nBASE DE CONOCIMIENTO (preguntas frecuentes publicadas)\n";
         $s .= $faqs ? implode("\n\n", array_map(fn ($f) => '• ' . $f['question'] . "\n" . $f['answer'], $faqs)) : '(ninguna coincide con esta consulta)';
 
+        if ($casos) {
+            $s .= "\n\nCASOS ANTERIORES Y MANUALES (úsalos solo si encajan con esta consulta: de ahí sacas el criterio y el tono del equipo; no copies datos de otros clientes ni mezcles casos distintos)\n";
+            foreach ($casos as $d) {
+                $tipo = str_contains((string) $d->source_id, '#') ? 'Manual' : 'Caso resuelto';
+                $s .= '[' . $tipo . ': ' . $d->title . "]\n" . mb_substr((string) $d->content, 0, 1400) . "\n\n";
+            }
+        }
+
         if ($ejemplos) {
             $s .= "\n\nERRORES ANTERIORES (el equipo corrigió estas respuestas; aprende de ellos)\n";
             foreach ($ejemplos as $e) {
@@ -265,11 +275,7 @@ class AiSuggestionService
         $h = preg_replace('#<(br|/p|/div|/li)\s*/?>#i', "\n", $html);
         $h = html_entity_decode(strip_tags((string) $h), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if ($this->anonimizar) {
-            $h = preg_replace('/[\w.+-]+@[\w-]+(\.[\w-]+)+/u', '[email]', (string) $h);
-            $h = preg_replace('/\+?\d[\d .\/-]{6,}\d/', '[tel]', (string) $h);
-            if (mb_strlen($this->nombreCliente) >= 3) {
-                $h = str_ireplace($this->nombreCliente, '[cliente]', (string) $h);
-            }
+            $h = Scrub::tapar((string) $h, $this->nombreCliente);
         }
         $h = preg_replace("/[ \t]+/", ' ', (string) $h);
         $h = trim((string) preg_replace("/\n{3,}/", "\n\n", (string) $h));

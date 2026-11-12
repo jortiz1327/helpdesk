@@ -18,6 +18,11 @@ return [
     'max_tokens' => (int) env('AI_MAX_TOKENS', 700),
     'timeout'    => (int) env('AI_TIMEOUT', 30),
 
+    // Manuales (claves de config/manuals.php) que la IA puede consultar. Solo los pensados para clientes.
+    'manuals'    => ['cliente'],
+    // Puntuación mínima absoluta FULLTEXT (0 = solo cuenta la relativa al mejor resultado; subirla con datos reales si se cuelan casos poco relacionados).
+    'knowledge_min_score' => (float) env('AI_KNOWLEDGE_MIN_SCORE', 0.0),
+
     'providers' => [
         'anthropic' => [
             'api_key'  => env('AI_KEY_ANTHROPIC', $activo === 'anthropic' ? env('AI_API_KEY') : null),
