@@ -77,7 +77,7 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringContainsString('AB12CD345', $this->fake->ultimoSistema);
     }
 
-    private function flota(string $emailUsuario): void
+    private function flota(string $emailUsuario, bool $appsSinRespuesta = false): void
     {
         config(['ai.support.url' => 'https://panel.example.com', 'ai.support.key' => 'K-secreta']);
         Cache::flush();
@@ -85,7 +85,14 @@ class AiSuggestionsTest extends TestCase
         Http::fake([
             'panel.example.com/api/support/v1/users/lookup*' => Http::response(['success' => true, 'data' => $encontrado
                 ? ['encontrado' => true, 'coincidencias' => [['app' => 'sol', 'hoteles' => ['Hotel Sol'], 'buffets' => [['id' => 'b3b3b3b3-0000-4000-8000-000000000003', 'nombre' => 'Buffet Principal']]]]]
-                : ['encontrado' => false, 'coincidencias' => []]]),
+                : ['encontrado' => false, 'coincidencias' => [], 'apps_sin_respuesta' => $appsSinRespuesta ? [['app' => 'luna', 'motivo' => 'sin_funcion']] : []]]),
+            'panel.example.com/api/support/v1/hotels*' => function ($r) {
+                $q = mb_strtolower((string) ($r->data()['q'] ?? ''));
+                $h = [];
+                if (str_contains($q, 'sol')) { $h[] = ['id' => 'h1', 'nombre' => 'Hotel Sol', 'grupo' => 'G', 'app' => 'sol']; }
+                if (str_contains($q, 'luna')) { $h[] = ['id' => 'h2', 'nombre' => 'Hotel Luna', 'grupo' => 'G', 'app' => 'luna']; }
+                return Http::response(['success' => true, 'data' => ['total' => count($h), 'hoteles' => $h]]);
+            },
             'panel.example.com/api/support/v1/buffets/b3b3b3b3-0000-4000-8000-000000000003/antennas*' => Http::response(['success' => true, 'data' => [
                 ['nombre' => 'Antena Frios', 'en_linea' => false, 'caida_desde' => '2026-11-10T09:12:00+01:00', 'etiquetas' => 64],
                 ['nombre' => 'Antena Sala', 'en_linea' => true, 'caida_desde' => null, 'etiquetas' => 10],
@@ -122,6 +129,51 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringContainsString('NO figura como usuario', $this->fake->ultimoSistema);
         $this->assertStringNotContainsString('Hotel Sol', $this->fake->ultimoSistema);
         $this->assertStringNotContainsString('Antena Frios', $this->fake->ultimoSistema);
+    }
+
+    public function test_si_el_hotel_que_dice_no_coincide_con_el_correo_se_explica_con_tacto_y_se_deriva(): void
+    {
+        $this->activar();
+        $this->flota('m@x.com');
+        $tk = $this->ticket('Hola, soy del Hotel Luna y una etiqueta AB12CD345 no se actualiza');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('no figura asociado a ese hotel', $p);
+        $this->assertStringContainsString('un compañero del equipo revisará su caso', $p);
+        $this->assertStringContainsString('NO reveles a qué hotel pertenece un correo', $p);
+        $this->assertStringNotContainsString('Antena Frios', $p);   // sin datos del hotel
+        $this->assertStringNotContainsString('Hotel Sol', $p);      // ni del hotel real del correo
+    }
+
+    public function test_si_hotel_y_correo_coinciden_sigue_con_los_datos(): void
+    {
+        $this->activar();
+        $this->flota('m@x.com');
+        $tk = $this->ticket('Soy del Hotel Sol y mi etiqueta AB12CD345 no se actualiza');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertStringContainsString('VERIFICADO', $this->fake->ultimoSistema);
+        $this->assertStringContainsString('SIN CONEXIÓN: Antena Frios', $this->fake->ultimoSistema);
+    }
+
+    public function test_si_no_se_puede_comprobar_no_dice_que_el_correo_no_pertenece(): void
+    {
+        $this->activar();
+        $this->flota('otro@hotel.com', true);   // alguna app no respondió: resultado incompleto
+        $tk = $this->ticket('Mis etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('NO afirmes que el correo no pertenece', $p);
+        $this->assertStringNotContainsString('NO figura como usuario', $p);
+    }
+
+    public function test_si_aun_no_hay_correo_se_pregunta_primero_el_hotel(): void
+    {
+        $this->activar();
+        $this->flota('m@x.com');
+        DB::table('contacts')->where('id', $this->cid)->update(['email' => null]);
+        $tk = $this->ticket('Mis etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertStringContainsString('Pregunta PRIMERO el nombre del hotel', $this->fake->ultimoSistema);
     }
 
     public function test_sin_configurar_la_flota_no_sale_ninguna_peticion(): void

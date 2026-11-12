@@ -80,29 +80,89 @@ class HotelsApi
      */
     public function buscarPorCorreo(?string $email): array
     {
+        return $this->verificar($email)['sitios'];
+    }
+
+    /**
+     * ¿Este correo es de un usuario de la aplicación? Estados:
+     *  · apagada       sin configurar: no se pregunta nada
+     *  · sin_correo    no hay un correo válido que comprobar
+     *  · encontrado    figura como usuario activo (sitios = dónde)
+     *  · no_encontrado ninguna app lo conoce (y TODAS contestaron)
+     *  · incompleto    no se pudo comprobar del todo (el panel no contesta o alguna app no respondió):
+     *                  NO se puede afirmar que el correo no pertenece al hotel
+     *
+     * @return array{estado:string, sitios:array<int, array{buffet_id:string, buffet:string, hotel:string}>}
+     */
+    public function verificar(?string $email): array
+    {
+        if (! $this->configured()) {
+            return ['estado' => 'apagada', 'sitios' => []];
+        }
         $email = mb_strtolower(trim((string) $email));
-        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL) || ! $this->configured()) {
-            return [];
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['estado' => 'sin_correo', 'sitios' => []];
         }
         $d = $this->get('/api/support/v1/users/lookup', ['email' => $email]);
-        if (! $d || empty($d['encontrado'])) {
-            return [];
+        if ($d === null) {
+            return ['estado' => 'incompleto', 'sitios' => []];
         }
+        if (! empty($d['encontrado'])) {
+            return ['estado' => 'encontrado', 'sitios' => $this->sitiosDe($d)];
+        }
+        return ['estado' => ((array) ($d['apps_sin_respuesta'] ?? [])) ? 'incompleto' : 'no_encontrado', 'sitios' => []];
+    }
+
+    /** Hoteles/buffets de las coincidencias de /users/lookup (tolera variantes de nombres de campo). */
+    private function sitiosDe(array $d): array
+    {
         $out = [];
         foreach ((array) ($d['coincidencias'] ?? []) as $c) {
             $hoteles = array_values((array) ($c['hoteles'] ?? []));
+            $conBuffet = false;
             foreach ((array) ($c['buffets'] ?? []) as $b) {
                 $id = is_array($b) ? (string) self::pick($b, ['id', 'buffet_id'], '') : '';
                 if (! self::idValido($id)) {
                     continue;
                 }
+                $conBuffet = true;
                 $hotel = is_array($b) && self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']) !== null
                     ? self::nombre(self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']))
                     : (count($hoteles) === 1 ? self::nombre($hoteles[0]) : '');
                 $out[$id] = ['buffet_id' => $id, 'buffet' => self::nombre($b), 'hotel' => $hotel];
             }
+            if (! $conBuffet) {   // sin buffets utilizables: al menos el nombre de los hoteles
+                foreach ($hoteles as $h) {
+                    $out['h:' . self::norm(self::nombre($h))] = ['buffet_id' => '', 'buffet' => '', 'hotel' => self::nombre($h)];
+                }
+            }
         }
         return array_values($out);
+    }
+
+    /** Texto sin tildes, minúsculas y solo letras/números, para comparar nombres de hotel. */
+    public static function norm(string $s): string
+    {
+        $s = mb_strtolower($s);
+        $s = strtr($s, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n']);
+        return trim(preg_replace('/[^a-z0-9]+/', ' ', $s));
+    }
+
+    /**
+     * Busca hoteles por nombre en el inventario del panel. Devuelve hasta 5 [{nombre, grupo}],
+     * o null si no se pudo consultar (distinto de «no hay ninguno», que es []).
+     */
+    public function buscarHoteles(string $nombre): ?array
+    {
+        $nombre = trim($nombre);
+        if (! $this->configured() || mb_strlen($nombre) < 3) {
+            return null;
+        }
+        $d = $this->get('/api/support/v1/hotels', ['q' => $nombre, 'per_page' => 5]);
+        if ($d === null) {
+            return null;
+        }
+        return array_map(fn ($h) => ['nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
     }
 
     /**

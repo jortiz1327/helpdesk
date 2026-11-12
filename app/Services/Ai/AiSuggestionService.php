@@ -189,7 +189,8 @@ class AiSuggestionService
         $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId, 3, 4, 2, (string) ($t->subject ?? ''));
 
         $t->codigos = $ticketId ? $this->leerCodigosDeFotos($ticketId) : [[], 0];
-        $t->hotel = $anonimizar ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))));
+        $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
+        $t->hotel = $anonimizar ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente);
 
         $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
         try {
@@ -372,24 +373,59 @@ class AiSuggestionService
     }
 
     /**
-     * ¿Quién escribe? Si el correo figura como usuario en la app de hoteles, de qué hotel/buffet es y
-     * cómo están sus antenas (consulta de solo lectura, ver HotelsApi). Sin configurar: nada.
+     * ¿Quién escribe? Flujo: 1) el hotel que dice ser, buscado en el panel; 2) su correo, comprobado en el panel;
+     * 3) si coincide, hotel/buffet y estado de antenas y etiquetas (solo lectura, ver HotelsApi); si no coincide o no
+     * consta, se le explica con tacto y se deriva a una persona. Sin configurar: nada.
      */
-    private function contextoHotel(?string $email, array $codigos = []): string
+    private function contextoHotel(?string $contactEmail, array $codigos = [], string $textoCliente = ''): string
     {
         $api = app(HotelsApi::class);
         if (! $api->configured()) {
             return '';
         }
-        $e = trim((string) $email);
-        $sitios = array_slice($api->buscarPorCorreo($e), 0, 4);
-        if (! $sitios) {
-            return "\nVERIFICACIÓN DEL CLIENTE\n- El correo del cliente" . ($e !== '' ? " ($e)" : ' (no consta)')
-                . " NO figura como usuario en la aplicación de hoteles. No des datos de ningún hotel ni de su estado. "
-                . "Si la consulta depende del hotel, pide que indique su hotel y el correo con el que accede a la aplicación.\n";
+        // Correo: el que el cliente dice usar (si lo escribe) o, si no, el del contacto del ticket.
+        preg_match_all('/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/', $textoCliente, $m);
+        $e = trim((string) ($m[0][0] ?? $contactEmail));
+        // Hotel: el que el cliente nombra, buscado en el inventario del panel.
+        $nombres = $this->nombresDeHotel($textoCliente);
+        $dir = [];
+        $dirFalla = false;
+        foreach (array_slice($nombres, 0, 3) as $n) {
+            $r = $api->buscarHoteles($n);
+            $r === null ? $dirFalla = true : $dir = array_merge($dir, $r);
         }
-        $s = "\nVERIFICACIÓN DEL CLIENTE (consulta automática de solo lectura: no digas de dónde sale)\n"
-            . "- El correo del cliente ($e) figura como usuario activo de la aplicación de hoteles en: "
+        $v = $api->verificar($e);
+        $sitios = array_slice($v['sitios'], 0, 4);
+        $cab = "\nVERIFICACIÓN DEL CLIENTE (consulta automática de solo lectura: no digas de dónde sale)\n";
+        $comun = "- NO des datos de ningún hotel ni de su estado, y NO reveles a qué hotel pertenece un correo.\n";
+        $derivar = "- Termina diciendo con amabilidad que un compañero del equipo revisará su caso y le atenderá personalmente; no sigas con el diagnóstico.\n";
+        $pedir = "- Pídele con tacto que confirme el nombre del hotel y el correo con el que accede a la aplicación.\n";
+        $tacto = "- Sin acusar ni sonar a sospecha: es lo normal que alguien escriba con otro correo.\n";
+
+        if ($v['estado'] === 'sin_correo') {
+            if (! $nombres) {
+                return $cab . "- Aún no sabemos de qué hotel es ni con qué correo accede. Pregunta PRIMERO el nombre del hotel y, a continuación, el correo con el que accede a la aplicación.\n" . $comun;
+            }
+            if ($dir) {
+                return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "». Falta comprobar su correo: pídele el correo con el que accede a la aplicación.\n" . $comun;
+            }
+            return $cab . "- El hotel que nombra no se localiza en nuestro sistema" . ($dirFalla ? ' (no se pudo consultar ahora)' : '') . ". Pídele el nombre exacto del hotel y el correo con el que accede a la aplicación.\n" . $comun . $derivar;
+        }
+        if ($v['estado'] === 'incompleto') {
+            return $cab . "- No se ha podido comprobar el correo ($e) ahora mismo. NO afirmes que el correo no pertenece al hotel ni que no figura.\n"
+                . "- Di que un compañero comprobará sus datos y le atenderá. Si aún no sabemos el hotel, pregúntalo.\n" . $comun;
+        }
+        if ($v['estado'] === 'no_encontrado') {
+            return $cab . "- El correo del cliente ($e) NO figura como usuario en la aplicación de hoteles.\n"
+                . "- Explícaselo con tacto: con ese correo no podemos asociarle a un hotel en nuestro sistema.\n" . $pedir . $tacto . $comun . $derivar;
+        }
+        // encontrado: ¿coincide con el hotel que dice ser?
+        if ($dir && ! $this->coincideHotel($dir, $sitios)) {
+            return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "», pero su correo ($e) no figura asociado a ese hotel en la aplicación.\n"
+                . "- Explícaselo con tacto: con el correo que nos indica no podemos asociarle a ese hotel en nuestro sistema.\n" . $pedir . $tacto . $comun . $derivar;
+        }
+        $s = $cab
+            . "- VERIFICADO: el correo del cliente ($e) figura como usuario activo de la aplicación de hoteles en: "
             . implode('; ', array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /'), $sitios)) . ".\n";
         if (count($sitios) > 1) {
             $s .= "- Figura en varios sitios: si la consulta depende del hotel, pregunta de cuál habla.\n";
@@ -423,6 +459,41 @@ class AiSuggestionService
             }
         }
         return $s . "- Si hay antenas sin conexión: NO pidas reiniciar, desconectar ni tocar nada; di que el equipo de soporte lo revisará. No des MAC ni IP de antenas. Si una etiqueta tiene batería baja, sigue la guía de pilas (no tramites material).\n";
+    }
+
+    /** Nombres de hotel que el cliente menciona («Hotel Alua Soul Menorca», «AluaSun Lago Park»…): candidatos para buscar en el panel. */
+    private function nombresDeHotel(string $texto): array
+    {
+        $out = [];
+        $cap = '[A-ZÁÉÍÓÚÑ][\wáéíóúñ\'\-]*';
+        if (preg_match_all('/\b(?i:hotel|resort|restaurante|aparthotel|apartamentos|complejo)\s+((?:' . $cap . '\s*){1,4})/u', $texto, $m)) {
+            foreach ($m[1] as $n) {
+                $out[trim($n)] = true;
+            }
+        }
+        if (preg_match_all('/\b(alua[\wáéíóúñ]*(?:\s+' . $cap . '){0,3})/iu', $texto, $m)) {   // la cadena más habitual
+            foreach ($m[1] as $n) {
+                $out[trim($n)] = true;
+            }
+        }
+        return array_values(array_filter(array_keys($out), fn ($n) => mb_strlen($n) >= 4));
+    }
+
+    /** ¿Alguno de los hoteles buscados es uno de los sitios donde figura el correo? (nombres sin tildes, uno dentro de otro) */
+    private function coincideHotel(array $dir, array $sitios): bool
+    {
+        foreach ($dir as $d) {
+            $a = HotelsApi::norm($d['nombre']);
+            foreach ($sitios as $x) {
+                foreach ([$x['hotel'], $x['buffet']] as $nombre) {
+                    $b = HotelsApi::norm((string) $nombre);
+                    if ($a !== '' && $b !== '' && (str_contains($a, $b) || str_contains($b, $a))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** Códigos de etiqueta (9 letras/números) o MAC (12 hex) escritos en un texto. */
