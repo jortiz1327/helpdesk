@@ -112,6 +112,31 @@ class AiKnowledge
         );
     }
 
+    /** Igual que indexarCorreccion, pero para una respuesta de un chat de prueba (source_id «chat:N»). */
+    public function indexarCorreccionChat(int $msgId): void
+    {
+        $m = DB::table('ai_lab_messages as m')->join('ai_lab_chats as c', 'c.id', '=', 'm.chat_id')->where('m.id', $msgId)
+            ->first(['m.id', 'm.chat_id', 'm.body', 'm.rating', 'm.correction', 'c.title', 'c.contact_name']);
+        if (! $m || $m->rating !== 'down' || trim((string) $m->correction) === '') {
+            $this->quitarCorreccionChat($msgId);
+            return;
+        }
+        $nombre = (string) ($m->contact_name ?? '');
+        $q = (string) DB::table('ai_lab_messages')->where('chat_id', $m->chat_id)->where('role', 'user')->where('id', '<', $msgId)->orderByDesc('id')->value('body');
+        $content = "Pregunta del cliente:\n" . mb_substr(Scrub::tapar($q, $nombre), 0, 1200)
+            . "\n\nLo que la IA respondió y estaba mal:\n" . mb_substr(Scrub::tapar((string) $m->body, $nombre), 0, 800)
+            . "\n\nIndicación del equipo (qué estaba mal y cómo hay que responder; es un criterio a aplicar, no un texto para copiar):\n" . mb_substr(Scrub::tapar((string) $m->correction, $nombre), 0, 2000);
+        DB::table('ai_documents')->updateOrInsert(
+            ['source_type' => 'correccion', 'source_id' => 'chat:' . $msgId],
+            ['title' => mb_substr(Scrub::tapar((string) $m->title, $nombre), 0, 255), 'content' => $content, 'quality' => null, 'indexed_at' => now()],
+        );
+    }
+
+    public function quitarCorreccionChat(int $msgId): void
+    {
+        DB::table('ai_documents')->where('source_type', 'correccion')->where('source_id', 'chat:' . $msgId)->delete();
+    }
+
     public function quitarCorreccion(int $suggestionId): void
     {
         DB::table('ai_documents')->where('source_type', 'correccion')->where('source_id', (string) $suggestionId)->delete();

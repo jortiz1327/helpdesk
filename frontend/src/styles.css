@@ -4408,21 +4408,3 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-head svg, .ai-box > svg { width: 15px; height: 15px; fill: currentColor; flex: none; }
 .ai-done .ai-act { margin-top: 8px; }
 
-/* Laboratorio de la IA (solo local): un caso cada vez */
-.lab-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.lab-one{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px;align-items:start}
-@media (max-width:900px){.lab-one{grid-template-columns:1fr}}
-.lab section{min-width:0}
-.lab small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.65;margin-bottom:4px}
-.lab-msg,.lab-ai{padding:14px 16px;border-radius:12px}
-.lab-msg{background:rgba(127,127,127,.1)}
-.lab-ai{border:1px dashed rgba(127,127,127,.5)}
-.lab-msg h4{margin:0 0 8px;font-size:15px}
-.lab-msg p,.lab-ai p,.lab-real p{margin:0;white-space:pre-wrap;font-size:15px;line-height:1.55;overflow-wrap:anywhere}
-.lab-msg p{max-height:60vh;overflow:auto}
-.lab-btns{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
-.lab-abst{opacity:.85}
-.lab-real-t{margin-top:12px;background:none;border:0;padding:0;font-size:13px;text-decoration:underline;opacity:.75;cursor:pointer;color:inherit}
-.lab-real{margin-top:8px;padding:12px 14px;border-radius:10px;background:rgba(127,127,127,.08)}
-.lab-before{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(200,120,0,.1)}
-.lab-before p{font-size:13px!important}

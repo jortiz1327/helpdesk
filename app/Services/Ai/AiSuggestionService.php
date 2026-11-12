@@ -73,7 +73,6 @@ class AiSuggestionService
                 'accuracy' => ($arriba + $abajo) > 0 ? round($arriba / ($arriba + $abajo) * 100) : null,
             ],
             'usage'      => $this->consumo(),
-            'lab'        => $this->labActivo(),
             'knowledge'  => [
                 'tickets' => DB::table('ai_documents')->where('source_type', 'ticket')->count(),
                 'manuals' => DB::table('ai_documents')->where('source_type', 'manual')->count(),
@@ -89,112 +88,25 @@ class AiSuggestionService
         ];
     }
 
-    // -- Laboratorio (solo en local) ------------------------------------------------
-
-    public function labActivo(): bool
-    {
-        return (bool) config('ai.lab');
-    }
-
-    /**
-     * Casos para validar rápido: tickets ya resueltos donde una persona contestó. El caso es
-     * lo que escribió el cliente ANTES de esa primera respuesta; la IA contesta solo con eso
-     * (sin ver lo posterior) y se compara con lo que dijo el equipo. Se saltan los ya valorados.
-     *
-     * @return array<int, array<string,mixed>>
-     */
-    public function labCasos(int $n = 10): array
-    {
-        $out = [];
-        $q = DB::table('tickets')->whereIn('status', ['resuelto', 'cerrado'])->whereNull('merged_into_id')->inRandomOrder()->limit(120)->pluck('id');
-        foreach ($q as $tid) {
-            if (count($out) >= $n) {
-                break;
-            }
-            $resp = DB::table('messages')->where('ticket_id', $tid)->where('direction', 'out')->where('is_internal_note', 0)
-                ->whereNotNull('author_user_id')->whereNotNull('body')->orderBy('id')->first(['id', 'body']);
-            if (! $resp || mb_strlen($this->plano((string) $resp->body)) < 40) {
-                continue;
-            }
-            $previos = DB::table('messages')->where('ticket_id', $tid)->where('direction', 'in')->where('is_internal_note', 0)
-                ->where('id', '<', $resp->id)->whereNotNull('body')->orderByDesc('id')->limit(3)->get(['id', 'body'])->reverse()->values();
-            if ($previos->isEmpty()) {
-                continue;
-            }
-            $disparo = (int) $previos->last()->id;
-            $ya = DB::table('ai_suggestions')->where('ticket_id', $tid)->where('trigger_message_id', $disparo)->orderByDesc('id')->first();
-            if ($ya && $ya->rating) {
-                continue;
-            }
-            $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')->where('t.id', $tid)->first(['t.code', 't.subject', 'c.name as contact_name']);
-            $out[] = [
-                'ticket_id' => (int) $tid, 'message_id' => $disparo, 'code' => $t->code, 'subject' => $t->subject, 'contact' => $t->contact_name,
-                'message' => $previos->map(fn ($m) => $this->plano((string) $m->body))->filter()->implode("\n\n"),
-                'real_reply' => mb_substr($this->plano((string) $resp->body), 0, 2500),
-                'suggestion' => $ya,
-            ];
-        }
-        return $out;
-    }
-
-    /**
-     * Los casos que el equipo corrigió (👎), para volver a probarlos con lo aprendido: cada uno
-     * lleva la sugerencia mala y la indicación, y se pide una sugerencia NUEVA.
-     *
-     * @return array<int, array<string,mixed>>
-     */
-    public function labCorregidos(): array
-    {
-        $out = [];
-        $filas = DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->orderByDesc('rated_at')->limit(30)->get();
-        foreach ($filas as $a) {
-            $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')->where('t.id', $a->ticket_id)->first(['t.code', 't.subject', 'c.name as contact_name']);
-            $previos = DB::table('messages')->where('ticket_id', $a->ticket_id)->where('direction', 'in')->where('is_internal_note', 0)
-                ->where('id', '<=', $a->trigger_message_id)->whereNotNull('body')->orderByDesc('id')->limit(3)->get(['body'])->reverse();
-            $resp = DB::table('messages')->where('ticket_id', $a->ticket_id)->where('direction', 'out')->where('is_internal_note', 0)
-                ->whereNotNull('author_user_id')->whereNotNull('body')->where('id', '>', $a->trigger_message_id)->orderBy('id')->value('body');
-            $out[] = [
-                'ticket_id' => (int) $a->ticket_id, 'message_id' => (int) $a->trigger_message_id, 'code' => $t->code ?? '', 'subject' => $t->subject ?? '', 'contact' => $t->contact_name ?? null,
-                'message' => $previos->map(fn ($m) => $this->plano((string) $m->body))->filter()->implode("
-
-"),
-                'real_reply' => $resp ? mb_substr($this->plano((string) $resp), 0, 2500) : '(el equipo no llegó a contestar tras este mensaje)',
-                'suggestion' => null, 'regen' => true,
-                'before' => ['body' => (string) $a->body, 'correction' => (string) $a->correction],
-            ];
-        }
-        return $out;
-    }
-
-    /** La sugerencia del laboratorio para ese mensaje (la genera si no hay una válida). */
-    public function forMensaje(int $ticketId, int $messageId, ?int $userId, bool $regenerate = false): object
-    {
-        if (! $regenerate) {
-            $ya = DB::table('ai_suggestions')->where('ticket_id', $ticketId)->where('trigger_message_id', $messageId)
-                ->where('status', '!=', 'failed')->orderByDesc('id')->first();
-            if ($ya) {
-                return $ya;
-            }
-        }
-        return $this->generate($ticketId, $messageId, $userId, 'lab', $messageId);
-    }
-
     /** Tokens y coste ESTIMADO (config ai.prices) de hoy, los últimos 30 días y el total. */
     private function consumo(): array
     {
         $precios = (array) config('ai.prices', []);
         $calc = function ($desde) use ($precios) {
-            $q = DB::table('ai_suggestions')->whereNotNull('input_tokens');
-            if ($desde) {
-                $q->where('created_at', '>=', $desde);
-            }
             $in = $out = 0;
             $coste = 0.0;
             $n = 0;
-            foreach ($q->selectRaw('model, COUNT(*) n, SUM(input_tokens) i, SUM(output_tokens) o')->groupBy('model')->get() as $r) {
-                [$pi, $po] = $precios[$r->model] ?? $precios['default'] ?? [0, 0];
-                $in += (int) $r->i; $out += (int) $r->o; $n += (int) $r->n;
-                $coste += $r->i / 1e6 * $pi + $r->o / 1e6 * $po;
+            // Sugerencias de tickets y respuestas de los chats de prueba (/ia).
+            foreach (['ai_suggestions', 'ai_lab_messages'] as $tabla) {
+                $q = DB::table($tabla)->whereNotNull('input_tokens');
+                if ($desde) {
+                    $q->where('created_at', '>=', $desde);
+                }
+                foreach ($q->selectRaw('model, COUNT(*) n, SUM(input_tokens) i, SUM(output_tokens) o')->groupBy('model')->get() as $r) {
+                    [$pi, $po] = $precios[$r->model] ?? $precios['default'] ?? [0, 0];
+                    $in += (int) $r->i; $out += (int) $r->o; $n += (int) $r->n;
+                    $coste += $r->i / 1e6 * $pi + $r->o / 1e6 * $po;
+                }
             }
             return ['calls' => $n, 'input' => $in, 'output' => $out, 'cost' => round($coste, 4)];
         };
@@ -257,38 +169,60 @@ class AiSuggestionService
                 $t->contact_name = null;
             }
 
-            $conversacion = $this->conversacion($ticketId);
-            $pregunta = $this->ultimaDelCliente($conversacion);
-            $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
-            $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
-            $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId, 3, 4, 2, (string) ($t->subject ?? ''));
-
-            $t->codigos = $this->leerCodigosDeFotos($ticketId);
-            $t->hotel = $anonimizar ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))));
-
-            $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
-            try {
-                $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos), $this->comoTurnos($conversacion));
-                if (! empty($r['truncated'])) {
-                    // Un texto cortado a medias no se puede enseñar como si estuviera completo.
-                    $fila += ['model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens']];   // se pagó aunque no sirva
-                    throw new AiException('La respuesta de la IA salió incompleta');
-                }
-                $texto = trim($r['text']);
-                $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
-                return $fila + [
-                    'status' => $sabe ? 'ready' : 'abstained', 'body' => $sabe ? $texto : null,
-                    'model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens'],
-                ];
-            } catch (Throwable $e) {
-                report($e);
-                return $fila + ['status' => 'failed', 'body' => null, 'error' => mb_substr($e instanceof AiException ? $e->getMessage() : 'Error inesperado', 0, 250)];
-            }
+            return $this->componer($t, $this->conversacion($ticketId), $ticketId, $ai, $anonimizar);
         } finally {
             $this->anonimizar = false;
             $this->hasta = null;
             $this->nombreCliente = '';
         }
+    }
+
+    /**
+     * Compone la respuesta a partir de un «ticket» ya cargado y su conversación ([{role, text}]). Lo comparten los
+     * tickets reales y los chats de prueba ($ticketId null). Nunca lanza: un fallo vuelve como status «failed».
+     */
+    private function componer(object $t, array $conversacion, ?int $ticketId, AiProvider $ai, bool $anonimizar): array
+    {
+        $pregunta = $this->ultimaDelCliente($conversacion);
+        $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
+        $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
+        $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId, 3, 4, 2, (string) ($t->subject ?? ''));
+
+        $t->codigos = $ticketId ? $this->leerCodigosDeFotos($ticketId) : [[], 0];
+        $t->hotel = $anonimizar ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))));
+
+        $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
+        try {
+            $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos), $this->comoTurnos($conversacion));
+            if (! empty($r['truncated'])) {
+                // Un texto cortado a medias no se puede enseñar como si estuviera completo.
+                $fila += ['model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens']];   // se pagó aunque no sirva
+                throw new AiException('La respuesta de la IA salió incompleta');
+            }
+            $texto = trim($r['text']);
+            $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
+            return $fila + [
+                'status' => $sabe ? 'ready' : 'abstained', 'body' => $sabe ? $texto : null,
+                'model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens'],
+            ];
+        } catch (Throwable $e) {
+            report($e);
+            return $fila + ['status' => 'failed', 'body' => null, 'error' => mb_substr($e instanceof AiException ? $e->getMessage() : 'Error inesperado', 0, 250)];
+        }
+    }
+
+    /**
+     * Chat de pruebas (página /ia, solo local): contesta al último mensaje de $conv como si fuera un ticket nuevo.
+     * $chat: title, contact_name, contact_email. Devuelve lo mismo que redactar().
+     */
+    public function responderChat(object $chat, array $conv, AiProvider $ai): array
+    {
+        $t = (object) [
+            'id' => null, 'subject' => (string) $chat->title, 'category_id' => null, 'channel' => 'chat', 'category_name' => null,
+            'contact_name' => $chat->contact_name ?: null, 'contact_email' => $chat->contact_email ?: null,
+            'yaRespondio' => (bool) array_filter($conv, fn ($m) => $m['role'] === 'assistant'),
+        ];
+        return $this->componer($t, $conv, null, $ai, false);
     }
 
     /**
@@ -508,7 +442,7 @@ class AiSuggestionService
     /** Saludo según la hora y si el equipo ya contestó en este ticket (entonces no se repite presentación ni saludo). */
     private function saludo(object $t): string
     {
-        $yaRespondio = DB::table('messages')->where('ticket_id', $t->id)->where('direction', 'out')
+        $yaRespondio = property_exists($t, 'yaRespondio') ? $t->yaRespondio : DB::table('messages')->where('ticket_id', $t->id)->where('direction', 'out')
             ->where('is_internal_note', 0)->whereNotNull('author_user_id')
             ->when($this->hasta, fn ($q) => $q->where('id', '<', $this->hasta))->exists();
         if ($yaRespondio) {

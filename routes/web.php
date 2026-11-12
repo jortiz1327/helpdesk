@@ -19,6 +19,20 @@ $spa = fn () => response()->file(public_path('index.html'), [
 
 Route::get('/', $spa);
 
+// Chats de prueba de la IA: SOLO local (el controlador da 404 si config('ai.lab') está apagado).
+Route::prefix('ia')->controller(\App\Http\Controllers\AiLabController::class)->group(function () {
+    Route::get('/', 'page');
+    Route::get('/{id}', 'page')->whereNumber('id');
+    Route::get('/app.js', 'script');
+    Route::get('/api/chats', 'chats');
+    Route::post('/api/chats', 'create');
+    Route::get('/api/chats/{id}', 'show')->whereNumber('id');
+    Route::delete('/api/chats/{id}', 'destroy')->whereNumber('id');
+    Route::post('/api/chats/{id}/send', 'send')->whereNumber('id');
+    Route::post('/api/chats/{id}/regenerate', 'regenerate')->whereNumber('id');
+    Route::post('/api/messages/{msg}/rate', 'rate')->whereNumber('msg');
+});
+
 /*
  * Cualquier otra ruta se resuelve también a la SPA: la vista vive en la URL
  * (`/agentes/tickets`, …), así que recargar ahí tiene que devolver la app.

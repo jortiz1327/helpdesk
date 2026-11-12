@@ -3,7 +3,6 @@ import { api } from '../api.js'
 import { fmtDate } from '../util.js'
 import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
-import AiLab from './AiLab.jsx'
 
 /* -------------------------------------------------------------------------
  * AJUSTES › ASISTENTE IA. Encender o apagar las sugerencias, ver cuánto
@@ -118,8 +117,6 @@ export default function AiSettings() {
           </ul>
         )}
       </div>
-
-      {d.lab && <div style={{ marginTop: 12 }}><AiLab /></div>}
 
       {d.corrections.length > 0 && (
         <div className="card em-card" style={{ marginTop: 12 }}>
