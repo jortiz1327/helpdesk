@@ -23,9 +23,8 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="AI_HOTELS_KEY" value="" force="true"/>
-        <env name="AI_HOTELS_URLS" value="" force="true"/>
-        <env name="AI_HOTELS_APPS" value="[]" force="true"/>
+        <env name="AI_SUPPORT_URL" value="" force="true"/>
+        <env name="AI_SUPPORT_KEY" value="" force="true"/>
         <!-- BD de test SEPARADA (nunca la real). El TestCase se niega a correr contra
              cualquier BD que no acabe en «_test», como red de seguridad. -->
         <env name="DB_CONNECTION" value="mysql" force="true"/>

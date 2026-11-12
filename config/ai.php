@@ -20,17 +20,13 @@ return [
     'lab'        => (bool) env('AI_LAB', env('APP_ENV') === 'local'),
     'timeout'    => (int) env('AI_TIMEOUT', 30),
 
-    // Consulta de SOLO LECTURA a la flota de AppHoteles (hotel del cliente y estado de antenas). Apagado si no hay apps.
-    // AI_HOTELS_APPS=[{"url":"https://hotel-sol.example.com","key":"..."}]  (una entrada por app; solo https)
-    'hotels' => [
-        // Lo normal: una clave para toda la flota + las URLs de las apps:
-        //   AI_HOTELS_KEY=...   AI_HOTELS_URLS=https://app-uno.ejemplo.com,https://app-dos.ejemplo.com
-        'key'     => (string) env('AI_HOTELS_KEY', ''),
-        'urls'    => array_values(array_filter(array_map('trim', explode(',', (string) env('AI_HOTELS_URLS', ''))))),
-        // Excepciones con clave propia: AI_HOTELS_APPS=[{"url":"https://…","key":"…"}]
-        'apps'    =>json_decode((string) env('AI_HOTELS_APPS', '[]'), true) ?: [],
-        'timeout' => (int) env('AI_HOTELS_TIMEOUT', 8),
-        'ttl'     => (int) env('AI_HOTELS_TTL', 6 * 3600),
+
+    // Consulta de SOLO LECTURA a la API de soporte del panel de AppHoteles (hotel del cliente, antenas, etiquetas).
+    // Apagado si falta la URL o la clave. AI_SUPPORT_URL=https://<panel>  AI_SUPPORT_KEY=<API_KEY_SUPPORT_READONLY del panel>
+    'support' => [
+        'url'     => (string) env('AI_SUPPORT_URL', ''),
+        'key'     => (string) env('AI_SUPPORT_KEY', ''),
+        'timeout' => (int) env('AI_SUPPORT_TIMEOUT', 12),
     ],
 
     // Manuales (claves de config/manuals.php) que la IA puede consultar. Solo los pensados para clientes.

@@ -79,18 +79,20 @@ class AiSuggestionsTest extends TestCase
 
     private function flota(string $emailUsuario): void
     {
-        config(['ai.hotels.apps' => [['url' => 'https://hotel-sol.example.com', 'key' => 'K-secreta']]]);
+        config(['ai.support.url' => 'https://panel.example.com', 'ai.support.key' => 'K-secreta']);
         Cache::flush();
+        $encontrado = $emailUsuario === 'm@x.com';
         Http::fake([
-            'hotel-sol.example.com/api/management/containers*' => Http::response([
-                ['id' => 2, 'uuid' => 'h-uuid', 'name' => 'Hotel Sol', 'container_type' => 3, 'parent_id' => 1],
-                ['id' => 3, 'uuid' => 'b-uuid', 'name' => 'Buffet Principal', 'container_type' => 4, 'parent_id' => 2],
-            ]),
-            'hotel-sol.example.com/api/management/users*' => Http::response(['success' => true, 'data' => ['0' => ['email' => $emailUsuario, 'is_enabled' => 1]]]),
-            'hotel-sol.example.com/api/management/buffets/3/details' => Http::response(['success' => true, 'data' => ['antennas' => [
-                ['mac' => 'AP0000000001', 'apName' => 'Antena Frios', 'ip' => '10.0.0.20', 'online' => false, 'offline_since' => '2026-11-10T09:12:00+01:00', 'eslCount' => 64, 'buffet_id' => 3],
-                ['mac' => 'AP0000000002', 'apName' => 'Antena Sala', 'ip' => '10.0.0.21', 'online' => true, 'offline_since' => null, 'eslCount' => 10, 'buffet_id' => 3],
-            ], 'tags' => [['mac' => 'AB12CD345', 'name' => 'AB12CD345', 'is_online' => false, 'battery' => 8, 'signal' => -81, 'ap_mac' => 'AP0000000001', 'updated_at' => '2026-11-09T18:30:44+01:00']]]]),
+            'panel.example.com/api/support/v1/users/lookup*' => Http::response(['success' => true, 'data' => $encontrado
+                ? ['encontrado' => true, 'coincidencias' => [['app' => 'sol', 'hoteles' => ['Hotel Sol'], 'buffets' => [['id' => 3, 'nombre' => 'Buffet Principal']]]]]
+                : ['encontrado' => false, 'coincidencias' => []]]),
+            'panel.example.com/api/support/v1/buffets/3/antennas*' => Http::response(['success' => true, 'data' => [
+                ['nombre' => 'Antena Frios', 'en_linea' => false, 'caida_desde' => '2026-11-10T09:12:00+01:00', 'etiquetas' => 64],
+                ['nombre' => 'Antena Sala', 'en_linea' => true, 'caida_desde' => null, 'etiquetas' => 10],
+            ]]),
+            'panel.example.com/api/support/v1/buffets/3/tags*' => Http::response(['success' => true, 'data' => [
+                ['codigo' => 'AB12CD345', 'en_linea' => false, 'bateria' => 8, 'senal' => -81, 'actualizada' => '2026-11-09T18:30:44+01:00', 'antena' => ['nombre' => 'Antena Frios', 'en_linea' => false]],
+            ]]),
         ]);
     }
 

@@ -7,64 +7,43 @@ use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * Consulta de SOLO LECTURA a la API de gestión de AppHoteles (la flota de apps de los hoteles).
- * Sirve para dos cosas: saber de qué hotel/buffet es un correo (¿figura como usuario en la app?)
- * y ver el estado de las antenas de ese buffet.
+ * Consulta de SOLO LECTURA a la API de soporte del panel de AppHoteles (/api/support/v1): saber de qué
+ * hotel/buffet es un correo y ver el estado de las antenas y etiquetas de ese buffet. El panel reparte
+ * las consultas entre las apps; aquí no hay URLs ni claves de hoteles, solo la del panel (AI_SUPPORT_*).
  *
  * Seguridad:
  *  · La IA NUNCA elige qué se pide: el código llama a estas rutas fijas y le pasa el resultado.
- *  · Lista cerrada de rutas, todas GET (no hay forma de llegar a borrar, restaurar ni revelar credenciales).
- *  · Las claves van SOLO en el .env (AI_HOTELS_APPS). Ojo: la clave de AdminHoteles es la de gestión
- *    completa de esa app; lo ideal es pedir una clave de solo lectura para soporte.
- *  · Sin configuración, todo devuelve vacío y no sale ninguna petición.
+ *  · Solo GET, solo https, ids siempre enteros. La respuesta ya viene filtrada por el panel (sin IP ni MAC).
+ *  · Sin URL o sin clave, todo devuelve vacío y no sale ninguna petición.
+ *  · Si el panel no contesta (o contesta con errores), se devuelve vacío: la IA no inventa ni verifica.
  */
 class HotelsApi
 {
-    /** Únicas rutas que se llaman. */
-    private const RUTAS = ['/api/management/containers', '/api/management/users'];
-
-    /** Y la ficha de un buffet concreto (su número). */
-    private const FICHA = '#^/api/management/buffets/\d+/details$#';
-
     public function configured(): bool
     {
-        return $this->apps() !== [];
+        return $this->base() !== '' && (string) config('ai.support.key', '') !== '';
     }
 
-    /** @return array<int, array{url:string, key:string}> */
-    private function apps(): array
+    private function base(): string
     {
-        $apps = [];
-        // Lo normal: UNA clave para toda la flota (AI_HOTELS_KEY) y la lista de URLs (AI_HOTELS_URLS, separadas por comas).
-        $comun = (string) config('ai.hotels.key', '');
-        $lista = array_map(fn ($u) => ['url' => $u, 'key' => $comun], (array) config('ai.hotels.urls', []));
-        // AI_HOTELS_APPS permite una clave propia para alguna app concreta.
-        foreach (array_merge($lista, (array) config('ai.hotels.apps', [])) as $a) {
-            $url = rtrim((string) ($a['url'] ?? ''), '/');
-            $key = (string) ($a['key'] ?? '');
-            if ($url !== '' && $key !== '' && str_starts_with($url, 'https://')) {
-                $apps[] = ['url' => $url, 'key' => $key];
-            }
-        }
-        return $apps;
+        $u = rtrim((string) config('ai.support.url', ''), '/');
+        return str_starts_with($u, 'https://') ? $u : '';
     }
 
-    /** GET de una ruta permitida. Devuelve el contenido (data) o null si falla. */
-    private function get(array $app, string $ruta, array $query = []): ?array
+    /** GET de una ruta fija. Devuelve data o null si falla. */
+    private function get(string $ruta, array $query = []): ?array
     {
-        if (! in_array($ruta, self::RUTAS, true) && ! preg_match(self::FICHA, $ruta)) {
+        if (! $this->configured()) {
             return null;
         }
         try {
-            $r = Http::timeout((int) config('ai.hotels.timeout', 8))->acceptJson()
-                ->withHeaders(['X-Api-Key' => $app['key'], 'X-Actor' => 'Helpdesk IA (solo lectura)'])
-                ->get($app['url'] . $ruta, $query);
+            $r = Http::timeout((int) config('ai.support.timeout', 12))->acceptJson()
+                ->withHeaders(['X-Api-Key' => (string) config('ai.support.key'), 'X-Actor' => 'IA-Soporte'])
+                ->get($this->base() . $ruta, $query);
             if (! $r->successful()) {
                 return null;
             }
-            $j = $r->json();
-            // /containers viene sin envoltorio; el resto, dentro de data.
-            $d = is_array($j) && array_key_exists('success', $j) ? ($j['data'] ?? null) : $j;
+            $d = $r->json('data');
             return is_array($d) ? $d : null;
         } catch (Throwable $e) {
             report($e);
@@ -72,107 +51,105 @@ class HotelsApi
         }
     }
 
-    /**
-     * Índice correo → buffets donde figura como usuario. Se guarda unas horas (ai.hotels.ttl):
-     * montarlo cuesta una petición por buffet.
-     *
-     * @return array<string, array<int, array{app:string, buffet_id:int, buffet_uuid:string, buffet:string, hotel:string}>>
-     */
-    public function directorio(bool $rehacer = false): array
+    /** Primer valor presente de una lista de posibles nombres de campo. */
+    private static function pick(array $a, array $claves, $defecto = null)
     {
-        if (! $this->configured()) {
-            return [];
-        }
-        if ($rehacer) {
-            Cache::forget('ai_hotels_directorio');
-        }
-        return Cache::remember('ai_hotels_directorio', (int) config('ai.hotels.ttl', 6 * 3600), function () {
-            $idx = [];
-            foreach ($this->apps() as $app) {
-                $conts = $this->get($app, '/api/management/containers') ?? [];
-                $porId = [];
-                foreach ($conts as $c) {
-                    $porId[(int) ($c['id'] ?? 0)] = $c;
-                }
-                foreach ($conts as $c) {
-                    if ((int) ($c['container_type'] ?? 0) !== 4) {   // 4 = buffet (los usuarios cuelgan de ahí)
-                        continue;
-                    }
-                    $hotel = (string) ($porId[(int) ($c['parent_id'] ?? 0)]['name'] ?? '');
-                    $usuarios = $this->get($app, '/api/management/users', ['buffet_id' => $c['uuid']]) ?? [];
-                    foreach (array_values((array) $usuarios) as $u) {   // a veces llega como objeto con claves numéricas
-                        $mail = mb_strtolower(trim((string) ($u['email'] ?? '')));
-                        if ($mail === '' || ! (int) ($u['is_enabled'] ?? 1)) {
-                            continue;
-                        }
-                        $idx[$mail][] = ['app' => $app['url'], 'buffet_id' => (int) $c['id'], 'buffet_uuid' => (string) $c['uuid'], 'buffet' => (string) $c['name'], 'hotel' => $hotel];
-                    }
-                }
+        foreach ($claves as $c) {
+            if (array_key_exists($c, $a) && $a[$c] !== null && $a[$c] !== '') {
+                return $a[$c];
             }
-            return $idx;
-        });
+        }
+        return $defecto;
     }
 
-    /** Dónde figura este correo como usuario activo (puede ser en varios buffets). */
+    private static function nombre($x): string
+    {
+        return is_array($x) ? (string) self::pick($x, ['nombre', 'name', 'hotel', 'buffet'], '') : (string) $x;
+    }
+
+    /**
+     * Dónde figura este correo como usuario activo (puede ser en varios buffets).
+     *
+     * @return array<int, array{buffet_id:int, buffet:string, hotel:string}>
+     */
     public function buscarPorCorreo(?string $email): array
     {
         $email = mb_strtolower(trim((string) $email));
-        return $email === '' ? [] : ($this->directorio()[$email] ?? []);
-    }
-
-    /** La ficha de un buffet (antenas y etiquetas), guardada 2 minutos. null si no se pudo leer. */
-    private function ficha(array $sitio): ?array
-    {
-        foreach ($this->apps() as $app) {
-            if ($app['url'] === $sitio['app']) {
-                $f = Cache::remember('ai_hotels_ficha_' . md5($app['url']) . '_' . (int) $sitio['buffet_id'], 120,
-                    fn () => $this->get($app, '/api/management/buffets/' . (int) $sitio['buffet_id'] . '/details') ?? []);
-                return $f ?: null;
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL) || ! $this->configured()) {
+            return [];
+        }
+        $d = $this->get('/api/support/v1/users/lookup', ['email' => $email]);
+        if (! $d || empty($d['encontrado'])) {
+            return [];
+        }
+        $out = [];
+        foreach ((array) ($d['coincidencias'] ?? []) as $c) {
+            $hoteles = array_values((array) ($c['hoteles'] ?? []));
+            foreach ((array) ($c['buffets'] ?? []) as $b) {
+                $id = is_array($b) ? (int) self::pick($b, ['id', 'buffet_id'], 0) : 0;
+                if ($id <= 0) {
+                    continue;
+                }
+                $hotel = is_array($b) && self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']) !== null
+                    ? self::nombre(self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']))
+                    : (count($hoteles) === 1 ? self::nombre($hoteles[0]) : '');
+                $out[$id] = ['buffet_id' => $id, 'buffet' => self::nombre($b), 'hotel' => $hotel];
             }
         }
-        return null;
+        return array_values($out);
     }
 
     /**
      * Estado de las antenas de un buffet: [{name, online, offline_since, esl}]. null si no se pudo leer.
-     * No se devuelven IP ni MAC: la IA no los necesita y no deben salir en una respuesta.
      */
     public function antenas(array $sitio): ?array
     {
-        $f = $this->ficha($sitio);
-        if ($f === null) {
+        $id = (int) ($sitio['buffet_id'] ?? 0);
+        if ($id <= 0) {
             return null;
         }
+        $d = Cache::remember("ai_support_antenas_$id", 120, fn () => $this->get("/api/support/v1/buffets/$id/antennas") ?? []);
+        if (! $d) {
+            return null;
+        }
+        $lista = isset($d['antenas']) ? $d['antenas'] : (isset($d['antennas']) ? $d['antennas'] : $d);
         return array_map(fn ($a) => [
-            'name' => (string) ($a['apName'] ?? 'Antena'), 'online' => (bool) ($a['online'] ?? false),
-            'offline_since' => $a['offline_since'] ?? null, 'esl' => (int) ($a['eslCount'] ?? 0),
-        ], array_values((array) ($f['antennas'] ?? [])));
+            'name'          => (string) self::pick((array) $a, ['nombre', 'name', 'apName'], 'Antena'),
+            'online'        => (bool) self::pick((array) $a, ['en_linea', 'online', 'is_online'], false),
+            'offline_since' => self::pick((array) $a, ['caida_desde', 'offline_since']),
+            'esl'           => (int) self::pick((array) $a, ['etiquetas', 'esl', 'eslCount'], 0),
+        ], array_values((array) $lista));
     }
 
     /**
-     * Estado de UNA etiqueta (por su código/MAC) dentro de ese buffet: en línea, batería, señal, última
-     * actualización y la antena que la sirve. null si no es de ese buffet. Nunca de otro hotel.
+     * Estado de UNA etiqueta (por su código) dentro de ese buffet: en línea, batería, señal, última
+     * actualización y su antena. null si no es de ese buffet. Nunca de otro hotel.
      */
     public function etiqueta(array $sitio, string $codigo): ?array
     {
-        $f = $this->ficha($sitio);
+        $id = (int) ($sitio['buffet_id'] ?? 0);
         $codigo = mb_strtoupper(trim($codigo));
-        if ($f === null || $codigo === '') {
+        if ($id <= 0 || $codigo === '') {
             return null;
         }
-        $antenas = [];
-        foreach ((array) ($f['antennas'] ?? []) as $a) {
-            $antenas[(string) ($a['mac'] ?? '')] = ['name' => (string) ($a['apName'] ?? 'Antena'), 'online' => (bool) ($a['online'] ?? false)];
+        $d = $this->get("/api/support/v1/buffets/$id/tags", ['code' => $codigo]);
+        if (! $d) {
+            return null;
         }
-        foreach ((array) ($f['tags'] ?? []) as $t) {
-            if (mb_strtoupper((string) ($t['mac'] ?? '')) === $codigo || mb_strtoupper((string) ($t['name'] ?? '')) === $codigo) {
-                $ap = $antenas[(string) ($t['ap_mac'] ?? '')] ?? null;
-                return [
-                    'code' => $codigo, 'online' => (bool) ($t['is_online'] ?? false), 'battery' => isset($t['battery']) ? (int) $t['battery'] : null,
-                    'signal' => isset($t['signal']) ? (int) $t['signal'] : null, 'updated_at' => $t['updated_at'] ?? null, 'antenna' => $ap,
-                ];
-            }
+        $t = isset($d[0]) && is_array($d[0]) ? $d[0] : (isset($d['data'][0]) ? $d['data'][0] : (isset($d['etiqueta']) ? $d['etiqueta'] : $d));
+        if (! is_array($t) || $t === [] || (isset($t[0]) && ! is_array($t[0]))) {
+            return null;
         }
-        return null;
+        $ap = self::pick($t, ['antena', 'antenna']);
+        $bat = self::pick($t, ['bateria', 'battery']);
+        $sig = self::pick($t, ['senal', 'señal', 'signal']);
+        return [
+            'code'       => $codigo,
+            'online'     => (bool) self::pick($t, ['en_linea', 'online', 'is_online'], false),
+            'battery'    => $bat !== null ? (int) $bat : null,
+            'signal'     => $sig !== null ? (int) $sig : null,
+            'updated_at' => self::pick($t, ['actualizada', 'ultima_actualizacion', 'updated_at']),
+            'antenna'    => is_array($ap) ? ['name' => self::nombre($ap), 'online' => (bool) self::pick($ap, ['en_linea', 'online'], false)] : null,
+        ];
     }
 }
