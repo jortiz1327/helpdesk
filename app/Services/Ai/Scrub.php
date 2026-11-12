@@ -9,6 +9,8 @@ class Scrub
     {
         $t = (string) preg_replace('/[\w.+-]+@[\w-]+(\.[\w-]+)+/u', '[email]', $texto);
         $t = (string) preg_replace('/\+?\d[\d .\/-]{6,}\d/', '[tel]', $t);
+        // Enlaces con parámetros o muy largos: pueden llevar tokens o identificadores de un cliente.
+        $t = (string) preg_replace_callback('#https?://[^\s)>"\]]+#i', fn ($m) => (str_contains($m[0], '?') || strlen($m[0]) > 70) ? '[enlace]' : $m[0], $t);
         $nombre = trim((string) $nombre);
         if (mb_strlen($nombre) >= 3) {
             $t = str_ireplace($nombre, '[cliente]', $t);

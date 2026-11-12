@@ -20,18 +20,20 @@ class AiKnowledgeTest extends TestCase
 
     private int $cid;
 
+    private static int $hechos = 0;
+
     /**
      * El truncado deja filas CONFIRMADAS que chocarían con los tests de transacción que
-     * vengan después en el mismo proceso: al acabar la clase se reconstruye la base de pruebas.
+     * vengan después en el mismo proceso: tras el último test de la clase se reconstruye
+     * la base de pruebas (solo si es la de pruebas).
      */
-    public static function tearDownAfterClass(): void
+    protected function tearDown(): void
     {
-        $app = require __DIR__ . '/../../bootstrap/app.php';
-        $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-        if (\Illuminate\Support\Facades\DB::connection()->getDatabaseName() === 'helpdesk_test') {
-            \Illuminate\Support\Facades\Artisan::call('migrate:fresh', ['--force' => true]);
+        $total = count(array_filter(get_class_methods($this), fn ($m) => str_starts_with($m, 'test_')));
+        if (++self::$hechos >= $total && DB::connection()->getDatabaseName() === 'helpdesk_test') {
+            $this->artisan('migrate:fresh', ['--force' => true]);
         }
-        parent::tearDownAfterClass();
+        parent::tearDown();
     }
 
     protected function setUp(): void
@@ -81,6 +83,14 @@ class AiKnowledgeTest extends TestCase
             $this->assertStringNotContainsString($prohibido, $doc->content . $doc->title);
         }
         $this->assertSame(0, (new AiKnowledge())->indexarTickets()[0]);   // incremental: no repite
+    }
+
+    public function test_tapa_enlaces_con_parametros(): void
+    {
+        $t = \App\Services\Ai\Scrub::tapar('Mira https://aemegroup.com/ayuda y https://x.cloud/portal?token=abc123 ok');
+        $this->assertStringContainsString('https://aemegroup.com/ayuda', $t);
+        $this->assertStringNotContainsString('abc123', $t);
+        $this->assertStringContainsString('[enlace]', $t);
     }
 
     public function test_indexa_el_manual_del_cliente(): void

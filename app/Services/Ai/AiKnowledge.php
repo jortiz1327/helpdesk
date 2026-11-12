@@ -73,7 +73,7 @@ class AiKnowledge
         $nombre = (string) ($t->contact_name ?? '');
         $q = trim(Scrub::tapar(Scrub::plano((string) $pregunta->body), $nombre));
         $r = trim(Scrub::tapar($respuestas->implode("\n\n"), $nombre));
-        if (mb_strlen($q) < 15 || mb_strlen($r) < 15) {
+        if (mb_strlen($q) < 15 || mb_strlen($r) < 40) {   // respuestas de una línea ("le llamo") no enseñan nada
             return null;
         }
 
