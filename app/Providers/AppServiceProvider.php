@@ -23,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
         $tz     = config('app.timezone', 'Europe/Madrid');
         $offset = (new \DateTime('now', new \DateTimeZone($tz)))->format('P');   // p. ej. +02:00
         config(['database.connections.mysql.timezone' => $offset]);
+
+        // Proveedor de IA (sugerencias de respuesta). Cambiar de empresa es cambiar esta línea.
+        $this->app->bind(\App\Services\Ai\AiProvider::class, \App\Services\Ai\AnthropicProvider::class);
     }
 
     public function boot(): void

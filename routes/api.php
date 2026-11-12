@@ -120,6 +120,9 @@ Route::middleware('token')->group(function () {
     // --- Helpdesk: TICKETS (núcleo del sistema) ---
     Route::match(['get', 'post'], 'tickets.php', [TicketsController::class, 'handle'])
         ->middleware('can:helpdesk.access');
+    // Sugerencias de la IA en la ficha del ticket (solo propone; la persona responde).
+    Route::match(['get', 'post'], 'ai_suggestions.php', [\App\Http\Controllers\AiSuggestionsController::class, 'handle'])
+        ->middleware('can:helpdesk.access');
     // Campos personalizados de ticket: rellenar valores (helpdesk.access); definir/borrar
     // el catálogo lo filtra el controlador con support.config.
     Route::match(['get', 'post'], 'ticket_fields.php', [\App\Http\Controllers\TicketFieldsController::class, 'handle'])
