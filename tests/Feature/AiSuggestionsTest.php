@@ -8,7 +8,9 @@ use App\Services\Ai\AiProvider;
 use App\Services\Ai\AiException;
 use App\Services\TokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 use Tests\Unit\Code128ReaderTest;
@@ -73,6 +75,59 @@ class AiSuggestionsTest extends TestCase
 
         $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
         $this->assertStringContainsString('AB12CD345', $this->fake->ultimoSistema);
+    }
+
+    private function flota(string $emailUsuario): void
+    {
+        config(['ai.hotels.apps' => [['url' => 'https://hotel-sol.example.com', 'key' => 'K-secreta']]]);
+        Cache::flush();
+        Http::fake([
+            'hotel-sol.example.com/api/management/containers*' => Http::response([
+                ['id' => 2, 'uuid' => 'h-uuid', 'name' => 'Hotel Sol', 'container_type' => 3, 'parent_id' => 1],
+                ['id' => 3, 'uuid' => 'b-uuid', 'name' => 'Buffet Principal', 'container_type' => 4, 'parent_id' => 2],
+            ]),
+            'hotel-sol.example.com/api/management/users*' => Http::response(['success' => true, 'data' => ['0' => ['email' => $emailUsuario, 'is_enabled' => 1]]]),
+            'hotel-sol.example.com/api/management/inventory*' => Http::response(['success' => true, 'data' => ['antennas' => [
+                ['mac' => 'AP0000000001', 'apName' => 'Antena Frios', 'ip' => '10.0.0.20', 'online' => false, 'offline_since' => '2026-11-10T09:12:00+01:00', 'eslCount' => 64, 'buffet_id' => 3],
+                ['mac' => 'AP0000000002', 'apName' => 'Antena Sala', 'ip' => '10.0.0.21', 'online' => true, 'offline_since' => null, 'eslCount' => 10, 'buffet_id' => 3],
+            ]]]),
+        ]);
+    }
+
+    public function test_verifica_el_correo_en_la_flota_y_ve_las_antenas_sin_filtrar_ip_ni_mac(): void
+    {
+        $this->activar();
+        $this->flota('m@x.com');
+        $tk = $this->ticket('Mis etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('Hotel Sol / Buffet Principal', $p);
+        $this->assertStringContainsString('SIN CONEXIÓN: Antena Frios', $p);
+        $this->assertStringNotContainsString('AP0000000001', $p);
+        $this->assertStringNotContainsString('10.0.0.20', $p);
+        $this->assertStringNotContainsString('K-secreta', $p);
+        Http::assertSent(fn ($r) => $r->method() === 'GET' && $r->hasHeader('X-Api-Key', 'K-secreta'));
+    }
+
+    public function test_un_correo_que_no_esta_en_la_app_no_recibe_datos_de_hoteles(): void
+    {
+        $this->activar();
+        $this->flota('otro@hotel.com');
+        $tk = $this->ticket('Mis etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertStringContainsString('NO figura como usuario', $this->fake->ultimoSistema);
+        $this->assertStringNotContainsString('Hotel Sol', $this->fake->ultimoSistema);
+        $this->assertStringNotContainsString('Antena Frios', $this->fake->ultimoSistema);
+    }
+
+    public function test_sin_configurar_la_flota_no_sale_ninguna_peticion(): void
+    {
+        $this->activar();
+        Http::fake();
+        $tk = $this->ticket('Mis etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        Http::assertNothingSent();
+        $this->assertStringNotContainsString('VERIFICACIÓN DEL CLIENTE', $this->fake->ultimoSistema);
     }
 
     public function test_apagada_no_llama_a_la_ia(): void

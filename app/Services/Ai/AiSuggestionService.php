@@ -250,7 +250,7 @@ class AiSuggestionService
             $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
                 ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
                 ->where('t.id', $ticketId)
-                ->first(['t.id', 't.subject', 't.category_id', 't.channel', 'c.name as contact_name', 'cat.name as category_name']);
+                ->first(['t.id', 't.subject', 't.category_id', 't.channel', 'c.name as contact_name', 'c.email as contact_email', 'cat.name as category_name']);
             $this->nombreCliente = $anonimizar ? trim((string) ($t->contact_name ?? '')) : '';
             if ($anonimizar) {
                 $t->subject = $this->plano((string) $t->subject);
@@ -264,6 +264,7 @@ class AiSuggestionService
             $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId, 3, 4, 2, (string) ($t->subject ?? ''));
 
             $t->codigos = $this->leerCodigosDeFotos($ticketId);
+            $t->hotel = $anonimizar ? '' : $this->contextoHotel($t->contact_email ?? null);
 
             $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
             try {
@@ -436,6 +437,42 @@ class AiSuggestionService
         }
     }
 
+    /**
+     * ¿Quién escribe? Si el correo figura como usuario en la app de hoteles, de qué hotel/buffet es y
+     * cómo están sus antenas (consulta de solo lectura, ver HotelsApi). Sin configurar: nada.
+     */
+    private function contextoHotel(?string $email): string
+    {
+        $api = app(HotelsApi::class);
+        if (! $api->configured()) {
+            return '';
+        }
+        $e = trim((string) $email);
+        $sitios = array_slice($api->buscarPorCorreo($e), 0, 4);
+        if (! $sitios) {
+            return "\nVERIFICACIÓN DEL CLIENTE\n- El correo del cliente" . ($e !== '' ? " ($e)" : ' (no consta)')
+                . " NO figura como usuario en la aplicación de hoteles. No des datos de ningún hotel ni de su estado. "
+                . "Si la consulta depende del hotel, pide que indique su hotel y el correo con el que accede a la aplicación.\n";
+        }
+        $s = "\nVERIFICACIÓN DEL CLIENTE (consulta automática de solo lectura: no digas de dónde sale)\n"
+            . "- El correo del cliente ($e) figura como usuario activo de la aplicación de hoteles en: "
+            . implode('; ', array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /'), $sitios)) . ".\n";
+        if (count($sitios) > 1) {
+            $s .= "- Figura en varios sitios: si la consulta depende del hotel, pregunta de cuál habla.\n";
+        }
+        foreach ($sitios as $x) {
+            $an = $api->antenas($x);
+            if ($an === null) {
+                continue;
+            }
+            $caidas = array_values(array_filter($an, fn ($a) => ! $a['online']));
+            $s .= '- Antenas de ' . $x['buffet'] . ': ' . count($an) . ' en total; ' . ($caidas
+                ? 'SIN CONEXIÓN: ' . implode(', ', array_map(fn ($a) => $a['name'] . ($a['offline_since'] ? ' (desde ' . substr((string) $a['offline_since'], 0, 16) . ')' : ''), $caidas)) . ".\n"
+                : "todas con conexión.\n");
+        }
+        return $s . "- Si hay antenas sin conexión: NO pidas reiniciar, desconectar ni tocar nada; di que el equipo de soporte lo revisará. No des MAC ni IP.\n";
+    }
+
     /** Saludo según la hora y si el equipo ya contestó en este ticket (entonces no se repite presentación ni saludo). */
     private function saludo(object $t): string
     {
@@ -475,7 +512,7 @@ class AiSuggestionService
         $leido = $codigos
             ? "\nCÓDIGO(S) DE BARRAS LEÍDO(S) DE LAS FOTOS DEL CLIENTE (lectura automática fiable): " . implode(', ', $codigos) . ". Úsalo(s) para identificar la etiqueta y menciónalo(s) cuando ayude; no pidas de nuevo el código.\n"
             : ($nFotos ? "\nEL CLIENTE HA ADJUNTADO " . $nFotos . " FOTO(S) pero NO se ha podido leer ningún código de barras en ellas. Si el código hace falta, pide una foto más cercana y frontal, con el código completo y enfocado, sin reflejos, o que lo escriba; no te inventes ningún código.\n" : '');
-        $s .= $leido;
+        $s .= $leido . ($t->hotel ?? '');
         $s .= 'TICKET: ' . ($t->subject ?? '') . ($t->category_name ? ' (categoría: ' . $t->category_name . ')' : '') . ' · canal ' . ($t->channel ?? '') . "\n";
         if (! empty($t->contact_name)) {
             $s .= 'CLIENTE: ' . $t->contact_name . "\n";

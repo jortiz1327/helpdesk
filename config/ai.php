@@ -20,6 +20,14 @@ return [
     'lab'        => (bool) env('AI_LAB', env('APP_ENV') === 'local'),
     'timeout'    => (int) env('AI_TIMEOUT', 30),
 
+    // Consulta de SOLO LECTURA a la flota de AppHoteles (hotel del cliente y estado de antenas). Apagado si no hay apps.
+    // AI_HOTELS_APPS=[{"url":"https://hotel-sol.example.com","key":"..."}]  (una entrada por app; solo https)
+    'hotels' => [
+        'apps'    => json_decode((string) env('AI_HOTELS_APPS', '[]'), true) ?: [],
+        'timeout' => (int) env('AI_HOTELS_TIMEOUT', 8),
+        'ttl'     => (int) env('AI_HOTELS_TTL', 6 * 3600),
+    ],
+
     // Manuales (claves de config/manuals.php) que la IA puede consultar. Solo los pensados para clientes.
     'manuals'    => ['cliente'],
     // Puntuación mínima absoluta FULLTEXT (0 = solo cuenta la relativa al mejor resultado; subirla con datos reales si se cuelan casos poco relacionados).
