@@ -4233,3 +4233,19 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .rail:not(.expanded) .rail-collapse { width: 36px; height: 32px; margin: 0 auto 4px; padding: 0; color: var(--ink-3); }
 .ra-btn, .rail-collapse, .notif-bell, .ru-card { transition: background-color var(--t) ease, color var(--t) ease; }
 .ra-btn:active, .rail-collapse:active, .notif-bell:active, .ru-card:active { transform: scale(0.97); }
+
+/* ---- Sugerencia de la IA en la ficha del ticket ---- */
+.ai-box { margin: 12px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--primary) 6%, var(--panel-2)); display: grid; gap: 8px; }
+.ai-box.ai-soft, .ai-box.ai-load { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 13px; border-color: var(--line); background: var(--panel-2); }
+.ai-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ai-head b { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.ai-head small { color: var(--muted); font-size: 12px; }
+.ai-body { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; max-width: 72ch; }
+.ai-act { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-act .ai-re { margin-left: auto; }
+.ai-fix { display: grid; gap: 6px; }
+.ai-fix label { font-size: 12.5px; color: var(--muted); }
+.ai-fix textarea { width: 100%; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: inherit; font: inherit; }
+.ai-done { font-size: 13px; color: var(--muted); }
+.ai-done q { display: block; margin-top: 4px; color: inherit; }
+@media (pointer: coarse) { .ai-act .btn { min-height: 44px; } }

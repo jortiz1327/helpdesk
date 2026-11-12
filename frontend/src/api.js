@@ -450,6 +450,16 @@ export const api = {
   cancelScheduled: (sched_id) => req('tickets.php?action=sched_cancel', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sched_id }),
   }),
+  // Sugerencias de la IA en la ficha (solo proponen; la persona responde)
+  aiSuggest: (ticket, regenerate = false) => regenerate
+    ? req('ai_suggestions.php?action=regenerate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }) })
+    : req(`ai_suggestions.php?action=suggest&ticket=${ticket}`),
+  aiRate: (id, rating, correction) => req('ai_suggestions.php?action=rate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, rating, correction }),
+  }),
+  aiUsed: (id) => req('ai_suggestions.php?action=used', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+  }),
   // Borrar ticket entero (requiere tickets.delete)
   deleteTicket: (id) => req('tickets.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
