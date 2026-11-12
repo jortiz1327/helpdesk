@@ -32,7 +32,11 @@ class HotelsApi
     private function apps(): array
     {
         $apps = [];
-        foreach ((array) config('ai.hotels.apps', []) as $a) {
+        // Lo normal: UNA clave para toda la flota (AI_HOTELS_KEY) y la lista de URLs (AI_HOTELS_URLS, separadas por comas).
+        $comun = (string) config('ai.hotels.key', '');
+        $lista = array_map(fn ($u) => ['url' => $u, 'key' => $comun], (array) config('ai.hotels.urls', []));
+        // AI_HOTELS_APPS permite una clave propia para alguna app concreta.
+        foreach (array_merge($lista, (array) config('ai.hotels.apps', [])) as $a) {
             $url = rtrim((string) ($a['url'] ?? ''), '/');
             $key = (string) ($a['key'] ?? '');
             if ($url !== '' && $key !== '' && str_starts_with($url, 'https://')) {
