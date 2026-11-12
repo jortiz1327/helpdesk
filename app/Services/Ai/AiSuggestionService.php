@@ -261,7 +261,7 @@ class AiSuggestionService
             $pregunta = $this->ultimaDelCliente($conversacion);
             $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
             $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
-            $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId);
+            $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId, 3, 4, 2, (string) ($t->subject ?? ''));
 
             $t->codigos = $this->leerCodigosDeFotos($ticketId);
 
@@ -494,11 +494,20 @@ class AiSuggestionService
             }
         }
 
-        if ($casos) {
-            $s .= "\n\nCASOS ANTERIORES Y MANUALES (úsalos solo si encajan con esta consulta: de ahí sacas el criterio y el tono del equipo; no copies datos de otros clientes ni mezcles casos distintos)\n";
-            foreach ($casos as $d) {
-                $tipo = str_contains((string) $d->source_id, '#') ? 'Manual' : 'Caso resuelto';
-                $s .= '[' . $tipo . ': ' . $d->title . "]\n" . mb_substr((string) $d->content, 0, 1400) . "\n\n";
+        $guias = array_values(array_filter($casos, fn ($d) => str_contains((string) $d->source_id, '#')));
+        $previos = array_values(array_filter($casos, fn ($d) => ! str_contains((string) $d->source_id, '#')));
+        if ($guias) {
+            $s .= "\n\nGUÍA OFICIAL DE LA APLICACIÓN Y MANUALES (fuente fiable)\n"
+                . "Si la consulta se resuelve con estos pasos, RESPONDE con ellos, adaptados a este cliente y con tus palabras: eso es contestar con fiabilidad, no hace falta derivar. "
+                . "Nombra la pantalla y el botón tal como aparecen en la guía. Si la guía no cubre lo que pregunta, no completes con suposiciones.\n";
+            foreach ($guias as $d) {
+                $s .= '[Guía: ' . $d->title . "]\n" . mb_substr((string) $d->content, 0, 1500) . "\n\n";
+            }
+        }
+        if ($previos) {
+            $s .= "\n\nCASOS ANTERIORES RESUELTOS (úsalos solo si encajan con esta consulta: de ahí sacas el criterio y el tono del equipo; no copies datos de otros clientes ni mezcles casos distintos)\n";
+            foreach ($previos as $d) {
+                $s .= '[Caso resuelto: ' . $d->title . "]\n" . mb_substr((string) $d->content, 0, 1400) . "\n\n";
             }
         }
 

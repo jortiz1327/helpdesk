@@ -120,6 +120,16 @@ class AiKnowledgeTest extends TestCase
         $this->assertSame(0, DB::table('ai_documents')->where('source_type', 'correccion')->count());
     }
 
+    public function test_la_guia_se_encuentra_por_raiz_de_palabra_y_sin_ruido_del_saludo(): void
+    {
+        foreach ([['Usuarios', 'Crear y eliminar usuarios: entra en Usuarios, pulsa Eliminar y confirma con tu contraseña.'], ['Wellness: Iconos', 'Gestionar las fuentes tipográficas de iconos y los distintivos de las ofertas wellness.']] as $i => [$tit, $c]) {
+            DB::table('ai_documents')->insert(['source_type' => 'manual', 'source_id' => "x:$i#1", 'title' => $tit, 'content' => $c, 'indexed_at' => now()]);
+        }
+        $r = app(AiKnowledge::class)->buscar('Modificar Usuario Buenos días Eva Vallejo ya no trabaja con nosotros, hay que eliminar el Usuario y crear otro', null, 0, 3, 0, 'Modificar Usuario');
+        $this->assertNotEmpty($r);
+        $this->assertSame('Usuarios', $r[0]->title);   // «usuario» encuentra «usuarios»
+    }
+
     public function test_tapa_enlaces_con_parametros(): void
     {
         $t = \App\Services\Ai\Scrub::tapar('Mira https://aemegroup.com/ayuda y https://x.cloud/portal?token=abc123 ok');

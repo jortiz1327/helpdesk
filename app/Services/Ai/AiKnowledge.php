@@ -186,6 +186,31 @@ class AiKnowledge
         return $n;
     }
 
+    private const PARADAS = 'a al algo algun alguna ante aqui asi aun aunque bien buen buena buenas buenos cada como con contra cual cuando de del desde donde dos el ella ellos en entre era eran eres es esa ese eso esta estaba estan este esto estos fue ha han hasta hay hemos hola la las le les lo los mas me mi mis mucho muy nos nosotros nuestro o os otra otro para pero por porque que quien se sea ser si sin sobre su sus te tiene tienen todo todos tu tus un una uno unos usted va ya yo buenas dias tardes noches saludos gracias favor tambien necesito necesitamos necesitaria queria queremos podrian podria pueden puedo puede hotel hoteles etiqueta etiquetas';
+
+    /** Consulta BOOLEAN con raíces de palabra: las del asunto pesan más. '' si no queda ninguna palabra útil. */
+    private function consultaManual(string $asunto, string $texto): string
+    {
+        $paradas = array_flip(explode(' ', self::PARADAS));
+        $terminos = [];
+        $anadir = function (string $t, bool $fuerte) use (&$terminos, $paradas) {
+            foreach (preg_split('/\s+/u', mb_strtolower(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $t))) ?: [] as $p) {
+                $p = strtr($p, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+                if (mb_strlen($p) < 4 || isset($paradas[$p]) || ctype_digit($p) || count($terminos) >= 40) {
+                    continue;
+                }
+                $l = mb_strlen($p);
+                $raiz = mb_substr($p, 0, $l <= 5 ? $l - 1 : ($l <= 7 ? $l - 2 : $l - 3));
+                if (mb_strlen($raiz) >= 4 && (! isset($terminos[$raiz]) || $fuerte)) {
+                    $terminos[$raiz] = $fuerte;
+                }
+            }
+        };
+        $anadir($asunto, true);
+        $anadir(mb_substr($texto, 0, 500), false);
+        return implode(' ', array_map(fn ($r, $fuerte) => ($fuerte ? '>' : '') . $r . '*', array_keys($terminos), $terminos));
+    }
+
     /** Párrafos agrupados en trozos de ~TROZO caracteres. */
     private function trocear(string $texto): array
     {
@@ -215,7 +240,7 @@ class AiKnowledge
      * El documento viene sin datos personales. Solo cuentan los que puntúan al menos el 40 % del mejor
      * (y más que config('ai.knowledge_min_score'), 0 por defecto).
      */
-    public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 3, int $nCorrecciones = 2): array
+    public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 4, int $nCorrecciones = 2, string $asunto = ''): array
     {
         $q = trim(mb_substr(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $texto), 0, 600));
         if (mb_strlen($q) < 6) {
@@ -223,10 +248,13 @@ class AiKnowledge
         }
         $min = (float) config('ai.knowledge_min_score', 1.0);
 
-        $buscar = function (string $tipo, int $n) use ($q, $ticketId, $min) {
+        $buscar = function (string $tipo, int $n) use ($q, $ticketId, $min, $texto, $asunto) {
+            // Los manuales se buscan por raíces de palabra (usuario ≈ usuarios, eliminar ≈ eliminación) y sin el ruido
+            // del mensaje (saludos, nombres…): FULLTEXT natural no sabe de plurales. Lo del asunto pesa más.
+            [$modo, $consulta] = $tipo === 'manual' && ($b = $this->consultaManual($asunto, $texto)) !== '' ? ['BOOLEAN', $b] : ['NATURAL LANGUAGE', $q];
             $f = DB::table('ai_documents')->where('source_type', $tipo)
-                ->selectRaw('id, source_type, source_id, title, content, quality, MATCH(title, content) AGAINST(? IN NATURAL LANGUAGE MODE) AS score', [$q])
-                ->whereRaw('MATCH(title, content) AGAINST(? IN NATURAL LANGUAGE MODE)', [$q]);
+                ->selectRaw("id, source_type, source_id, title, content, quality, MATCH(title, content) AGAINST(? IN $modo MODE) AS score", [$consulta])
+                ->whereRaw("MATCH(title, content) AGAINST(? IN $modo MODE)", [$consulta]);
             if ($tipo === 'ticket' && $ticketId) {
                 $f->where('source_id', '!=', (string) $ticketId);
             }
