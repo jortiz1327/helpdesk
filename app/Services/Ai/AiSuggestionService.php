@@ -264,7 +264,7 @@ class AiSuggestionService
             $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId, 3, 4, 2, (string) ($t->subject ?? ''));
 
             $t->codigos = $this->leerCodigosDeFotos($ticketId);
-            $t->hotel = $anonimizar ? '' : $this->contextoHotel($t->contact_email ?? null);
+            $t->hotel = $anonimizar ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))));
 
             $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
             try {
@@ -441,7 +441,7 @@ class AiSuggestionService
      * ¿Quién escribe? Si el correo figura como usuario en la app de hoteles, de qué hotel/buffet es y
      * cómo están sus antenas (consulta de solo lectura, ver HotelsApi). Sin configurar: nada.
      */
-    private function contextoHotel(?string $email): string
+    private function contextoHotel(?string $email, array $codigos = []): string
     {
         $api = app(HotelsApi::class);
         if (! $api->configured()) {
@@ -470,7 +470,39 @@ class AiSuggestionService
                 ? 'SIN CONEXIÓN: ' . implode(', ', array_map(fn ($a) => $a['name'] . ($a['offline_since'] ? ' (desde ' . substr((string) $a['offline_since'], 0, 16) . ')' : ''), $caidas)) . ".\n"
                 : "todas con conexión.\n");
         }
-        return $s . "- Si hay antenas sin conexión: NO pidas reiniciar, desconectar ni tocar nada; di que el equipo de soporte lo revisará. No des MAC ni IP.\n";
+        // Estado de las etiquetas concretas que menciona el cliente (código leído de la foto o escrito en el mensaje).
+        foreach (array_slice($codigos, 0, 5) as $c) {
+            $hallada = null;
+            foreach ($sitios as $x) {
+                if ($hallada = $api->etiqueta($x, $c)) {
+                    $hallada['buffet'] = $x['buffet'];
+                    break;
+                }
+            }
+            if ($hallada) {
+                $ap = $hallada['antenna'];
+                $s .= "- Etiqueta {$c} (" . $hallada['buffet'] . '): ' . ($hallada['online'] ? 'en línea' : 'SIN CONEXIÓN')
+                    . ($hallada['battery'] !== null ? ', batería ' . $hallada['battery'] . ' %' : '')
+                    . ($hallada['signal'] !== null ? ', señal ' . $hallada['signal'] . ' dBm' : '')
+                    . ($hallada['updated_at'] ? ', última actualización ' . substr(str_replace('T', ' ', (string) $hallada['updated_at']), 0, 16) : '')
+                    . ($ap ? ', la sirve la antena ' . $ap['name'] . ($ap['online'] ? ' (con conexión)' : ' (SIN CONEXIÓN)') : '') . ".\n";
+            }
+        }
+        return $s . "- Si hay antenas sin conexión: NO pidas reiniciar, desconectar ni tocar nada; di que el equipo de soporte lo revisará. No des MAC ni IP de antenas. Si una etiqueta tiene batería baja, sigue la guía de pilas (no tramites material).\n";
+    }
+
+    /** Códigos de etiqueta (9 letras/números) o MAC (12 hex) escritos en un texto. */
+    private function codigosEnTexto(string $texto): array
+    {
+        preg_match_all('/\b[A-Za-z0-9]{9,12}\b/', $texto, $m);
+        $out = [];
+        foreach ($m[0] as $c) {
+            $c = strtoupper($c);
+            if (preg_match('/^[0-9A-F]{12}$/', $c) || (strlen($c) === 9 && preg_match('/\d/', $c) && preg_match('/[A-Z]/', $c))) {
+                $out[$c] = true;
+            }
+        }
+        return array_keys($out);
     }
 
     /** Saludo según la hora y si el equipo ya contestó en este ticket (entonces no se repite presentación ni saludo). */

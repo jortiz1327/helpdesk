@@ -21,7 +21,10 @@ use Throwable;
 class HotelsApi
 {
     /** Únicas rutas que se llaman. */
-    private const RUTAS = ['/api/management/containers', '/api/management/users', '/api/management/inventory'];
+    private const RUTAS = ['/api/management/containers', '/api/management/users'];
+
+    /** Y la ficha de un buffet concreto (su número). */
+    private const FICHA = '#^/api/management/buffets/\d+/details$#';
 
     public function configured(): bool
     {
@@ -49,7 +52,7 @@ class HotelsApi
     /** GET de una ruta permitida. Devuelve el contenido (data) o null si falla. */
     private function get(array $app, string $ruta, array $query = []): ?array
     {
-        if (! in_array($ruta, self::RUTAS, true)) {
+        if (! in_array($ruta, self::RUTAS, true) && ! preg_match(self::FICHA, $ruta)) {
             return null;
         }
         try {
@@ -117,31 +120,59 @@ class HotelsApi
         return $email === '' ? [] : ($this->directorio()[$email] ?? []);
     }
 
+    /** La ficha de un buffet (antenas y etiquetas), guardada 2 minutos. null si no se pudo leer. */
+    private function ficha(array $sitio): ?array
+    {
+        foreach ($this->apps() as $app) {
+            if ($app['url'] === $sitio['app']) {
+                $f = Cache::remember('ai_hotels_ficha_' . md5($app['url']) . '_' . (int) $sitio['buffet_id'], 120,
+                    fn () => $this->get($app, '/api/management/buffets/' . (int) $sitio['buffet_id'] . '/details') ?? []);
+                return $f ?: null;
+            }
+        }
+        return null;
+    }
+
     /**
      * Estado de las antenas de un buffet: [{name, online, offline_since, esl}]. null si no se pudo leer.
      * No se devuelven IP ni MAC: la IA no los necesita y no deben salir en una respuesta.
      */
     public function antenas(array $sitio): ?array
     {
-        $app = null;
-        foreach ($this->apps() as $a) {
-            if ($a['url'] === $sitio['app']) {
-                $app = $a;
-            }
-        }
-        if (! $app) {
+        $f = $this->ficha($sitio);
+        if ($f === null) {
             return null;
         }
-        $inv = Cache::remember('ai_hotels_inv_' . md5($app['url']), 120, fn () => $this->get($app, '/api/management/inventory') ?? []);
-        if (! $inv) {
+        return array_map(fn ($a) => [
+            'name' => (string) ($a['apName'] ?? 'Antena'), 'online' => (bool) ($a['online'] ?? false),
+            'offline_since' => $a['offline_since'] ?? null, 'esl' => (int) ($a['eslCount'] ?? 0),
+        ], array_values((array) ($f['antennas'] ?? [])));
+    }
+
+    /**
+     * Estado de UNA etiqueta (por su código/MAC) dentro de ese buffet: en línea, batería, señal, última
+     * actualización y la antena que la sirve. null si no es de ese buffet. Nunca de otro hotel.
+     */
+    public function etiqueta(array $sitio, string $codigo): ?array
+    {
+        $f = $this->ficha($sitio);
+        $codigo = mb_strtoupper(trim($codigo));
+        if ($f === null || $codigo === '') {
             return null;
         }
-        $out = [];
-        foreach ((array) ($inv['antennas'] ?? []) as $a) {
-            if ((int) ($a['buffet_id'] ?? 0) === (int) $sitio['buffet_id']) {
-                $out[] = ['name' => (string) ($a['apName'] ?? 'Antena'), 'online' => (bool) ($a['online'] ?? false), 'offline_since' => $a['offline_since'] ?? null, 'esl' => (int) ($a['eslCount'] ?? 0)];
+        $antenas = [];
+        foreach ((array) ($f['antennas'] ?? []) as $a) {
+            $antenas[(string) ($a['mac'] ?? '')] = ['name' => (string) ($a['apName'] ?? 'Antena'), 'online' => (bool) ($a['online'] ?? false)];
+        }
+        foreach ((array) ($f['tags'] ?? []) as $t) {
+            if (mb_strtoupper((string) ($t['mac'] ?? '')) === $codigo || mb_strtoupper((string) ($t['name'] ?? '')) === $codigo) {
+                $ap = $antenas[(string) ($t['ap_mac'] ?? '')] ?? null;
+                return [
+                    'code' => $codigo, 'online' => (bool) ($t['is_online'] ?? false), 'battery' => isset($t['battery']) ? (int) $t['battery'] : null,
+                    'signal' => isset($t['signal']) ? (int) $t['signal'] : null, 'updated_at' => $t['updated_at'] ?? null, 'antenna' => $ap,
+                ];
             }
         }
-        return $out;
+        return null;
     }
 }

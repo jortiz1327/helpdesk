@@ -87,10 +87,10 @@ class AiSuggestionsTest extends TestCase
                 ['id' => 3, 'uuid' => 'b-uuid', 'name' => 'Buffet Principal', 'container_type' => 4, 'parent_id' => 2],
             ]),
             'hotel-sol.example.com/api/management/users*' => Http::response(['success' => true, 'data' => ['0' => ['email' => $emailUsuario, 'is_enabled' => 1]]]),
-            'hotel-sol.example.com/api/management/inventory*' => Http::response(['success' => true, 'data' => ['antennas' => [
+            'hotel-sol.example.com/api/management/buffets/3/details' => Http::response(['success' => true, 'data' => ['antennas' => [
                 ['mac' => 'AP0000000001', 'apName' => 'Antena Frios', 'ip' => '10.0.0.20', 'online' => false, 'offline_since' => '2026-11-10T09:12:00+01:00', 'eslCount' => 64, 'buffet_id' => 3],
                 ['mac' => 'AP0000000002', 'apName' => 'Antena Sala', 'ip' => '10.0.0.21', 'online' => true, 'offline_since' => null, 'eslCount' => 10, 'buffet_id' => 3],
-            ]]]),
+            ], 'tags' => [['mac' => 'AB12CD345', 'name' => 'AB12CD345', 'is_online' => false, 'battery' => 8, 'signal' => -81, 'ap_mac' => 'AP0000000001', 'updated_at' => '2026-11-09T18:30:44+01:00']]]]),
         ]);
     }
 
@@ -98,9 +98,11 @@ class AiSuggestionsTest extends TestCase
     {
         $this->activar();
         $this->flota('m@x.com');
-        $tk = $this->ticket('Mis etiquetas no se actualizan');
+        $tk = $this->ticket('Mi etiqueta AB12CD345 no se actualiza');
         $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
         $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('Etiqueta AB12CD345 (Buffet Principal): SIN CONEXIÓN, batería 8 %, señal -81 dBm', $p);
+        $this->assertStringContainsString('la sirve la antena Antena Frios (SIN CONEXIÓN)', $p);
         $this->assertStringContainsString('Hotel Sol / Buffet Principal', $p);
         $this->assertStringContainsString('SIN CONEXIÓN: Antena Frios', $p);
         $this->assertStringNotContainsString('AP0000000001', $p);
