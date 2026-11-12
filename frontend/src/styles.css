@@ -4408,17 +4408,19 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-head svg, .ai-box > svg { width: 15px; height: 15px; fill: currentColor; flex: none; }
 .ai-done .ai-act { margin-top: 8px; }
 
-/* Laboratorio de la IA (solo local) */
-.lab-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
-.lab-case{border:1px solid var(--line,#2a2f3a);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.lab-case.done{opacity:.6}
-.lab-case header{font-size:13px;line-height:1.3;overflow-wrap:anywhere}
-.lab-case small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.65;margin-bottom:2px}
-.lab-msg p,.lab-ai p,.lab-real p{margin:0;white-space:pre-wrap;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
-.lab-msg{padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.1);max-height:160px;overflow:auto}
-.lab-ai{padding:8px 10px;border-radius:8px;border:1px dashed rgba(127,127,127,.45)}
+/* Laboratorio de la IA (solo local): un caso cada vez */
+.lab-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.lab-one{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px;align-items:start}
+@media (max-width:900px){.lab-one{grid-template-columns:1fr}}
+.lab section{min-width:0}
+.lab small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.65;margin-bottom:4px}
+.lab-msg,.lab-ai{padding:14px 16px;border-radius:12px}
+.lab-msg{background:rgba(127,127,127,.1)}
+.lab-ai{border:1px dashed rgba(127,127,127,.5)}
+.lab-msg h4{margin:0 0 8px;font-size:15px}
+.lab-msg p,.lab-ai p,.lab-real p{margin:0;white-space:pre-wrap;font-size:15px;line-height:1.55;overflow-wrap:anywhere}
+.lab-msg p{max-height:60vh;overflow:auto}
+.lab-btns{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
 .lab-abst{opacity:.85}
-.lab-ok{margin:0;font-size:13px}
-.lab-ok q{display:block;opacity:.8;margin-top:4px}
-.lab-real-t{align-self:flex-start;background:none;border:0;padding:0;font-size:12px;text-decoration:underline;opacity:.7;cursor:pointer;color:inherit}
-.lab-real{padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.08);max-height:200px;overflow:auto}
+.lab-real-t{margin-top:12px;background:none;border:0;padding:0;font-size:13px;text-decoration:underline;opacity:.75;cursor:pointer;color:inherit}
+.lab-real{margin-top:8px;padding:12px 14px;border-radius:10px;background:rgba(127,127,127,.08)}
