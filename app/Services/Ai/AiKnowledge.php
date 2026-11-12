@@ -152,6 +152,37 @@ class AiKnowledge
                 $n++;
             }
         }
+        return $n + $this->indexarDocumentacion();
+    }
+
+    /**
+     * Documentación propia: los .md / .txt de resources/ai-docs (p. ej. el informe de cada
+     * apartado de la aplicación de los hoteles). Cada archivo se reindexa entero al cambiar.
+     */
+    public function indexarDocumentacion(): int
+    {
+        $dir = resource_path('ai-docs');
+        if (! is_dir($dir)) {
+            return 0;
+        }
+        $n = 0;
+        $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS));
+        foreach ($it as $f) {
+            if (! $f->isFile() || ! in_array(strtolower($f->getExtension()), ['md', 'txt'], true)) {
+                continue;
+            }
+            $rel = str_replace('\\', '/', substr($f->getPathname(), strlen($dir) + 1));
+            $texto = (string) file_get_contents($f->getPathname());
+            $titulo = preg_match('/^#\s+(.+)$/m', $texto, $m) ? trim($m[1]) : pathinfo($rel, PATHINFO_FILENAME);
+            DB::table('ai_documents')->where('source_type', 'manual')->where('source_id', 'like', 'doc:' . $rel . '#%')->delete();
+            foreach ($this->trocear($texto) as $i => $trozo) {
+                DB::table('ai_documents')->insert([
+                    'source_type' => 'manual', 'source_id' => 'doc:' . $rel . '#' . ($i + 1), 'title' => mb_substr($titulo, 0, 255),
+                    'content' => $trozo, 'quality' => null, 'indexed_at' => now(),
+                ]);
+                $n++;
+            }
+        }
         return $n;
     }
 
@@ -184,7 +215,7 @@ class AiKnowledge
      * El documento viene sin datos personales. Solo cuentan los que puntúan al menos el 40 % del mejor
      * (y más que config('ai.knowledge_min_score'), 0 por defecto).
      */
-    public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 2, int $nCorrecciones = 2): array
+    public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 3, int $nCorrecciones = 2): array
     {
         $q = trim(mb_substr(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $texto), 0, 600));
         if (mb_strlen($q) < 6) {
