@@ -10,6 +10,9 @@ import { useToast } from '../App.jsx'
  * conocimiento. La clave del proveedor NO se pone aquí: va en el .env del
  * servidor, y esta pantalla solo dice si hay una.
  * ---------------------------------------------------------------------- */
+const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + ' M' : n >= 1e3 ? (n / 1e3).toFixed(1) + ' k' : String(n))
+const euros = (usd) => (usd > 0 && usd < 0.01 ? '< 0,01 $' : usd.toFixed(2).replace('.', ',') + ' $')
+
 export default function AiSettings() {
   const toast = useToast()
   const [d, setD] = useState(null)
@@ -77,6 +80,22 @@ export default function AiSettings() {
         )}
         {valoradas > 0 && valoradas < 20 ? <p className="em-desc" style={{ marginTop: 8 }}>Con menos de 20 valoraciones el acierto aún dice poco.</p> : null}
       </div>
+
+      {d.usage && (
+        <div className="card em-card" style={{ marginTop: 12 }}>
+          <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Consumo y coste estimado</h3>
+          <dl className="ai-stats">
+            {[['Hoy', d.usage.today], ['Últimos 30 días', d.usage.month], ['Total', d.usage.total]].map(([t, u]) => (
+              <div key={t}>
+                <dt>{t}</dt>
+                <dd>{euros(u.cost)}</dd>
+                <small className="muted">{u.calls} llamadas · {fmtTok(u.input)} entrada · {fmtTok(u.output)} salida</small>
+              </div>
+            ))}
+          </dl>
+          <p className="em-desc" style={{ marginTop: 8 }}>Estimación en dólares a partir de los tokens guardados y la tarifa configurada ({d.model}); la cifra oficial es la de la consola del proveedor, que puede tardar en actualizarse. Solo cuenta las llamadas que ya devolvieron una respuesta.</p>
+        </div>
+      )}
 
       <div className="card em-card" style={{ marginTop: 12 }}>
         <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Base de conocimiento</h3>

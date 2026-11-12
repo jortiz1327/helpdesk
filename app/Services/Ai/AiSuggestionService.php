@@ -69,6 +69,7 @@ class AiSuggestionService
                 // Acierto = útiles / valoradas. Solo tiene sentido con algunas valoraciones.
                 'accuracy' => ($arriba + $abajo) > 0 ? round($arriba / ($arriba + $abajo) * 100) : null,
             ],
+            'usage'      => $this->consumo(),
             'knowledge'  => [
                 'tickets' => DB::table('ai_documents')->where('source_type', 'ticket')->count(),
                 'manuals' => DB::table('ai_documents')->where('source_type', 'manual')->count(),
@@ -82,6 +83,28 @@ class AiSuggestionService
                 ->where('a.rating', 'down')->whereNotNull('a.correction')->orderByDesc('a.rated_at')->limit(8)
                 ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.rated_at'])->all(),
         ];
+    }
+
+    /** Tokens y coste ESTIMADO (config ai.prices) de hoy, los últimos 30 días y el total. */
+    private function consumo(): array
+    {
+        $precios = (array) config('ai.prices', []);
+        $calc = function ($desde) use ($precios) {
+            $q = DB::table('ai_suggestions')->whereNotNull('input_tokens');
+            if ($desde) {
+                $q->where('created_at', '>=', $desde);
+            }
+            $in = $out = 0;
+            $coste = 0.0;
+            $n = 0;
+            foreach ($q->selectRaw('model, COUNT(*) n, SUM(input_tokens) i, SUM(output_tokens) o')->groupBy('model')->get() as $r) {
+                [$pi, $po] = $precios[$r->model] ?? $precios['default'] ?? [0, 0];
+                $in += (int) $r->i; $out += (int) $r->o; $n += (int) $r->n;
+                $coste += $r->i / 1e6 * $pi + $r->o / 1e6 * $po;
+            }
+            return ['calls' => $n, 'input' => $in, 'output' => $out, 'cost' => round($coste, 4)];
+        };
+        return ['today' => $calc(now()->startOfDay()), 'month' => $calc(now()->subDays(30)), 'total' => $calc(null)];
     }
 
     /**
@@ -152,6 +175,7 @@ class AiSuggestionService
                 $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos), $this->comoTurnos($conversacion));
                 if (! empty($r['truncated'])) {
                     // Un texto cortado a medias no se puede enseñar como si estuviera completo.
+                    $fila += ['model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens']];   // se pagó aunque no sirva
                     throw new AiException('La respuesta de la IA salió incompleta');
                 }
                 $texto = trim($r['text']);

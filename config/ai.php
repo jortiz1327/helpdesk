@@ -23,6 +23,12 @@ return [
     // Puntuación mínima absoluta FULLTEXT (0 = solo cuenta la relativa al mejor resultado; subirla con datos reales si se cuelan casos poco relacionados).
     'knowledge_min_score' => (float) env('AI_KNOWLEDGE_MIN_SCORE', 0.0),
 
+    // Precio en USD por millón de tokens [entrada, salida], solo para ESTIMAR el gasto en Ajustes (la factura real es la del proveedor).
+    // Comprobar en la web del proveedor; se puede ajustar sin tocar código con AI_PRICE_IN / AI_PRICE_OUT.
+    'prices' => [
+        'default' => [(float) env('AI_PRICE_IN', 1.0), (float) env('AI_PRICE_OUT', 5.0)],
+    ],
+
     'providers' => [
         'anthropic' => [
             'api_key'  => env('AI_KEY_ANTHROPIC', $activo === 'anthropic' ? env('AI_API_KEY') : null),
