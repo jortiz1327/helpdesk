@@ -207,6 +207,13 @@ class AiSuggestionsTest extends TestCase
 
         $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $g->json('suggestion.id'), 'rating' => 'up'])->assertOk();
         $this->assertSame([], $this->withHeader('X-App-Token', $token)->getJson('/api/ai_suggestions.php?action=lab_cases')->json('cases'));   // ya validado: no vuelve
+        // Repasar lo corregido: vuelve con la sugerencia mala y la indicación, y pide una NUEVA.
+        $mal = DB::table('ai_suggestions')->where('id', $g->json('suggestion.id'))->first();
+        $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $mal->id, 'rating' => 'down', 'correction' => 'Debia indicar Posiciones.'])->assertOk();
+        $rev = $this->withHeader('X-App-Token', $token)->getJson('/api/ai_suggestions.php?action=lab_cases&modo=corregidos')->assertOk()->json('cases.0');
+        $this->assertSame('Debia indicar Posiciones.', $rev['before']['correction']);
+        $nueva = $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=lab_generate', ['ticket' => $tk, 'message' => $rev['message_id'], 'regenerate' => true])->json('suggestion.id');
+        $this->assertNotSame((int) $mal->id, $nueva);
     }
 
     public function test_no_se_puede_encender_sin_clave(): void

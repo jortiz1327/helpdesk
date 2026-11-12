@@ -137,6 +137,35 @@ class AiSuggestionService
         return $out;
     }
 
+    /**
+     * Los casos que el equipo corrigió (👎), para volver a probarlos con lo aprendido: cada uno
+     * lleva la sugerencia mala y la indicación, y se pide una sugerencia NUEVA.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public function labCorregidos(): array
+    {
+        $out = [];
+        $filas = DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->orderByDesc('rated_at')->limit(30)->get();
+        foreach ($filas as $a) {
+            $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')->where('t.id', $a->ticket_id)->first(['t.code', 't.subject', 'c.name as contact_name']);
+            $previos = DB::table('messages')->where('ticket_id', $a->ticket_id)->where('direction', 'in')->where('is_internal_note', 0)
+                ->where('id', '<=', $a->trigger_message_id)->whereNotNull('body')->orderByDesc('id')->limit(3)->get(['body'])->reverse();
+            $resp = DB::table('messages')->where('ticket_id', $a->ticket_id)->where('direction', 'out')->where('is_internal_note', 0)
+                ->whereNotNull('author_user_id')->whereNotNull('body')->where('id', '>', $a->trigger_message_id)->orderBy('id')->value('body');
+            $out[] = [
+                'ticket_id' => (int) $a->ticket_id, 'message_id' => (int) $a->trigger_message_id, 'code' => $t->code ?? '', 'subject' => $t->subject ?? '', 'contact' => $t->contact_name ?? null,
+                'message' => $previos->map(fn ($m) => $this->plano((string) $m->body))->filter()->implode("
+
+"),
+                'real_reply' => $resp ? mb_substr($this->plano((string) $resp), 0, 2500) : '(el equipo no llegó a contestar tras este mensaje)',
+                'suggestion' => null, 'regen' => true,
+                'before' => ['body' => (string) $a->body, 'correction' => (string) $a->correction],
+            ];
+        }
+        return $out;
+    }
+
     /** La sugerencia del laboratorio para ese mensaje (la genera si no hay una válida). */
     public function forMensaje(int $ticketId, int $messageId, ?int $userId, bool $regenerate = false): object
     {

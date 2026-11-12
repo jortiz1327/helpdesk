@@ -21,14 +21,16 @@ export default function AiLab() {
   const [guardando, setGuardando] = useState(false)
   const [hechos, setHechos] = useState(0)
   const pidiendo = useRef(new Set())
+  const [modo, setModo] = useState('')   // '' = casos nuevos · 'corregidos' = repasar los que corregí
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (m = '') => {
+    setModo(m)
     setCasos(null); setError(''); setI(0); setSug({}); setCargando({}); setHechos(0); pidiendo.current = new Set()
-    const r = await api.aiLabCases(10)
+    const r = await api.aiLabCases(10, m)
     if (r?.ok) { setCasos(r.cases); setSug(Object.fromEntries(r.cases.filter((c) => c.suggestion).map((c) => [c.message_id, c.suggestion]))) }
     else setError(r?.error || 'No se pudo cargar')
   }, [])
-  useEffect(() => { cargar() }, [cargar])
+  useEffect(() => { cargar('') }, [cargar])
 
   const generar = useCallback(async (c, regenerar = false) => {
     if (pidiendo.current.has(c.message_id)) return
@@ -44,7 +46,7 @@ export default function AiLab() {
   // El actual y, de fondo, el siguiente.
   useEffect(() => {
     if (!casos) return
-    ;[casos[i], casos[i + 1]].forEach((c) => { if (c && !sug[c.message_id]) generar(c) })
+    ;[casos[i], casos[i + 1]].forEach((c) => { if (c && !sug[c.message_id]) generar(c, !!c.regen) })
   }, [casos, i])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const ir = (n) => { setI(n); setReal(false); setCorrigiendo(false); setTexto('') }
@@ -57,7 +59,7 @@ export default function AiLab() {
       <div className="card em-card lab">
         <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>Lote terminado</h3>
         <p className="em-desc">Has validado {hechos} de {casos.length}. Todo ha quedado en la memoria de la IA.</p>
-        <button className="btn primary" onClick={cargar}>Otros 10 casos</button>
+        <button className="btn primary" onClick={() => cargar('')}>Otros 10 casos</button>
       </div>
     )
   }
@@ -82,6 +84,7 @@ export default function AiLab() {
         <h3 style={{ margin: 0, fontSize: 15 }}>Laboratorio (solo local)</h3>
         <small className="muted">Caso {i + 1} de {casos.length} · {hechos} validados</small>
         <span style={{ flex: 1 }} />
+        <button className="btn sm ghost" onClick={() => cargar(modo === 'corregidos' ? '' : 'corregidos')}>{modo === 'corregidos' ? 'Volver a casos nuevos' : 'Repasar mis correcciones'}</button>
         <button className="btn sm ghost" onClick={() => ir(i + 1)}>Saltar</button>
       </div>
       <p className="em-desc" style={{ marginTop: 4 }}>La IA contesta solo con lo que había antes de la respuesta del equipo. No se envía nada: todo es memoria para la IA.</p>
@@ -91,6 +94,12 @@ export default function AiLab() {
           <small>Cliente · <b className="mono">{c.code}</b>{c.contact ? ` · ${c.contact}` : ''}</small>
           <h4>{c.subject}</h4>
           <p>{c.message}</p>
+          {c.before && (
+            <div className="lab-before">
+              <small>Lo que la IA dijo antes (estaba mal)</small><p>{c.before.body || '(derivó a una persona)'}</p>
+              <small style={{ marginTop: 8 }}>Tu indicación</small><p><b>{c.before.correction}</b></p>
+            </div>
+          )}
         </section>
 
         <section className="lab-ai">

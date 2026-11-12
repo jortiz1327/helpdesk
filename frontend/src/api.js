@@ -461,7 +461,7 @@ export const api = {
   aiUsed: (id) => req('ai_suggestions.php?action=used', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   }),
-  aiLabCases: (n = 10) => req(`ai_suggestions.php?action=lab_cases&n=${n}`),
+  aiLabCases: (n = 10, modo = '') => req(`ai_suggestions.php?action=lab_cases&n=${n}&modo=${modo}`),
   aiLabGenerate: (ticket, message, regenerate = false) => req('ai_suggestions.php?action=lab_generate', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket, message, regenerate }),
   }),

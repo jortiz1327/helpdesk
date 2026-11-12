@@ -4424,3 +4424,5 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .lab-abst{opacity:.85}
 .lab-real-t{margin-top:12px;background:none;border:0;padding:0;font-size:13px;text-decoration:underline;opacity:.75;cursor:pointer;color:inherit}
 .lab-real{margin-top:8px;padding:12px 14px;border-radius:10px;background:rgba(127,127,127,.08)}
+.lab-before{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(200,120,0,.1)}
+.lab-before p{font-size:13px!important}

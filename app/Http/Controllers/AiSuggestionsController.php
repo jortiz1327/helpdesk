@@ -54,7 +54,9 @@ class AiSuggestionsController extends Controller
     private function labCases(Request $request)
     {
         if ($denegado = $this->soloLab($request)) return $denegado;
-        $cases = $this->ai->labCasos(max(1, min(20, (int) $request->query('n', 10))));
+        $cases = $request->query('modo') === 'corregidos'
+            ? $this->ai->labCorregidos()
+            : $this->ai->labCasos(max(1, min(20, (int) $request->query('n', 10))));
         foreach ($cases as &$c) {
             $c['suggestion'] = $c['suggestion'] ? $this->salida($c['suggestion']) : null;
         }
