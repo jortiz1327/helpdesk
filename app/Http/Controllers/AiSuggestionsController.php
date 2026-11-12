@@ -35,6 +35,8 @@ class AiSuggestionsController extends Controller
             'rate'       => $this->post($request) ?? $this->rate($request),
             'used'       => $this->post($request) ?? $this->used($request),
             'admin'      => $this->admin($request),
+            'lab_cases'  => $this->labCases($request),
+            'lab_generate' => $this->post($request) ?? $this->labGenerate($request),
             'admin_save' => $this->post($request) ?? $this->adminSave($request),
             'admin_index' => $this->post($request) ?? $this->adminIndex($request),
             default      => response()->json(['ok' => true, 'enabled' => $this->ai->enabled()]),
@@ -46,6 +48,36 @@ class AiSuggestionsController extends Controller
     {
         if ($denegado = $this->soloConfig($request)) return $denegado;
         return response()->json(['ok' => true] + $this->ai->panel());
+    }
+
+    /** Laboratorio (solo APP_ENV=local): casos ya resueltos para validar la IA de un vistazo. */
+    private function labCases(Request $request)
+    {
+        if ($denegado = $this->soloLab($request)) return $denegado;
+        $cases = $this->ai->labCasos(max(1, min(20, (int) $request->query('n', 10))));
+        foreach ($cases as &$c) {
+            $c['suggestion'] = $c['suggestion'] ? $this->salida($c['suggestion']) : null;
+        }
+        return response()->json(['ok' => true, 'cases' => $cases]);
+    }
+
+    private function labGenerate(Request $request)
+    {
+        if ($denegado = $this->soloLab($request)) return $denegado;
+        $ticket = (int) $request->input('ticket');
+        $msg = (int) $request->input('message');
+        if (! DB::table('messages')->where('id', $msg)->where('ticket_id', $ticket)->where('direction', 'in')->exists()) {
+            return response()->json(['ok' => false, 'error' => 'Caso no válido'], 404);
+        }
+        $s = $this->ai->forMensaje($ticket, $msg, $request->user()->id, filter_var($request->input('regenerate'), FILTER_VALIDATE_BOOLEAN));
+        return response()->json(['ok' => true, 'suggestion' => $this->salida($s)]);
+    }
+
+    private function soloLab(Request $request)
+    {
+        if (! $this->ai->labActivo()) return response()->json(['ok' => false, 'error' => 'No disponible'], 404);
+        if (! $this->ai->enabled()) return response()->json(['ok' => false, 'error' => 'El asistente está apagado'], 422);
+        return $this->soloConfig($request);
     }
 
     private function adminSave(Request $request)

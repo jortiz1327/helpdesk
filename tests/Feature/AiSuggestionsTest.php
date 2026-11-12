@@ -182,6 +182,33 @@ class AiSuggestionsTest extends TestCase
         $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=admin_save', ['enabled' => false])->assertOk()->assertJsonPath('enabled', false);
     }
 
+    public function test_laboratorio_contesta_solo_con_lo_previo_y_no_envia_nada(): void
+    {
+        config(['ai.lab' => true]);
+        $token = $this->encargado();
+        $this->activar();
+        $tk = $this->ticket('Mi etiqueta no cambia de precio desde ayer, que hago?');
+        $uid = DB::table('users')->value('id');
+        DB::table('messages')->insert(['contact_id' => $this->cid, 'wa_id' => '', 'ticket_id' => $tk, 'direction' => 'out', 'author_user_id' => $uid,
+            'body' => 'Hola Marta, la respuesta secreta del equipo es reiniciar la zona con el codigo ZETA-99 desde Posiciones.', 'created_at' => now()]);
+        DB::table('tickets')->where('id', $tk)->update(['status' => 'resuelto']);
+
+        $r = $this->withHeader('X-App-Token', $token)->getJson('/api/ai_suggestions.php?action=lab_cases')->assertOk();
+        $caso = $r->json('cases.0');
+        $this->assertSame($tk, $caso['ticket_id']);
+        $this->assertStringContainsString('ZETA-99', $caso['real_reply']);   // se enseña al validador...
+
+        $g = $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=lab_generate', ['ticket' => $tk, 'message' => $caso['message_id']])->assertOk();
+        $g->assertJsonPath('suggestion.status', 'ready');
+        $this->assertStringNotContainsString('ZETA-99', $this->fake->ultimoSistema);   // ...pero la IA no la ve
+        $this->assertStringContainsString('le hablo de AEME Group', $this->fake->ultimoSistema);   // y trata el caso como primer contacto
+        $this->assertSame('lab', DB::table('ai_suggestions')->value('mode'));
+        $this->assertSame(1, DB::table('messages')->where('ticket_id', $tk)->where('direction', 'out')->count());   // nada enviado
+
+        $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $g->json('suggestion.id'), 'rating' => 'up'])->assertOk();
+        $this->assertSame([], $this->withHeader('X-App-Token', $token)->getJson('/api/ai_suggestions.php?action=lab_cases')->json('cases'));   // ya validado: no vuelve
+    }
+
     public function test_no_se_puede_encender_sin_clave(): void
     {
         $this->fake->configurada = false;

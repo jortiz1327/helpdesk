@@ -16,6 +16,8 @@ $activo = env('AI_PROVIDER', 'anthropic');
 return [
     'provider'   => $activo,
     'max_tokens' => (int) env('AI_MAX_TOKENS', 2000),
+    // Laboratorio de validación (tickets resueltos, sin enviar nada). Solo existe en local; en producción no se enciende.
+    'lab'        => (bool) env('AI_LAB', env('APP_ENV') === 'local'),
     'timeout'    => (int) env('AI_TIMEOUT', 30),
 
     // Manuales (claves de config/manuals.php) que la IA puede consultar. Solo los pensados para clientes.

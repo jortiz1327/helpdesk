@@ -26,6 +26,9 @@ class AiSuggestionService
     private const MAX_EJEMPLOS = 4;
     private const MAX_MENSAJES = 10;
 
+    /** Solo el laboratorio: contesta como si la conversación terminara en este mensaje (ignora lo posterior). */
+    private ?int $hasta = null;
+
     private bool $anonimizar = false;
     private string $nombreCliente = '';
 
@@ -70,6 +73,7 @@ class AiSuggestionService
                 'accuracy' => ($arriba + $abajo) > 0 ? round($arriba / ($arriba + $abajo) * 100) : null,
             ],
             'usage'      => $this->consumo(),
+            'lab'        => $this->labActivo(),
             'knowledge'  => [
                 'tickets' => DB::table('ai_documents')->where('source_type', 'ticket')->count(),
                 'manuals' => DB::table('ai_documents')->where('source_type', 'manual')->count(),
@@ -83,6 +87,67 @@ class AiSuggestionService
                 ->where('a.rating', 'down')->whereNotNull('a.correction')->orderByDesc('a.rated_at')->limit(8)
                 ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.rated_at'])->all(),
         ];
+    }
+
+    // -- Laboratorio (solo en local) ------------------------------------------------
+
+    public function labActivo(): bool
+    {
+        return (bool) config('ai.lab');
+    }
+
+    /**
+     * Casos para validar rápido: tickets ya resueltos donde una persona contestó. El caso es
+     * lo que escribió el cliente ANTES de esa primera respuesta; la IA contesta solo con eso
+     * (sin ver lo posterior) y se compara con lo que dijo el equipo. Se saltan los ya valorados.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public function labCasos(int $n = 10): array
+    {
+        $out = [];
+        $q = DB::table('tickets')->whereIn('status', ['resuelto', 'cerrado'])->whereNull('merged_into_id')->inRandomOrder()->limit(120)->pluck('id');
+        foreach ($q as $tid) {
+            if (count($out) >= $n) {
+                break;
+            }
+            $resp = DB::table('messages')->where('ticket_id', $tid)->where('direction', 'out')->where('is_internal_note', 0)
+                ->whereNotNull('author_user_id')->whereNotNull('body')->orderBy('id')->first(['id', 'body']);
+            if (! $resp || mb_strlen($this->plano((string) $resp->body)) < 40) {
+                continue;
+            }
+            $previos = DB::table('messages')->where('ticket_id', $tid)->where('direction', 'in')->where('is_internal_note', 0)
+                ->where('id', '<', $resp->id)->whereNotNull('body')->orderByDesc('id')->limit(3)->get(['id', 'body'])->reverse()->values();
+            if ($previos->isEmpty()) {
+                continue;
+            }
+            $disparo = (int) $previos->last()->id;
+            $ya = DB::table('ai_suggestions')->where('ticket_id', $tid)->where('trigger_message_id', $disparo)->orderByDesc('id')->first();
+            if ($ya && $ya->rating) {
+                continue;
+            }
+            $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')->where('t.id', $tid)->first(['t.code', 't.subject', 'c.name as contact_name']);
+            $out[] = [
+                'ticket_id' => (int) $tid, 'message_id' => $disparo, 'code' => $t->code, 'subject' => $t->subject, 'contact' => $t->contact_name,
+                'message' => $previos->map(fn ($m) => $this->plano((string) $m->body))->filter()->implode("\n\n"),
+                'real_reply' => mb_substr($this->plano((string) $resp->body), 0, 2500),
+                'suggestion' => $ya,
+            ];
+        }
+        return $out;
+    }
+
+    /** La sugerencia del laboratorio para ese mensaje (la genera si no hay una válida). */
+    public function forMensaje(int $ticketId, int $messageId, ?int $userId, bool $regenerate = false): object
+    {
+        if (! $regenerate) {
+            $ya = DB::table('ai_suggestions')->where('ticket_id', $ticketId)->where('trigger_message_id', $messageId)
+                ->where('status', '!=', 'failed')->orderByDesc('id')->first();
+            if ($ya) {
+                return $ya;
+            }
+        }
+        return $this->generate($ticketId, $messageId, $userId, 'lab', $messageId);
     }
 
     /** Tokens y coste ESTIMADO (config ai.prices) de hoy, los últimos 30 días y el total. */
@@ -130,10 +195,10 @@ class AiSuggestionService
         return $this->generate($ticketId, (int) $ult->id, $userId);
     }
 
-    private function generate(int $ticketId, int $messageId, ?int $userId): object
+    private function generate(int $ticketId, int $messageId, ?int $userId, string $modo = 'suggest', ?int $hasta = null): object
     {
-        $fila = $this->redactar($ticketId, $this->ai) + [
-            'ticket_id' => $ticketId, 'trigger_message_id' => $messageId, 'mode' => 'suggest',
+        $fila = $this->redactar($ticketId, $this->ai, false, $hasta) + [
+            'ticket_id' => $ticketId, 'trigger_message_id' => $messageId, 'mode' => $modo,
             'created_by' => $userId, 'created_at' => now(), 'updated_at' => now(),
         ];
         $id = DB::table('ai_suggestions')->insertGetId($fila);
@@ -148,9 +213,10 @@ class AiSuggestionService
      *
      * @return array{status:string, body:?string, sources:string, model?:?string, input_tokens?:?int, output_tokens?:?int, error?:string}
      */
-    public function redactar(int $ticketId, AiProvider $ai, bool $anonimizar = false): array
+    public function redactar(int $ticketId, AiProvider $ai, bool $anonimizar = false, ?int $hasta = null): array
     {
         $this->anonimizar = $anonimizar;
+        $this->hasta = $hasta;
         try {
             $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
                 ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
@@ -190,6 +256,7 @@ class AiSuggestionService
             }
         } finally {
             $this->anonimizar = false;
+            $this->hasta = null;
             $this->nombreCliente = '';
         }
     }
@@ -228,6 +295,7 @@ class AiSuggestionService
     private function conversacion(int $ticketId): array
     {
         $rows = DB::table('messages')->where('ticket_id', $ticketId)->where('is_internal_note', 0)
+            ->when($this->hasta, fn ($q) => $q->where('id', '<=', $this->hasta))
             ->whereNotNull('body')->orderByDesc('id')->limit(self::MAX_MENSAJES)->get(['direction', 'body']);
 
         return $rows->reverse()->map(fn ($m) => [
@@ -318,6 +386,7 @@ class AiSuggestionService
     {
         try {
             $ids = DB::table('messages')->where('ticket_id', $ticketId)->where('direction', 'in')->where('is_internal_note', 0)
+                ->when($this->hasta, fn ($q) => $q->where('id', '<=', $this->hasta))
                 ->orderByDesc('id')->limit(self::MAX_MENSAJES)->pluck('id');
             $fotos = DB::table('attachments')->whereIn('message_id', $ids)->where('mime', 'like', 'image/%')
                 ->orderByDesc('id')->limit(4)->get(['path']);
@@ -342,7 +411,8 @@ class AiSuggestionService
     private function saludo(object $t): string
     {
         $yaRespondio = DB::table('messages')->where('ticket_id', $t->id)->where('direction', 'out')
-            ->where('is_internal_note', 0)->whereNotNull('author_user_id')->exists();
+            ->where('is_internal_note', 0)->whereNotNull('author_user_id')
+            ->when($this->hasta, fn ($q) => $q->where('id', '<', $this->hasta))->exists();
         if ($yaRespondio) {
             return "SALUDO Y PRESENTACIÓN (anula lo que digan las instrucciones anteriores)\n"
                 . "- El equipo ya contestó antes en esta conversación: NO saludes, NO te presentes ni repitas «le hablo de AEME Group». Entra directamente en la respuesta.\n"
