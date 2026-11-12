@@ -71,11 +71,17 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, i
         <div className="ai-done">
           {s.rating === 'up' ? 'Valoraste esta sugerencia como útil.' : 'Corrección guardada. Gracias, así aprende.'}
           {s.rating === 'down' && s.correction ? <q>{s.correction}</q> : null}
+          {s.rating === 'down' && (
+            <div className="ai-act">
+              <button className="btn sm primary" onClick={() => cargar(true)} disabled={cargando}>Generar de nuevo con esta indicación</button>
+            </div>
+          )}
         </div>
       ) : corrigiendo ? (
         <div className="ai-fix">
-          <label htmlFor={`aifix-${s.id}`}>¿Qué debía decir? Se guarda para que la IA mejore.</label>
-          <textarea id={`aifix-${s.id}`} rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} autoFocus />
+          <label htmlFor={`aifix-${s.id}`}>¿Qué falló y cómo debe responder? Basta con el criterio, no hace falta redactar el mensaje. Se guarda para que la IA mejore.</label>
+          <textarea id={`aifix-${s.id}`} rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} autoFocus
+            placeholder="Ej.: es ambiguo; para cambiar platos en un hotel se hace desde Posiciones, indícaselo paso a paso." />
           <div className="ai-act">
             <button className="btn sm primary" disabled={guardando || texto.trim().length < 5} onClick={() => valorar('down', texto)}>Guardar corrección</button>
             <button className="btn sm ghost" onClick={() => setCorrigiendo(false)}>Cancelar</button>

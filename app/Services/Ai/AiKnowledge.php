@@ -104,7 +104,7 @@ class AiKnowledge
         $pregunta = Scrub::tapar(Scrub::plano((string) DB::table('messages')->where('id', $s->trigger_message_id)->value('body')), $nombre);
         $content = "Pregunta del cliente:\n" . mb_substr($pregunta, 0, 1200)
             . "\n\nLo que la IA respondió y estaba mal:\n" . mb_substr(Scrub::tapar((string) $s->body, $nombre), 0, 800)
-            . "\n\nLo correcto, según el equipo:\n" . mb_substr(Scrub::tapar((string) $s->correction, $nombre), 0, 2000);
+            . "\n\nIndicación del equipo (qué estaba mal y cómo hay que responder; es un criterio a aplicar, no un texto para copiar):\n" . mb_substr(Scrub::tapar((string) $s->correction, $nombre), 0, 2000);
 
         DB::table('ai_documents')->updateOrInsert(
             ['source_type' => 'correccion', 'source_id' => (string) $suggestionId],

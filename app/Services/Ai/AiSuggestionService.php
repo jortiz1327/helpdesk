@@ -300,7 +300,7 @@ class AiSuggestionService
         $correcciones = array_values(array_filter($casos, fn ($d) => $d->source_type === 'correccion' && ! in_array((int) $d->source_id, array_column($ejemplos, 'id'), true)));
         $casos = array_values(array_filter($casos, fn ($d) => $d->source_type !== 'correccion'));
         if ($correcciones) {
-            $s .= "\n\nCORRECCIONES DEL EQUIPO A CONSULTAS PARECIDAS (lo que se dio por correcto; síguelo)\n";
+            $s .= "\n\nCORRECCIONES DEL EQUIPO A CONSULTAS PARECIDAS (son indicaciones del equipo sobre cómo responder; aplícalas como criterio y redacta con tus palabras, adaptado a este cliente)\n";
             foreach ($correcciones as $d) {
                 $s .= mb_substr((string) $d->content, 0, 1800) . "\n\n";
             }
@@ -317,7 +317,7 @@ class AiSuggestionService
         if ($ejemplos) {
             $s .= "\n\nERRORES ANTERIORES (el equipo corrigió estas respuestas; aprende de ellos)\n";
             foreach ($ejemplos as $e) {
-                $s .= "- Pregunta del cliente: " . mb_substr($e['pregunta'], 0, 400) . "\n  Respuesta incorrecta: " . mb_substr($e['mala'], 0, 400) . "\n  Lo correcto: " . mb_substr($e['correccion'], 0, 600) . "\n";
+                $s .= "- Pregunta del cliente: " . mb_substr($e['pregunta'], 0, 400) . "\n  Respuesta incorrecta: " . mb_substr($e['mala'], 0, 400) . "\n  Indicación del equipo (criterio a aplicar, no texto a copiar): " . mb_substr($e['correccion'], 0, 600) . "\n";
             }
         }
         return $s;

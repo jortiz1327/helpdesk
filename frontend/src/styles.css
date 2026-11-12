@@ -4404,3 +4404,6 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 
 .ai-spin { width: 14px; height: 14px; border: 2px solid var(--line-2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; flex: none; }
 @media (prefers-reduced-motion: reduce) { .ai-spin { animation-duration: 2s; } }
+.ai-head b { white-space: nowrap; }
+.ai-head svg, .ai-box > svg { width: 15px; height: 15px; fill: currentColor; flex: none; }
+.ai-done .ai-act { margin-top: 8px; }
