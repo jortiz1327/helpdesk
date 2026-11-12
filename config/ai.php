@@ -15,7 +15,7 @@ $activo = env('AI_PROVIDER', 'anthropic');
 
 return [
     'provider'   => $activo,
-    'max_tokens' => (int) env('AI_MAX_TOKENS', 700),
+    'max_tokens' => (int) env('AI_MAX_TOKENS', 2000),
     'timeout'    => (int) env('AI_TIMEOUT', 30),
 
     // Manuales (claves de config/manuals.php) que la IA puede consultar. Solo los pensados para clientes.

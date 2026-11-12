@@ -46,6 +46,7 @@ class AnthropicProvider implements AiProvider
             'model'         => (string) ($r->json('model') ?: $this->model()),
             'input_tokens'  => $r->json('usage.input_tokens'),
             'output_tokens' => $r->json('usage.output_tokens'),
+            'truncated'     => $r->json('stop_reason') === 'max_tokens',
         ];
     }
 }

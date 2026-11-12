@@ -10,7 +10,7 @@ interface AiProvider
 {
     /**
      * @param  array<int, array{role: 'user'|'assistant', content: string}>  $messages
-     * @return array{text: string, model: string, input_tokens: ?int, output_tokens: ?int}
+     * @return array{text: string, model: string, input_tokens: ?int, output_tokens: ?int, truncated?: bool}
      * @throws AiException
      */
     public function complete(string $system, array $messages): array;

@@ -454,6 +454,7 @@ export const api = {
   aiSuggest: (ticket, regenerate = false) => regenerate
     ? req('ai_suggestions.php?action=regenerate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }) })
     : req(`ai_suggestions.php?action=suggest&ticket=${ticket}`),
+  aiStatus: () => req('ai_suggestions.php?action=status'),
   aiRate: (id, rating, correction) => req('ai_suggestions.php?action=rate', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, rating, correction }),
   }),

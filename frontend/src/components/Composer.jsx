@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import RichInput from './RichInput.jsx'
+import AiSuggestion from './AiSuggestion.jsx'
 
 const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
 
@@ -15,8 +16,25 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
   const ed = useRef(null)
   const [empty, setEmpty] = useState(true)
   const [sending, setSending] = useState(false)   // envío en curso: bloquea el botón y evita doble envío
-  const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna
+  const [mode, setMode] = useState('reply') // 'reply' = al cliente · 'note' = interna · 'ai' = al cliente, con borrador de la IA
   const note = mode === 'note'
+  /* Pestaña «Sugerencia de IA»: solo aparece si el asistente está activo. La IA no gasta
+     nada hasta que se abre la pestaña (se genera bajo demanda, una vez por mensaje). */
+  const [aiOn, setAiOn] = useState(false)
+  useEffect(() => {
+    if (!ticketId || disabled) return
+    let vivo = true
+    api.aiStatus().then((r) => { if (vivo) setAiOn(!!r?.enabled) }).catch(() => {})
+    return () => { vivo = false }
+  }, [ticketId, disabled])
+  /* La IA escribe el mensaje tal cual en el editor. Si ya hay algo escrito no lo pisa
+     (devuelve false y la caja ofrece «Usar» a mano). */
+  const ponerSugerencia = (texto, auto = false) => {
+    if (auto && ed.current && !ed.current.isEmpty()) return false
+    const html = String(texto).split(/\n{2,}/).map((p) => '<p>' + p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</p>').join('')
+    ed.current?.setHtml(html); setEmpty(false)
+    return true
+  }
   /* WhatsApp (`wa` = { window_open, window_closes }): fuera de la ventana de 24 h Meta no
      deja escribir al cliente, así que la respuesta se bloquea (la nota interna no). */
   const waCerrada = !!wa && !note && !wa.window_open
@@ -125,13 +143,21 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
     }}>
       {/* Conmutador: responder al cliente vs nota interna (solo la ven los agentes) */}
       <div className="cmp-mode">
-        <button type="button" className={`cmp-mode-btn ${!note ? 'on' : ''}`} onClick={() => setMode('reply')}>
+        <button type="button" className={`cmp-mode-btn ${mode === 'reply' ? 'on' : ''}`} onClick={() => setMode('reply')}>
           <Icon.send /> Responder
         </button>
         <button type="button" className={`cmp-mode-btn note ${note ? 'on' : ''}`} onClick={() => setMode('note')}>
           <Icon.note /> Nota interna
         </button>
+        {aiOn && (
+          <button type="button" className={`cmp-mode-btn ai ${mode === 'ai' ? 'on' : ''}`} onClick={() => setMode('ai')}>
+            <Icon.bolt /> Sugerencia de IA
+          </button>
+        )}
       </div>
+      {mode === 'ai' && !bloqueado && (
+        <AiSuggestion ticketId={ticketId} inline onUse={ponerSugerencia} />
+      )}
       {/* Destinatarios: solo al responder (una nota interna no se envía a nadie). */}
       {!note && to && (
         <div className="cmp-dest">

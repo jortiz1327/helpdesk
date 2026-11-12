@@ -10,7 +10,6 @@ import WaUsageMeter from './WaUsageMeter.jsx'
 import SedeField from './SedeField.jsx'
 import OrgFilter from './OrgFilter.jsx'
 import Composer from './Composer.jsx'
-import AiSuggestion from './AiSuggestion.jsx'
 import Agents from './Agents.jsx'
 import CronAlerts from './CronAlerts.jsx'
 import LoadError from './LoadError.jsx'
@@ -2508,22 +2507,6 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   </div>
                   <button className="btn sm" onClick={() => assign(String(user.id))}>Asignármelo</button>
                 </div>
-              )}
-
-              {/* Sugerencia de la IA: solo propone; «Usar» la pasa al editor como borrador. */}
-              {view === 'chat' && !t.merged_into_id && t.priority !== 'sin_asignar' && !asignadoAOtro && can('tickets.reply') && !(d.lock && !d.lock.mine) && (
-                <AiSuggestion
-                  ticketId={id}
-                  lastMessageKey={[...mensajes].reverse().find((m) => m.direction === 'in' && !m.is_internal_note)?.id || 0}
-                  toast={toast}
-                  onUse={(texto) => {
-                    try {
-                      const html = String(texto).split(/\n{2,}/).map((p) => '<p>' + p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</p>').join('')
-                      localStorage.setItem(`tk_draft_${id}`, JSON.stringify({ html, note: false }))
-                      setComposerKey((k) => k + 1)   // remonta el editor: carga el borrador
-                    } catch { toast('No se pudo pasar al editor', 'err') }
-                  }}
-                />
               )}
 
               {/* El editor solo en la conversación (no en el historial). */}

@@ -143,6 +143,10 @@ class AiSuggestionService
             $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
             try {
                 $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos), $this->comoTurnos($conversacion));
+                if (! empty($r['truncated'])) {
+                    // Un texto cortado a medias no se puede enseñar como si estuviera completo.
+                    throw new AiException('La respuesta de la IA salió incompleta');
+                }
                 $texto = trim($r['text']);
                 $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
                 return $fila + [

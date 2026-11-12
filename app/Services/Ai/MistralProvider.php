@@ -38,6 +38,7 @@ class MistralProvider implements AiProvider
             'model'         => (string) ($r->json('model') ?: $this->model()),
             'input_tokens'  => $r->json('usage.prompt_tokens'),
             'output_tokens' => $r->json('usage.completion_tokens'),
+            'truncated'     => $r->json('choices.0.finish_reason') === 'length',
         ];
     }
 }

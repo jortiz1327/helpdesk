@@ -9,7 +9,7 @@ import { Icon } from '../icons.jsx'
  * corrección se guarda y alimenta las siguientes sugerencias.
  * Si el asistente está apagado no se pinta nada.
  * ---------------------------------------------------------------------- */
-export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast }) {
+export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, inline = false }) {
   const [s, setS] = useState(null)          // sugerencia vigente
   const [on, setOn] = useState(false)       // ¿asistente activo?
   const [cargando, setCargando] = useState(false)
@@ -26,6 +26,9 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast })
     setCargando(false)
     setOn(!!r?.enabled)
     setS(r?.suggestion || null)
+    // En la pestaña de la composición, la sugerencia se escribe sola en el editor (si está vacío).
+    const n = r?.suggestion
+    if (inline && n?.status === 'ready' && !n.used && !n.rating && onUse(n.body, true)) { api.aiUsed(n.id); setS({ ...n, used: true }) }
     setCorrigiendo(false); setTexto('')
   }
 
@@ -47,7 +50,7 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast })
     return <div className="ai-box ai-soft"><span>La IA no tiene base para contestar esto con fiabilidad. Respóndelo tú; si quieres que aprenda, anótalo en una FAQ.</span></div>
   }
 
-  const usar = () => { api.aiUsed(s.id); onUse(s.body); setS({ ...s, used: true }) }
+  const usar = () => { api.aiUsed(s.id); onUse(s.body, false); setS({ ...s, used: true }) }
   const valorar = async (rating, correction) => {
     setGuardando(true)
     const r = await api.aiRate(s.id, rating, correction)
@@ -60,9 +63,9 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast })
     <div className="ai-box" role="region" aria-label="Sugerencia de la IA">
       <div className="ai-head">
         <b><Icon.bolt className="ic-x" aria-hidden="true" /> Sugerencia de la IA</b>
-        <small>Borrador: revísalo antes de enviar</small>
+        <small>{inline && s.used ? 'Escrita en el editor: revísala antes de enviar' : 'Borrador: revísalo antes de enviar'}</small>
       </div>
-      <p className="ai-body">{s.body}</p>
+      {!(inline && s.used) && <p className="ai-body">{s.body}</p>}
 
       {s.rating ? (
         <div className="ai-done">
@@ -80,7 +83,7 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast })
         </div>
       ) : (
         <div className="ai-act">
-          <button className="btn sm primary" onClick={usar} disabled={s.used}>{s.used ? 'Usada' : 'Usar como base'}</button>
+          <button className="btn sm primary" onClick={usar} disabled={s.used}>{s.used ? 'Usada' : (inline ? 'Escribir en el editor' : 'Usar como base')}</button>
           <button className="btn sm ghost" onClick={() => valorar('up')} disabled={guardando} aria-label="Valorar como útil" title="Es útil">👍 Útil</button>
           <button className="btn sm ghost" onClick={() => setCorrigiendo(true)} aria-label="Valorar como incorrecta y corregir" title="Está mal: la corrijo">👎 Corregir</button>
           <button className="btn sm ghost ai-re" onClick={() => cargar(true)} disabled={cargando}>Otra sugerencia</button>

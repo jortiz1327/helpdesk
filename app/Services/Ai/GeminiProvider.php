@@ -46,6 +46,7 @@ class GeminiProvider implements AiProvider
             'model'         => $this->model(),
             'input_tokens'  => $r->json('usageMetadata.promptTokenCount'),
             'output_tokens' => $r->json('usageMetadata.candidatesTokenCount'),
+            'truncated'     => $r->json('candidates.0.finishReason') === 'MAX_TOKENS',
         ];
     }
 }
