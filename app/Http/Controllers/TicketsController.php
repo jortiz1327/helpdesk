@@ -1148,6 +1148,21 @@ class TicketsController extends Controller
         $starred = $messages->isEmpty() ? [] : DB::table('effective_responses')
             ->whereIn('ticket_id', $ids)->whereIn('message_id', $messages->pluck('id')->all())
             ->pluck('message_id')->flip()->all();
+        // Mensajes de WhatsApp que CITAN a otro (el cliente o el móvil responde a un mensaje concreto):
+        // la API lo manda en payload.context.id (el wamid del citado). Se busca de una vez, sin volver a la BD por cada uno.
+        $citados = [];
+        foreach ($messages as $m) {
+            $p = $m->payload ? json_decode($m->payload, true) : null;
+            $m->_citaId = is_array($p) && is_string($p['context']['id'] ?? null) ? $p['context']['id'] : null;
+            if ($m->_citaId) $citados[$m->_citaId] = null;
+        }
+        if ($citados) {
+            foreach (DB::table('messages as q')->leftJoin('users as qu', 'qu.id', '=', 'q.author_user_id')
+                ->whereIn('q.wamid', array_keys($citados))
+                ->get(['q.wamid', 'q.id', 'q.direction', 'q.type', 'q.body', 'qu.name as author_name']) as $q) {
+                $citados[$q->wamid] = $q;
+            }
+        }
         foreach ($messages as $m) {
             $m->attachments = $byMessage[$m->id] ?? [];
             $m->starred = isset($starred[$m->id]);
@@ -1156,7 +1171,17 @@ class TicketsController extends Controller
                 // Enviado desde el móvil (WhatsApp Business con Coexistence), no desde el Helpdesk.
                 if (($p['_via'] ?? null) === 'movil') $m->via = 'movil';
             }
-            unset($m->payload);
+            if ($m->_citaId) {
+                $q = $citados[$m->_citaId] ?? null;
+                $m->reply_to = $q ? [
+                    'id' => (int) $q->id,
+                    'direction' => $q->direction,
+                    'author' => $q->direction === 'out' ? ($q->author_name ?: 'Atención al cliente') : null,
+                    'type' => $q->type,
+                    'preview' => mb_substr(trim(preg_replace('/\s+/u', ' ', strip_tags((string) $q->body))), 0, 160),
+                ] : ['id' => null];   // citado fuera de lo que guardamos (anterior al historial, o de otro chat)
+            }
+            unset($m->payload, $m->_citaId);
         }
         return $messages;
     }
