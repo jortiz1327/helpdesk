@@ -46,7 +46,16 @@
   .col { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
   .blk { border-radius: 12px; padding: 14px 18px; border-left: 5px solid var(--line); }
   .blk h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; align-items: center; }
-  .blk .txt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; }
+  .blk .bh { all: unset; box-sizing: border-box; display: flex; width: 100%; gap: 10px; align-items: center; cursor: pointer; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .blk .bh:hover { color: var(--ink); }
+  .blk .bh:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .blk .bh .chev { width: 12px; flex: none; }
+  .blk .bh kbd { margin-left: auto; font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 5px; padding: 0 6px; text-transform: none; }
+  .blk .txt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; max-height: 48dvh; overflow: auto; }
+  .blk .prev { display: none; color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .blk.min .txt { display: none; }
+  .blk.min .prev { display: block; }
+  .blk.min .bh { margin-bottom: 2px; }
   .client { background: var(--client); border-color: var(--accent); }
   .human { background: var(--human); border-color: var(--c-responder); }
   .ia { background: var(--ia); border-color: var(--c-pedir_info); }
@@ -96,7 +105,7 @@
     <div class="scroll" id="scroll"><div class="col" id="caso"></div></div>
     <div class="foot"><div class="col">
       <button class="btn" id="ant">← Anterior</button>
-      <span class="grow" id="estado">Teclas: 1 responder · 2 pedir dato · 3 derivar · 4 descartar · Enter confirma y sigue · ← → mover</span>
+      <span class="grow" id="estado">1-4 decidir · Enter sigue · ← → mover · C H I minimizar</span>
       <button class="btn primary" id="sig">Confirmar y siguiente ↵</button>
     </div></div>
   </main>
