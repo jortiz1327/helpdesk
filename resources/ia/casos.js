@@ -76,6 +76,24 @@ function crearBotones() {
 }
 function pintarBotones(c) { document.querySelectorAll('.dbtn').forEach((b) => b.setAttribute('aria-pressed', String(!!c && b.dataset.k === c.decision))) }
 
+// Propuesta de la IA (ai:prerrellenar) para un caso aún sin revisar: no cuenta como revisado hasta que se acepta o se corrige.
+function pintarProp(c) {
+  const box = $('prop'); box.replaceChildren()
+  const p = c && !c.revisado ? c.propuesta : null
+  box.hidden = !p
+  if (!p) return
+  const cab = el('div', 'ph', 'Propuesta de la IA'), s = el('span', 'badge', DEC[p.decision].n)
+  s.style.background = 'var(--c-' + p.decision + ')'; cab.append(s, el('kbd', null, 'P'))
+  cab.lastChild.style.cssText = 'margin-left:auto;font:11px ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;padding:0 6px;text-transform:none'
+  const b = el('button', 'btn', 'Usar esta propuesta'); b.type = 'button'; b.onclick = usarPropuesta
+  box.append(cab, el('div', 'pt', p.comentario || '(sin comentario)'), b)
+}
+function usarPropuesta() {
+  const c = porId(actual); if (!c || !c.propuesta) return
+  c.decision = c.propuesta.decision; c.comentario = c.propuesta.comentario || ''
+  $('com').value = c.comentario; pintarBotones(c); guardar(c); pintarProp(c)
+}
+
 function pintarCaso() {
   const c = porId(actual), izq = $('colL'), der = $('colR'); izq.replaceChildren(); der.replaceChildren()
   if (!c) { izq.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
@@ -86,7 +104,7 @@ function pintarCaso() {
   izq.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
   if (c.ia) der.append(bloque('ia', 'Lo que hizo la IA (última prueba)', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
   else der.append(el('div', 'empty', 'La IA aún no ha probado este caso.'))
-  pintarBotones(c)
+  pintarBotones(c); pintarProp(c)
   $('com').value = c.comentario || ''
   $('estado').textContent = c.revisado ? 'Revisado ✓' : ''
   $('read').scrollTop = 0; izq.scrollTop = 0; der.scrollTop = 0   // solo al cambiar de caso
@@ -99,6 +117,7 @@ async function guardar(c, revisado = true) {
   try { await api('/' + c.id, 'POST', { decision: c.decision, comentario: c.comentario || '', revisado: c.revisado }); if (c.id === actual) $('estado').textContent = 'Guardado ✓' }
   catch (e) { $('estado').textContent = 'No se pudo guardar: ' + e.message }
   progreso(); pintarLista()
+  if (c.id === actual) pintarProp(c)   // una vez revisado, la propuesta desaparece
 }
 
 // El comentario se guarda solo (a los 0,6 s de dejar de escribir) y, antes de cambiar de caso, al momento.
@@ -136,6 +155,7 @@ document.addEventListener('keydown', (e) => {
   const k = ORDEN.find((x) => DEC[x].k === e.key)
   if (k) { e.preventDefault(); marcar(k) }
   else if (e.key === 'Enter') { e.preventDefault(); confirmarYSeguir() }
+  else if (e.key.toLowerCase() === 'p') { e.preventDefault(); usarPropuesta() }
   else if (e.key.toLowerCase() === 'n') { e.preventDefault(); $('com').focus() }
   else if (['c', 'h', 'i'].includes(e.key.toLowerCase())) {   // C / H / I: minimiza o abre ese bloque
     const cls = { c: 'client', h: 'human', i: 'ia' }[e.key.toLowerCase()]

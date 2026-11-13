@@ -66,8 +66,11 @@ class AiCasosController extends Controller
         $c = json_decode((string) file_get_contents($cand), true);
         $m = json_decode((string) file_get_contents($marcas), true);
         $ia = $this->ultimaEvaluacion();
+        $pf = $this->dir() . '/propuestas.json';   // propuestas de la IA para casos sin revisar (ai:prerrellenar)
+        $p = is_file($pf) ? (json_decode((string) file_get_contents($pf), true) ?: []) : [];
 
         return response()->json(array_map(fn ($x) => [
+            'propuesta' => empty($m[$x['id']]['revisado']) ? ($p[$x['id']] ?? null) : null,
             'id' => $x['id'], 'canal' => $x['canal'], 'asunto' => $x['asunto'], 'pregunta' => $x['pregunta'], 'humana' => $x['respuesta_humana'],
             'decision' => $m[$x['id']]['decision'] ?? 'responder', 'comentario' => $m[$x['id']]['comentario'] ?? '',
             'revisado' => (bool) ($m[$x['id']]['revisado'] ?? false), 'ia' => $ia[$x['id']] ?? null,

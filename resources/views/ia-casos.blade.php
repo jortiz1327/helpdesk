@@ -73,6 +73,11 @@
   /* Panel de decisión: siempre visible, sin scroll para decidir ni para escribir. */
   .panel { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; gap: 14px; padding: 18px; min-height: 0; overflow: auto; }
   .panel h3 { margin: 0; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .prop { border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 12px; background: color-mix(in srgb, var(--accent) 8%, var(--panel)); display: flex; flex-direction: column; gap: 8px; flex: none; }
+  .prop[hidden] { display: none; }
+  .prop .ph { display: flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .prop .pt { font-size: 13.5px; line-height: 1.45; max-height: 132px; overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .prop .btn { padding: 6px 12px; font-size: 14px; }
   .decide { display: flex; flex-direction: column; gap: 8px; }
   .dbtn { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 2px 10px; text-align: left; border: 2px solid var(--line); background: var(--bg); border-radius: 12px; padding: 10px 12px; cursor: pointer; transition: transform .12s ease-out, border-color .12s, background .12s; }
   .dbtn:hover { border-color: var(--muted); }
@@ -137,6 +142,7 @@
     <div class="work">
       <div class="read" id="read"><div class="col" id="colL"></div><div class="col" id="colR"></div></div>
       <aside class="panel" aria-label="Decisión">
+        <div class="prop" id="prop" hidden></div>
         <h3>¿Qué debería hacer la IA aquí?</h3>
         <div class="decide" id="botones"></div>
         <div class="note">
@@ -148,7 +154,7 @@
           <button class="btn" id="ant" title="Caso anterior (←)">←</button>
           <button class="btn primary" id="sig">Confirmar y siguiente ↵</button>
         </div>
-        <div class="keys"><kbd>1</kbd>–<kbd>4</kbd> decidir · <kbd>Enter</kbd> confirmar · <kbd>←</kbd> <kbd>→</kbd> mover · <kbd>C</kbd> <kbd>H</kbd> <kbd>I</kbd> minimizar · <kbd>N</kbd> comentar · <kbd>Esc</kbd> salir del comentario</div>
+        <div class="keys"><kbd>1</kbd>–<kbd>4</kbd> decidir · <kbd>P</kbd> usar propuesta · <kbd>Enter</kbd> confirmar · <kbd>←</kbd> <kbd>→</kbd> mover · <kbd>C</kbd> <kbd>H</kbd> <kbd>I</kbd> minimizar · <kbd>N</kbd> comentar · <kbd>Esc</kbd> salir del comentario</div>
       </aside>
     </div>
   </main>
