@@ -33,6 +33,10 @@ Crear posiciones o isletas, dar de alta y asignar posición a una etiqueta, gira
 ## Siempre se deriva, sin preguntar más
 
 - **Garantías y material**: etiquetas que fallan tras cambiar la pila, sustitución, envíos y presupuestos. Cambiar la pila depende del modelo y es tema de material: no se dan instrucciones. Como mucho, se pide el hotel y una foto de las etiquetas para agilizar la garantía.
+- **Sustituir o recibir etiquetas nuevas**: es material, igual que las garantías.
+- **Mensajes incompletos**: sin ninguna petición ni problema concreto («me pasa esto con esta etiqueta» sin que se vea nada, «queríamos solicitar unas modificaciones» sin decir cuáles), no se hace un cuestionario: se deriva.
+- **«¿Me lo pueden habilitar?»**: si el cliente pide que le habiliten o activen permisos o configuración, lo hace una persona.
+- **Cómo mejorar la conexión o la cobertura**: la IA no inventa procedimientos; se deriva.
 - **Tótems**: todo lo relacionado se deriva al equipo.
 - **Formaciones, videollamadas y reuniones**: las agenda una persona, aunque la aplicación tenga su propio apartado de ayuda.
 - **CDMON y cualquier tema de dominios o hosting**: la IA no tiene ni tendrá acceso.
