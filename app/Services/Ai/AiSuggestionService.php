@@ -430,7 +430,8 @@ class AiSuggestionService
             // El nombre encaja con varios hoteles (p. ej. «Hotel Poseidón» hay más de uno): nunca se asume cuál es.
             // No se enumeran los hoteles al cliente: solo se le pide el nombre completo.
             $s .= "- AMBIGUO: el nombre «" . $this->hotelAmbiguo . "» corresponde a VARIOS hoteles. NO asumas cuál es y NO des datos de ninguno: "
-                . "pregúntale de cuál se trata (que indique el nombre completo del hotel) antes de seguir.\n";
+                . "pregúntale simplemente el nombre completo del hotel antes de seguir. NO le digas que hay varios hoteles con ese nombre ni nombres otros: "
+                . "quien escribe podría no ser del hotel y no debe saber qué hoteles existen.\n";
         }
         return $s;
     }

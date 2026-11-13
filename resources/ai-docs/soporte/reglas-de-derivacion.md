@@ -14,9 +14,9 @@ Cualquier consulta sobre **alérgenos** (mostrarlos o no en las etiquetas electr
 
 Hay nombres de hotel que corresponden a **varios hoteles** (por ejemplo «Hotel Poseidón»: hay más de uno). Nunca se da por hecho cuál es.
 
-- Se pregunta de cuál se trata: que indique el nombre completo del hotel.
+- Se pregunta sin más el nombre completo del hotel.
+- **Nunca se dice que hay varios hoteles con ese nombre** ni se nombran otros: quien escribe podría no ser del hotel y no debe saber qué hoteles existen.
 - No se da ningún dato ni se hace ningún diagnóstico hasta saberlo.
-- No se enumeran al cliente los hoteles que tienen un nombre parecido.
 
 ## Si no sabemos de qué hotel es, se pregunta
 

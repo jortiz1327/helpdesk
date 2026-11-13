@@ -49,7 +49,7 @@ const minimizado = (k) => { try { return localStorage.getItem('casos-min-' + k) 
 const guardarMin = (k, v) => { try { localStorage.setItem('casos-min-' + k, v ? '1' : '0') } catch (e) {} }
 
 function bloque(cls, titulo, texto, badge, tecla) {
-  // Sin renglones vacíos de relleno: líneas con solo espacios y más de una línea en blanco seguida se compactan.
+  // Sin renglones vacíos de relleno (los correos traen \r\n y líneas con solo espacios).
   texto = String(texto).replace(/\r/g, '').replace(/[ \t ]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
   const b = el('div', 'blk ' + cls), h = el('button', 'bh'), chev = el('span', 'chev')
   h.type = 'button'
@@ -63,50 +63,59 @@ function bloque(cls, titulo, texto, badge, tecla) {
   b.append(h, prev, el('div', 'txt', texto)); return b
 }
 
+// Los botones de decisión se crean UNA vez: al decidir solo cambian de estado (no se repinta nada ni se mueve el scroll).
+function crearBotones() {
+  const g = $('botones')
+  ORDEN.forEach((k) => {
+    const b = el('button', 'dbtn'); b.type = 'button'; b.dataset.k = k; b.style.setProperty('--k', 'var(--c-' + k + ')')
+    b.append(el('i'), el('b', null, DEC[k].n), el('kbd', null, DEC[k].k), el('small', null, DEC[k].d))
+    b.onclick = () => marcar(k)
+    g.append(b)
+  })
+}
+function pintarBotones(c) { document.querySelectorAll('.dbtn').forEach((b) => b.setAttribute('aria-pressed', String(!!c && b.dataset.k === c.decision))) }
+
 function pintarCaso() {
   const c = porId(actual), col = $('caso'); col.replaceChildren()
-  if (!c) { col.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; return }
+  if (!c) { col.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
   const pos = casos.indexOf(c) + 1
-  $('titulo').textContent = (c.asunto || 'Sin asunto')
+  $('titulo').textContent = c.asunto || 'Sin asunto'
   $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal
   col.append(bloque('client', 'El cliente escribió', c.pregunta, null, 'C'))
   col.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
   if (c.ia) col.append(bloque('ia', 'Lo que hizo la IA (última prueba) →', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
-
-  const q = el('div', 'blk'); q.style.borderColor = 'var(--line)'
-  q.append(el('h3', null, '¿Qué debería hacer la IA en este caso?'))
-  const g = el('div', 'decide')
-  ORDEN.forEach((k) => {
-    const b = el('button', 'dbtn'); b.style.setProperty('--k', 'var(--c-' + k + ')'); b.setAttribute('aria-pressed', String(c.decision === k))
-    const kb = el('kbd', null, DEC[k].k); b.append(kb, el('b', null, DEC[k].n), el('small', null, DEC[k].d))
-    b.onclick = () => marcar(k)
-    g.append(b)
-  })
-  q.append(g)
-  const t = el('textarea'); t.rows = 2; t.placeholder = 'Comentario (opcional): por qué, o qué cambiarías'; t.value = c.comentario || ''; t.setAttribute('aria-label', 'Comentario')
-  t.oninput = () => { clearTimeout(tmCom); tmCom = setTimeout(() => { c.comentario = t.value; guardar(c, false) }, 600) }
-  t.onblur = () => { clearTimeout(tmCom); if (t.value !== (c.comentario || '')) { c.comentario = t.value; guardar(c, false) } }
-  q.append(el('div', null, '')); q.lastChild.style.height = '10px'; q.append(t)
-  col.append(q)
-  $('scroll').scrollTop = 0
-  $('ant').disabled = casos.indexOf(c) === 0
+  pintarBotones(c)
+  $('com').value = c.comentario || ''
+  $('estado').textContent = c.revisado ? 'Revisado ✓' : ''
+  $('read').scrollTop = 0   // solo al cambiar de caso
+  $('ant').disabled = pos === 1
 }
 
 async function guardar(c, revisado = true) {
   if (revisado) c.revisado = true
   $('estado').textContent = 'Guardando…'
-  try { await api('/' + c.id, 'POST', { decision: c.decision, comentario: c.comentario || '', revisado: c.revisado }); $('estado').textContent = 'Guardado ✓' }
+  try { await api('/' + c.id, 'POST', { decision: c.decision, comentario: c.comentario || '', revisado: c.revisado }); if (c.id === actual) $('estado').textContent = 'Guardado ✓' }
   catch (e) { $('estado').textContent = 'No se pudo guardar: ' + e.message }
   progreso(); pintarLista()
 }
 
-function marcar(k) { const c = porId(actual); if (!c) return; c.decision = k; guardar(c); pintarCaso() }
-function ir(id) { actual = id; pintarCaso(); pintarLista() }
+// El comentario se guarda solo (a los 0,6 s de dejar de escribir) y, antes de cambiar de caso, al momento.
+function flushCom() {
+  if (!tmCom) return
+  clearTimeout(tmCom); tmCom = null
+  const c = porId(actual); if (c) { c.comentario = $('com').value; guardar(c, false) }
+}
+$('com').oninput = () => { clearTimeout(tmCom); tmCom = setTimeout(flushCom, 600) }
+$('com').onblur = flushCom
+
+function marcar(k) { const c = porId(actual); if (!c) return; c.decision = k; pintarBotones(c); guardar(c) }
+function ir(id) { flushCom(); actual = id; pintarCaso(); pintarLista() }
 function mover(d) {
   const v = visibles(), i = v.findIndex((c) => c.id === actual), n = v[i + d]
   if (n) ir(n.id)
 }
 function confirmarYSeguir() {
+  flushCom()
   const c = porId(actual); if (!c) return
   if (!c.revisado) guardar(c)
   const v = visibles(), i = v.findIndex((x) => x.id === actual)
@@ -116,11 +125,17 @@ function confirmarYSeguir() {
 
 document.addEventListener('keydown', (e) => {
   const t = e.target.tagName
-  if (t === 'TEXTAREA' || t === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return
+  if (t === 'TEXTAREA') {
+    if (e.key === 'Escape') { e.preventDefault(); e.target.blur() }
+    else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); confirmarYSeguir() }
+    return
+  }
+  if (t === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return
   const k = ORDEN.find((x) => DEC[x].k === e.key)
   if (k) { e.preventDefault(); marcar(k) }
   else if (e.key === 'Enter') { e.preventDefault(); confirmarYSeguir() }
-  else if ('chiCHI'.includes(e.key) && e.key.length === 1) {   // C / H / I: minimiza o abre ese bloque
+  else if (e.key.toLowerCase() === 'n') { e.preventDefault(); $('com').focus() }
+  else if (['c', 'h', 'i'].includes(e.key.toLowerCase())) {   // C / H / I: minimiza o abre ese bloque
     const cls = { c: 'client', h: 'human', i: 'ia' }[e.key.toLowerCase()]
     const b = document.querySelector('.blk.' + cls + ' .bh'); if (b) { e.preventDefault(); b.click() }
   }
@@ -129,9 +144,10 @@ document.addEventListener('keydown', (e) => {
 })
 $('sig').onclick = confirmarYSeguir
 $('ant').onclick = () => mover(-1)
-$('filtro').onchange = () => { const v = visibles(); if (!v.find((c) => c.id === actual) && v[0]) actual = v[0].id; pintarCaso(); pintarLista() }
+$('filtro').onchange = () => { flushCom(); const v = visibles(); if (!v.find((c) => c.id === actual) && v[0]) actual = v[0].id; pintarCaso(); pintarLista() }
 
 ;(async () => {
+  crearBotones()
   try {
     casos = await api('/lista')
     const primero = casos.find((c) => !c.revisado) || casos[0]
