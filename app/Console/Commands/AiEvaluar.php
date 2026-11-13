@@ -97,7 +97,8 @@ class AiEvaluar extends Command
 
         $locales = DB::table('tickets')->whereIn('code', array_column($casos, 'code'))->pluck('id', 'code');
         $filas = [];
-        $conf = [];
+        $conf = [];      // casos que la IA puede resolver con lo que tiene (la nota principal)
+        $confApi = [];   // casos marcados [API]: dependen de consultar AdminHoteles, que esta prueba no hace
         $in = $out = 0;
         $bar = $this->output->createProgressBar(count($casos));
         foreach ($casos as $c) {
@@ -106,22 +107,33 @@ class AiEvaluar extends Command
             [$obtenido, $jin, $jout] = self::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null);
             $in += (int) ($r['input_tokens'] ?? 0) + $jin;
             $out += (int) ($r['output_tokens'] ?? 0) + $jout;
-            $conf[$esperado][$obtenido] = ($conf[$esperado][$obtenido] ?? 0) + 1;
+            $api = self::necesitaApi($marcas[$c['id']]['comentario'] ?? null);
+            if ($api) {
+                $confApi[$esperado][$obtenido] = ($confApi[$esperado][$obtenido] ?? 0) + 1;
+            } else {
+                $conf[$esperado][$obtenido] = ($conf[$esperado][$obtenido] ?? 0) + 1;
+            }
             $filas[] = [$c['id'], $c['canal'], $esperado, $obtenido, $esperado === $obtenido ? 'sí' : 'no',
                 // Lo grave: la IA contesta sola un caso que una persona debía llevar o aclarar.
                 $esperado !== 'responder' && $obtenido === 'responder' ? 'INDEBIDA' : '',
-                $r['status'], (string) ($r['body'] ?? $r['error'] ?? ''), $c['pregunta'], $c['respuesta_humana'], $marcas[$c['id']]['comentario'] ?? ''];
+                $r['status'], (string) ($r['body'] ?? $r['error'] ?? ''), $c['pregunta'], $c['respuesta_humana'], $marcas[$c['id']]['comentario'] ?? '', $api ? 'sí' : 'no'];
             $bar->advance();
         }
         $bar->finish();
         $this->newLine(2);
 
-        $this->resumen($conf, count($filas), $in, $out);
+        $this->info('— SIN API (la nota principal: casos que la IA puede resolver sin consultar AdminHoteles) —');
+        $this->resumen($conf, $in, $out);
+        if ($confApi) {
+            $this->newLine();
+            $this->info('— NECESITAN API (marcados [API]: aquí la IA va a ciegas, no es un fallo suyo) —');
+            $this->resumen($confApi, null, null);
+        }
 
         $f = "$dir/resultados-" . now()->format('Ymd-His') . '.csv';
         $h = fopen($f, 'w');
         fwrite($h, "\xEF\xBB\xBF");
-        fputcsv($h, ['caso', 'canal', 'esperado', 'obtenido', 'coincide', 'alerta', 'estado', 'texto_ia', 'cliente', 'respuesta_humana', 'comentario'], ';');
+        fputcsv($h, ['caso', 'canal', 'esperado', 'obtenido', 'coincide', 'alerta', 'estado', 'texto_ia', 'cliente', 'respuesta_humana', 'comentario', 'necesita_api'], ';');
         foreach ($filas as $fila) {
             fputcsv($h, $fila, ';');
         }
@@ -130,8 +142,15 @@ class AiEvaluar extends Command
         return self::SUCCESS;
     }
 
-    private function resumen(array $conf, int $total, int $in, int $out): void
+    /** ¿El comentario del revisor marca el caso como dependiente de AdminHoteles? (etiqueta [API] en cualquier sitio) */
+    public static function necesitaApi(?string $comentario): bool
     {
+        return (bool) preg_match('/\[\s*API\s*\]/i', (string) $comentario);
+    }
+
+    private function resumen(array $conf, ?int $in, ?int $out): void
+    {
+        $total = array_sum(array_map('array_sum', $conf));
         $ok = 0;
         $tipos = ['responder', 'pedir_info', 'derivar'];
         $filas = [];
@@ -148,6 +167,9 @@ class AiEvaluar extends Command
         $this->line(sprintf('Respuestas INDEBIDAS (contestó sola algo que debía pedir dato o derivar): %d', $indebidas));
         $this->line(sprintf('Demasiado prudente (derivó o preguntó cuando podía responder): %d de %d', $debiaRespo - ($conf['responder']['responder'] ?? 0), $debiaRespo));
 
+        if ($in === null) {
+            return;   // el coste se enseña una sola vez, en el bloque principal
+        }
         [$pi, $po] = config('ai.prices.' . config('ai.providers.' . config('ai.provider') . '.model')) ?? config('ai.prices.default', [0, 0]);
         $this->line(sprintf('Tokens: %s entrada, %s salida · coste estimado %.3f $', number_format($in), number_format($out), $in / 1e6 * $pi + $out / 1e6 * $po));
     }

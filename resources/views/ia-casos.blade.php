@@ -126,6 +126,7 @@
         <option value="todos">Todos los casos</option>
         <option value="pend">Sin revisar</option>
         <option value="dif">Donde la IA no coincide</option>
+        <option value="api">Necesitan [API]</option>
         <option value="desc">Descartados</option>
       </select>
     </header>

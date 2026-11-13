@@ -19,6 +19,15 @@ class AiEvaluarTest extends TestCase
         $this->assertSame('responder', AiEvaluar::clasificar('ready', 'Entra en Usuarios, pulsa Eliminar y confirma con tu contraseña. ¿Te funciona?'));
     }
 
+    public function test_la_etiqueta_api_se_reconoce_en_cualquier_parte_del_comentario(): void
+    {
+        $this->assertTrue(AiEvaluar::necesitaApi('[API] hay que mirar la rueda'));
+        $this->assertTrue(AiEvaluar::necesitaApi("Esto con [api] lo verá\notra línea"));
+        $this->assertTrue(AiEvaluar::necesitaApi('[ API ]'));
+        $this->assertFalse(AiEvaluar::necesitaApi('usar la api de adminhoteles'));
+        $this->assertFalse(AiEvaluar::necesitaApi(null));
+    }
+
     public function test_el_juez_clasifica_con_el_modelo_y_cae_a_la_regla_si_falla(): void
     {
         $juez = fn (string $dice) => new class($dice) implements AiProvider {

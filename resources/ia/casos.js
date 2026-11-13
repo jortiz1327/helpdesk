@@ -17,11 +17,12 @@ async function api(url, method = 'GET', body) {
 }
 
 const porId = (id) => casos.find((c) => c.id === id)
+const necesitaApi = (c) => /\[\s*API\s*\]/i.test(c.comentario || '')
 const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c.decision
 
 function visibles() {
   const f = $('filtro').value
-  return casos.filter((c) => c.id === actual || (f === 'todos' || (f === 'pend' && !c.revisado) || (f === 'dif' && difiere(c)) || (f === 'desc' && c.decision === 'descartar')))
+  return casos.filter((c) => c.id === actual || (f === 'todos' || (f === 'pend' && !c.revisado) || (f === 'dif' && difiere(c)) || (f === 'api' && necesitaApi(c)) || (f === 'desc' && c.decision === 'descartar')))
 }
 
 function progreso() {
@@ -36,7 +37,7 @@ function pintarLista() {
     const b = el('button', 'item'); b.setAttribute('role', 'listitem')
     if (c.id === actual) b.setAttribute('aria-current', 'true')
     const dot = el('span', 'dot'); dot.style.background = 'var(--c-' + c.decision + ')'
-    b.append(dot, el('span', 't', (c.asunto || c.pregunta).slice(0, 60)), el('span', 'df', difiere(c) ? 'IA≠' : ''), el('span', 'ck', c.revisado ? '✓' : ''))
+    b.append(dot, el('span', 't', (c.asunto || c.pregunta).slice(0, 60)), el('span', 'df', (necesitaApi(c) ? 'API ' : '') + (difiere(c) ? 'IA≠' : '')), el('span', 'ck', c.revisado ? '✓' : ''))
     b.title = DEC[c.decision].n + (c.revisado ? ' · revisado' : '')
     b.onclick = () => ir(c.id)
     box.append(b)
