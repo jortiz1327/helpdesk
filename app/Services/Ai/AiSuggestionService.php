@@ -30,6 +30,7 @@ class AiSuggestionService
     private ?int $hasta = null;
 
     private bool $anonimizar = false;
+    private bool $evalApi = false;
     private string $nombreCliente = '';
     /** Solo evaluación: ticket que NO puede encontrarse a sí mismo en el conocimiento (leave-one-out). */
     private ?int $excluirTicket = null;
@@ -197,7 +198,7 @@ class AiSuggestionService
 
         $t->codigos = $ticketId ? $this->leerCodigosDeFotos($ticketId) : [[], 0];
         $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
-        $t->hotel = $anonimizar ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente);
+        $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente);
 
         $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
         try {
@@ -237,15 +238,17 @@ class AiSuggestionService
      * Evaluación (comando ai:evaluar): contesta a un caso ya anonimizado como si fuera un ticket nuevo, sin guardar nada
      * y sin consultar datos de ningún hotel. $excluirTicket es el ticket local del propio caso, para que no se «copie».
      */
-    public function evaluarCaso(string $asunto, string $pregunta, ?int $excluirTicket, AiProvider $ai): array
+    public function evaluarCaso(string $asunto, string $pregunta, ?int $excluirTicket, AiProvider $ai, bool $conApi = false): array
     {
         $this->excluirTicket = $excluirTicket;
+        $this->evalApi = $conApi;   // casos [API]: la IA también ve lo que AdminHoteles diga del hotel que nombra el mensaje (solo lectura)
         try {
             $t = (object) ['id' => null, 'subject' => $asunto, 'category_id' => null, 'channel' => 'chat', 'category_name' => null,
                 'contact_name' => null, 'contact_email' => null, 'yaRespondio' => false];
             return $this->componer($t, [['role' => 'user', 'text' => $pregunta]], null, $ai, true);
         } finally {
             $this->excluirTicket = null;
+            $this->evalApi = false;
         }
     }
 

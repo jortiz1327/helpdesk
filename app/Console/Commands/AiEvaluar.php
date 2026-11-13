@@ -18,7 +18,8 @@ class AiEvaluar extends Command
 {
     protected $signature = 'ai:evaluar
         {--limite= : Máximo de casos (para probar con pocos)}
-        {--decision= : Solo los casos con esa decisión esperada (responder, pedir_info, derivar)}';
+        {--decision= : Solo los casos con esa decisión esperada (responder, pedir_info, derivar)}
+        {--sin-consulta : No consultar AdminHoteles en los casos [API] (como antes)}';
 
     protected $description = 'Evalúa la IA con el conjunto de pruebas marcado por el equipo (gasta tokens)';
 
@@ -103,7 +104,9 @@ class AiEvaluar extends Command
         $bar = $this->output->createProgressBar(count($casos));
         foreach ($casos as $c) {
             $esperado = $marcas[$c['id']]['decision'];
-            $r = $svc->evaluarCaso((string) $c['asunto'], (string) $c['pregunta'], isset($locales[$c['code']]) ? (int) $locales[$c['code']] : null, $ai);
+            // Los casos [API] se miden CON la consulta real (solo lectura) a AdminHoteles del hotel que nombra el mensaje.
+            $conApi = ! $this->option('sin-consulta') && self::necesitaApi($marcas[$c['id']]['comentario'] ?? null);
+            $r = $svc->evaluarCaso((string) $c['asunto'], (string) $c['pregunta'], isset($locales[$c['code']]) ? (int) $locales[$c['code']] : null, $ai, $conApi);
             [$obtenido, $jin, $jout] = self::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null);
             $in += (int) ($r['input_tokens'] ?? 0) + $jin;
             $out += (int) ($r['output_tokens'] ?? 0) + $jout;
@@ -126,7 +129,9 @@ class AiEvaluar extends Command
         $this->resumen($conf, $in, $out);
         if ($confApi) {
             $this->newLine();
-            $this->info('— NECESITAN API (marcados [API]: aquí la IA va a ciegas, no es un fallo suyo) —');
+            $this->info($this->option('sin-consulta')
+                ? '— NECESITAN API (marcados [API]: aquí la IA va a ciegas, no es un fallo suyo) —'
+                : '— CON API (marcados [API]: la IA ve lo que AdminHoteles dice del hotel que nombra el mensaje; no hay correo, así que no se verifica quién escribe) —');
             $this->resumen($confApi, null, null);
         }
 
