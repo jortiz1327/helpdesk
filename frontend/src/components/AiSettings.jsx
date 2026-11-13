@@ -11,7 +11,8 @@ import { useToast } from '../App.jsx'
  * servidor, y esta pantalla solo dice si hay una.
  * ---------------------------------------------------------------------- */
 const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + ' M' : n >= 1e3 ? (n / 1e3).toFixed(1) + ' k' : String(n))
-const euros = (usd) => (usd > 0 && usd < 0.01 ? '< 0,01 $' : usd.toFixed(2).replace('.', ',') + ' $')
+const ESTADO = { pending: 'pendiente de revisar', validated: 'validada', rejected: 'rechazada' }
+const euros =(usd) => (usd > 0 && usd < 0.01 ? '< 0,01 $' : usd.toFixed(2).replace('.', ',') + ' $')
 
 export default function AiSettings() {
   const toast = useToast()
@@ -39,6 +40,14 @@ export default function AiSettings() {
     else toast(r?.error || 'No se pudo actualizar', 'err')
   }
 
+  const revisar = async (id, status) => {
+    setBusy(true)
+    const r = await api.aiAdminReview(id, status)
+    setBusy(false)
+    if (r?.ok) { setD(r); toast(status === 'validated' ? 'Corrección validada: ya la usa la IA' : status === 'rejected' ? 'Corrección rechazada' : 'Corrección pendiente') }
+    else toast(r?.error || 'No se pudo guardar', 'err')
+  }
+
   const { stats: s, knowledge: k } = d
   const valoradas = s.up + s.down
 
@@ -49,7 +58,7 @@ export default function AiSettings() {
       <div className="card em-card">
         <p className="em-desc">
           En horario de atención, la IA <b>propone un borrador</b> de respuesta en la ficha del ticket. <b>Nunca envía nada</b>:
-          la persona lo revisa, lo usa o lo corrige. Cada 👎 con su corrección se guarda y mejora las siguientes sugerencias.
+          la persona lo revisa, lo usa o lo corrige. Cada 👎 con su corrección se guarda; cuando un responsable la valida, mejora las siguientes sugerencias.
         </p>
         <label className="fb-req-row" style={{ marginTop: 4 }}>
           <span className="fb-switch"><input type="checkbox" checked={d.enabled} disabled={busy}
@@ -120,10 +129,24 @@ export default function AiSettings() {
 
       {d.corrections.length > 0 && (
         <div className="card em-card" style={{ marginTop: 12 }}>
-          <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Últimas correcciones de los agentes</h3>
+          <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>
+            Correcciones de los agentes{d.corrections_pending > 0 ? ` · ${d.corrections_pending} por revisar` : ''}
+          </h3>
+          <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>
+            Una corrección no llega a la IA hasta que la validas: así un error de un agente no se convierte en norma.
+            Las rechazadas tampoco se usan.
+          </p>
           <ul className="ai-corr">
             {d.corrections.map((c) => (
-              <li key={c.id}><b className="mono">{c.ticket_code}</b> <small>{fmtDate(c.rated_at)}</small><q>{c.correction}</q></li>
+              <li key={c.id}>
+                <b className="mono">{c.ticket_code}</b> <small>{fmtDate(c.rated_at)} · {ESTADO[c.correction_status] || c.correction_status}</small>
+                <q>{c.correction}</q>
+                <span style={{ display: 'inline-flex', gap: 6, marginTop: 4 }}>
+                  {c.correction_status !== 'validated' && <button className="btn" disabled={busy} onClick={() => revisar(c.id, 'validated')}>Validar</button>}
+                  {c.correction_status !== 'rejected' && <button className="btn" disabled={busy} onClick={() => revisar(c.id, 'rejected')}>Rechazar</button>}
+                  {c.correction_status !== 'pending' && <button className="btn" disabled={busy} onClick={() => revisar(c.id, 'pending')}>Dejar pendiente</button>}
+                </span>
+              </li>
             ))}
           </ul>
         </div>

@@ -99,6 +99,11 @@ class AiKnowledgeTest extends TestCase
         $id = (int) DB::table('ai_suggestions')->where('ticket_id', $t1)->value('id');
         $svc->rate($id, 'down', 'Debía pedir el código de la etiqueta antes de nada, Marta.', $this->uid);
 
+        // Pendiente (Ana no es responsable): todavía no es conocimiento.
+        $this->assertSame(0, DB::table('ai_documents')->where('source_type', 'correccion')->count());
+        $this->assertSame('pending', DB::table('ai_suggestions')->where('id', $id)->value('correction_status'));
+        $svc->revisarCorreccion($id, 'validated', $this->uid);
+
         $doc = DB::table('ai_documents')->where('source_type', 'correccion')->first();
         $this->assertNotNull($doc);
         $this->assertStringContainsString('pedir el código de la etiqueta', $doc->content);
@@ -107,7 +112,7 @@ class AiKnowledgeTest extends TestCase
         // Llegan 4 correcciones más recientes sobre otros temas: la nuestra ya no está entre las 4 últimas.
         for ($i = 0; $i < 4; $i++) {
             DB::table('ai_suggestions')->insert(['ticket_id' => $t1, 'trigger_message_id' => null, 'status' => 'ready', 'body' => 'x', 'rating' => 'down',
-                'correction' => 'Otra cosa distinta número ' . $i, 'rated_at' => now()->addMinutes(5 + $i), 'created_at' => now(), 'updated_at' => now()]);
+                'correction_status' => 'validated', 'correction' => 'Otra cosa distinta número ' . $i,'rated_at' => now()->addMinutes(5 + $i), 'created_at' => now(), 'updated_at' => now()]);
         }
 
         // Otra consulta parecida: por parecido sí la encuentra, y va en su apartado.

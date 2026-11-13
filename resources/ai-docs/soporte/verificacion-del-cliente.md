@@ -20,6 +20,10 @@ No se corta al cliente de golpe ni se le hace sentir sospechoso: es normal que a
 
 Si el sistema no consigue comprobar el correo en ese momento (la consulta falla o no responden todas las aplicaciones), **no se afirma que el correo no pertenece al hotel**: no es lo mismo «no figura» que «no hemos podido comprobarlo». Se dice que un compañero comprobará sus datos y le atenderá.
 
+## Si el hotel no aparece en la búsqueda
+
+Que un hotel no salga al buscarlo **no significa que no exista**. Puede ser un hotel recién dado de alta (la lista del sistema se actualiza cada pocos minutos), un hotel oculto o uno cuya aplicación aún no está conectada. Nunca se le dice al cliente que su hotel «no existe» ni que «no consta»: se le pide que confirme el nombre exacto y se explica que un compañero del equipo lo revisará.
+
 ## Qué se puede decir y qué no
 
 - Nunca se dan claves, contraseñas, IP ni direcciones MAC de antenas.

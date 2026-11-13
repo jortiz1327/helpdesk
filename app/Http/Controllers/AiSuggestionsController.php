@@ -20,6 +20,7 @@ use InvalidArgumentException;
  *   GET  ?action=admin                   → panel de Ajustes: estado, acierto, conocimiento (support.config)
  *   POST ?action=admin_save  enabled     → enciende/apaga el asistente (support.config)
  *   POST ?action=admin_index             → actualiza la base de conocimiento (support.config)
+ *   POST ?action=admin_review  id, status → valida / rechaza una corrección de un agente (support.config)
  */
 class AiSuggestionsController extends Controller
 {
@@ -37,7 +38,8 @@ class AiSuggestionsController extends Controller
             'admin'      => $this->admin($request),
             'admin_save' => $this->post($request) ?? $this->adminSave($request),
             'admin_index' => $this->post($request) ?? $this->adminIndex($request),
-            default      => response()->json(['ok' => true, 'enabled' => $this->ai->enabled()]),
+            'admin_review' => $this->post($request) ?? $this->adminReview($request),
+            default     => response()->json(['ok' => true, 'enabled' => $this->ai->enabled()]),
         };
     }
 
@@ -66,6 +68,19 @@ class AiSuggestionsController extends Controller
         [$nuevos] = $k->indexarTickets();
         $trozos = $k->indexarManuales();
         return response()->json(['ok' => true, 'nuevos' => $nuevos, 'trozos' => $trozos] + $this->ai->panel());
+    }
+
+    /** Validar / rechazar / dejar pendiente una corrección de un agente (support.config). */
+    private function adminReview(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        try {
+            $ok = $this->ai->revisarCorreccion((int) $request->input('id'), (string) $request->input('status'), $request->user()->id);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+        }
+        return $ok ? response()->json(['ok' => true] + $this->ai->panel())
+                   : response()->json(['ok' => false, 'error' => 'Corrección no encontrada'], 404);
     }
 
     private function soloConfig(Request $request)

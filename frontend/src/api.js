@@ -466,6 +466,9 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
   }),
   aiAdminIndex: () => req('ai_suggestions.php?action=admin_index', { method: 'POST' }),
+  aiAdminReview: (id, status) => req('ai_suggestions.php?action=admin_review', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }),
+  }),
   // Borrar ticket entero (requiere tickets.delete)
   deleteTicket: (id) => req('tickets.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),

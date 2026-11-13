@@ -94,8 +94,9 @@ class AiKnowledge
         $s = DB::table('ai_suggestions as a')->join('tickets as t', 't.id', '=', 'a.ticket_id')
             ->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
             ->where('a.id', $suggestionId)
-            ->first(['a.id', 'a.body', 'a.correction', 'a.rating', 'a.trigger_message_id', 't.subject', 'c.name as contact_name']);
-        if (! $s || $s->rating !== 'down' || trim((string) $s->correction) === '') {
+            ->first(['a.id', 'a.body', 'a.correction', 'a.correction_status', 'a.rating', 'a.trigger_message_id', 't.subject', 'c.name as contact_name']);
+        // Solo las correcciones VALIDADAS por un responsable pasan a ser conocimiento.
+        if (! $s || $s->rating !== 'down' || trim((string) $s->correction) === '' || $s->correction_status !== 'validated') {
             $this->quitarCorreccion($suggestionId);
             return;
         }

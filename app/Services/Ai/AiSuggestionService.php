@@ -82,9 +82,12 @@ class AiSuggestionService
             'gaps' => DB::table('ai_suggestions as a')->leftJoin('tickets as t', 't.id', '=', 'a.ticket_id')
                 ->whereIn('a.status', ['abstained', 'failed'])->orderByDesc('a.id')->limit(10)
                 ->get(['a.id', 'a.status', 'a.error', 't.code as ticket_code', 't.subject', 'a.created_at'])->all(),
+            // Las pendientes primero: son las que un responsable tiene que validar o rechazar.
             'corrections' => DB::table('ai_suggestions as a')->leftJoin('tickets as t', 't.id', '=', 'a.ticket_id')
-                ->where('a.rating', 'down')->whereNotNull('a.correction')->orderByDesc('a.rated_at')->limit(8)
-                ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.rated_at'])->all(),
+                ->where('a.rating', 'down')->whereNotNull('a.correction')
+                ->orderByRaw("a.correction_status = 'pending' DESC")->orderByDesc('a.rated_at')->limit(15)
+                ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.correction_status', 'a.rated_at'])->all(),
+            'corrections_pending' => DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->where('correction_status', 'pending')->count(),
         ];
     }
 
@@ -240,13 +243,35 @@ class AiSuggestionService
             throw new InvalidArgumentException('Escribe qué debía responder (mínimo 5 letras) para poder aprender de ello');
         }
 
+        // Una corrección nueva o editada queda PENDIENTE: no llega a la IA hasta que la valide un
+        // responsable. Si quien corrige ya es responsable (support.config), cuenta como validada.
+        $responsable = $rating === 'down' && (bool) \App\Models\User::find($userId)?->can('support.config');
         DB::table('ai_suggestions')->where('id', $id)->update([
             'rating' => $rating, 'correction' => $rating === 'down' ? mb_substr($correction, 0, 4000) : null,
             'rated_by' => $userId, 'rated_at' => now(), 'updated_at' => now(),
+            'correction_status' => $responsable ? 'validated' : 'pending',
+            'correction_reviewed_by' => $responsable ? $userId : null,
+            'correction_reviewed_at' => $responsable ? now() : null,
         ]);
-        // La corrección pasa a ser conocimiento buscable (y deja de serlo si cambia a 👍).
+        // Solo si está validada pasa a ser conocimiento buscable (y deja de serlo si cambia a 👍).
         $this->knowledge->indexarCorreccion($id);
         return DB::table('ai_suggestions')->where('id', $id)->first();
+    }
+
+    /** Un responsable valida o rechaza una corrección. Solo las validadas alimentan a la IA. */
+    public function revisarCorreccion(int $id, string $estado, int $userId): bool
+    {
+        if (! in_array($estado, ['validated', 'rejected', 'pending'], true)) {
+            throw new InvalidArgumentException('Estado no válido');
+        }
+        $n = DB::table('ai_suggestions')->where('id', $id)->where('rating', 'down')->whereNotNull('correction')->update([
+            'correction_status' => $estado,
+            'correction_reviewed_by' => $estado === 'pending' ? null : $userId,
+            'correction_reviewed_at' => $estado === 'pending' ? null : now(),
+            'updated_at' => now(),
+        ]);
+        $this->knowledge->indexarCorreccion($id);
+        return $n > 0;
     }
 
     public function markUsed(int $id): void
@@ -331,7 +356,7 @@ class AiSuggestionService
     private function ejemplos(?int $categoryId): array
     {
         $rows = DB::table('ai_suggestions as s')->join('tickets as t', 't.id', '=', 's.ticket_id')
-            ->where('s.rating', 'down')->whereNotNull('s.correction')
+            ->where('s.rating', 'down')->whereNotNull('s.correction')->where('s.correction_status', 'validated')
             ->orderByRaw('(t.category_id <=> ?) DESC', [$categoryId])->orderByDesc('s.rated_at')
             ->limit(self::MAX_EJEMPLOS)->get(['s.id', 's.body', 's.correction', 's.trigger_message_id']);
 
