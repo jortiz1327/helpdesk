@@ -176,6 +176,30 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringNotContainsString('Antena Frios', $this->fake->ultimoSistema);
     }
 
+    public function test_con_el_hotel_nombrado_y_sin_correo_se_cuentan_las_antenas_pero_nada_mas(): void
+    {
+        $this->activar();
+        config(['ai.support.url' => 'https://panel.example.com', 'ai.support.key' => 'K-secreta']);
+        Cache::flush();
+        $hid = 'a1a1a1a1-0000-4000-8000-000000000001';
+        $buf = 'b5b5b5b5-0000-4000-8000-000000000005';
+        Http::fake([
+            "panel.example.com/api/support/v1/hotels/$hid/buffets*" => Http::response(['success' => true, 'data' => [
+                'hotel' => ['id' => $hid, 'nombre' => 'Hotel Marina Sol'], 'buffets' => [['id' => $buf, 'nombre' => 'Buffet Sol', 'hotel_id' => $hid]]]]),
+            'panel.example.com/api/support/v1/hotels*' => Http::response(['success' => true, 'data' => ['total' => 1, 'hoteles' => [['id' => $hid, 'nombre' => 'Hotel Marina Sol', 'grupo' => 'G']]]]),
+            "panel.example.com/api/support/v1/buffets/$buf/antennas*" => Http::response(['success' => true, 'data' => ['total' => 1, 'en_linea' => 0,
+                'antenas' => [['nombre' => 'Sol-1', 'en_linea' => false, 'caida_desde' => '2026-11-12T08:00:00+01:00', 'etiquetas' => 20]]]]),
+            'panel.example.com/api/support/v1/users/lookup*' => Http::response(['success' => true, 'data' => ['encontrado' => false, 'coincidencias' => []]]),
+        ]);
+        DB::table('contacts')->where('id', $this->cid)->update(['email' => null]);   // p. ej. WhatsApp: no hay correo que comprobar
+        $tk = $this->ticket('Hola, escribo del Hotel Marina Sol: las etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('ESTADO DE LAS ANTENAS no es un dato sensible', $p);
+        $this->assertStringContainsString('SIN CONEXIÓN: Sol-1', $p);
+        $this->assertStringContainsString('Para cualquier OTRO dato del hotel', $p);   // usuarios, permisos, etiquetas: antes el correo
+    }
+
     public function test_si_el_hotel_que_dice_no_coincide_con_el_correo_se_explica_con_tacto_y_se_deriva(): void
     {
         $this->activar();

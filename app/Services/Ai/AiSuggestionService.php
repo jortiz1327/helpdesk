@@ -478,6 +478,34 @@ class AiSuggestionService
                 return $cab . "- Aún no sabemos de qué hotel es ni con qué correo accede. Pregunta PRIMERO el nombre del hotel y, a continuación, el correo con el que accede a la aplicación.\n" . $comun;
             }
             if ($dir) {
+                // Hotel localizado y sin duda de cuál es: el ESTADO DE LAS ANTENAS no es un dato sensible y se puede contar sin
+                // verificar el correo (decisión de Juan, 13-nov). Todo lo demás (usuarios, permisos, etiquetas concretas) sigue
+                // pidiendo el correo antes.
+                $elegido = null;
+                if ($this->hotelAmbiguo === null) {
+                    $nombresNorm = array_map(fn ($x) => HotelsApi::norm($x), $nombres);
+                    foreach ($dir as $h) {
+                        if (in_array(HotelsApi::norm($h['nombre']), $nombresNorm, true)) { $elegido = $h; break; }
+                    }
+                    $elegido ??= count($dir) === 1 ? $dir[0] : null;
+                }
+                $lineas = '';
+                foreach ($elegido && ($elegido['id'] ?? '') !== '' ? ($api->buffetsDeHotel($elegido['id']) ?? []) : [] as $x) {
+                    $an = $api->antenas($x);
+                    if ($an === null) {
+                        continue;
+                    }
+                    $caidas = array_values(array_filter($an, fn ($a) => ! $a['online']));
+                    $lineas .= '- Antenas de ' . ($x['buffet'] ?: $elegido['nombre']) . ': ' . count($an) . ' en total; ' . ($caidas
+                        ? 'SIN CONEXIÓN: ' . implode(', ', array_map(fn ($a) => $a['name'] . ($a['offline_since'] ? ' (desde ' . substr((string) $a['offline_since'], 0, 16) . ')' : ''), $caidas)) . ".\n"
+                        : "todas con conexión.\n");
+                }
+                if ($lineas !== '') {
+                    return $cab . "- El cliente dice ser de «" . $elegido['nombre'] . "». Su correo aún no está comprobado.\n"
+                        . "- El ESTADO DE LAS ANTENAS no es un dato sensible: puedes contárselo ya, sin pedir el correo para eso:\n" . $lineas
+                        . "- Si hay antenas sin conexión: NO pidas reiniciar, desconectar ni tocar nada; di que el equipo de soporte lo revisará. No des MAC ni IP de antenas.\n"
+                        . "- Para cualquier OTRO dato del hotel (usuarios, permisos, etiquetas concretas) pide antes el correo con el que accede a la aplicación y NO reveles a qué hotel pertenece un correo.\n";
+                }
                 return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "». Falta comprobar su correo: pídele el correo con el que accede a la aplicación.\n" . $comun;
             }
             return $cab . "- El hotel que nombra no se localiza en nuestro sistema" . ($dirFalla ? ' (no se pudo consultar ahora)' : '') . ". Pídele el nombre exacto del hotel y el correo con el que accede a la aplicación.\n" . $comun . $derivar;

@@ -169,7 +169,31 @@ class HotelsApi
         if ($d === null) {
             return null;
         }
-        return array_map(fn ($h) => ['nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
+        return array_map(fn ($h) => ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
+    }
+
+    /**
+     * Buffets de un hotel ya localizado (para ver el estado de sus antenas sin verificar el correo: ese dato no es sensible).
+     * Misma forma que los «sitios» de verificar(): [{buffet_id, buffet, hotel}]. null si no se pudo consultar.
+     */
+    public function buffetsDeHotel(string $hotelId): ?array
+    {
+        if (! self::idValido($hotelId)) {
+            return null;
+        }
+        $d = Cache::remember("ai_support_hotel_buffets_$hotelId", 300, fn () => $this->get("/api/support/v1/hotels/$hotelId/buffets") ?? []);
+        if (! $d) {
+            return null;
+        }
+        $hotel = self::nombre($d['hotel'] ?? '');
+        $out = [];
+        foreach (array_slice(array_values((array) ($d['buffets'] ?? [])), 0, 6) as $b) {
+            $id = is_array($b) ? (string) self::pick($b, ['id', 'buffet_id'], '') : '';
+            if (self::idValido($id)) {
+                $out[] = ['buffet_id' => $id, 'buffet' => self::nombre($b), 'hotel' => $hotel];
+            }
+        }
+        return $out;
     }
 
     /**
