@@ -1,0 +1,91 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+
+/**
+ * Revisión del conjunto de pruebas de la IA (página /ia/casos). SOLO en local (config ai.lab): en cualquier otro
+ * entorno todo devuelve 404. Lee y escribe storage/app/ai-eval/{candidatos,marcas}.json: cada caso es un ticket real
+ * ya anonimizado y la persona marca qué debería hacer la IA (responder / pedir_info / derivar / descartar).
+ * No llama a ningún proveedor de IA ni envía nada a nadie.
+ */
+class AiCasosController extends Controller
+{
+    private const DECISIONES = ['responder', 'pedir_info', 'derivar', 'descartar'];
+
+    public function __construct()
+    {
+        abort_unless(config('ai.lab'), 404);
+    }
+
+    private function dir(): string
+    {
+        return (string) config('ai.eval_dir');
+    }
+
+    public function page()
+    {
+        return response()->view('ia-casos');
+    }
+
+    /** El JavaScript de la página: aparte porque la CSP de la app no permite scripts dentro del HTML. */
+    public function script()
+    {
+        return response(file_get_contents(resource_path('ia/casos.js')), 200, ['Content-Type' => 'application/javascript; charset=utf-8', 'Cache-Control' => 'no-store']);
+    }
+
+    /** Lo que hizo la IA en la última evaluación: [id => [obtenido, estado, texto]]. */
+    private function ultimaEvaluacion(): array
+    {
+        $archivos = glob($this->dir() . '/resultados-*.csv') ?: [];
+        if (! $archivos) {
+            return [];
+        }
+        rsort($archivos);
+        $h = fopen($archivos[0], 'r');
+        if (fread($h, 3) !== "\xEF\xBB\xBF") {
+            rewind($h);
+        }
+        $ia = [];
+        fgetcsv($h, 0, ';', '"', '\\');   // cabecera
+        while (($f = fgetcsv($h, 0, ';', '"', '\\')) !== false) {
+            if (isset($f[7])) {
+                $ia[(int) $f[0]] = ['obtenido' => $f[3], 'estado' => $f[6], 'texto' => $f[7]];
+            }
+        }
+        fclose($h);
+        return $ia;
+    }
+
+    public function lista()
+    {
+        $cand = $this->dir() . '/candidatos.json';
+        $marcas = $this->dir() . '/marcas.json';
+        abort_unless(is_file($cand) && is_file($marcas), 404, 'Faltan candidatos.json y marcas.json');
+        $c = json_decode((string) file_get_contents($cand), true);
+        $m = json_decode((string) file_get_contents($marcas), true);
+        $ia = $this->ultimaEvaluacion();
+
+        return response()->json(array_map(fn ($x) => [
+            'id' => $x['id'], 'canal' => $x['canal'], 'asunto' => $x['asunto'], 'pregunta' => $x['pregunta'], 'humana' => $x['respuesta_humana'],
+            'decision' => $m[$x['id']]['decision'] ?? 'responder', 'comentario' => $m[$x['id']]['comentario'] ?? '',
+            'revisado' => (bool) ($m[$x['id']]['revisado'] ?? false), 'ia' => $ia[$x['id']] ?? null,
+        ], $c));
+    }
+
+    public function guardar(Request $r, int $id)
+    {
+        $d = $r->validate(['decision' => 'required|in:' . implode(',', self::DECISIONES), 'comentario' => 'nullable|string|max:1000', 'revisado' => 'boolean']);
+        $f = $this->dir() . '/marcas.json';
+        abort_unless(is_file($f), 404);
+        if (! is_file($f . '.bak')) {
+            copy($f, $f . '.bak');   // copia de lo que había antes de tocar nada
+        }
+        $m = json_decode((string) file_get_contents($f), true);
+        abort_unless(isset($m[$id]), 404);
+        $m[$id] = ['decision' => $d['decision'], 'comentario' => trim((string) ($d['comentario'] ?? '')), 'revisado' => (bool) ($d['revisado'] ?? true)];
+        file_put_contents($f, json_encode($m, JSON_UNESCAPED_UNICODE), LOCK_EX);
+        return response()->json(['ok' => true]);
+    }
+}

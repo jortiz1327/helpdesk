@@ -73,7 +73,7 @@ class AiEvaluar extends Command
 
     public function handle(AiSuggestionService $svc): int
     {
-        $dir = storage_path('app/ai-eval');
+        $dir = (string) config('ai.eval_dir');
         if (! is_file("$dir/candidatos.json") || ! is_file("$dir/marcas.json")) {
             $this->error('Faltan storage/app/ai-eval/candidatos.json y marcas.json (conjunto de pruebas).');
             return self::FAILURE;

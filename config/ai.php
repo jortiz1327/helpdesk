@@ -18,6 +18,8 @@ return [
     // Tope de tokens de SALIDA. En Anthropic el razonamiento interno del modelo cuenta aquí: con 2000 las consultas
     // largas se quedaban sin margen y la respuesta salía cortada (se descartaba como «incompleta»).
     'max_tokens' => (int) env('AI_MAX_TOKENS', 4000),
+    // Carpeta del conjunto de pruebas (casos reales anonimizados, marcas del equipo y resultados). Fuera de git.
+    'eval_dir' => env('AI_EVAL_DIR', storage_path('app/ai-eval')),
     // Anthropic: «default» deja que el modelo razone como siempre; «disabled» lo apaga (menos coste y latencia).
     'anthropic_thinking' => env('AI_THINKING_ANTHROPIC', 'default'),
     // Laboratorio de validación (tickets resueltos, sin enviar nada). Solo existe en local; en producción no se enciende.

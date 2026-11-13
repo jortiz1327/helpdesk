@@ -19,6 +19,14 @@ $spa = fn () => response()->file(public_path('index.html'), [
 
 Route::get('/', $spa);
 
+// Revisión del conjunto de pruebas de la IA (casos reales anonimizados): SOLO local, igual que /ia.
+Route::prefix('ia/casos')->controller(\App\Http\Controllers\AiCasosController::class)->group(function () {
+    Route::get('/', 'page');
+    Route::get('/app.js', 'script');
+    Route::get('/api/lista', 'lista');
+    Route::post('/api/{id}', 'guardar')->whereNumber('id');
+});
+
 // Chats de prueba de la IA: SOLO local (el controlador da 404 si config('ai.lab') está apagado).
 Route::prefix('ia')->controller(\App\Http\Controllers\AiLabController::class)->group(function () {
     Route::get('/', 'page');
