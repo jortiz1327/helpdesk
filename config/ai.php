@@ -15,7 +15,11 @@ $activo = env('AI_PROVIDER', 'anthropic');
 
 return [
     'provider'   => $activo,
-    'max_tokens' => (int) env('AI_MAX_TOKENS', 2000),
+    // Tope de tokens de SALIDA. En Anthropic el razonamiento interno del modelo cuenta aquí: con 2000 las consultas
+    // largas se quedaban sin margen y la respuesta salía cortada (se descartaba como «incompleta»).
+    'max_tokens' => (int) env('AI_MAX_TOKENS', 4000),
+    // Anthropic: «default» deja que el modelo razone como siempre; «disabled» lo apaga (menos coste y latencia).
+    'anthropic_thinking' => env('AI_THINKING_ANTHROPIC', 'default'),
     // Laboratorio de validación (tickets resueltos, sin enviar nada). Solo existe en local; en producción no se enciende.
     'lab'        => (bool) env('AI_LAB', env('APP_ENV') === 'local'),
     'timeout'    => (int) env('AI_TIMEOUT', 30),

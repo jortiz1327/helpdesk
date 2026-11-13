@@ -19,16 +19,21 @@ class AnthropicProvider implements AiProvider
     {
         $this->exigirClave();
 
+        $cuerpo = [
+            'model'      => $this->model(),
+            'max_tokens' => $this->maxTokens(),
+            'system'     => $system,
+            'messages'   => $messages,
+        ];
+        if (config('ai.anthropic_thinking') === 'disabled') {
+            $cuerpo['thinking'] = ['type' => 'disabled'];
+        }
+
         try {
             $r = Http::timeout($this->timeout())
                 ->withHeaders(['x-api-key' => $this->key(), 'anthropic-version' => '2023-06-01'])
                 ->acceptJson()
-                ->post($this->url('/v1/messages'), [
-                    'model'      => $this->model(),
-                    'max_tokens' => $this->maxTokens(),
-                    'system'     => $system,
-                    'messages'   => $messages,
-                ]);
+                ->post($this->url('/v1/messages'), $cuerpo);
         } catch (Throwable) {
             throw new AiException('No se pudo contactar con la IA');
         }
