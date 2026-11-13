@@ -450,6 +450,12 @@ class AiSuggestionService
         $e = trim((string) ($m[0][0] ?? $contactEmail));
         // Hotel: el que el cliente nombra, buscado en el inventario del panel.
         $nombres = $this->nombresDeHotel($textoCliente);
+        // Sin «Hotel X» explícito (p. ej. solo la firma «Barceló Benidorm Beach»): se prueban nombres propios del mensaje y solo
+        // valen los hoteles cuyo nombre contiene el buscado (o al revés), para no arrastrar resultados sueltos del buscador.
+        $porMayusculas = ! $nombres;
+        if ($porMayusculas) {
+            $nombres = $this->nombresPorMayusculas($textoCliente);
+        }
         $dir = [];
         $dirFalla = false;
         foreach (array_slice($nombres, 0, 3) as $n) {
@@ -457,6 +463,10 @@ class AiSuggestionService
             if ($r === null) {
                 $dirFalla = true;
                 continue;
+            }
+            if ($porMayusculas) {
+                $nn = HotelsApi::norm($n);
+                $r = array_values(array_filter($r, fn ($h) => $nn !== '' && (str_contains(HotelsApi::norm($h['nombre']), $nn) || str_contains($nn, HotelsApi::norm($h['nombre'])))));
             }
             $dir = array_merge($dir, $r);
             // Varios resultados y ninguno se llama exactamente así: el cliente no ha dicho cuál de ellos es.
@@ -565,7 +575,7 @@ class AiSuggestionService
     {
         $out = [];
         $cap = '[A-ZÁÉÍÓÚÑ][\wáéíóúñ\'\-]*';
-        if (preg_match_all('/\b(?i:hotel|resort|restaurante|aparthotel|apartamentos|complejo)\s+((?:' . $cap . '\s*){1,4})/u', $texto, $m)) {
+        if (preg_match_all('/\b(?i:hotel|resort|restaurante|aparthotel|apartamentos|complejo)[ 	]+((?:' . $cap . '[ 	]*){1,4})/u', $texto, $m)) {
             foreach ($m[1] as $n) {
                 $out[trim($n)] = true;
             }
@@ -576,6 +586,26 @@ class AiSuggestionService
             }
         }
         return array_values(array_filter(array_keys($out), fn ($n) => mb_strlen($n) >= 4));
+    }
+
+    /** Nombres propios de 2-4 palabras del mensaje (firmas tipo «Barceló Benidorm Beach»), sin saludos ni cargos: candidatos a hotel. */
+    private function nombresPorMayusculas(string $texto): array
+    {
+        $cap = '[A-ZÁÉÍÓÚÑ][\wáéíóúñ\'\-]*';
+        $paradas = array_flip(explode(' ', 'buenos buenas hola saludos gracias por favor un una el la los las estimados estimado atentamente cordialmente subdirector director jefe responsable manager deputy telf tel correo email aeme group etiqueta etiquetas antena antenas buffet cliente muchas mil nos os les le si no ya que desde para con sin sobre tenemos tengo hemos'));
+        $out = [];
+        if (preg_match_all('/(?<![\wáéíóúñ])(' . $cap . '(?:[ \t]+(?:(?:de|del|la|las|los|y|&)[ \t]+)?' . $cap . '){1,3})/u', $texto, $m)) {
+            foreach ($m[1] as $frase) {
+                $pal = preg_split('/[ \t]+/', trim($frase));
+                while ($pal && isset($paradas[mb_strtolower($pal[0])])) { array_shift($pal); }
+                while ($pal && isset($paradas[mb_strtolower(end($pal))])) { array_pop($pal); }
+                $n = implode(' ', $pal);
+                if (count($pal) >= 2 && mb_strlen($n) >= 6) {
+                    $out[$n] = true;
+                }
+            }
+        }
+        return array_slice(array_keys($out), 0, 4);
     }
 
     /** ¿Alguno de los hoteles buscados es uno de los sitios donde figura el correo? (nombres sin tildes, uno dentro de otro) */

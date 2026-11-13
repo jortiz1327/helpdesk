@@ -200,6 +200,17 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringContainsString('Para cualquier OTRO dato del hotel', $p);   // usuarios, permisos, etiquetas: antes el correo
     }
 
+    public function test_encuentra_el_hotel_de_la_firma_aunque_no_ponga_la_palabra_hotel(): void
+    {
+        $svc = app(\App\Services\Ai\AiSuggestionService::class);
+        $f = new \ReflectionMethod($svc, 'nombresPorMayusculas');
+        $f->setAccessible(true);
+        $n = $f->invoke($svc, "Buenos días\nSe han actualizado algunas etiquetas, ¿Lo podríais chequear? Mil gracias,\nSubdirector | Deputy Manager\nBarceló Benidorm Beach\nAvinguda Mare de Déu del Sofrat");
+        $this->assertContains('Barceló Benidorm Beach', $n);
+        $this->assertNotContains('Buenos días', $n);
+        $this->assertNotContains('Subdirector Deputy Manager', $n);
+    }
+
     public function test_si_el_hotel_que_dice_no_coincide_con_el_correo_se_explica_con_tacto_y_se_deriva(): void
     {
         $this->activar();
