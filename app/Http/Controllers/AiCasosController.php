@@ -76,7 +76,7 @@ class AiCasosController extends Controller
 
     public function guardar(Request $r, int $id)
     {
-        $d = $r->validate(['decision' => 'required|in:' . implode(',', self::DECISIONES), 'comentario' => 'nullable|string|max:1000', 'revisado' => 'boolean']);
+        $d = $r->validate(['decision' => 'required|in:' . implode(',', self::DECISIONES), 'comentario' => 'nullable|string|max:10000', 'revisado' => 'boolean']);
         $f = $this->dir() . '/marcas.json';
         abort_unless(is_file($f), 404);
         if (! is_file($f . '.bak')) {
