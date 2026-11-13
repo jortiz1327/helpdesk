@@ -14,6 +14,7 @@ Preguntar muchas cosas a la vez agobia al cliente y no ayuda a lo importante. Po
 - Los demás detalles (código de la etiqueta, fotos, qué etiquetas fallan, en qué pantalla, desde cuándo) se piden **después**, cuando el cliente haya contestado.
 - Si ya sabemos hotel y correo, se pregunta lo más importante, **como mucho dos cosas**, y lo demás queda para el siguiente mensaje.
 - Nunca se envía una lista de tres o más datos.
+- **No se pregunta lo obvio ni lo inventado.** Solo se pregunta si la respuesta cambia lo que hay que hacer y el dato no está ya en el mensaje. No se pide confirmar fechas, año, hotel o petición que el cliente ya expresó con claridad, ni se sondean detalles que no figuran en la documentación («¿afecta a todos los servicios?», «¿son fechas de este año?»). Si el cliente ya dio lo necesario y lo gestiona una persona, se deriva.
 
 ## Si no coincide
 

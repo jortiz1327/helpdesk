@@ -160,6 +160,8 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringContainsString('como máximo DOS por mensaje', $p);              // línea fija del código
         $this->assertStringContainsString('el correo con el que accede', $p);
         $this->assertStringContainsString('NUNCA le digas al cliente que existen varios hoteles', $p);
+        $this->assertStringContainsString('NO PREGUNTES LO OBVIO NI LO INVENTADO', $p);   // línea fija
+        $this->assertStringContainsString('No preguntes lo obvio ni lo inventado', $p);   // prompt base
     }
 
     public function test_un_correo_que_no_esta_en_la_app_no_recibe_datos_de_hoteles(): void
