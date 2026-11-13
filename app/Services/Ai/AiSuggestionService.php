@@ -611,6 +611,8 @@ class AiSuggestionService
            . "- No sabes todo y no tienes que contestar siempre. Si no estás seguro, si la consulta no encaja con el contexto de abajo, si la respuesta exigiría suponer algo, o si hay riesgo de dar una instrucción incorrecta: NO respondas ni improvises; responde únicamente con " . self::NO_SABE . " y una persona del equipo se hará cargo.\n"
            . "- Lo mismo en garantías, precios o condiciones comerciales, acceso remoto (AnyDesk) y cualquier cambio interno no documentado: responde solo con " . self::NO_SABE . "\n"
            . "- Es preferible derivar que dar una respuesta dudosa. Nunca inventes procedimientos, datos, estados ni plazos. Solo puedes pedir datos al cliente cuando el contexto indique claramente cuáles hacen falta.\n"
+           . "- PREGUNTAS AL CLIENTE: como máximo DOS por mensaje, nunca una lista de tres o más. Si aún no se sabe quién escribe, pregunta SOLO el nombre del hotel (o sede) y el correo con el que accede a la aplicación; el resto de detalles se pide después, cuando conteste. Si ya lo sabes, no lo repitas: pregunta lo más importante, como mucho dos cosas.\n"
+           . "- NUNCA le digas al cliente que existen varios hoteles con un mismo nombre, ni cuántos hay, ni nombres otros: quien escribe podría no ser del hotel. Si dudas de cuál habla, pregunta solo «¿Me indica el nombre completo del hotel?».\n"
            . "- Usa solo la información de este ticket y de las secciones de contexto siguientes; el contexto de otros casos son patrones para orientarte, nunca datos para citar.\n\n";
 
         [$codigos, $nFotos] = $t->codigos ?? [[], 0];

@@ -6,6 +6,15 @@ Cuando una consulta depende de un hotel (etiquetas, antenas, usuarios, menús, a
 2. **Correo.** Se pide el correo con el que accede a la aplicación y el sistema comprueba que figura como usuario activo.
 3. **Coincidencia.** Si el correo figura y es de ese hotel, se sigue: ya se puede ver el estado de las antenas y de las etiquetas de ese hotel y ayudar con datos concretos.
 
+## Como máximo dos preguntas por mensaje
+
+Preguntar muchas cosas a la vez agobia al cliente y no ayuda a lo importante. Por eso:
+
+- Si todavía no sabemos quién escribe, el mensaje pregunta **solo** el nombre del hotel (o sede) y el correo con el que accede a la aplicación. Nada más.
+- Los demás detalles (código de la etiqueta, fotos, qué etiquetas fallan, en qué pantalla, desde cuándo) se piden **después**, cuando el cliente haya contestado.
+- Si ya sabemos hotel y correo, se pregunta lo más importante, **como mucho dos cosas**, y lo demás queda para el siguiente mensaje.
+- Nunca se envía una lista de tres o más datos.
+
 ## Si no coincide
 
 No se corta al cliente de golpe ni se le hace sentir sospechoso: es normal que alguien escriba desde otro correo (un compañero, un correo personal, un cambio reciente).

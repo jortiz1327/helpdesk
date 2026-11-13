@@ -150,6 +150,18 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringNotContainsString('Hotel Poseidón La Manga', $p);                       // no se enumeran los otros
     }
 
+    public function test_el_prompt_limita_a_dos_preguntas_por_mensaje(): void
+    {
+        $this->activar();
+        $tk = $this->ticket('Las etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('como máximo DOS preguntas por mensaje', $p);   // base del prompt (resources/ai/prompt-soporte.md)
+        $this->assertStringContainsString('como máximo DOS por mensaje', $p);              // línea fija del código
+        $this->assertStringContainsString('el correo con el que accede', $p);
+        $this->assertStringContainsString('NUNCA le digas al cliente que existen varios hoteles', $p);
+    }
+
     public function test_un_correo_que_no_esta_en_la_app_no_recibe_datos_de_hoteles(): void
     {
         $this->activar();
