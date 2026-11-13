@@ -120,6 +120,36 @@ class AiSuggestionsTest extends TestCase
         Http::assertSent(fn ($r) => $r->method() === 'GET' && $r->hasHeader('X-Api-Key', 'K-secreta'));
     }
 
+    /** Forma REAL de la API (comprobada con datos reales): buffets con hotel_id, hoteles aparte y antenas en data.antenas. */
+    public function test_con_la_forma_real_enlaza_buffet_y_hotel_y_pregunta_cual_si_el_nombre_es_ambiguo(): void
+    {
+        $this->activar();
+        config(['ai.support.url' => 'https://panel.example.com', 'ai.support.key' => 'K-secreta']);
+        Cache::flush();
+        $buf = 'b4b4b4b4-0000-4000-8000-000000000004';
+        Http::fake([
+            'panel.example.com/api/support/v1/users/lookup*' => Http::response(['success' => true, 'data' => ['encontrado' => true, 'desactivados_en_apps' => 0,
+                'apps_sin_respuesta' => [['app' => 'otra', 'motivo' => 'sin_funcion']],
+                'coincidencias' => [['app' => 'poseidon', 'usuario' => ['nombre' => 'M', 'rol' => 'F&B', 'activo' => true], 'acceso_a_todo_el_grupo' => false,
+                    'hoteles' => [['id' => 'h9', 'nombre' => 'Hotel Poseidón Playa']], 'buffets' => [['id' => $buf, 'nombre' => 'Buffet Playa', 'hotel_id' => 'h9']]]]]]),
+            'panel.example.com/api/support/v1/hotels*' => Http::response(['success' => true, 'data' => ['total' => 3, 'hoteles' => [
+                ['id' => 'h8', 'nombre' => 'Hotel Poseidón La Manga', 'grupo' => 'Hoteles Poseidón'],
+                ['id' => 'h9', 'nombre' => 'Hotel Poseidón Playa', 'grupo' => 'Hoteles Poseidón'],
+                ['id' => 'h7', 'nombre' => 'Poseidón Resort', 'grupo' => 'Hoteles Poseidón']]]]),
+            "panel.example.com/api/support/v1/buffets/$buf/antennas*" => Http::response(['success' => true, 'data' => ['total' => 1, 'en_linea' => 1,
+                'antenas' => [['nombre' => 'Playa-1', 'en_linea' => true, 'caida_desde' => null, 'etiquetas' => 25]]]]),
+        ]);
+        $tk = $this->ticket('Hola, soy del Hotel Poseidón y una etiqueta no se actualiza');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('VERIFICADO', $p);                                      // encontrado aunque otra app no respondiera
+        $this->assertStringContainsString('Hotel Poseidón Playa / Buffet Playa', $p);              // hotel_id → nombre del hotel
+        $this->assertStringContainsString('Antenas de Buffet Playa: 1 en total', $p);              // data.antenas
+        $this->assertStringContainsString('corresponde a VARIOS hoteles', $p);                     // ambiguo: hay 3 «Poseidón»
+        $this->assertStringContainsString('NO asumas cuál es', $p);
+        $this->assertStringNotContainsString('Hotel Poseidón La Manga', $p);                       // no se enumeran los otros
+    }
+
     public function test_un_correo_que_no_esta_en_la_app_no_recibe_datos_de_hoteles(): void
     {
         $this->activar();

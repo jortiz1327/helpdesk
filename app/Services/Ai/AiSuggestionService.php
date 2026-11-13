@@ -33,6 +33,8 @@ class AiSuggestionService
     private string $nombreCliente = '';
     /** Solo evaluación: ticket que NO puede encontrarse a sí mismo en el conocimiento (leave-one-out). */
     private ?int $excluirTicket = null;
+    /** Nombre de hotel que encaja con varios hoteles del panel (se rellena en contextoHotel). */
+    private ?string $hotelAmbiguo = null;
 
     public function __construct(protected AiProvider $ai, protected ?AiKnowledge $knowledge = null)
     {
@@ -422,6 +424,19 @@ class AiSuggestionService
      */
     private function contextoHotel(?string $contactEmail, array $codigos = [], string $textoCliente = ''): string
     {
+        $this->hotelAmbiguo = null;
+        $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente);
+        if ($s !== '' && $this->hotelAmbiguo !== null) {
+            // El nombre encaja con varios hoteles (p. ej. «Hotel Poseidón» hay más de uno): nunca se asume cuál es.
+            // No se enumeran los hoteles al cliente: solo se le pide el nombre completo.
+            $s .= "- AMBIGUO: el nombre «" . $this->hotelAmbiguo . "» corresponde a VARIOS hoteles. NO asumas cuál es y NO des datos de ninguno: "
+                . "pregúntale de cuál se trata (que indique el nombre completo del hotel) antes de seguir.\n";
+        }
+        return $s;
+    }
+
+    private function contextoHotelBase(?string $contactEmail, array $codigos = [], string $textoCliente = ''): string
+    {
         $api = app(HotelsApi::class);
         if (! $api->configured()) {
             return '';
@@ -435,7 +450,16 @@ class AiSuggestionService
         $dirFalla = false;
         foreach (array_slice($nombres, 0, 3) as $n) {
             $r = $api->buscarHoteles($n);
-            $r === null ? $dirFalla = true : $dir = array_merge($dir, $r);
+            if ($r === null) {
+                $dirFalla = true;
+                continue;
+            }
+            $dir = array_merge($dir, $r);
+            // Varios resultados y ninguno se llama exactamente así: el cliente no ha dicho cuál de ellos es.
+            $exacto = array_filter($r, fn ($h) => HotelsApi::norm($h['nombre']) === HotelsApi::norm($n));
+            if (count($r) >= 2 && ! $exacto && $this->hotelAmbiguo === null) {
+                $this->hotelAmbiguo = $n;
+            }
         }
         $v = $api->verificar($e);
         $sitios = array_slice($v['sitios'], 0, 4);

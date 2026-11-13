@@ -119,6 +119,13 @@ class HotelsApi
         $out = [];
         foreach ((array) ($d['coincidencias'] ?? []) as $c) {
             $hoteles = array_values((array) ($c['hoteles'] ?? []));
+            // Cada buffet trae solo hotel_id: el nombre del hotel está en la lista «hoteles» de la misma coincidencia.
+            $nombrePorId = [];
+            foreach ($hoteles as $h) {
+                if (is_array($h) && isset($h['id'])) {
+                    $nombrePorId[(string) $h['id']] = self::nombre($h);
+                }
+            }
             $conBuffet = false;
             foreach ((array) ($c['buffets'] ?? []) as $b) {
                 $id = is_array($b) ? (string) self::pick($b, ['id', 'buffet_id'], '') : '';
@@ -128,7 +135,7 @@ class HotelsApi
                 $conBuffet = true;
                 $hotel = is_array($b) && self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']) !== null
                     ? self::nombre(self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']))
-                    : (count($hoteles) === 1 ? self::nombre($hoteles[0]) : '');
+                    : ($nombrePorId[(string) (is_array($b) ? ($b['hotel_id'] ?? '') : '')] ?? (count($hoteles) === 1 ? self::nombre($hoteles[0]) : ''));
                 $out[$id] = ['buffet_id' => $id, 'buffet' => self::nombre($b), 'hotel' => $hotel];
             }
             if (! $conBuffet) {   // sin buffets utilizables: al menos el nombre de los hoteles

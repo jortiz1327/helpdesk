@@ -40,6 +40,37 @@ class AiEvaluar extends Command
         return 'responder';
     }
 
+    /**
+     * Lo que hizo la IA, juzgado por el propio modelo (una llamada corta): más fiable que mirar palabras sueltas.
+     * Si el juez falla o no contesta algo válido, se cae a la regla por palabras (clasificar).
+     *
+     * @return array{0:string, 1:int, 2:int} decisión, tokens de entrada, tokens de salida
+     */
+    public static function juzgar(\App\Services\Ai\AiProvider $ai, string $cliente, string $status, ?string $body): array
+    {
+        if ($status !== 'ready' || trim((string) $body) === '') {
+            return ['derivar', 0, 0];   // «no sé» o fallo: nada llega al cliente
+        }
+        $sistema = "Eres un revisor de calidad de un servicio de soporte. Se te da el mensaje de un cliente y el borrador que ha escrito un asistente. "
+            . "Clasifica lo que HACE el borrador, con UNA sola palabra:\n"
+            . "responder = da una respuesta, solución o confirmación al problema del cliente.\n"
+            . "pedir_info = su objetivo principal es pedir al cliente datos que faltan (hotel, código, foto, detalle) antes de poder ayudar.\n"
+            . "derivar = dice que lo atenderá, revisará o gestionará una persona del equipo, sin resolver ni preguntar nada esencial.\n"
+            . "Contesta solo con la palabra, sin nada más.";
+        try {
+            $r = $ai->complete($sistema, [['role' => 'user', 'content' => "MENSAJE DEL CLIENTE:\n" . mb_substr($cliente, 0, 1500) . "\n\nBORRADOR DEL ASISTENTE:\n" . mb_substr((string) $body, 0, 2500)]]);
+            $palabra = mb_strtolower(trim((string) ($r['text'] ?? '')));
+            foreach (['pedir_info', 'responder', 'derivar'] as $d) {
+                if (str_contains($palabra, $d)) {
+                    return [$d, (int) ($r['input_tokens'] ?? 0), (int) ($r['output_tokens'] ?? 0)];
+                }
+            }
+            return [self::clasificar($status, $body), (int) ($r['input_tokens'] ?? 0), (int) ($r['output_tokens'] ?? 0)];
+        } catch (\Throwable $e) {
+            return [self::clasificar($status, $body), 0, 0];
+        }
+    }
+
     public function handle(AiSuggestionService $svc): int
     {
         $dir = storage_path('app/ai-eval');
@@ -72,9 +103,9 @@ class AiEvaluar extends Command
         foreach ($casos as $c) {
             $esperado = $marcas[$c['id']]['decision'];
             $r = $svc->evaluarCaso((string) $c['asunto'], (string) $c['pregunta'], isset($locales[$c['code']]) ? (int) $locales[$c['code']] : null, $ai);
-            $obtenido = self::clasificar((string) $r['status'], $r['body'] ?? null);
-            $in += (int) ($r['input_tokens'] ?? 0);
-            $out += (int) ($r['output_tokens'] ?? 0);
+            [$obtenido, $jin, $jout] = self::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null);
+            $in += (int) ($r['input_tokens'] ?? 0) + $jin;
+            $out += (int) ($r['output_tokens'] ?? 0) + $jout;
             $conf[$esperado][$obtenido] = ($conf[$esperado][$obtenido] ?? 0) + 1;
             $filas[] = [$c['id'], $c['canal'], $esperado, $obtenido, $esperado === $obtenido ? 'sí' : 'no',
                 // Lo grave: la IA contesta sola un caso que una persona debía llevar o aclarar.
