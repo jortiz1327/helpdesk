@@ -31,6 +31,8 @@ class AiSuggestionService
 
     private bool $anonimizar = false;
     private string $nombreCliente = '';
+    /** Solo evaluación: ticket que NO puede encontrarse a sí mismo en el conocimiento (leave-one-out). */
+    private ?int $excluirTicket = null;
 
     public function __construct(protected AiProvider $ai, protected ?AiKnowledge $knowledge = null)
     {
@@ -189,7 +191,7 @@ class AiSuggestionService
         $pregunta = $this->ultimaDelCliente($conversacion);
         $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
         $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
-        $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId, 3, 4, 2, (string) ($t->subject ?? ''));
+        $casos = $this->knowledge->buscar(($t->subject ?? '') . ' ' . $pregunta, $ticketId ?? $this->excluirTicket, 3, 4, 2, (string) ($t->subject ?? ''));
 
         $t->codigos = $ticketId ? $this->leerCodigosDeFotos($ticketId) : [[], 0];
         $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
@@ -227,6 +229,22 @@ class AiSuggestionService
             'yaRespondio' => (bool) array_filter($conv, fn ($m) => $m['role'] === 'assistant'),
         ];
         return $this->componer($t, $conv, null, $ai, false);
+    }
+
+    /**
+     * Evaluación (comando ai:evaluar): contesta a un caso ya anonimizado como si fuera un ticket nuevo, sin guardar nada
+     * y sin consultar datos de ningún hotel. $excluirTicket es el ticket local del propio caso, para que no se «copie».
+     */
+    public function evaluarCaso(string $asunto, string $pregunta, ?int $excluirTicket, AiProvider $ai): array
+    {
+        $this->excluirTicket = $excluirTicket;
+        try {
+            $t = (object) ['id' => null, 'subject' => $asunto, 'category_id' => null, 'channel' => 'chat', 'category_name' => null,
+                'contact_name' => null, 'contact_email' => null, 'yaRespondio' => false];
+            return $this->componer($t, [['role' => 'user', 'text' => $pregunta]], null, $ai, true);
+        } finally {
+            $this->excluirTicket = null;
+        }
     }
 
     /**
