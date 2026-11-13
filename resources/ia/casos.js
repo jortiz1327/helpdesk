@@ -76,18 +76,19 @@ function crearBotones() {
 function pintarBotones(c) { document.querySelectorAll('.dbtn').forEach((b) => b.setAttribute('aria-pressed', String(!!c && b.dataset.k === c.decision))) }
 
 function pintarCaso() {
-  const c = porId(actual), col = $('caso'); col.replaceChildren()
-  if (!c) { col.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
+  const c = porId(actual), izq = $('colL'), der = $('colR'); izq.replaceChildren(); der.replaceChildren()
+  if (!c) { izq.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
   const pos = casos.indexOf(c) + 1
   $('titulo').textContent = c.asunto || 'Sin asunto'
   $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal
-  col.append(bloque('client', 'El cliente escribió', c.pregunta, null, 'C'))
-  col.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
-  if (c.ia) col.append(bloque('ia', 'Lo que hizo la IA (última prueba) →', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
+  izq.append(bloque('client', 'El cliente escribió', c.pregunta, null, 'C'))
+  izq.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
+  if (c.ia) der.append(bloque('ia', 'Lo que hizo la IA (última prueba)', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
+  else der.append(el('div', 'empty', 'La IA aún no ha probado este caso.'))
   pintarBotones(c)
   $('com').value = c.comentario || ''
   $('estado').textContent = c.revisado ? 'Revisado ✓' : ''
-  $('read').scrollTop = 0   // solo al cambiar de caso
+  $('read').scrollTop = 0; izq.scrollTop = 0; der.scrollTop = 0   // solo al cambiar de caso
   $('ant').disabled = pos === 1
 }
 

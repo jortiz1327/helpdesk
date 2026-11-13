@@ -45,9 +45,13 @@
   .top { padding: 12px 24px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: baseline; gap: 12px; }
   .top h2 { margin: 0; font-size: 16px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .top small { color: var(--muted); }
-  .work { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
-  .read { overflow: auto; padding: 22px 24px 40px; min-height: 0; }
-  .col { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .work { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+  /* Lectura a dos columnas: lo del cliente (y la respuesta humana) a la izquierda, la IA a la derecha; cada una con su scroll. */
+  .read { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; min-height: 0; overflow: hidden; }
+  .col { overflow: auto; min-height: 0; padding: 20px 18px 40px; display: flex; flex-direction: column; gap: 14px; align-content: start; }
+  .col + .col { border-left: 1px solid var(--line); }
+  .col .blk { flex: none; }
+  .colh { margin: 0; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 
   .blk { border-radius: 14px; padding: 14px 18px; border-left: 5px solid var(--line); }
   .blk .bh { all: unset; box-sizing: border-box; display: flex; width: 100%; gap: 10px; align-items: center; cursor: pointer; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
@@ -95,7 +99,12 @@
   .keys kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
 
   @media (prefers-reduced-motion: reduce) { .btn, .dbtn, .bar i { transition: none; } }
-  @media (max-width: 1100px) { .work { grid-template-columns: minmax(0, 1fr) 330px; } }
+  @media (max-width: 1180px) {
+    .work { grid-template-columns: minmax(0, 1fr) 320px; }
+    .read { display: block; overflow: auto; }
+    .col { overflow: visible; padding: 16px 18px 0; }
+    .col + .col { border-left: 0; padding-top: 14px; padding-bottom: 40px; }
+  }
   @media (max-width: 860px) {
     .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
     aside.lista { max-height: 28dvh; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -125,7 +134,7 @@
   <main>
     <div class="top"><h2 id="titulo">Cargando…</h2><small id="meta"></small></div>
     <div class="work">
-      <div class="read" id="read"><div class="col" id="caso"></div></div>
+      <div class="read" id="read"><div class="col" id="colL"></div><div class="col" id="colR"></div></div>
       <aside class="panel" aria-label="Decisión">
         <h3>¿Qué debería hacer la IA aquí?</h3>
         <div class="decide" id="botones"></div>
