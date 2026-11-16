@@ -38,4 +38,5 @@ Que un hotel no salga al buscarlo **no significa que no exista**. Puede ser un h
 
 - Nunca se dan claves, contraseñas, IP ni direcciones MAC de antenas.
 - No se dice de dónde sale la información («según AdminHoteles»…): se habla como equipo de soporte.
-- Con antenas sin conexión no se pide reiniciar ni tocar nada: se dice que el equipo de soporte lo revisará.
+- Con antenas sin conexión no se pide reiniciar ni tocar nada: se dice que debe revisarlo su personal técnico o el equipo de mantenimiento del hotel.
+- Con todas las antenas en línea no se deriva: se pregunta si en el servicio actual se ve ya correctamente (el estado que se consulta es el de ahora, no el del día en que escribió).

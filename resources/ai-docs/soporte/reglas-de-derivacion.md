@@ -28,12 +28,15 @@ Si lo que el cliente pide es que el equipo **haga** algo (cambiar de rueda de me
 
 ## Lo que el hotel hace por sí mismo: se explica cómo
 
-Crear posiciones o isletas, dar de alta y asignar posición a una etiqueta, girar etiquetas, activar o desactivar servicios… los hace una persona del propio hotel desde la aplicación. Aquí la IA **explica cómo se hace** según la documentación (nunca confirma que algo «ya está hecho»), después de comprobar el hotel y el correo.
+Crear posiciones o isletas, dar de alta y asignar posición a una etiqueta, girar etiquetas, activar o desactivar servicios… los hace una persona del propio hotel desde la aplicación. **Aunque el cliente lo pida como «¿podéis agregar estas etiquetas?» o «necesitamos crear posiciones nuevas»**, se le explica cómo hacerlo (Posiciones > Crear nueva posición, elegir isleta y etiqueta): el cliente no sabe que puede hacerlo él. Solo las altas de **usuarios** y los permisos los hace el equipo. Aquí la IA **explica cómo se hace** según la documentación (nunca confirma que algo «ya está hecho»), después de comprobar el hotel y el correo.
 
 ## Siempre se deriva, sin preguntar más
 
+**El texto al derivar es corto:** «Gracias por su mensaje. Hemos registrado la incidencia y el equipo la revisará.» No se repite ni se resume lo que cuenta el cliente.
+
 - **Garantías y material**: etiquetas que fallan tras cambiar la pila, sustitución, envíos y presupuestos. Cambiar la pila depende del modelo y es tema de material: no se dan instrucciones. Como mucho, se pide el hotel y una foto de las etiquetas para agilizar la garantía.
 - **Sustituir o recibir etiquetas nuevas**: es material, igual que las garantías.
+- **Problema de uso sin que el mensaje nombre ningún hotel** («no me cambian las etiquetas», «error al emparejar», «unauthorized», «verifica mi usuario»): NO se deriva todavía; se pide el nombre del hotel y el correo con el que accede (máximo dos preguntas). Derivar viene después, con el hotel conocido. Excepciones: si falla el **contenido** que se muestra («null», «array», un plato que no toca) es un fallo de código y se deriva sin preguntar; y si el cliente sí nombra un hotel, aunque no se localice, tampoco se pregunta.
 - **Mensajes incompletos**: sin ninguna petición ni problema concreto («me pasa esto con esta etiqueta» sin que se vea nada, «queríamos solicitar unas modificaciones» sin decir cuáles), no se hace un cuestionario: se deriva.
 - **«¿Me lo pueden habilitar?»**: si el cliente pide que le habiliten o activen permisos o configuración, lo hace una persona.
 - **Cómo mejorar la conexión o la cobertura**: la IA no inventa procedimientos; se deriva.
@@ -41,6 +44,7 @@ Crear posiciones o isletas, dar de alta y asignar posición a una etiqueta, gira
 - **Formaciones, videollamadas y reuniones**: las agenda una persona, aunque la aplicación tenga su propio apartado de ayuda.
 - **CDMON y cualquier tema de dominios o hosting**: la IA no tiene ni tendrá acceso.
 - **Fallos de la aplicación que parecen de código**, como que las traducciones den error (puede que el servicio que traduce se haya quedado sin crédito) o que una pantalla no cargue: solo una persona.
+- **Rueda de menú o cartelería que no cambia a las horas programadas** (los servicios hay que formarlos a mano): puede ser de código, se deriva sin preguntar más.
 - **Pantallas de animación** y mensajes que mencionan a un compañero concreto o a un departamento concreto.
 - **Quien no es hotel, tienda ni farmacia** (una universidad, por ejemplo) y los clientes de **Milar**: se derivan a soporte/programación; AdminHoteles no puede consultarlos.
 - **Mensajes sin contexto**: si no se sabe qué es el cliente ni a qué se debe (suele ser la continuación de otro ticket), se deriva.

@@ -42,19 +42,21 @@ class AiCasosController extends Controller
         if (! $archivos) {
             return [];
         }
-        rsort($archivos);
-        $h = fopen($archivos[0], 'r');
-        if (fread($h, 3) !== "\xEF\xBB\xBF") {
-            rewind($h);
-        }
+        sort($archivos);   // del más viejo al más nuevo: de cada caso vale lo último que la IA hizo con él (una pasada parcial no borra el resto)
         $ia = [];
-        fgetcsv($h, 0, ';', '"', '\\');   // cabecera
-        while (($f = fgetcsv($h, 0, ';', '"', '\\')) !== false) {
-            if (isset($f[7])) {
-                $ia[(int) $f[0]] = ['obtenido' => $f[3], 'estado' => $f[6], 'texto' => $f[7]];
+        foreach ($archivos as $archivo) {
+            $h = fopen($archivo, 'r');
+            if (fread($h, 3) !== "\xEF\xBB\xBF") {
+                rewind($h);
             }
+            fgetcsv($h, 0, ';', '"', '\\');   // cabecera
+            while (($f = fgetcsv($h, 0, ';', '"', '\\')) !== false) {
+                if (isset($f[7])) {
+                    $ia[(int) $f[0]] = ['obtenido' => $f[3], 'estado' => $f[6], 'texto' => $f[7]];
+                }
+            }
+            fclose($h);
         }
-        fclose($h);
         return $ia;
     }
 
@@ -69,9 +71,14 @@ class AiCasosController extends Controller
         $pf = $this->dir() . '/propuestas.json';   // propuestas de la IA para casos sin revisar (ai:prerrellenar)
         $p = is_file($pf) ? (json_decode((string) file_get_contents($pf), true) ?: []) : [];
 
+        // Notas de Claude sobre un caso (storage/app/ai-eval/notas.json: {id: texto}); se enseñan en gris bajo lo que hizo la IA.
+        $nf = $this->dir() . '/notas.json';
+        $notas = is_file($nf) ? (json_decode((string) file_get_contents($nf), true) ?: []) : [];
+
         return response()->json(array_map(fn ($x) => [
+            'nota' => $notas[$x['id']] ?? null,
             'propuesta' => empty($m[$x['id']]['revisado']) ? ($p[$x['id']] ?? null) : null,
-            'id' => $x['id'], 'canal' => $x['canal'], 'asunto' => $x['asunto'], 'pregunta' => $x['pregunta'], 'humana' => $x['respuesta_humana'],
+            'id' => $x['id'], 'code' => $x['code'] ?? '', 'lote' => $x['lote'] ?? '', 'canal' => $x['canal'], 'asunto' => $x['asunto'], 'pregunta' => $x['pregunta'], 'humana' => $x['respuesta_humana'],
             'decision' => $m[$x['id']]['decision'] ?? 'responder', 'comentario' => $m[$x['id']]['comentario'] ?? '',
             'revisado' => (bool) ($m[$x['id']]['revisado'] ?? false), 'ia' => $ia[$x['id']] ?? null,
         ], $c));

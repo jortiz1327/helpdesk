@@ -19,6 +19,9 @@ class AiEvaluar extends Command
     protected $signature = 'ai:evaluar
         {--limite= : Máximo de casos (para probar con pocos)}
         {--decision= : Solo los casos con esa decisión esperada (responder, pedir_info, derivar)}
+        {--sin-revisar : Incluir también los casos aún sin revisar, solo para ver lo que responde la IA (la nota que salga no vale)}
+        {--lote= : Solo los casos de este lote (ver ai:nuevos-casos); sin esto, los de todos los lotes}
+        {--caso=* : Solo estos casos (id del ticket; se puede repetir: --caso=5669 --caso=6223)}
         {--sin-consulta : No consultar AdminHoteles en los casos [API] (como antes)}';
 
     protected $description = 'Evalúa la IA con el conjunto de pruebas marcado por el equipo (gasta tokens)';
@@ -89,7 +92,10 @@ class AiEvaluar extends Command
         $casos = array_values(array_filter(
             json_decode((string) file_get_contents("$dir/candidatos.json"), true),
             fn ($c) => in_array($marcas[$c['id']]['decision'] ?? 'descartar', ['responder', 'pedir_info', 'derivar'], true)
+                && ($this->option('sin-revisar') || ! empty($marcas[$c['id']]['revisado']))   // un caso sin revisar no tiene decisión del equipo con la que comparar
+                && (! $this->option('lote') || ($c['lote'] ?? '') === $this->option('lote'))
                 && (! $this->option('decision') || $marcas[$c['id']]['decision'] === $this->option('decision'))
+                && (! $this->option('caso') || in_array((string) $c['id'], array_map('strval', (array) $this->option('caso')), true))
         ));
         if ($this->option('limite') !== null) {
             $casos = array_slice($casos, 0, max(1, (int) $this->option('limite')));

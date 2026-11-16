@@ -22,6 +22,11 @@ class AiSuggestionService
     /** Marca que devuelve el modelo cuando no tiene base para contestar. */
     public const NO_SABE = '[[NO_SABE]]';
 
+    /** Qué hacer según el estado de las antenas (decisión de Juan, 16-nov). El estado es el de AHORA, no el del día del ticket. */
+    private const REGLA_ANTENAS = "- Según las antenas:\n"
+        . "  · TODAS CON CONEXIÓN: no derives ni digas que «un compañero lo revisará». Cuéntale que las antenas están en línea y pregúntale si en el servicio actual se ve ya correctamente (si no, qué etiqueta o menú sigue mal).\n"
+        . "  · ALGUNA SIN CONEXIÓN: dile cuáles y que debe revisarlo su personal técnico o el equipo de mantenimiento del hotel. NO le pidas reiniciar, desconectar ni tocar nada tú. No des MAC ni IP de antenas.\n";
+
     private const MAX_FAQS = 4;
     private const MAX_EJEMPLOS = 4;
     private const MAX_MENSAJES = 10;
@@ -457,6 +462,8 @@ class AiSuggestionService
             $nombres = $this->nombresPorMayusculas($textoCliente);
         }
         $dir = [];
+        $unicos = [];
+        $ambiguos = [];
         $dirFalla = false;
         foreach (array_slice($nombres, 0, 3) as $n) {
             $r = $api->buscarHoteles($n);
@@ -471,7 +478,18 @@ class AiSuggestionService
             $dir = array_merge($dir, $r);
             // Varios resultados y ninguno se llama exactamente así: el cliente no ha dicho cuál de ellos es.
             $exacto = array_filter($r, fn ($h) => HotelsApi::norm($h['nombre']) === HotelsApi::norm($n));
-            if (count($r) >= 2 && ! $exacto && $this->hotelAmbiguo === null) {
+            if (count($r) === 1) {
+                $unicos[] = [HotelsApi::norm($n), $r[0]];
+            }
+            if (count($r) >= 2 && ! $exacto) {
+                $ambiguos[] = $n;
+            }
+        }
+        // Un nombre suelto («Playas») que está dentro de otro nombre ya resuelto a UN solo hotel («Playas de Guardamar») no es ambiguo.
+        foreach ($ambiguos as $n) {
+            $nn = HotelsApi::norm($n);
+            $cubierto = array_filter($unicos, fn ($u) => $u[0] !== $nn && str_contains(' ' . $u[0] . ' ', ' ' . $nn . ' '));
+            if (! $cubierto && $this->hotelAmbiguo === null) {
                 $this->hotelAmbiguo = $n;
             }
         }
@@ -497,7 +515,7 @@ class AiSuggestionService
                     foreach ($dir as $h) {
                         if (in_array(HotelsApi::norm($h['nombre']), $nombresNorm, true)) { $elegido = $h; break; }
                     }
-                    $elegido ??= count($dir) === 1 ? $dir[0] : null;
+                    $elegido ??= $unicos ? $unicos[0][1] : (count($dir) === 1 ? $dir[0] : null);
                 }
                 $lineas = '';
                 foreach ($elegido && ($elegido['id'] ?? '') !== '' ? ($api->buffetsDeHotel($elegido['id']) ?? []) : [] as $x) {
@@ -513,10 +531,11 @@ class AiSuggestionService
                 if ($lineas !== '') {
                     return $cab . "- El cliente dice ser de «" . $elegido['nombre'] . "». Su correo aún no está comprobado.\n"
                         . "- El ESTADO DE LAS ANTENAS no es un dato sensible: puedes contárselo ya, sin pedir el correo para eso:\n" . $lineas
-                        . "- Si hay antenas sin conexión: NO pidas reiniciar, desconectar ni tocar nada; di que el equipo de soporte lo revisará. No des MAC ni IP de antenas.\n"
+                        . self::REGLA_ANTENAS
                         . "- Para cualquier OTRO dato del hotel (usuarios, permisos, etiquetas concretas) pide antes el correo con el que accede a la aplicación y NO reveles a qué hotel pertenece un correo.\n";
                 }
-                return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "». Falta comprobar su correo: pídele el correo con el que accede a la aplicación.\n" . $comun;
+                return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "». Falta comprobar su correo.\n"
+                    . "- Si lo que pide es algo que el propio hotel hace en la aplicación (crear posiciones, dar de alta o girar etiquetas, activar servicios…), EXPLÍCALE los pasos con la documentación SIN pedir el correo: un procedimiento general no revela datos del hotel. Pide el correo solo si necesitas datos concretos de ese hotel (usuarios, permisos, etiquetas concretas).\n" . $comun;
             }
             return $cab . "- El hotel que nombra no se localiza en nuestro sistema" . ($dirFalla ? ' (no se pudo consultar ahora)' : '') . ". Pídele el nombre exacto del hotel y el correo con el que accede a la aplicación.\n" . $comun . $derivar;
         }
@@ -567,7 +586,7 @@ class AiSuggestionService
                     . ($ap ? ', la sirve la antena ' . $ap['name'] . ($ap['online'] ? ' (con conexión)' : ' (SIN CONEXIÓN)') : '') . ".\n";
             }
         }
-        return $s . "- Si hay antenas sin conexión: NO pidas reiniciar, desconectar ni tocar nada; di que el equipo de soporte lo revisará. No des MAC ni IP de antenas. Si una etiqueta tiene batería baja, sigue la guía de pilas (no tramites material).\n";
+        return $s . self::REGLA_ANTENAS . "- Si una etiqueta tiene batería baja, sigue la guía de pilas (no tramites material).\n";
     }
 
     /** Nombres de hotel que el cliente menciona («Hotel Alua Soul Menorca», «AluaSun Lago Park»…): candidatos para buscar en el panel. */
@@ -675,7 +694,9 @@ class AiSuggestionService
            . "- PRIORIDAD: las reglas de «SIEMPRE DERIVA» (más abajo) van ANTES que pedir el hotel o el correo. Si el mensaje cae en uno de esos temas, NO preguntes nada: agradece, di que un compañero del equipo lo revisará y le atenderá personalmente, y termina.\n"
            . "- PREGUNTAS AL CLIENTE: como máximo DOS por mensaje, nunca una lista de tres o más. Si aún no se sabe quién escribe, pregunta SOLO el nombre del hotel (o sede) y el correo con el que accede a la aplicación; el resto de detalles se pide después, cuando conteste. Si ya lo sabes, no lo repitas: pregunta lo más importante, como mucho dos cosas.\n"
            . "- NO PREGUNTES LO OBVIO NI LO INVENTADO: solo preguntas algo si su respuesta cambia lo que hay que hacer y el dato no está ya en el mensaje. No pidas confirmar lo que el cliente ya dijo con claridad (fechas, año, hotel, qué quiere) ni sondees detalles que no aparecen en tu contexto o en la documentación (por ejemplo, «si afecta a todos los servicios» o «si las fechas son de este año»). Si el cliente ya dio lo necesario y la gestión la hace una persona del equipo, no preguntes más: deriva.\n"
-           . "- SIEMPRE DERIVA a una persona, sin preguntar más y sin explicar procedimientos: alérgenos, garantías y material (incluido cambiar pilas y sustituir o recibir etiquetas nuevas), presupuestos y envíos, mensajes incompletos o sin ninguna petición ni problema concreto (por ejemplo, un adjunto que no ves), cualquier petición de que te «habiliten» o activen permisos o configuración, preguntas sobre cómo mejorar la conexión o cobertura (no inventes procedimientos), tótems, formaciones o reuniones, dominios y hosting (CDMON), fallos de la aplicación que pueden ser de código, y clientes que no son hotel, tienda ni farmacia. Quien pide que el equipo ejecute un cambio (cambiar la rueda de menú de un buffet, logos, plantillas, altas o permisos de usuario) también se deriva; nunca facilites usuarios ni contraseñas. Lo que el hotel hace por sí mismo en la aplicación (crear posiciones o isletas, dar de alta etiquetas, girarlas, activar servicios) se le explica cómo hacerlo, sin confirmar nunca que ya está hecho.\n"
+           . "- PROBLEMA CONCRETO SIN HOTEL: si el cliente cuenta un problema real de uso (etiquetas que no cambian o no actualizan, error al emparejar o vincular, error de permisos como «unauthorized», «verifica mi usuario» o «no puedo entrar») y el mensaje NO nombra ningún hotel ni lo firma, NO derives: pide el nombre del hotel y el correo con el que accede a la aplicación (máximo esas dos preguntas). Derivar viene después, ya con el hotel conocido. EXCEPCIONES, aquí se deriva sin preguntar: (1) si lo que falla es el CONTENIDO que muestran la aplicación o las etiquetas (la palabra «null» o «array», un plato que no toca, datos raros): es un fallo de código; (2) si el cliente SÍ nombra un hotel, aunque no lo localices; (3) si el mensaje cae en un tema de la lista siguiente y además trae ya el hotel.\n"
+           . "- SIEMPRE DERIVA a una persona, sin preguntar más y sin explicar procedimientos: alérgenos, garantías y material (incluido cambiar pilas y sustituir o recibir etiquetas nuevas), presupuestos y envíos, mensajes incompletos o sin NINGUNA petición ni problema concreto (por ejemplo, un adjunto que no ves; si hay un problema concreto sin hotel, aplica la regla de PROBLEMA CONCRETO SIN HOTEL), cualquier petición de que te «habiliten» o activen permisos o configuración, preguntas sobre cómo mejorar la conexión o cobertura (no inventes procedimientos), tótems, formaciones o reuniones, dominios y hosting (CDMON), fallos de la aplicación que pueden ser de código (incluida una rueda de menú o cartelería que no cambia en las horas programadas), y clientes que no son hotel, tienda ni farmacia. Quien pide que el equipo ejecute un cambio (cambiar la rueda de menú de un buffet, logos, plantillas, altas o permisos de usuario) también se deriva; nunca facilites usuarios ni contraseñas. Lo que el hotel hace por sí mismo en la aplicación (crear posiciones o isletas, dar de alta o agregar etiquetas, girarlas, activar servicios) se le explica cómo hacerlo con la documentación, sin confirmar nunca que ya está hecho, AUNQUE el cliente lo pida como «¿podéis agregar/crear estas etiquetas o posiciones?» (el cliente no sabe que puede hacerlo él: explícale los pasos, p. ej. Posiciones > Crear nueva posición, isleta, etiqueta). Solo las altas de USUARIOS y los permisos los hace el equipo y se derivan.\n"
+           . "- AL DERIVAR sé breve: «Gracias por su mensaje. Hemos registrado la incidencia y el equipo la revisará.» No repitas ni resumas lo que cuenta el cliente, no enumeres sus incidencias ni añadas explicaciones.\n"
            . "- NUNCA le digas al cliente que existen varios hoteles con un mismo nombre, ni cuántos hay, ni nombres otros: quien escribe podría no ser del hotel. Si dudas de cuál habla, pregunta solo «¿Me indica el nombre completo del hotel?».\n"
            . "- Usa solo la información de este ticket y de las secciones de contexto siguientes; el contexto de otros casos son patrones para orientarte, nunca datos para citar.\n\n";
 

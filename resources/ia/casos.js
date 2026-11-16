@@ -22,7 +22,10 @@ const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c
 
 function visibles() {
   const f = $('filtro').value
-  return casos.filter((c) => c.id === actual || (f === 'todos' || (f === 'pend' && !c.revisado) || (f === 'dif' && difiere(c)) || (f === 'api' && necesitaApi(c)) || (f === 'desc' && c.decision === 'descartar')))
+  // Buscador: por número de caso, código del ticket o palabras del asunto/mensaje.
+  const q = ($('buscar') ? $('buscar').value : '').trim().toLowerCase().replace(/^#/, '')
+  if (q) return casos.filter((c) => String(c.id).includes(q) || (c.code || '').toLowerCase().includes(q) || ((c.asunto || '') + ' ' + (c.pregunta || '')).toLowerCase().includes(q))
+  return casos.filter((c) => c.id === actual || (f === 'todos' || (f === 'nuevos' && c.lote) || (f === 'claude' && c.nota) || (f === 'pend' && !c.revisado) || (f === 'dif' && difiere(c)) || (f === 'api' && necesitaApi(c)) || (f === 'desc' && c.decision === 'descartar')))
 }
 
 function progreso() {
@@ -37,7 +40,7 @@ function pintarLista() {
     const b = el('button', 'item'); b.setAttribute('role', 'listitem')
     if (c.id === actual) b.setAttribute('aria-current', 'true')
     const dot = el('span', 'dot'); dot.style.background = 'var(--c-' + c.decision + ')'
-    b.append(dot, el('span', 't', (c.asunto || c.pregunta).slice(0, 60)), el('span', 'df', (necesitaApi(c) ? 'API ' : '') + (difiere(c) ? 'IA≠' : '')), el('span', 'ck', c.revisado ? '✓' : ''))
+    b.append(dot, el('span', 'num', '#' + c.id), el('span', 't', (c.asunto || c.pregunta).slice(0, 60)), el('span', 'df', (necesitaApi(c) ? 'API ' : '') + (difiere(c) ? 'IA≠' : '')), el('span', 'ck', c.revisado ? '✓' : ''))
     b.title = DEC[c.decision].n + (c.revisado ? ' · revisado' : '')
     b.onclick = () => ir(c.id)
     box.append(b)
@@ -99,10 +102,11 @@ function pintarCaso() {
   if (!c) { izq.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
   const pos = casos.indexOf(c) + 1
   $('titulo').textContent = c.asunto || 'Sin asunto'
-  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal
+  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · lote nuevo' : '')
   izq.append(bloque('client', 'El cliente escribió', c.pregunta, null, 'C'))
   izq.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
   if (c.ia) der.append(bloque('ia', 'Lo que hizo la IA (última prueba)', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
+  if (c.nota) der.append(bloque('nota', 'Nota de Claude', c.nota, null, null))
   else der.append(el('div', 'empty', 'La IA aún no ha probado este caso.'))
   pintarBotones(c); pintarProp(c)
   $('com').value = c.comentario || ''
@@ -151,6 +155,7 @@ document.addEventListener('keydown', (e) => {
     else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); confirmarYSeguir() }
     return
   }
+  if (t === 'INPUT') { if (e.key === 'Escape') e.target.blur(); return }   // el buscador: escribir no debe disparar atajos
   if (t === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return
   const k = ORDEN.find((x) => DEC[x].k === e.key)
   if (k) { e.preventDefault(); marcar(k) }
@@ -166,6 +171,7 @@ document.addEventListener('keydown', (e) => {
 })
 $('sig').onclick = confirmarYSeguir
 $('ant').onclick = () => mover(-1)
+$('buscar').oninput = () => { const v = visibles(); if (v.length && !v.find((c) => c.id === actual)) { flushCom(); actual = v[0].id; pintarCaso() } pintarLista() }
 $('filtro').onchange = () => { flushCom(); const v = visibles(); if (!v.find((c) => c.id === actual) && v[0]) actual = v[0].id; pintarCaso(); pintarLista() }
 
 ;(async () => {

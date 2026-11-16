@@ -9,13 +9,13 @@
   :root {
     --bg: #f4f5f7; --panel: #ffffff; --ink: #1c2230; --muted: #667085; --line: #e3e6ec; --accent: #2f5bea; --accent-ink: #ffffff;
     --c-responder: #1f8a4c; --c-pedir_info: #b7791f; --c-derivar: #c0392b; --c-descartar: #7b8190;
-    --client: #eef3ff; --human: #f1f8f3; --ia: #fbf6ec;
+    --client: #eef3ff; --human: #f1f8f3; --ia: #fbf6ec; --nota: #eceef2;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #12151c; --panel: #1b2029; --ink: #e8ebf2; --muted: #9aa3b5; --line: #2a303c; --accent: #6f93ff; --accent-ink: #0d1220;
       --c-responder: #4fc883; --c-pedir_info: #e6b04c; --c-derivar: #ee7d70; --c-descartar: #9aa3b5;
-      --client: #1c2742; --human: #17291f; --ia: #2b2415;
+      --client: #1c2742; --human: #17291f; --ia: #2b2415; --nota: #252a33;
     }
   }
   * { box-sizing: border-box; }
@@ -32,6 +32,9 @@
   .bar { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 8px 0 4px; }
   .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s ease-out; }
   select { font: inherit; width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+  #buscar { font: inherit; width: 100%; margin-top: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+  #buscar:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .item .num { font-size: 11px; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
   .list { overflow: auto; flex: 1; padding: 8px; }
   .item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
   .item:hover { background: var(--bg); }
@@ -67,6 +70,7 @@
   .client { background: var(--client); border-color: var(--accent); }
   .human { background: var(--human); border-color: var(--c-responder); }
   .ia { background: var(--ia); border-color: var(--c-pedir_info); }
+  .nota { background: var(--nota); border-color: var(--c-descartar); }
   .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; color: #fff; text-transform: none; letter-spacing: 0; }
   .empty { margin: 40px auto; text-align: center; color: var(--muted); max-width: 420px; }
 
@@ -130,10 +134,14 @@
       <select id="filtro" aria-label="Filtrar casos">
         <option value="todos">Todos los casos</option>
         <option value="pend">Sin revisar</option>
+        <option value="nuevos">Casos nuevos (lote de 30)</option>
+        <option value="claude">Revalidados por Claude</option>
         <option value="dif">Donde la IA no coincide</option>
         <option value="api">Necesitan [API]</option>
         <option value="desc">Descartados</option>
       </select>
+      <input id="buscar" type="search" placeholder="Buscar por nº, código o palabra" aria-label="Buscar caso" autocomplete="off">
+
     </header>
     <div class="list" id="lista" role="list"></div>
   </aside>

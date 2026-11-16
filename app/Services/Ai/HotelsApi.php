@@ -169,6 +169,13 @@ class HotelsApi
         if ($d === null) {
             return null;
         }
+        // «Playas de Guardamar» no encuentra «Hotel Playas Guardamar»: si no hay nada, se reintenta sin las palabras de enlace.
+        if (! ((array) ($d['hoteles'] ?? []))) {
+            $sin = trim(preg_replace('/\b(de|del|la|las|los|el|y)\b\s*/iu', '', $nombre));
+            if ($sin !== '' && $sin !== $nombre && mb_strlen($sin) >= 3) {
+                $d = $this->get('/api/support/v1/hotels', ['q' => $sin, 'per_page' => 5]) ?? $d;
+            }
+        }
         return array_map(fn ($h) => ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
     }
 
