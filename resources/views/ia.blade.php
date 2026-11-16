@@ -40,6 +40,7 @@
   .btn.sm { padding: 4px 10px; font-size: 13px; }
   .btn.ghost { border-color: transparent; background: none; color: var(--muted); }
   .newbtn { width: 100%; margin-top: 12px; }
+  .casos-link { display: block; width: 100%; margin-top: 8px; text-align: center; text-decoration: none; }
   main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .top { padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: center; gap: 12px; }
   .top h2 { margin: 0; font-size: 15px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -86,6 +87,7 @@
       <h1>Chats de prueba de la IA</h1>
       <p>Solo local · nada se envía a nadie</p>
       <button class="btn primary newbtn" id="nuevo">+ Nueva conversación</button>
+      <a class="btn casos-link" href="/ia/casos">Revisar casos →</a>
       <form class="newform" id="form">
         <input id="n-name" placeholder="Nombre del cliente (opcional)" maxlength="120" autocomplete="off">
         <input id="n-email" type="email" placeholder="Correo del cliente (opcional, prueba la verificación del hotel)" maxlength="190" autocomplete="off">

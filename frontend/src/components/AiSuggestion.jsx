@@ -16,6 +16,7 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, i
   const [corrigiendo, setCorrigiendo] = useState(false)
   const [texto, setTexto] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [fallo, setFallo] = useState(null)   // la petición misma falló (sin red, tardó demasiado…): se avisa, no se esconde
   const seq = useRef(0)
 
   const cargar = async (regenerar = false) => {
@@ -24,6 +25,8 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, i
     const r = await api.aiSuggest(ticketId, regenerar)
     if (mia !== seq.current) return
     setCargando(false)
+    if (r?.ok === false) { setOn(true); setFallo(r.error || 'No se pudo pedir la sugerencia.'); return }
+    setFallo(null)
     setOn(!!r?.enabled)
     setS(r?.suggestion || null)
     // En la pestaña de la composición, la sugerencia se escribe sola en el editor (si está vacío).
@@ -37,18 +40,24 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, i
 
   if (!on) return null
   if (cargando && (!s || inline)) return <div className="ai-box ai-load" role="status" aria-busy="true"><span className="ai-spin" aria-hidden="true" /> Generando sugerencia…</div>
+  if (fallo) {
+    return (
+      <div className="ai-box ai-soft" role="alert">
+        <span><b>No se pudo pedir la sugerencia.</b> {fallo} Puedes responder tú mientras tanto.</span>
+        <button className="btn sm ghost" onClick={() => cargar()} disabled={cargando}>Reintentar</button>
+      </div>
+    )
+  }
   if (!s) return null
   if (s.status === 'failed') {
     return (
-      <div className="ai-box ai-soft">
-        <span>La IA no pudo preparar una sugerencia ahora.</span>
+      <div className="ai-box ai-soft" role="alert">
+        <span><b>La IA no pudo preparar una sugerencia.</b> Suele ser un fallo puntual: reintenta, y si sigue igual, respóndelo tú.</span>
         <button className="btn sm ghost" onClick={() => cargar(true)} disabled={cargando}>Reintentar</button>
       </div>
     )
   }
-  if (s.status === 'abstained') {
-    return <div className="ai-box ai-soft"><span><b>Derivado a una persona.</b> La IA no está segura de esto y no ha querido inventar: respóndelo tú. Si quieres que aprenda, anótalo en una FAQ o corrígela con 👎 en la próxima.</span></div>
-  }
+  const noSabe = s.status === 'abstained'
 
   const usar = () => { api.aiUsed(s.id); onUse(s.body, false); setS({ ...s, used: true }) }
   const valorar = async (rating, correction) => {
@@ -62,14 +71,16 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, i
   return (
     <div className="ai-box" role="region" aria-label="Sugerencia de la IA">
       <div className="ai-head">
-        <b><Icon.bolt className="ic-x" aria-hidden="true" /> Sugerencia de la IA</b>
-        <small>{inline && s.used ? 'Escrita en el editor: revísala antes de enviar' : 'Borrador: revísalo antes de enviar'}</small>
+        <b><Icon.bolt className="ic-x" aria-hidden="true" /> {noSabe ? 'La IA no se atreve con este ticket' : 'Sugerencia de la IA'}</b>
+        <small>{noSabe ? 'No hay borrador' : inline && s.used ? 'Escrita en el editor: revísala antes de enviar' : 'Borrador: revísalo antes de enviar'}</small>
       </div>
-      {!(inline && s.used) && <p className="ai-body">{s.body}</p>}
+      {noSabe
+        ? <p className="ai-body">No tiene claro cómo responder y prefiere no inventar: respóndelo tú. Si sí sabías qué contestar, díselo con «Sí sabía» y aprenderá.</p>
+        : !(inline && s.used) && <p className="ai-body">{s.body}</p>}
 
       {s.rating ? (
         <div className="ai-done">
-          {s.rating === 'up' ? 'Valoraste esta sugerencia como útil.' : 'Corrección guardada. Gracias, así aprende.'}
+          {s.rating === 'up' ? (noSabe ? 'Anotado: era un caso para una persona.' : 'Valoraste esta sugerencia como útil.') : 'Corrección guardada. Gracias, así aprende.'}
           {s.rating === 'down' && s.correction ? <q>{s.correction}</q> : null}
           {s.rating === 'down' && (
             <div className="ai-act">
@@ -89,9 +100,9 @@ export default function AiSuggestion({ ticketId, lastMessageKey, onUse, toast, i
         </div>
       ) : (
         <div className="ai-act">
-          <button className="btn sm primary" onClick={usar} disabled={s.used}>{s.used ? 'Usada' : (inline ? 'Escribir en el editor' : 'Usar como base')}</button>
-          <button className="btn sm ghost" onClick={() => valorar('up')} disabled={guardando} aria-label="Valorar como útil" title="Es útil">👍 Útil</button>
-          <button className="btn sm ghost" onClick={() => setCorrigiendo(true)} aria-label="Valorar como incorrecta y corregir" title="Está mal: la corrijo">👎 Corregir</button>
+          {!noSabe && <button className="btn sm primary" onClick={usar} disabled={s.used}>{s.used ? 'Usada' : (inline ? 'Escribir en el editor' : 'Usar como base')}</button>}
+          <button className="btn sm ghost" onClick={() => valorar('up')} disabled={guardando} aria-label={noSabe ? 'Valorar como bien llevado por una persona' : 'Valorar como útil'} title={noSabe ? 'Hizo bien: lo lleva una persona' : 'Es útil'}>{noSabe ? '👍 Mejor una persona' : '👍 Útil'}</button>
+          <button className="btn sm ghost" onClick={() => setCorrigiendo(true)} aria-label={noSabe ? 'Indicar que sí sabía responder' : 'Valorar como incorrecta y corregir'} title={noSabe ? 'Sí sabía: cuento cómo debía responder' : 'Está mal: la corrijo'}>{noSabe ? '👎 Sí sabía' : '👎 Corregir'}</button>
           <button className="btn sm ghost ai-re" onClick={() => cargar(true)} disabled={cargando}>Otra sugerencia</button>
         </div>
       )}

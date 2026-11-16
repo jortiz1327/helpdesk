@@ -45,6 +45,7 @@ class AiCasosController extends Controller
         sort($archivos);   // del más viejo al más nuevo: de cada caso vale lo último que la IA hizo con él (una pasada parcial no borra el resto)
         $ia = [];
         foreach ($archivos as $archivo) {
+            $cuando = preg_match('/resultados-(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)/', basename($archivo), $t) ? "{$t[3]}/{$t[2]}/{$t[1]} {$t[4]}:{$t[5]}" : null;   // la hora está en el nombre del archivo
             $h = fopen($archivo, 'r');
             if (fread($h, 3) !== "\xEF\xBB\xBF") {
                 rewind($h);
@@ -52,7 +53,7 @@ class AiCasosController extends Controller
             fgetcsv($h, 0, ';', '"', '\\');   // cabecera
             while (($f = fgetcsv($h, 0, ';', '"', '\\')) !== false) {
                 if (isset($f[7])) {
-                    $ia[(int) $f[0]] = ['obtenido' => $f[3], 'estado' => $f[6], 'texto' => $f[7]];
+                    $ia[(int) $f[0]] = ['obtenido' => $f[3], 'estado' => $f[6], 'texto' => $f[7], 'cuando' => $cuando];
                 }
             }
             fclose($h);

@@ -105,7 +105,7 @@ function pintarCaso() {
   $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · lote nuevo' : '')
   izq.append(bloque('client', 'El cliente escribió', c.pregunta, null, 'C'))
   izq.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
-  if (c.ia) der.append(bloque('ia', 'Lo que hizo la IA (última prueba)', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
+  if (c.ia) der.append(bloque('ia', 'Lo que hizo la IA (última prueba' + (c.ia.cuando ? ' · ' + c.ia.cuando : '') + ')', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
   if (c.nota) der.append(bloque('nota', 'Nota de Claude', c.nota, null, null))
   else der.append(el('div', 'empty', 'La IA aún no ha probado este caso.'))
   pintarBotones(c); pintarProp(c)
