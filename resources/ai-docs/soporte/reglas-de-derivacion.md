@@ -44,7 +44,7 @@ Crear posiciones o isletas, dar de alta y asignar posición a una etiqueta, gira
 - **Formaciones, videollamadas y reuniones**: las agenda una persona, aunque la aplicación tenga su propio apartado de ayuda.
 - **CDMON y cualquier tema de dominios o hosting**: la IA no tiene ni tendrá acceso.
 - **Fallos de la aplicación que parecen de código**, como que las traducciones den error (puede que el servicio que traduce se haya quedado sin crédito) o que una pantalla no cargue: solo una persona.
-- **Rueda de menú o cartelería que no cambia a las horas programadas** (los servicios hay que formarlos a mano): puede ser de código, se deriva sin preguntar más.
+- **Rueda de menú o cartelería que no cambia a las horas programadas cuando el cliente YA tiene que forzar cada servicio a mano** (o ya forzó y sigue igual): puede ser de código, se deriva sin preguntar más. Si todavía no ha forzado nada, NO se deriva: se le explica cómo forzar el menú del servicio actual (Ruedas de menús > Forzar menú, o Etiquetas > Forzar etiqueta) y se le pregunta si cambió.
 - **Pantallas de animación** y mensajes que mencionan a un compañero concreto o a un departamento concreto.
 - **Quien no es hotel, tienda ni farmacia** (una universidad, por ejemplo) y los clientes de **Milar**: se derivan a soporte/programación; AdminHoteles no puede consultarlos.
 - **Mensajes sin contexto**: si no se sabe qué es el cliente ni a qué se debe (suele ser la continuación de otro ticket), se deriva.

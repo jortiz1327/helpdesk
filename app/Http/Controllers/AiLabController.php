@@ -88,7 +88,7 @@ class AiLabController extends Controller
         $ult = DB::table('ai_lab_messages')->where('chat_id', $id)->where('role', 'assistant')->where('superseded', 0)->orderByDesc('id')->first();
         abort_unless($ult, 422);
         DB::table('ai_lab_messages')->where('id', $ult->id)->update(['superseded' => 1]);
-        return $this->contestar($id);
+        return $this->contestar($id, true);   // «Otra» siempre genera una respuesta nueva, aunque lo último sea un «ok»
     }
 
     public function rate(Request $r, int $msg)
@@ -108,13 +108,16 @@ class AiLabController extends Controller
         return response()->json(['ok' => true, 'messages' => $this->mensajes((int) $m->chat_id)]);
     }
 
-    private function contestar(int $id)
+    private function contestar(int $id, bool $forzar = false)
     {
         $chat = DB::table('ai_lab_chats')->where('id', $id)->first();
         $conv = DB::table('ai_lab_messages')->where('chat_id', $id)->where('superseded', 0)
             ->where(fn ($q) => $q->where('role', 'user')->orWhere('status', 'ready'))
             ->orderBy('id')->get(['role', 'body'])->map(fn ($m) => ['role' => $m->role, 'text' => (string) $m->body])->all();
-        $res = $this->ai->responderChat($chat, $conv, $this->provider);
+        $res = $this->ai->responderChat($chat, $conv, $this->provider, $forzar);
+        if ($res['status'] === 'silent') {   // solo acusó recibo: no se contesta ni se guarda nada
+            return response()->json(['messages' => $this->mensajes($id)]);
+        }
         DB::table('ai_lab_messages')->insert([
             'chat_id' => $id, 'role' => 'assistant', 'body' => $res['body'] ?? null, 'status' => $res['status'], 'error' => $res['error'] ?? null,
             'model' => $res['model'] ?? null, 'input_tokens' => $res['input_tokens'] ?? null, 'output_tokens' => $res['output_tokens'] ?? null, 'created_at' => now(),

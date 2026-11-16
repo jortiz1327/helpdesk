@@ -104,6 +104,16 @@ class HotelsApi
             return ['estado' => 'sin_correo', 'sitios' => []];
         }
         $d = $this->get('/api/support/v1/users/lookup', ['email' => $email]);
+        // El panel contesta pero a veces una de sus apps no: una segunda consulta suele salir bien, y evita decir «no hemos podido
+        // comprobar su correo» cuando sí figura. Si el panel mismo no contesta (null, tras el tiempo máximo) NO se reintenta: sería
+        // esperar otra vez lo mismo con el agente mirando.
+        if ($d !== null && empty($d['encontrado']) && ((array) ($d['apps_sin_respuesta'] ?? []))) {
+            usleep(700000);
+            $d2 = $this->get('/api/support/v1/users/lookup', ['email' => $email]);
+            if ($d2 !== null) {
+                $d = $d2;
+            }
+        }
         if ($d === null) {
             return ['estado' => 'incompleto', 'sitios' => []];
         }

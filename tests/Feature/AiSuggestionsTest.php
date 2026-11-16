@@ -200,6 +200,48 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringContainsString('Para cualquier OTRO dato del hotel', $p);   // usuarios, permisos, etiquetas: antes el correo
     }
 
+    public function test_si_el_correo_no_se_pudo_comprobar_pero_el_hotel_viene_nombrado_se_cuentan_las_antenas(): void
+    {
+        $this->activar();
+        config(['ai.support.url' => 'https://panel.example.com', 'ai.support.key' => 'K-secreta']);
+        Cache::flush();
+        $hid = 'a1a1a1a1-0000-4000-8000-000000000001';
+        $buf = 'b5b5b5b5-0000-4000-8000-000000000005';
+        Http::fake([
+            "panel.example.com/api/support/v1/hotels/$hid/buffets*" => Http::response(['success' => true, 'data' => [
+                'hotel' => ['id' => $hid, 'nombre' => 'Hotel Marina Sol'], 'buffets' => [['id' => $buf, 'nombre' => 'Buffet Sol', 'hotel_id' => $hid]]]]),
+            'panel.example.com/api/support/v1/hotels*' => Http::response(['success' => true, 'data' => ['total' => 1, 'hoteles' => [['id' => $hid, 'nombre' => 'Hotel Marina Sol', 'grupo' => 'G']]]]),
+            "panel.example.com/api/support/v1/buffets/$buf/antennas*" => Http::response(['success' => true, 'data' => ['total' => 1, 'en_linea' => 1,
+                'antenas' => [['nombre' => 'Sol-1', 'en_linea' => true, 'etiquetas' => 20]]]]),
+            // El panel contesta, pero una de sus apps no: el correo no se puede comprobar (ni en el reintento).
+            'panel.example.com/api/support/v1/users/lookup*' => Http::response(['success' => true, 'data' => ['encontrado' => false, 'coincidencias' => [], 'apps_sin_respuesta' => ['AdminHoteles-3']]]),
+        ]);
+        $tk = $this->ticket('Hola, escribo del Hotel Marina Sol: las etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('No se ha podido comprobar el correo', $p);
+        $this->assertStringContainsString('NO afirmes que el correo no pertenece al hotel', $p);
+        $this->assertStringContainsString('todas con conexión', $p);   // aun así, las antenas del hotel que nombra
+        $this->assertStringContainsString('Ruedas de menús > Forzar menú', $p);   // con antenas en línea y «sigue igual»: se le da el paso, no se deriva
+        $this->assertStringContainsString('Para cualquier OTRO dato del hotel', $p);
+    }
+
+    public function test_un_ok_despues_de_la_respuesta_no_se_contesta_pero_una_pregunta_si(): void
+    {
+        $S = \App\Services\Ai\AiSuggestionService::class;
+        $u = fn ($t) => ['role' => 'user', 'text' => $t];
+        $a = ['role' => 'assistant', 'text' => 'Fuerce el menú desde Ruedas de menús.'];
+        foreach (['ok', 'Vale, gracias!', 'Perfecto 👍', '👍', 'muchas gracias', 'Ok.'] as $acuse) {
+            $this->assertTrue($S::soloAcusaRecibo([$u('No cambia'), $a, $u($acuse)]), $acuse);
+        }
+        $this->assertTrue($S::soloAcusaRecibo([$u('No cambia'), $a, $u('o'), $u('ok')]));   // varios mensajes seguidos
+        // Todo lo que sea más que un acuse sigue contestándose.
+        foreach (['ok pero sigue igual', 'gracias, y el desayuno?', 'no', 'sí', 'ya lo he forzado y no funciona'] as $no) {
+            $this->assertFalse($S::soloAcusaRecibo([$u('No cambia'), $a, $u($no)]), $no);
+        }
+        $this->assertFalse($S::soloAcusaRecibo([$u('ok')]));   // sin respuesta previa de la IA, se contesta
+    }
+
     public function test_encuentra_el_hotel_de_la_firma_aunque_no_ponga_la_palabra_hotel(): void
     {
         $svc = app(\App\Services\Ai\AiSuggestionService::class);
