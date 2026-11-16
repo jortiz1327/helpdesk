@@ -580,6 +580,8 @@ class AiSuggestionService
         // Correo: el que el cliente dice usar (si lo escribe) o, si no, el del contacto del ticket.
         preg_match_all('/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/', $textoCliente, $m);
         $e = trim((string) ($m[0][0] ?? $contactEmail));
+        // Un pedido de material no necesita saber si las antenas están en línea ni qué rol tiene el usuario: no se consulta ni se cuenta.
+        $pedido = self::esPedido($textoCliente);
         // Hotel: el que el cliente nombra, buscado en el inventario del panel.
         $this->avisar('Buscando el hotel en AdminHoteles…');
         $nombres = $this->nombresDeHotel($textoCliente);
@@ -656,7 +658,7 @@ class AiSuggestionService
                 return $cab . "- Aún no sabemos de qué hotel es ni con qué correo accede. Pregunta PRIMERO el nombre del hotel y, a continuación, el correo con el que accede a la aplicación.\n" . $comun;
             }
             if ($dir) {
-                if ($antenas = $this->antenasSinVerificar($api, $dir, $nombres, $unicos)) {
+                if (! $pedido && ($antenas = $this->antenasSinVerificar($api, $dir, $nombres, $unicos))) {
                     return $cab . $antenas;
                 }
                 return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "». Falta comprobar su correo.\n"
@@ -666,7 +668,7 @@ class AiSuggestionService
         }
         if ($v['estado'] === 'incompleto') {
             // El correo no se pudo comprobar, pero si el hotel viene nombrado y se localiza, el estado de las antenas se cuenta igual.
-            if ($dir && $nombres && ($antenas = $this->antenasSinVerificar($api, $dir, $nombres, $unicos))) {
+            if (! $pedido && $dir && $nombres && ($antenas = $this->antenasSinVerificar($api, $dir, $nombres, $unicos))) {
                 return $cab . "- No se ha podido comprobar el correo ($e) ahora mismo. NO afirmes que el correo no pertenece al hotel ni que no figura.\n" . $antenas;
             }
             return $cab . "- No se ha podido comprobar el correo ($e) ahora mismo. NO afirmes que el correo no pertenece al hotel ni que no figura.\n"
@@ -688,7 +690,7 @@ class AiSuggestionService
             $s .= "- Figura en varios sitios: si la consulta depende del hotel, pregunta de cuál habla.\n";
         }
         // Rol del usuario (la API no da los permisos concretos, solo el nombre del rol).
-        $roles = array_values(array_unique(array_filter(array_map(fn ($x) => $x['rol'] ?? null, $sitios))));
+        $roles = $pedido ? [] : array_values(array_unique(array_filter(array_map(fn ($x) => $x['rol'] ?? null, $sitios))));
         if ($roles) {
             $this->paso('rol', true, 'Rol de su usuario: ' . implode(', ', array_map(fn ($r) => '«' . $r . '»', $roles)) . (array_filter($sitios, fn ($x) => ($x['activo'] ?? true) === false) ? ' · usuario DESACTIVADO' : ' · usuario activo'));
         }
@@ -696,10 +698,10 @@ class AiSuggestionService
             $s .= '- Rol de su usuario en la aplicación: ' . implode(', ', array_map(fn ($r) => '«' . $r . '»', $roles))
                 . ".\n- USUARIOS Y PERMISOS: si pide acceso o permisos (crear platos, modificar menús, forzar, etc.), dile qué rol tiene hoy y, con la documentación de roles, qué permite ese tipo de rol (sin inventar permisos que no sepas). Si el rol parece suficiente, indícale dónde se hace en la aplicación. Si necesita más permisos, o que se cree o reactive un usuario, lo hace una persona: DERIVA, pero la respuesta DEBE incluir antes una frase con su rol actual («Su usuario tiene hoy el rol X») (esto prevalece sobre «sé breve» al derivar), y termina con que un compañero revisará la ampliación de permisos. NUNCA afirmes qué permisos incluye o no incluye su rol concreto: los roles los personaliza cada hotel y tú solo sabes el NOMBRE del rol. No digas que ya está hecho y no facilites usuarios ni contraseñas.\n";
         }
-        if (array_filter($sitios, fn ($x) => ($x['activo'] ?? true) === false)) {
+        if (! $pedido && array_filter($sitios, fn ($x) => ($x['activo'] ?? true) === false)) {
             $s .= "- Su usuario figura DESACTIVADO en la aplicación: díselo con tacto; reactivarlo lo hace una persona del equipo (deriva con la frase corta).\n";
         }
-        foreach ($sitios as $x) {
+        foreach ($pedido ? [] : $sitios as $x) {
             $an = $api->antenas($x);
             if ($an === null) {
                 continue;
@@ -711,7 +713,7 @@ class AiSuggestionService
                 : "todas con conexión.\n");
         }
         // Estado de las etiquetas concretas que menciona el cliente (código leído de la foto o escrito en el mensaje).
-        foreach (array_slice($codigos, 0, 5) as $c) {
+        foreach ($pedido ? [] : array_slice($codigos, 0, 5) as $c) {
             $hallada = null;
             foreach ($sitios as $x) {
                 if ($hallada = $api->etiqueta($x, $c)) {
@@ -731,7 +733,19 @@ class AiSuggestionService
                     . ($ap ? ', la sirve la antena ' . $ap['name'] . ($ap['online'] ? ' (con conexión)' : ' (SIN CONEXIÓN)') : '') . ".\n";
             }
         }
+        if ($pedido) {
+            $this->paso('filtro', null, 'Es un pedido de material: no se consultan antenas ni rol');
+            return $s;
+        }
         return $s . self::REGLA_ANTENAS . "- Si una etiqueta tiene batería baja, sigue la guía de pilas (no tramites material).\n";
+    }
+
+    /** ¿Pide material (pedido, soportes, presupuesto…) y no cuenta ningún fallo? Entonces las antenas y el rol no pintan nada. */
+    private static function esPedido(string $t): bool
+    {
+        $fallo = '/antena|conexi[oó]n|no (se )?(actualiz|cambia|muestra|funcion|enciende|responde|reaccion)|se cambian solas|fuera de servicio|ca[ií]d[ao]|sin (se[ñn]al|conexi)|offline|no (puedo|me deja)|(da|sale|aparece|muestra)n? (un )?error|mensaje de error|falla|problema|incidencia|aver[ií]a/iu';
+        $pide = '/pedido|pedir|necesit(o|amos) (más )?(etiquetas|soportes|material)|soportes|material|presupuesto|factura|albar[aá]n|env[ií]o de|comprar|reposici[oó]n/iu';
+        return preg_match($pide, $t) === 1 && preg_match($fallo, $t) !== 1;
     }
 
     /** Nombres de hotel que el cliente menciona («Hotel Alua Soul Menorca», «AluaSun Lago Park»…): candidatos para buscar en el panel. */
