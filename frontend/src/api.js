@@ -454,6 +454,33 @@ export const api = {
   aiSuggest: (ticket, regenerate = false) => regenerate
     ? req('ai_suggestions.php?action=regenerate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }) })
     : req(`ai_suggestions.php?action=suggest&ticket=${ticket}`),
+  // Sugerencia con cada paso al momento: el servidor devuelve una línea JSON por paso ({paso}, {hace}, {fin}, {error}).
+  aiSuggestStream: async (ticket, regen, onEvent) => {
+    const ctl = new AbortController()
+    const timer = setTimeout(() => ctl.abort(), 90000)
+    try {
+      const r = await fetch(`${BASE}/ai_suggestions.php?action=stream&ticket=${ticket}${regen ? '&regen=1' : ''}`, { headers: { 'X-App-Token': getToken() }, signal: ctl.signal })
+      if (!r.ok || !r.body) return { ok: false, error: 'No se pudo pedir la sugerencia.' }
+      const lector = r.body.getReader()
+      const dec = new TextDecoder()
+      let resto = '', fin = null
+      for (;;) {
+        const { value, done } = await lector.read()
+        if (value) resto += dec.decode(value, { stream: true })
+        const lineas = resto.split('\n'); resto = done ? '' : lineas.pop()
+        for (const l of lineas) {
+          if (!l.trim()) continue
+          let e; try { e = JSON.parse(l) } catch { continue }
+          if (e.fin) fin = e.fin
+          onEvent(e)
+        }
+        if (done) break
+      }
+      return fin ? { ok: true, ...fin } : { ok: false, error: 'La respuesta llegó incompleta.' }
+    } catch (e) {
+      return { ok: false, error: e?.name === 'AbortError' ? 'La operación tardó demasiado. Inténtalo de nuevo.' : 'No se pudo conectar. Revisa la red.' }
+    } finally { clearTimeout(timer) }
+  },
   aiStatus: () => req('ai_suggestions.php?action=status'),
   aiRate: (id, rating, correction) => req('ai_suggestions.php?action=rate', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, rating, correction }),

@@ -47,6 +47,40 @@ class AiSuggestionService
     private ?int $excluirTicket = null;
     /** Nombre de hotel que encaja con varios hoteles del panel (se rellena en contextoHotel). */
     private ?string $hotelAmbiguo = null;
+    /** Lo que hizo la IA en esta sugerencia, paso a paso (se guarda en `sources.traza` y se enseña al agente en el panel). */
+    private array $traza = [];
+
+    /** Apunta un paso en la traza. $ok: true = bien, false = problema, null = informativo. */
+    /** Quien llama (el panel del ticket) recibe cada paso al momento: así el agente ve lo que va haciendo la IA. */
+    private $alPaso = null;
+
+    public function alPaso(?callable $f): void
+    {
+        $this->alPaso = $f;
+    }
+
+    private function paso(string $k, ?bool $ok, string $texto, ?array $datos = null): void
+    {
+        $p = ['k' => $k, 'ok' => $ok, 'texto' => $texto] + ($datos !== null ? ['datos' => $datos] : []);
+        $this->traza[] = $p;
+        if ($this->alPaso) { ($this->alPaso)(['paso' => $p]); }
+    }
+
+    /** Aviso pasajero de lo que está haciendo ahora (no se guarda). */
+    private function avisar(string $texto): void
+    {
+        if ($this->alPaso) { ($this->alPaso)(['hace' => $texto]); }
+    }
+
+    private function pasoAntenas(string $buffet, array $an): void
+    {
+        $caidas = array_values(array_filter($an, fn ($a) => ! $a['online']));
+        $en = count($an) - count($caidas);
+        $this->paso('antenas', ! $caidas, 'Antenas de ' . ($buffet ?: 'el hotel') . ': ' . count($an) . ' localizadas · ' . $en . ' en línea'
+            . ($caidas ? ' · sin conexión: ' . implode(', ', array_map(fn ($a) => $a['name'], $caidas)) : ''),
+            ['buffet' => $buffet, 'consultado' => $an[0]['consultado'] ?? null, 'en_vivo' => $an[0]['en_vivo'] ?? null,
+             'lista' => array_map(fn ($a) => ['nombre' => $a['name'], 'en_linea' => (bool) $a['online'], 'caida_desde' => $a['offline_since'], 'etiquetas' => $a['esl']], $an)]);
+    }
 
     public function __construct(protected AiProvider $ai, protected ?AiKnowledge $knowledge = null)
     {
@@ -202,10 +236,14 @@ class AiSuggestionService
      */
     private function componer(object $t, array $conversacion, ?int $ticketId, AiProvider $ai, bool $anonimizar): array
     {
+        $this->traza = [];
         // Solo audios de WhatsApp (todavía no se transcriben): texto fijo y cortés, sin llamar al proveedor (no gasta nada).
         if (self::soloAudios($conversacion)) {
-            return ['sources' => json_encode(['faqs' => [], 'examples' => [], 'docs' => []]), 'status' => 'ready', 'body' => self::TEXTO_AUDIO, 'model' => null, 'input_tokens' => 0, 'output_tokens' => 0];
+            $this->paso('filtro', null, 'El cliente solo ha enviado audios: se prepara el texto fijo de «no podemos escuchar audios» (sin llamar a la IA)');
+            $this->paso('salida', true, 'Respuesta preparada: texto fijo (no se gastó nada)');
+            return ['sources' => json_encode(['faqs' => [], 'examples' => [], 'docs' => [], 'traza' => $this->traza]), 'status' => 'ready', 'body' => self::TEXTO_AUDIO, 'model' => null, 'input_tokens' => 0, 'output_tokens' => 0];
         }
+        $this->avisar('Leyendo la conversación y buscando en la memoria…');
         $pregunta = $this->ultimaDelCliente($conversacion);
         $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
         $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
@@ -215,7 +253,12 @@ class AiSuggestionService
         $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
         $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente);
 
-        $fila = ['sources' => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos)])];
+        $this->paso('memoria', null, 'Memoria consultada: ' . count($faqs) . ' preguntas frecuentes · ' . count($ejemplos) . ' respuestas de ejemplo · ' . count($casos) . ' casos/manuales parecidos'
+            . ($casos ? ' (' . implode('; ', array_map(fn ($d) => mb_substr((string) ($d->title ?? ''), 0, 60), array_slice($casos, 0, 4))) . ')' : ''),
+            ['faqs' => count($faqs), 'ejemplos' => count($ejemplos), 'casos' => array_map(fn ($d) => ['tipo' => (string) ($d->source_type ?? ''), 'titulo' => mb_substr((string) ($d->title ?? ''), 0, 90)], array_slice($casos, 0, 6))]);
+        $fuentes = fn () => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos), 'traza' => $this->traza]);
+        $fila = ['sources' => $fuentes()];
+        $this->avisar('Redactando la respuesta…');
         try {
             $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos), $this->comoTurnos($conversacion));
             if (! empty($r['truncated'])) {
@@ -225,12 +268,16 @@ class AiSuggestionService
             }
             $texto = trim($r['text']);
             $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
+            $this->paso('salida', $sabe ? true : null, $sabe ? 'Respuesta preparada · ' . self::tipoDeRespuesta($texto) . ' (estimado)' : 'La IA no se atreve: no hay borrador, lo debe llevar una persona');
+            $fila['sources'] = $fuentes();
             return $fila + [
                 'status' => $sabe ? 'ready' : 'abstained', 'body' => $sabe ? $texto : null,
                 'model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens'],
             ];
         } catch (Throwable $e) {
             report($e);
+            $this->paso('salida', false, 'La IA no pudo preparar la respuesta');
+            $fila['sources'] = $fuentes();
             return $fila + ['status' => 'failed', 'body' => null, 'error' => mb_substr($e instanceof AiException ? $e->getMessage() : 'Error inesperado', 0, 250)];
         }
     }
@@ -255,6 +302,18 @@ class AiSuggestionService
     }
 
     /** ¿Lo último que escribió el cliente (tras la última respuesta) es solo un acuse de recibo? Solo cuenta si ya se le había contestado. */
+    /** Clasificación aproximada de lo que hace el borrador, solo para el panel del agente. */
+    private static function tipoDeRespuesta(string $t): string
+    {
+        if (preg_match('/compañer[oa]s? (del equipo )?(revisar|le atender|comprobar|se pondr)|equipo (de [\wáéíóú\/ ]+ )?(revisar|le atender)/iu', $t)) {
+            return 'deriva a una persona del equipo';
+        }
+        if (preg_match('/\?/u', mb_substr($t, -400))) {
+            return 'pide datos o confirma con el cliente';
+        }
+        return 'responde o explica';
+    }
+
     public static function soloAcusaRecibo(array $conv): bool
     {
         $ultimos = [];
@@ -515,12 +574,14 @@ class AiSuggestionService
     {
         $api = app(HotelsApi::class);
         if (! $api->configured()) {
+            $this->paso('hotel', null, 'AdminHoteles no está configurado: no se consulta el hotel');
             return '';
         }
         // Correo: el que el cliente dice usar (si lo escribe) o, si no, el del contacto del ticket.
         preg_match_all('/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/', $textoCliente, $m);
         $e = trim((string) ($m[0][0] ?? $contactEmail));
         // Hotel: el que el cliente nombra, buscado en el inventario del panel.
+        $this->avisar('Buscando el hotel en AdminHoteles…');
         $nombres = $this->nombresDeHotel($textoCliente);
         // Sin «Hotel X» explícito (p. ej. solo la firma «Barceló Benidorm Beach»): se prueban nombres propios del mensaje y solo
         // valen los hoteles cuyo nombre contiene el buscado (o al revés), para no arrastrar resultados sueltos del buscador.
@@ -560,8 +621,30 @@ class AiSuggestionService
                 $this->hotelAmbiguo = $n;
             }
         }
+        if ($this->hotelAmbiguo !== null) {
+            $this->paso('hotel', false, 'Hotel ambiguo: «' . $this->hotelAmbiguo . '» corresponde a varios hoteles');
+        } elseif ($dir) {
+            $this->paso('hotel', true, 'Hotel localizado: ' . $dir[0]['nombre'] . (! empty($dir[0]['grupo']) ? ' (' . $dir[0]['grupo'] . ')' : '') . (count($dir) > 1 ? ' · +' . (count($dir) - 1) . ' coincidencias' : ''), ['nombre' => $dir[0]['nombre'], 'grupo' => $dir[0]['grupo'] ?? null, 'otras' => count($dir) - 1]);
+        } elseif ($nombres) {
+            $this->paso('hotel', false, 'Hotel no localizado: «' . $nombres[0] . '»' . ($dirFalla ? ' (el panel no respondió)' : ''));
+        } else {
+            $this->paso('hotel', null, 'El cliente no nombra ningún hotel');
+        }
+        $this->avisar('Comprobando el correo en AdminHoteles…');
         $v = $api->verificar($e);
         $sitios = array_slice($v['sitios'], 0, 4);
+        // Traza para el agente: hotel y correo (lo que ve el panel de la sugerencia).
+        if ($v['estado'] === 'sin_correo') {
+            $this->paso('correo', null, 'Sin correo que comprobar');
+        } elseif ($v['estado'] === 'incompleto') {
+            $this->paso('correo', null, "No se pudo comprobar el correo $e ahora (el panel no respondió)");
+        } elseif ($v['estado'] === 'no_encontrado') {
+            $this->paso('correo', false, "El correo $e no figura como usuario de la aplicación");
+        } elseif ($dir && ! $this->coincideHotel($dir, $sitios)) {
+            $this->paso('correo', false, "El correo $e figura, pero no asociado al hotel que dice");
+        } else {
+            $this->paso('correo', true, "Correo $e verificado en: " . implode('; ', array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /'), $sitios)), ['correo' => $e, 'sitios' => array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /'), $sitios)]);
+        }
         $cab = "\nVERIFICACIÓN DEL CLIENTE (consulta automática de solo lectura: no digas de dónde sale)\n";
         $comun = "- NO des datos de ningún hotel ni de su estado, y NO reveles a qué hotel pertenece un correo.\n";
         $derivar = "- Termina diciendo con amabilidad que un compañero del equipo revisará su caso y le atenderá personalmente; no sigas con el diagnóstico.\n";
@@ -607,6 +690,9 @@ class AiSuggestionService
         // Rol del usuario (la API no da los permisos concretos, solo el nombre del rol).
         $roles = array_values(array_unique(array_filter(array_map(fn ($x) => $x['rol'] ?? null, $sitios))));
         if ($roles) {
+            $this->paso('rol', true, 'Rol de su usuario: ' . implode(', ', array_map(fn ($r) => '«' . $r . '»', $roles)) . (array_filter($sitios, fn ($x) => ($x['activo'] ?? true) === false) ? ' · usuario DESACTIVADO' : ' · usuario activo'));
+        }
+        if ($roles) {
             $s .= '- Rol de su usuario en la aplicación: ' . implode(', ', array_map(fn ($r) => '«' . $r . '»', $roles))
                 . ".\n- USUARIOS Y PERMISOS: si pide acceso o permisos (crear platos, modificar menús, forzar, etc.), dile qué rol tiene hoy y, con la documentación de roles, qué permite ese tipo de rol (sin inventar permisos que no sepas). Si el rol parece suficiente, indícale dónde se hace en la aplicación. Si necesita más permisos, o que se cree o reactive un usuario, lo hace una persona: DERIVA, pero la respuesta DEBE incluir antes una frase con su rol actual («Su usuario tiene hoy el rol X») (esto prevalece sobre «sé breve» al derivar), y termina con que un compañero revisará la ampliación de permisos. NUNCA afirmes qué permisos incluye o no incluye su rol concreto: los roles los personaliza cada hotel y tú solo sabes el NOMBRE del rol. No digas que ya está hecho y no facilites usuarios ni contraseñas.\n";
         }
@@ -618,6 +704,7 @@ class AiSuggestionService
             if ($an === null) {
                 continue;
             }
+            $this->pasoAntenas((string) $x['buffet'], $an);
             $caidas = array_values(array_filter($an, fn ($a) => ! $a['online']));
             $s .= '- Antenas de ' . $x['buffet'] . ': ' . count($an) . ' en total; ' . ($caidas
                 ? 'SIN CONEXIÓN: ' . implode(', ', array_map(fn ($a) => $a['name'] . ($a['offline_since'] ? ' (desde ' . substr((string) $a['offline_since'], 0, 16) . ')' : ''), $caidas)) . ".\n"
@@ -632,6 +719,9 @@ class AiSuggestionService
                     break;
                 }
             }
+            $this->paso('etiqueta', $hallada ? (bool) $hallada['online'] : null, $hallada
+                ? "Etiqueta $c (" . $hallada['buffet'] . '): ' . ($hallada['online'] ? 'en línea' : 'SIN CONEXIÓN') . ($hallada['battery'] !== null ? ', batería ' . $hallada['battery'] . ' %' : '')
+                : "Etiqueta $c: no localizada en el panel");
             if ($hallada) {
                 $ap = $hallada['antenna'];
                 $s .= "- Etiqueta {$c} (" . $hallada['buffet'] . '): ' . ($hallada['online'] ? 'en línea' : 'SIN CONEXIÓN')
@@ -687,6 +777,7 @@ class AiSuggestionService
             if ($an === null) {
                 continue;
             }
+            $this->pasoAntenas((string) ($x['buffet'] ?: $elegido['nombre']), $an);
             $caidas = array_values(array_filter($an, fn ($a) => ! $a['online']));
             $lineas .= '- Antenas de ' . ($x['buffet'] ?: $elegido['nombre']) . ': ' . count($an) . ' en total; ' . ($caidas
                 ? 'SIN CONEXIÓN: ' . implode(', ', array_map(fn ($a) => $a['name'] . ($a['offline_since'] ? ' (desde ' . substr((string) $a['offline_since'], 0, 16) . ')' : ''), $caidas)) . ".\n"

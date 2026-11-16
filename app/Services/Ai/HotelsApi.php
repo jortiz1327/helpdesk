@@ -236,6 +236,8 @@ class HotelsApi
             'online'        => (bool) self::pick((array) $a, ['en_linea', 'online', 'is_online'], false),
             'offline_since' => self::pick((array) $a, ['caida_desde', 'offline_since']),
             'esl'           => (int) self::pick((array) $a, ['etiquetas', 'esl', 'eslCount'], 0),
+            'consultado'    => $d['consultado'] ?? null,
+            'en_vivo'       => $d['en_vivo'] ?? null,
         ], array_values((array) $lista));
     }
 

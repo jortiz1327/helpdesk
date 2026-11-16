@@ -14,6 +14,7 @@ use InvalidArgumentException;
  *
  *   GET  ?action=status                  → ¿está activa?
  *   GET  ?action=suggest&ticket=ID       → la sugerencia vigente (la genera si no existe)
+ *   GET  ?action=stream&ticket=ID[&regen=1] → igual, pero devuelve cada paso al momento (una línea JSON por paso, NDJSON)
  *   POST ?action=regenerate  ticket      → pide otra
  *   POST ?action=rate  id, rating, correction → 👍 / 👎 (con corrección obligatoria)
  *   POST ?action=used  id                → el agente la usó de base
@@ -32,6 +33,7 @@ class AiSuggestionsController extends Controller
     {
         return match ($request->query('action', 'status')) {
             'suggest'    => $this->suggest($request, false),
+            'stream'     => $this->stream($request),
             'regenerate' => $this->post($request) ?? $this->suggest($request, true),
             'rate'       => $this->post($request) ?? $this->rate($request),
             'used'       => $this->post($request) ?? $this->used($request),
@@ -106,6 +108,39 @@ class AiSuggestionsController extends Controller
         return response()->json(['ok' => true, 'enabled' => true, 'suggestion' => $s ? $this->salida($s) : null]);
     }
 
+    /** Igual que suggest, pero cada paso de la IA (hotel, correo, antenas, memoria…) llega al momento, en una línea JSON. */
+    private function stream(Request $request)
+    {
+        if (! $this->ai->enabled()) {
+            return response()->json(['ok' => true, 'enabled' => false, 'suggestion' => null]);
+        }
+        $ticket = (int) $request->query('ticket');
+        if (! TicketVisibility::puedeVer($request->user(), $ticket)) {
+            return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
+        }
+        $regen = $request->boolean('regen');
+        $uid = $request->user()->id;
+        return response()->stream(function () use ($ticket, $regen, $uid) {
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
+            $emitir = function (array $e) {
+                echo json_encode($e, JSON_UNESCAPED_UNICODE) . "\n";
+                @flush();
+            };
+            $this->ai->alPaso($emitir);
+            try {
+                $s = $this->ai->forTicket($ticket, $uid, $regen);
+                $emitir(['fin' => ['suggestion' => $s ? $this->salida($s) : null]]);
+            } catch (\Throwable $e) {
+                report($e);
+                $emitir(['error' => 'No se pudo preparar la sugerencia.']);
+            } finally {
+                $this->ai->alPaso(null);
+            }
+        }, 200, ['Content-Type' => 'application/x-ndjson; charset=utf-8', 'Cache-Control' => 'no-cache, no-store', 'X-Accel-Buffering' => 'no']);
+    }
+
     private function rate(Request $request)
     {
         $s = $this->propia($request);
@@ -144,6 +179,7 @@ class AiSuggestionsController extends Controller
             'id' => (int) $s->id, 'ticket_id' => (int) $s->ticket_id, 'status' => $s->status, 'body' => $s->body,
             'sources' => json_decode((string) $s->sources, true) ?: ['faqs' => [], 'examples' => []],
             'rating' => $s->rating, 'correction' => $s->correction, 'used' => $s->used_at !== null,
+            'model' => $s->model, 'created_at' => $s->created_at,
         ];
     }
 }

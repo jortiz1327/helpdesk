@@ -21,6 +21,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
   /* Pestaña «Sugerencia de IA»: solo aparece si el asistente está activo. La IA no gasta
      nada hasta que se abre la pestaña (se genera bajo demanda, una vez por mensaje). */
   const [aiOn, setAiOn] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)   // panel lateral de solo lectura
   useEffect(() => {
     if (!ticketId || disabled) return
     let vivo = true
@@ -150,14 +151,12 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
           <Icon.note /> Nota interna
         </button>
         {aiOn && (
-          <button type="button" className={`cmp-mode-btn ai ${mode === 'ai' ? 'on' : ''}`} onClick={() => setMode('ai')}>
+          <button type="button" className={`cmp-mode-btn ai ${aiOpen ? 'on' : ''}`} onClick={() => setAiOpen((v) => !v)} aria-expanded={aiOpen}>
             <Icon.bolt /> Sugerencia de IA
           </button>
         )}
       </div>
-      {mode === 'ai' && !bloqueado && (
-        <AiSuggestion ticketId={ticketId} inline onUse={ponerSugerencia} />
-      )}
+      {aiOpen && ticketId && <AiSuggestion ticketId={ticketId} onClose={() => setAiOpen(false)} />}
       {/* Destinatarios: solo al responder (una nota interna no se envía a nadie). */}
       {!note && to && (
         <div className="cmp-dest">
