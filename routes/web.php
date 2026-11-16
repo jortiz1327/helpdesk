@@ -30,6 +30,7 @@ Route::prefix('ia/casos')->controller(\App\Http\Controllers\AiCasosController::c
 // Chats de prueba de la IA: SOLO local (el controlador da 404 si config('ai.lab') está apagado).
 Route::prefix('ia')->controller(\App\Http\Controllers\AiLabController::class)->group(function () {
     Route::get('/', 'page');
+    Route::get('/flujo', 'flujo');
     Route::get('/{id}', 'page')->whereNumber('id');
     Route::get('/app.js', 'script');
     Route::get('/api/chats', 'chats');

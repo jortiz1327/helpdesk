@@ -88,6 +88,7 @@
       <p>Solo local · nada se envía a nadie</p>
       <button class="btn primary newbtn" id="nuevo">+ Nueva conversación</button>
       <a class="btn casos-link" href="/ia/casos">Revisar casos →</a>
+      <a class="btn casos-link" href="/ia/flujo">Cómo funciona (flujo) →</a>
       <form class="newform" id="form">
         <input id="n-name" placeholder="Nombre del cliente (opcional)" maxlength="120" autocomplete="off">
         <input id="n-email" type="email" placeholder="Correo del cliente (opcional, prueba la verificación del hotel)" maxlength="190" autocomplete="off">

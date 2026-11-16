@@ -25,6 +25,12 @@ class AiLabController extends Controller
         return response()->view('ia', ['configurada' => $this->provider->configured()]);
     }
 
+    /** Esquema de cómo funciona la IA, paso a paso (solo lectura: es una página estática). */
+    public function flujo()
+    {
+        return response()->view('ia-flujo');
+    }
+
     /** El JavaScript de la página: va aparte porque la CSP de la app no permite scripts dentro del HTML. */
     public function script()
     {
