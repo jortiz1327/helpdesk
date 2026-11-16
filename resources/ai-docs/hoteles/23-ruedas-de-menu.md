@@ -77,3 +77,9 @@ Con la función `DTOUCH` y `force-menus` se ve el botón "Publicaciones de dTouc
 ## Términos y relación con otros apartados
 - **Menú**: un día de la rueda. **Servicio**: desayuno, comida, etc. ([15-servicios](15-servicios.md)). **Posición**: [21-posiciones](21-posiciones.md).
 - Platos: [12-platos](12-platos.md). Plano: [22-plano-planner](22-plano-planner.md). Temáticos: [24-tematicos](24-tematicos.md). Menú del día: [25-menu-del-dia](25-menu-del-dia.md). Especiales: [26-menus-especiales](26-menus-especiales.md). Cambios: [27-cambios-programados-y-temporales](27-cambios-programados-y-temporales.md). Contenido actual: [02-contenido-actual](02-contenido-actual.md). Comunicaciones: [32-comunicaciones](32-comunicaciones.md).
+
+### Cambiar de rueda para unas fechas (por ejemplo, buffet reducido en temporada baja)
+Lo hace el propio hotel desde **Configurar ruedas de menús** (`/menus/wheels`), sin pedirlo al equipo, si su usuario tiene los permisos de ruedas (**crear** y **editar ruedas de menú**):
+1. Crear la rueda para ese periodo con **Crear nueva rueda de menú**: **Nombre**, **Fecha de inicio** y **Fecha de fin**, y marcar «Activar rueda automáticamente».
+2. Para volver a la rueda normal, esa rueda debe estar activa a partir de la fecha en que se quiere volver (se activa con la edición de la rueda, o con su fecha de inicio si se creó con «Activar rueda automáticamente»). Activar una rueda desactiva las demás.
+3. Si el usuario no ve esas opciones, le falta el permiso: lo asigna un administrador de su hotel o el equipo (ver [04-roles-permisos](04-roles-permisos.md)).

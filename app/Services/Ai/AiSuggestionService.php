@@ -22,6 +22,10 @@ class AiSuggestionService
     /** Marca que devuelve el modelo cuando no tiene base para contestar. */
     public const NO_SABE = '[[NO_SABE]]';
 
+    /** Marca que sustituye a un audio de WhatsApp en la conversación, y el texto fijo con el que se contesta si es lo único que llegó. */
+    public const MARCA_AUDIO = '[audio]';
+    public const TEXTO_AUDIO = "Lo sentimos, pero ahora mismo no podemos escuchar este audio. ¿Podría escribirnos su consulta por mensaje? Muchas gracias.\n\nAtención al cliente · AEME Group";
+
     /** Qué hacer según el estado de las antenas (decisión de Juan, 16-nov). El estado es el de AHORA, no el del día del ticket. */
     private const REGLA_ANTENAS = "- Según las antenas:\n"
         . "  · NUNCA afirmes que «el sistema no está caído», que «funciona correctamente» ni que no hay ninguna incidencia: las antenas en línea solo prueban que las antenas responden, no el estado del servicio, y puede haber una incidencia general que solo conoce el equipo. Si el cliente pregunta por una incidencia o caída general, di lo que sí ves (las antenas) y que el equipo le informará del estado de la incidencia.\n"
@@ -197,6 +201,10 @@ class AiSuggestionService
      */
     private function componer(object $t, array $conversacion, ?int $ticketId, AiProvider $ai, bool $anonimizar): array
     {
+        // Solo audios de WhatsApp (todavía no se transcriben): texto fijo y cortés, sin llamar al proveedor (no gasta nada).
+        if (self::soloAudios($conversacion)) {
+            return ['sources' => json_encode(['faqs' => [], 'examples' => [], 'docs' => []]), 'status' => 'ready', 'body' => self::TEXTO_AUDIO, 'model' => null, 'input_tokens' => 0, 'output_tokens' => 0];
+        }
         $pregunta = $this->ultimaDelCliente($conversacion);
         $faqs = $this->faqsParaTexto(($t->subject ?? '') . ' ' . $pregunta);
         $ejemplos = $this->ejemplos($t->category_id ? (int) $t->category_id : null);
@@ -357,12 +365,27 @@ class AiSuggestionService
     {
         $rows = DB::table('messages')->where('ticket_id', $ticketId)->where('is_internal_note', 0)
             ->when($this->hasta, fn ($q) => $q->where('id', '<=', $this->hasta))
-            ->whereNotNull('body')->orderByDesc('id')->limit(self::MAX_MENSAJES)->get(['direction', 'body']);
+            ->whereNotNull('body')->orderByDesc('id')->limit(self::MAX_MENSAJES)->get(['direction', 'body', 'type', 'media_mime']);
 
-        return $rows->reverse()->map(fn ($m) => [
-            'role' => $m->direction === 'in' ? 'user' : 'assistant',
-            'text' => $this->plano((string) $m->body),
-        ])->filter(fn ($m) => $m['text'] !== '')->values()->all();
+        return $rows->reverse()->map(function ($m) {
+            $texto = $this->plano((string) $m->body);
+            // Un audio de WhatsApp no trae texto: se deja una marca para saber que existió (no se transcribe, de momento).
+            $esAudio = $m->direction === 'in' && ($m->type === 'audio' || str_starts_with((string) $m->media_mime, 'audio/'));
+            return ['role' => $m->direction === 'in' ? 'user' : 'assistant', 'text' => $texto === '' && $esAudio ? self::MARCA_AUDIO : $texto];
+        })->filter(fn ($m) => $m['text'] !== '')->values()->all();
+    }
+
+    /** ¿Lo último del cliente (tras la última respuesta) son solo audios, sin ningún texto? */
+    public static function soloAudios(array $conv): bool
+    {
+        $ultimos = [];
+        foreach (array_reverse($conv) as $m) {
+            if ($m['role'] !== 'user') {
+                break;
+            }
+            $ultimos[] = trim((string) $m['text']);
+        }
+        return $ultimos !== [] && ! array_filter($ultimos, fn ($x) => strcasecmp($x, self::MARCA_AUDIO) !== 0);
     }
 
     private function ultimaDelCliente(array $conv): string
@@ -769,6 +792,7 @@ class AiSuggestionService
            . "- EXPLICAR O VERIFICAR PRIMERO: cómo se ACCEDE o se usa la aplicación (entrar desde el móvil, qué hace una pantalla) se explica directamente. Pero si la petición CONFIGURA algo del buffet (crear o editar posiciones, isletas, etiquetas, servicios) o toca datos o configuración CONCRETOS de ese hotel, y todavía no está verificado el correo, primero se pide el correo y se explica después (ejemplos: desbloquear o bloquear servicios, reactivar etiquetas inactivas, crear una isleta, cambiar algo en su cuenta). Si todavía no sabes quién escribe, NO expliques el procedimiento: pide primero el nombre del establecimiento y el correo con el que accede (máximo esas dos preguntas) y el resto se atiende después. Y si el cliente cuenta que YA lo intentó y la aplicación no se lo permite («no nos deja habilitarlas», «sale error»), no le repitas los pasos genéricos: deriva con la frase corta.\n"
            . "- AL DERIVAR sé breve: «Gracias por su mensaje. Hemos registrado la incidencia y el equipo la revisará.» No repitas ni resumas lo que cuenta el cliente, no enumeres sus incidencias ni añadas explicaciones.\n"
            . "- NUNCA le digas al cliente que existen varios hoteles con un mismo nombre, ni cuántos hay, ni nombres otros: quien escribe podría no ser del hotel. Si dudas de cuál habla, pregunta solo «¿Me indica el nombre completo del hotel?».\n"
+           . "- AUDIOS: «" . self::MARCA_AUDIO . "» en la conversación es un audio de WhatsApp que no podemos escuchar. No supongas lo que decía. Si además hay texto del cliente, contesta solo al texto; si el texto remite al audio («como te dije en el audio»), pídele con tacto que lo escriba.\n"
            . "- Usa solo la información de este ticket y de las secciones de contexto siguientes; el contexto de otros casos son patrones para orientarte, nunca datos para citar.\n\n";
 
         [$codigos, $nFotos] = $t->codigos ?? [[], 0];

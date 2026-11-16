@@ -242,6 +242,21 @@ class AiSuggestionsTest extends TestCase
         $this->assertFalse($S::soloAcusaRecibo([$u('ok')]));   // sin respuesta previa de la IA, se contesta
     }
 
+    public function test_un_audio_de_whatsapp_se_contesta_con_texto_fijo_sin_llamar_a_la_ia(): void
+    {
+        $S = \App\Services\Ai\AiSuggestionService::class;
+        $u = fn ($t) => ['role' => 'user', 'text' => $t];
+        $this->assertTrue($S::soloAudios([$u('[audio]')]));
+        $this->assertTrue($S::soloAudios([$u('hola'), ['role' => 'assistant', 'text' => 'x'], $u('[audio]'), $u('[audio]')]));
+        $this->assertFalse($S::soloAudios([$u('[audio]'), $u('no funciona la etiqueta')]));   // si hay texto, se contesta al texto
+        $this->assertFalse($S::soloAudios([$u('hola')]));
+
+        $r = app($S)->responderChat((object) ['title' => 'Audio', 'contact_name' => null, 'contact_email' => null], [$u('[audio]')], $this->fake, true);
+        $this->assertSame('ready', $r['status']);
+        $this->assertStringContainsString('no podemos escuchar este audio', $r['body']);
+        $this->assertSame(0, $this->fake->llamadas);   // no se llamó al proveedor: no gasta nada
+    }
+
     public function test_encuentra_el_hotel_de_la_firma_aunque_no_ponga_la_palabra_hotel(): void
     {
         $svc = app(\App\Services\Ai\AiSuggestionService::class);
