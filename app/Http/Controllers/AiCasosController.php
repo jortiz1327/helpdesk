@@ -81,13 +81,13 @@ class AiCasosController extends Controller
             'propuesta' => empty($m[$x['id']]['revisado']) ? ($p[$x['id']] ?? null) : null,
             'id' => $x['id'], 'code' => $x['code'] ?? '', 'lote' => $x['lote'] ?? '', 'canal' => $x['canal'], 'asunto' => $x['asunto'], 'pregunta' => $x['pregunta'], 'humana' => $x['respuesta_humana'],
             'decision' => $m[$x['id']]['decision'] ?? 'responder', 'comentario' => $m[$x['id']]['comentario'] ?? '',
-            'revisado' => (bool) ($m[$x['id']]['revisado'] ?? false), 'ia' => $ia[$x['id']] ?? null,
+            'revisado' => (bool) ($m[$x['id']]['revisado'] ?? false), 'dudoso' => (bool) ($m[$x['id']]['dudoso'] ?? false), 'ia' => $ia[$x['id']] ?? null,
         ], $c));
     }
 
     public function guardar(Request $r, int $id)
     {
-        $d = $r->validate(['decision' => 'required|in:' . implode(',', self::DECISIONES), 'comentario' => 'nullable|string|max:10000', 'revisado' => 'boolean']);
+        $d = $r->validate(['decision' => 'required|in:' . implode(',', self::DECISIONES), 'comentario' => 'nullable|string|max:10000', 'revisado' => 'boolean', 'dudoso' => 'boolean']);
         $f = $this->dir() . '/marcas.json';
         abort_unless(is_file($f), 404);
         if (! is_file($f . '.bak')) {
@@ -95,7 +95,8 @@ class AiCasosController extends Controller
         }
         $m = json_decode((string) file_get_contents($f), true);
         abort_unless(isset($m[$id]), 404);
-        $m[$id] = ['decision' => $d['decision'], 'comentario' => trim((string) ($d['comentario'] ?? '')), 'revisado' => (bool) ($d['revisado'] ?? true)];
+        $m[$id] = ['decision' => $d['decision'], 'comentario' => trim((string) ($d['comentario'] ?? '')), 'revisado' => (bool) ($d['revisado'] ?? true)]
+            + (! empty($d['dudoso']) ? ['dudoso' => true] : []);   // «dudoso»: el caso no le dice nada o está obsoleto y lo revisa después
         file_put_contents($f, json_encode($m, JSON_UNESCAPED_UNICODE), LOCK_EX);
         return response()->json(['ok' => true]);
     }

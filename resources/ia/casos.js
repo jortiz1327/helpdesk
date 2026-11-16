@@ -20,12 +20,46 @@ const porId = (id) => casos.find((c) => c.id === id)
 const necesitaApi = (c) => /\[\s*API\s*\]/i.test(c.comentario || '')
 const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c.decision
 
+// Filtros agrupados por lo que quieres hacer; cada opción enseña cuántos casos tiene.
+const FILTROS = [
+  ['Para revisar', [
+    ['todos', 'Todos los casos', () => true],
+    ['pend', 'Sin revisar', (c) => !c.revisado],
+    ['dud', '🚩 Dudosos (los miro luego)', (c) => c.dudoso],
+    ['nuevos', 'Segundo lote (30 casos del 16-nov)', (c) => !!c.lote],
+  ]],
+  ['Según tu decisión', [
+    ['d-responder', 'Debe responder', (c) => c.decision === 'responder' && c.revisado],
+    ['d-pedir_info', 'Debe pedir dato', (c) => c.decision === 'pedir_info' && c.revisado],
+    ['d-derivar', 'Debe derivar', (c) => c.decision === 'derivar' && c.revisado],
+    ['desc', 'Descartados', (c) => c.decision === 'descartar'],
+  ]],
+  ['Según la IA y la API', [
+    ['dif', 'Donde la IA no coincide', (c) => difiere(c)],
+    ['ok', 'Donde la IA coincide', (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido === c.decision],
+    ['sinprobar', 'Que la IA aún no ha probado', (c) => !c.ia],
+    ['api', 'Necesitan [API]', (c) => necesitaApi(c)],
+    ['claude', 'Revalidados por Claude', (c) => !!c.nota],
+  ]],
+]
+const FILTRO = Object.fromEntries(FILTROS.flatMap(([, o]) => o.map(([v, , fn]) => [v, fn])))
+function pintarFiltro() {
+  const s = $('filtro'), val = s.value || 'todos'; s.replaceChildren()
+  FILTROS.forEach(([grupo, ops]) => {
+    const g = document.createElement('optgroup'); g.label = grupo
+    ops.forEach(([v, n, fn]) => { const o = document.createElement('option'); o.value = v; o.textContent = n + ' (' + casos.filter(fn).length + ')'; g.append(o) })
+    s.append(g)
+  })
+  s.value = val
+}
+
 function visibles() {
   const f = $('filtro').value
   // Buscador: por número de caso, código del ticket o palabras del asunto/mensaje.
   const q = ($('buscar') ? $('buscar').value : '').trim().toLowerCase().replace(/^#/, '')
   if (q) return casos.filter((c) => String(c.id).includes(q) || (c.code || '').toLowerCase().includes(q) || ((c.asunto || '') + ' ' + (c.pregunta || '')).toLowerCase().includes(q))
-  return casos.filter((c) => c.id === actual || (f === 'todos' || (f === 'nuevos' && c.lote) || (f === 'claude' && c.nota) || (f === 'pend' && !c.revisado) || (f === 'dif' && difiere(c)) || (f === 'api' && necesitaApi(c)) || (f === 'desc' && c.decision === 'descartar')))
+  const fn = FILTRO[f] || FILTRO.todos
+  return casos.filter((c) => c.id === actual || fn(c))
 }
 
 function progreso() {
@@ -40,7 +74,8 @@ function pintarLista() {
     const b = el('button', 'item'); b.setAttribute('role', 'listitem')
     if (c.id === actual) b.setAttribute('aria-current', 'true')
     const dot = el('span', 'dot'); dot.style.background = 'var(--c-' + c.decision + ')'
-    b.append(dot, el('span', 'num', '#' + c.id), el('span', 't', (c.asunto || c.pregunta).slice(0, 60)), el('span', 'df', (necesitaApi(c) ? 'API ' : '') + (difiere(c) ? 'IA≠' : '')), el('span', 'ck', c.revisado ? '✓' : ''))
+    const tag = el('span', 'tag', { responder: 'R', pedir_info: 'P', derivar: 'D', descartar: '✕' }[c.decision]); tag.style.color = 'var(--c-' + c.decision + ')'
+    b.append(dot, tag, el('span', 'num', '#' + c.id), el('span', 't', (c.asunto || c.pregunta).slice(0, 60)), el('span', 'df', (necesitaApi(c) ? 'API ' : '') + (difiere(c) ? 'IA≠' : '')), el('span', 'ck', c.dudoso ? '🚩' : c.revisado ? '✓' : ''))
     b.title = DEC[c.decision].n + (c.revisado ? ' · revisado' : '')
     b.onclick = () => ir(c.id)
     box.append(b)
@@ -77,7 +112,11 @@ function crearBotones() {
     g.append(b)
   })
 }
-function pintarBotones(c) { document.querySelectorAll('.dbtn').forEach((b) => b.setAttribute('aria-pressed', String(!!c && b.dataset.k === c.decision))) }
+function pintarBotones(c) {
+  document.querySelectorAll('.dbtn').forEach((b) => b.setAttribute('aria-pressed', String(!!c && b.dataset.k === c.decision)))
+  $('dudoso').setAttribute('aria-pressed', String(!!c && !!c.dudoso))
+}
+function alternarDudoso() { const c = porId(actual); if (!c) return; c.dudoso = !c.dudoso; pintarBotones(c); guardar(c, false) }
 
 // Propuesta de la IA (ai:prerrellenar) para un caso aún sin revisar: no cuenta como revisado hasta que se acepta o se corrige.
 function pintarProp(c) {
@@ -102,7 +141,7 @@ function pintarCaso() {
   if (!c) { izq.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
   const pos = casos.indexOf(c) + 1
   $('titulo').textContent = c.asunto || 'Sin asunto'
-  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · lote nuevo' : '')
+  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · segundo lote' : '')
   izq.append(bloque('client', 'El cliente escribió', c.pregunta, null, 'C'))
   izq.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
   if (c.ia) der.append(bloque('ia', 'Lo que hizo la IA (última prueba' + (c.ia.cuando ? ' · ' + c.ia.cuando : '') + ')', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
@@ -118,9 +157,9 @@ function pintarCaso() {
 async function guardar(c, revisado = true) {
   if (revisado) c.revisado = true
   $('estado').textContent = 'Guardando…'
-  try { await api('/' + c.id, 'POST', { decision: c.decision, comentario: c.comentario || '', revisado: c.revisado }); if (c.id === actual) $('estado').textContent = 'Guardado ✓' }
+  try { await api('/' + c.id, 'POST', { decision: c.decision, comentario: c.comentario || '', revisado: c.revisado, dudoso: !!c.dudoso }); if (c.id === actual) $('estado').textContent = 'Guardado ✓' }
   catch (e) { $('estado').textContent = 'No se pudo guardar: ' + e.message }
-  progreso(); pintarLista()
+  progreso(); pintarFiltro(); pintarLista()
   if (c.id === actual) pintarProp(c)   // una vez revisado, la propuesta desaparece
 }
 
@@ -161,6 +200,7 @@ document.addEventListener('keydown', (e) => {
   if (k) { e.preventDefault(); marcar(k) }
   else if (e.key === 'Enter') { e.preventDefault(); confirmarYSeguir() }
   else if (e.key.toLowerCase() === 'p') { e.preventDefault(); usarPropuesta() }
+  else if (e.key.toLowerCase() === 'd') { e.preventDefault(); alternarDudoso() }
   else if (e.key.toLowerCase() === 'n') { e.preventDefault(); $('com').focus() }
   else if (['c', 'h', 'i'].includes(e.key.toLowerCase())) {   // C / H / I: minimiza o abre ese bloque
     const cls = { c: 'client', h: 'human', i: 'ia' }[e.key.toLowerCase()]
@@ -170,6 +210,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') { e.preventDefault(); mover(-1) }
 })
 $('sig').onclick = confirmarYSeguir
+$('dudoso').onclick = alternarDudoso
 $('ant').onclick = () => mover(-1)
 $('buscar').oninput = () => { const v = visibles(); if (v.length && !v.find((c) => c.id === actual)) { flushCom(); actual = v[0].id; pintarCaso() } pintarLista() }
 $('filtro').onchange = () => { flushCom(); const v = visibles(); if (!v.find((c) => c.id === actual) && v[0]) actual = v[0].id; pintarCaso(); pintarLista() }
@@ -180,7 +221,6 @@ $('filtro').onchange = () => { flushCom(); const v = visibles(); if (!v.find((c)
     casos = await api('/lista')
     const primero = casos.find((c) => !c.revisado) || casos[0]
     actual = primero ? primero.id : null
-    if (!casos.some((c) => c.ia)) { const o = $('filtro').querySelector('[value=dif]'); o.disabled = true }
-    progreso(); pintarLista(); pintarCaso()
+    pintarFiltro(); progreso(); pintarLista(); pintarCaso()
   } catch (e) { $('titulo').textContent = 'No se pudo cargar: ' + e.message }
 })()

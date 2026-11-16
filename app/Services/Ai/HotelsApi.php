@@ -129,6 +129,10 @@ class HotelsApi
         $out = [];
         foreach ((array) ($d['coincidencias'] ?? []) as $c) {
             $hoteles = array_values((array) ($c['hoteles'] ?? []));
+            // Rol y estado del usuario en esa app (la API no da los permisos uno a uno, solo el nombre del rol).
+            $u = (array) ($c['usuario'] ?? []);
+            $rol = isset($u['rol']) && is_string($u['rol']) && trim($u['rol']) !== '' ? trim($u['rol']) : null;
+            $activo = array_key_exists('activo', $u) ? (bool) $u['activo'] : null;
             // Cada buffet trae solo hotel_id: el nombre del hotel está en la lista «hoteles» de la misma coincidencia.
             $nombrePorId = [];
             foreach ($hoteles as $h) {
@@ -146,11 +150,11 @@ class HotelsApi
                 $hotel = is_array($b) && self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']) !== null
                     ? self::nombre(self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']))
                     : ($nombrePorId[(string) (is_array($b) ? ($b['hotel_id'] ?? '') : '')] ?? (count($hoteles) === 1 ? self::nombre($hoteles[0]) : ''));
-                $out[$id] = ['buffet_id' => $id, 'buffet' => self::nombre($b), 'hotel' => $hotel];
+                $out[$id] = ['buffet_id' => $id, 'buffet' => self::nombre($b), 'hotel' => $hotel, 'rol' => $rol, 'activo' => $activo];
             }
             if (! $conBuffet) {   // sin buffets utilizables: al menos el nombre de los hoteles
                 foreach ($hoteles as $h) {
-                    $out['h:' . self::norm(self::nombre($h))] = ['buffet_id' => '', 'buffet' => '', 'hotel' => self::nombre($h)];
+                    $out['h:' . self::norm(self::nombre($h))] = ['buffet_id' => '', 'buffet' => '', 'hotel' => self::nombre($h), 'rol' => $rol, 'activo' => $activo];
                 }
             }
         }

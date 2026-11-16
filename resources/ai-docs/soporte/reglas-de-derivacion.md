@@ -55,3 +55,9 @@ Crear posiciones o isletas, dar de alta y asignar posición a una etiqueta, gira
 Lo primero es saber si escribe un **hotel, una tienda o una farmacia**. AdminHoteles solo conoce hoteles: en tiendas y farmacias no se puede consultar el estado de las antenas ni el stock.
 - **Tienda o farmacia con etiquetas que no actualizan**: se pide como máximo el **código nacional (CN)** del producto afectado y si la antena aparece conectada o en línea en su aplicación; si son todas o solo algunas se puede preguntar junto al código.
 - **Hotel**: se busca por el nombre que ya dice (solo se pide el nombre exacto si no aparece) y se valida el correo antes de hablar de datos concretos.
+
+## Explicar o verificar primero (16-nov)
+- Los pasos genéricos de la aplicación (crear una posición o isleta, cómo se usa una pantalla) se explican directamente.
+- Si la petición toca datos o configuración concretos del hotel (desbloquear o bloquear servicios, reactivar etiquetas inactivas, cambios en su cuenta) y aún no se sabe quién escribe: primero se pide el nombre del establecimiento y el correo con el que accede, y después se atiende.
+- Si el cliente cuenta que ya lo intentó y la aplicación no se lo permite, no se repiten los pasos genéricos: se deriva.
+- Nunca se afirma que «el sistema no está caído»: antenas en línea solo prueban que las antenas responden; una incidencia general solo la conoce el equipo.

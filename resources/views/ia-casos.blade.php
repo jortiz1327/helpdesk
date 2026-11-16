@@ -93,6 +93,10 @@
   .dbtn[aria-pressed="true"] { border-color: var(--k); background: color-mix(in srgb, var(--k) 14%, var(--panel)); }
   .dbtn[aria-pressed="true"] i { opacity: 1; box-shadow: 0 0 0 4px color-mix(in srgb, var(--k) 25%, transparent); }
   .dbtn[aria-pressed="true"] b { color: var(--k); }
+  .dudoso { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 2px dashed var(--line); background: none; border-radius: 12px; padding: 8px 12px; cursor: pointer; font-size: 14px; color: var(--muted); }
+  .dudoso kbd { margin-left: auto; font: 12px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 5px; padding: 0 7px; background: var(--panel); }
+  .dudoso[aria-pressed="true"] { border-style: solid; border-color: var(--c-pedir_info); color: var(--c-pedir_info); background: color-mix(in srgb, var(--c-pedir_info) 12%, var(--panel)); font-weight: 600; }
+  .item .tag { font-size: 10.5px; font-weight: 700; flex: none; width: 14px; text-align: center; }
   .note { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 180px; }
   .note label { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
   .note label kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 5px; padding: 0 6px; text-transform: none; letter-spacing: 0; }
@@ -131,15 +135,7 @@
       <p>Solo local · se guarda al instante · nada se envía</p>
       <div class="bar"><i id="barra"></i></div>
       <p id="prog" style="margin-bottom:10px"></p>
-      <select id="filtro" aria-label="Filtrar casos">
-        <option value="todos">Todos los casos</option>
-        <option value="pend">Sin revisar</option>
-        <option value="nuevos">Casos nuevos (lote de 30)</option>
-        <option value="claude">Revalidados por Claude</option>
-        <option value="dif">Donde la IA no coincide</option>
-        <option value="api">Necesitan [API]</option>
-        <option value="desc">Descartados</option>
-      </select>
+      <select id="filtro" aria-label="Filtrar casos"></select>
       <input id="buscar" type="search" placeholder="Buscar por nº, código o palabra" aria-label="Buscar caso" autocomplete="off">
 
     </header>
@@ -153,6 +149,7 @@
         <div class="prop" id="prop" hidden></div>
         <h3>¿Qué debería hacer la IA aquí?</h3>
         <div class="decide" id="botones"></div>
+        <button class="dudoso" id="dudoso" type="button" aria-pressed="false" title="Obsoleto o no te dice nada: lo marcas y lo ves después con el filtro «Dudosos»">🚩 Dudoso: lo miro luego <kbd>D</kbd></button>
         <div class="note">
           <label for="com">Tu comentario <kbd>N</kbd></label>
           <textarea id="com" placeholder="Opcional: por qué, o qué cambiarías (Ctrl+Enter guarda y pasa al siguiente)"></textarea>
