@@ -61,3 +61,8 @@ Lo primero es saber si escribe un **hotel, una tienda o una farmacia**. AdminHot
 - Si la petición toca datos o configuración concretos del hotel (desbloquear o bloquear servicios, reactivar etiquetas inactivas, cambios en su cuenta) y aún no se sabe quién escribe: primero se pide el nombre del establecimiento y el correo con el que accede, y después se atiende.
 - Si el cliente cuenta que ya lo intentó y la aplicación no se lo permite, no se repiten los pasos genéricos: se deriva.
 - Nunca se afirma que «el sistema no está caído»: antenas en línea solo prueban que las antenas responden; una incidencia general solo la conoce el equipo.
+
+## Verificar primero, explicar después (16-nov, sustituye al criterio anterior)
+- Si la petición implica CONFIGURAR algo del buffet (crear o editar posiciones, isletas, etiquetas, servicios, ruedas) y el correo del cliente no está verificado: primero se pide el correo con el que accede (el hotel ya se conoce si lo nombra) y se explica cuando lo confirme.
+- Explicar cómo se ACCEDE o se usa la aplicación (entrar desde el móvil, qué hace una pantalla) se hace directamente.
+- Con el correo ya verificado (por ejemplo, un ticket de correo) se explica sin volver a pedirlo.

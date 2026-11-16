@@ -114,6 +114,10 @@ class AiEvaluar extends Command
             $conApi = ! $this->option('sin-consulta') && self::necesitaApi($marcas[$c['id']]['comentario'] ?? null);
             $r = $svc->evaluarCaso((string) $c['asunto'], (string) $c['pregunta'], isset($locales[$c['code']]) ? (int) $locales[$c['code']] : null, $ai, $conApi);
             [$obtenido, $jin, $jout] = self::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null);
+            // [VERIF] en el comentario: «responder, pero solo tras verificar hotel y correo». Sin correo conocido, que la IA lo pida es acierto.
+            if ($esperado === 'responder' && $obtenido === 'pedir_info' && preg_match('/\[\s*VERIF\s*\]/i', (string) ($marcas[$c['id']]['comentario'] ?? ''))) {
+                $esperado = 'pedir_info';
+            }
             $in += (int) ($r['input_tokens'] ?? 0) + $jin;
             $out += (int) ($r['output_tokens'] ?? 0) + $jout;
             $api = self::necesitaApi($marcas[$c['id']]['comentario'] ?? null);

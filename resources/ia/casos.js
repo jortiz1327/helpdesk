@@ -18,7 +18,9 @@ async function api(url, method = 'GET', body) {
 
 const porId = (id) => casos.find((c) => c.id === id)
 const necesitaApi = (c) => /\[\s*API\s*\]/i.test(c.comentario || '')
-const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c.decision
+// [VERIF] en el comentario: «responder, pero solo tras verificar hotel y correo»; si la IA los pide, coincide.
+const verif = (c) => /\[\s*VERIF\s*\]/i.test(c.comentario || '')
+const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c.decision && !(verif(c) && c.decision === 'responder' && c.ia.obtenido === 'pedir_info')
 
 // Filtros agrupados por lo que quieres hacer; cada opción enseña cuántos casos tiene.
 const FILTROS = [
@@ -35,6 +37,7 @@ const FILTROS = [
     ['desc', 'Descartados', (c) => c.decision === 'descartar'],
   ]],
   ['Según la IA y la API', [
+    ['ind', '⚠ Respuestas indebidas (contestó y no debía)', (c) => c.ia && c.ia.obtenido === 'responder' && (c.decision === 'pedir_info' || c.decision === 'derivar')],
     ['dif', 'Donde la IA no coincide', (c) => difiere(c)],
     ['ok', 'Donde la IA coincide', (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido === c.decision],
     ['sinprobar', 'Que la IA aún no ha probado', (c) => !c.ia],
