@@ -71,6 +71,9 @@
   .human { background: var(--human); border-color: var(--c-responder); }
   .ia { background: var(--ia); border-color: var(--c-pedir_info); }
   .nota { background: var(--nota); border-color: var(--c-descartar); }
+  .aviso-hum { font-size: 13px; color: var(--muted); padding: 0 4px; margin-top: -4px; }
+  .hist { background: var(--nota); border-color: var(--c-descartar); }
+  .hist .txt { font-size: 14px; color: var(--muted); }
   .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; color: #fff; text-transform: none; letter-spacing: 0; }
   .empty { margin: 40px auto; text-align: center; color: var(--muted); max-width: 420px; }
 
@@ -159,6 +162,7 @@
           <div class="etiquetas" id="etiquetas" role="group" aria-label="Etiquetas rápidas del comentario">
             <button type="button" class="etq" data-etq="API" aria-pressed="false" title="Para decidir hay que consultar AdminHoteles de verdad (antenas, hotel…): se mide aparte">[API] consulta AdminHoteles</button>
             <button type="button" class="etq" data-etq="VERIF" aria-pressed="false" title="Responder, pero solo tras verificar hotel y correo: si la IA los pide, cuenta como acierto">[VERIF] tras verificar</button>
+            <button type="button" class="etq" data-etq="ANTIGUO" aria-pressed="false" title="La persona lo hizo porque antes de migrar a la app nueva solo podía el equipo; hoy lo hace el hotel. Manda lo actual (manuales), no la respuesta humana">[ANTIGUO] respuesta desfasada</button>
           </div>
           <textarea id="com" placeholder="Opcional: por qué, o qué cambiarías (Ctrl+Enter guarda y pasa al siguiente)"></textarea>
         </div>

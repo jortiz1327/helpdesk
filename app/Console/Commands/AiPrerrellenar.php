@@ -85,7 +85,7 @@ TXT;
         $in = $out = $fallos = 0;
         $bar = $this->output->createProgressBar(count($pend));
         foreach ($pend as $c) {
-            $user = "CASO\nAsunto: " . self::limpia((string) $c['asunto'], 150) . "\nCliente: " . self::limpia((string) $c['pregunta'], 1500)
+            $user = "CASO\nAsunto: " . self::limpia((string) $c['asunto'], 150) . (! empty($c['historial']) ? "\nCONVERSACIÓN PREVIA (es un SEGUIMIENTO: se evalúa solo el último mensaje del cliente):\n" . self::limpia((string) $c['historial'], 2500) : '') . "\nCliente: " . self::limpia((string) $c['pregunta'], 1500)
                 . "\nLo que respondió una persona: " . self::limpia((string) $c['respuesta_humana'], 600)
                 . "\nDecisión sugerida por la extracción automática: " . ($c['decision_propuesta'] ?? '?');
             try {

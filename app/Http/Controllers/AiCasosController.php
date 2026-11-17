@@ -79,7 +79,7 @@ class AiCasosController extends Controller
         return response()->json(array_map(fn ($x) => [
             'nota' => $notas[$x['id']] ?? null,
             'propuesta' => empty($m[$x['id']]['revisado']) ? ($p[$x['id']] ?? null) : null,
-            'id' => $x['id'], 'code' => $x['code'] ?? '', 'lote' => $x['lote'] ?? '', 'canal' => $x['canal'], 'asunto' => $x['asunto'], 'pregunta' => $x['pregunta'], 'humana' => $x['respuesta_humana'],
+            'id' => $x['id'], 'code' => $x['code'] ?? '', 'lote' => $x['lote'] ?? '', 'canal' => $x['canal'], 'asunto' => $x['asunto'], 'pregunta' => $x['pregunta'], 'historial' => $x['historial'] ?? null, 'humana' => $x['respuesta_humana'],
             'decision' => $m[$x['id']]['decision'] ?? 'responder', 'comentario' => $m[$x['id']]['comentario'] ?? '',
             'revisado' => (bool) ($m[$x['id']]['revisado'] ?? false), 'dudoso' => (bool) ($m[$x['id']]['dudoso'] ?? false), 'ia' => $ia[$x['id']] ?? null,
         ], $c));

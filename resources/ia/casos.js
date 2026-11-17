@@ -28,6 +28,7 @@ const FILTROS = [
     ['todos', 'Todos los casos', () => true],
     ['pend', 'Sin revisar', (c) => !c.revisado],
     ['dud', '🚩 Dudosos (los miro luego)', (c) => c.dudoso],
+    ['seg', 'Seguimientos · 2.º/3.º mensaje del cliente (para MEDIR)', (c) => (c.lote || '').startsWith('seg-')],
     ['lote5', 'Lote 5 · para MEDIR (20 casos nuevos del 17-nov)', (c) => c.lote === 'lote5-20261117'],
     ['lote4', 'Lote 4 · ya usado para ajustar (no vale para medir)', (c) => c.lote === 'lote4-20261117'],
     ['lote3', 'Lote 3 (20 casos del 17-nov, ya medido)', (c) => c.lote === 'lote3-20261117'],
@@ -142,14 +143,22 @@ function usarPropuesta() {
   $('com').value = c.comentario; pintarBotones(c); guardar(c); pintarProp(c)
 }
 
+function etiquetarHistorial(t) {
+  return String(t).split(/\n\n(?=CLIENTE: |EQUIPO: )/)
+    .map((x) => x.replace(/^CLIENTE: /, '▸ CLIENTE\n').replace(/^EQUIPO: /, '▸ EQUIPO\n'))
+    .join('\n\n')
+}
+
 function pintarCaso() {
   const c = porId(actual), izq = $('colL'), der = $('colR'); izq.replaceChildren(); der.replaceChildren()
   if (!c) { izq.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
   const pos = casos.indexOf(c) + 1
   $('titulo').textContent = c.asunto || 'Sin asunto'
   $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · ' + (c.lote.startsWith('lote5') ? 'lote 5 (para medir)' : c.lote.startsWith('lote4') ? 'lote 4 (ya usado)' : c.lote.startsWith('lote3') ? 'lote 3' : 'lote 2') : '')
-  izq.append(bloque('client', 'El cliente escribió', c.pregunta, null, 'C'))
-  izq.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
+  if (c.historial) izq.append(bloque('hist', 'Antes de este mensaje (solo contexto)', etiquetarHistorial(c.historial), null, null))
+  izq.append(bloque('client', c.historial ? 'El cliente escribe ahora' : 'El cliente escribió', c.pregunta, null, 'C'))
+  if (c.humana) izq.append(el('div', 'aviso-hum', 'Ojo: puede ser de antes de migrar a la app nueva (entonces solo el equipo podía hacer muchas cosas). Si es así, marca [ANTIGUO] y decide por lo que hoy puede hacer el hotel.'))
+  izq.append(bloque('human', c.historial ? 'Lo que respondió una persona A ESTE MENSAJE' : 'Lo que respondió una persona', c.humana, null, 'H'))
   if (c.ia) der.append(bloque('ia', 'Lo que hizo la IA (última prueba' + (c.ia.cuando ? ' · ' + c.ia.cuando : '') + ')', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
   if (c.nota) der.append(bloque('nota', 'Nota de Claude', c.nota, null, null))
   else der.append(el('div', 'empty', 'La IA aún no ha probado este caso.'))

@@ -379,14 +379,14 @@ class AiSuggestionService
      * Evaluación (comando ai:evaluar): contesta a un caso ya anonimizado como si fuera un ticket nuevo, sin guardar nada
      * y sin consultar datos de ningún hotel. $excluirTicket es el ticket local del propio caso, para que no se «copie».
      */
-    public function evaluarCaso(string $asunto, string $pregunta, ?int $excluirTicket, AiProvider $ai, bool $conApi = false): array
+    public function evaluarCaso(string $asunto, string $pregunta, ?int $excluirTicket, AiProvider $ai, bool $conApi = false, ?array $conversacion = null): array
     {
         $this->excluirTicket = $excluirTicket;
         $this->evalApi = $conApi;   // casos [API]: la IA también ve lo que AdminHoteles diga del hotel que nombra el mensaje (solo lectura)
         try {
             $t = (object) ['id' => null, 'subject' => $asunto, 'category_id' => null, 'channel' => 'chat', 'category_name' => null,
-                'contact_name' => null, 'contact_email' => null, 'yaRespondio' => false];
-            return $this->componer($t, [['role' => 'user', 'text' => $pregunta]], null, $ai, true);
+                'contact_name' => null, 'contact_email' => null, 'yaRespondio' => (bool) array_filter($conversacion ?? [], fn ($m) => $m['role'] === 'assistant')];
+            return $this->componer($t, $conversacion ?: [['role' => 'user', 'text' => $pregunta]], null, $ai, true);
         } finally {
             $this->excluirTicket = null;
             $this->evalApi = false;
@@ -973,7 +973,7 @@ class AiSuggestionService
             }
         }
         if ($previos) {
-            $s .= "\n\nCASOS ANTERIORES RESUELTOS (úsalos solo si encajan con esta consulta: de ahí sacas el criterio y el tono del equipo; no copies datos de otros clientes ni mezcles casos distintos)\n";
+            $s .= "\n\nCASOS ANTERIORES RESUELTOS (úsalos solo si encajan con esta consulta: de ahí sacas el tono del equipo; no copies datos de otros clientes ni mezcles casos distintos. OJO: muchos son de antes de que los hoteles pasaran a la aplicación nueva, cuando solo el equipo podía hacer posiciones, nombres de etiquetas, usuarios o forzar menús; hoy lo hace el propio hotel, así que si un caso antiguo muestra al equipo haciéndolo por el cliente, NO lo imites: el criterio lo dan la guía oficial y las reglas de arriba)\n";
             foreach ($previos as $d) {
                 $s .= '[Caso resuelto: ' . $d->title . "]\n" . mb_substr((string) $d->content, 0, 1400) . "\n\n";
             }

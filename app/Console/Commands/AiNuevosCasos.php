@@ -18,7 +18,8 @@ class AiNuevosCasos extends Command
     protected $signature = 'ai:nuevos-casos
         {--cantidad=30 : Casos a añadir}
         {--lote= : Nombre del lote (por defecto nuevos-AAAAMMDD)}
-        {--semilla=1 : Semilla del reparto aleatorio (para repetir el mismo lote)}';
+        {--semilla=1 : Semilla del reparto aleatorio (para repetir el mismo lote)}
+        {--seguimiento : Casos de SEGUIMIENTO: la conversación se corta en el 2.º o 3.º mensaje del cliente (tras una respuesta de una persona)}';
 
     protected $description = 'Añade al conjunto de pruebas un lote de tickets reales nuevos, anonimizados y sin revisar';
 
@@ -34,7 +35,8 @@ class AiNuevosCasos extends Command
         // Se compara por CÓDIGO: los ids de los casos viejos vienen de producción y no coinciden con los de la base local.
         $ya = array_flip(array_column($cand, 'code'));
         $idsUsados = array_flip(array_map('strval', array_column($cand, 'id')));
-        $lote = (string) ($this->option('lote') ?: 'nuevos-' . now()->format('Ymd'));
+        $seg = (bool) $this->option('seguimiento');
+        $lote = (string) ($this->option('lote') ?: ($seg ? 'seg-' : 'nuevos-') . now()->format('Ymd'));
         $n = max(1, (int) $this->option('cantidad'));
 
         $tickets = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
@@ -55,7 +57,7 @@ class AiNuevosCasos extends Command
             if (count($porCanal[$t->channel]) >= ($t->channel === 'email' ? $meta : $n - $meta)) {
                 continue;
             }
-            $caso = $this->caso($t, $lote);
+            $caso = $seg ? $this->casoSeguimiento($t, $lote) : $this->caso($t, $lote);
             if ($caso) {
                 $porCanal[$t->channel][] = $caso;
             }
@@ -79,6 +81,96 @@ class AiNuevosCasos extends Command
         $this->info(count($nuevos) . " casos nuevos en el lote «{$lote}» (". count($porCanal['email']) . ' correo, ' . count($porCanal['whatsapp']) . ' WhatsApp). Ahora hay ' . count($cand) . ' en total.');
         $this->line('Siguiente: php artisan ai:prerrellenar (propuestas) y revisarlos en /ia/casos con el filtro «Sin revisar».');
         return self::SUCCESS;
+    }
+
+    /**
+     * Pasa los mensajes de un ticket a TURNOS alternados cliente / persona (los seguidos del mismo lado se unen).
+     * Función pura, sin base de datos.
+     *
+     * @param  array<int, array{role:string, text:string}>  $mensajes  ya con el texto limpio, en orden
+     * @return array<int, array{role:string, text:string}>
+     */
+    public static function turnos(array $mensajes): array
+    {
+        $out = [];
+        foreach ($mensajes as $m) {
+            if (trim($m['text']) === '') {
+                continue;
+            }
+            if ($out && $out[count($out) - 1]['role'] === $m['role']) {
+                $out[count($out) - 1]['text'] .= "\n\n" . $m['text'];
+            } else {
+                $out[] = ['role' => $m['role'], 'text' => $m['text']];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Dónde cortar una conversación para probar un SEGUIMIENTO: el índice del 2.º mensaje del cliente (o del 3.º, si $tercero),
+     * siempre que lo siguiente sea una respuesta de una persona, que será lo que se compare. null si no hay.
+     *
+     * @param  array<int, array{role:string, text:string}>  $turnos
+     */
+    public static function puntoDeCorte(array $turnos, bool $tercero = false): ?int
+    {
+        $clientes = [];
+        foreach ($turnos as $i => $t) {
+            if ($t['role'] === 'user') {
+                $clientes[] = $i;
+            }
+        }
+        $orden = $tercero ? [2, 1] : [1, 2];   // posición (desde 0) del mensaje del cliente que se prueba
+        foreach ($orden as $k) {
+            $i = $clientes[$k] ?? null;
+            if ($i !== null && isset($turnos[$i + 1]) && $turnos[$i + 1]['role'] === 'assistant' && mb_strlen(trim($turnos[$i]['text'])) >= 20) {
+                return $i;
+            }
+        }
+        return null;
+    }
+
+    /** El caso de seguimiento de un ticket (o null si no sirve). */
+    private function casoSeguimiento(object $t, string $lote): ?array
+    {
+        $msgs = DB::table('messages')->where('ticket_id', $t->id)->where('is_internal_note', 0)->whereNotNull('body')
+            ->orderBy('id')->get(['direction', 'body', 'author_user_id', 'type']);
+        if ($msgs->count() < 4 || $msgs->count() > 40) {
+            return null;
+        }
+        $nombre = (string) ($t->contact_name ?? '');
+        $humano = fn ($m) => $m->direction === 'out' && ($t->channel === 'whatsapp'
+            ? $m->type === 'text' && ! str_contains((string) $m->body, 'horario de oficina') && mb_strlen(trim(strip_tags((string) $m->body))) >= 25
+            : (bool) $m->author_user_id);
+        $lista = [];
+        foreach ($msgs as $m) {
+            if ($m->direction === 'out' && ! $humano($m)) {
+                continue;   // aviso automático: no es un turno
+            }
+            $lista[] = ['role' => $m->direction === 'in' ? 'user' : 'assistant', 'text' => trim(Scrub::tapar(Scrub::plano((string) $m->body), $nombre))];
+        }
+        $turnos = self::turnos($lista);
+        if (! isset($turnos[0]) || $turnos[0]['role'] !== 'user') {
+            return null;
+        }
+        $corte = self::puntoDeCorte($turnos, mt_rand(0, 1) === 1);
+        if ($corte === null) {
+            return null;
+        }
+        $respuesta = trim($turnos[$corte + 1]['text']);
+        if (mb_strlen($respuesta) < 40) {
+            return null;
+        }
+        $conv = array_map(fn ($x) => ['role' => $x['role'], 'text' => mb_substr($x['text'], 0, 1200)], array_slice($turnos, 0, $corte + 1));
+        $historial = implode("\n\n", array_map(fn ($x) => ($x['role'] === 'user' ? 'CLIENTE: ' : 'EQUIPO: ') . $x['text'], array_slice($conv, 0, -1)));
+
+        return [
+            'id' => (int) $t->id, 'code' => $t->code, 'canal' => $t->channel, 'categoria' => (int) ($t->category_id ?? 0),
+            'abierto' => (string) $t->opened_at, 'asunto' => mb_substr(Scrub::tapar((string) $t->subject, $nombre), 0, 255),
+            'pregunta' => $conv[count($conv) - 1]['text'], 'historial' => $historial, 'conversacion' => $conv,
+            'respuesta_humana' => mb_substr($respuesta, 0, 2500), 'mensajes' => $msgs->count(), 'decision_propuesta' => null,
+            'lote' => $lote, 'seguimiento' => true,
+        ];
     }
 
     /** El caso de un ticket (o null si no sirve: sin petición clara, sin respuesta de una persona, demasiado largo…). */
