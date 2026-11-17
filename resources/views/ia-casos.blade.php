@@ -100,6 +100,10 @@
   .note { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 180px; }
   .note label { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
   .note label kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 5px; padding: 0 6px; text-transform: none; letter-spacing: 0; }
+  .etiquetas { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+  .etq { font: 600 12px ui-monospace, monospace; border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+  .etq:hover { border-color: var(--accent); color: var(--ink); }
+  .etq[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
   textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; width: 100%; flex: 1; min-height: 150px; resize: none; line-height: 1.5; }
   textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; background: var(--panel); }
   .nav { display: flex; gap: 8px; align-items: center; }
@@ -152,6 +156,10 @@
         <button class="dudoso" id="dudoso" type="button" aria-pressed="false" title="Obsoleto o no te dice nada: lo marcas y lo ves después con el filtro «Dudosos»">🚩 Dudoso: lo miro luego <kbd>D</kbd></button>
         <div class="note">
           <label for="com">Tu comentario <kbd>N</kbd></label>
+          <div class="etiquetas" id="etiquetas" role="group" aria-label="Etiquetas rápidas del comentario">
+            <button type="button" class="etq" data-etq="API" aria-pressed="false" title="Para decidir hay que consultar AdminHoteles de verdad (antenas, hotel…): se mide aparte">[API] consulta AdminHoteles</button>
+            <button type="button" class="etq" data-etq="VERIF" aria-pressed="false" title="Responder, pero solo tras verificar hotel y correo: si la IA los pide, cuenta como acierto">[VERIF] tras verificar</button>
+          </div>
           <textarea id="com" placeholder="Opcional: por qué, o qué cambiarías (Ctrl+Enter guarda y pasa al siguiente)"></textarea>
         </div>
         <div class="estado" id="estado" role="status"></div>

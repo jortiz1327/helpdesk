@@ -153,7 +153,7 @@ function pintarCaso() {
   if (c.nota) der.append(bloque('nota', 'Nota de Claude', c.nota, null, null))
   else der.append(el('div', 'empty', 'La IA aún no ha probado este caso.'))
   pintarBotones(c); pintarProp(c)
-  $('com').value = c.comentario || ''
+  $('com').value = c.comentario || ''; pintarEtiquetas()
   $('estado').textContent = c.revisado ? 'Revisado ✓' : ''
   $('read').scrollTop = 0; izq.scrollTop = 0; der.scrollTop = 0   // solo al cambiar de caso
   $('ant').disabled = pos === 1
@@ -174,7 +174,20 @@ function flushCom() {
   clearTimeout(tmCom); tmCom = null
   const c = porId(actual); if (c) { c.comentario = $('com').value; guardar(c, false) }
 }
-$('com').oninput = () => { clearTimeout(tmCom); tmCom = setTimeout(flushCom, 600) }
+// Etiquetas rápidas: pulsar añade (o quita) [API] / [VERIF] al principio del comentario, sin escribirlas.
+function pintarEtiquetas() {
+  const t = $('com').value
+  document.querySelectorAll('.etq').forEach((b) => b.setAttribute('aria-pressed', new RegExp('\\[\\s*' + b.dataset.etq + '\\s*\\]', 'i').test(t) ? 'true' : 'false'))
+}
+document.querySelectorAll('.etq').forEach((b) => {
+  b.onclick = () => {
+    const re = new RegExp('\\[\\s*' + b.dataset.etq + '\\s*\\]\\s?', 'ig')
+    const t = $('com').value
+    $('com').value = re.test(t) ? t.replace(re, '').trim() : '[' + b.dataset.etq + '] ' + t
+    pintarEtiquetas(); clearTimeout(tmCom); tmCom = setTimeout(flushCom, 0)
+  }
+})
+$('com').oninput = () => { pintarEtiquetas(); clearTimeout(tmCom); tmCom = setTimeout(flushCom, 600) }
 $('com').onblur = flushCom
 
 function marcar(k) { const c = porId(actual); if (!c) return; c.decision = k; pintarBotones(c); guardar(c) }
