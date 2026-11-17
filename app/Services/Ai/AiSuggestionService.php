@@ -653,6 +653,11 @@ class AiSuggestionService
         $pedir = "- Pídele con tacto que confirme el nombre del hotel y el correo con el que accede a la aplicación.\n";
         $tacto = "- Sin acusar ni sonar a sospecha: es lo normal que alguien escriba con otro correo.\n";
 
+        // Un pedido de material no depende de datos del hotel: si el correo no se pudo comprobar (o no hay), se atiende igual, sin derivar por eso.
+        if ($pedido && in_array($v['estado'], ['sin_correo', 'incompleto'], true)) {
+            return $cab . "- El cliente pide material. Eso no depende de datos de su hotel: NO hace falta verificar su correo ni derivar por eso. Explícale cómo hacer el pedido según las reglas de soporte.
+" . $comun;
+        }
         if ($v['estado'] === 'sin_correo') {
             if (! $nombres) {
                 return $cab . "- Aún no sabemos de qué hotel es ni con qué correo accede. Pregunta PRIMERO el nombre del hotel y, a continuación, el correo con el que accede a la aplicación.\n" . $comun;
