@@ -101,7 +101,7 @@
     <g style="--k:var(--k-mem)" class="n"><rect x="700" y="450" width="250" height="90"/><text x="825" y="484" class="t">📚 Memoria y guía</text><text x="825" y="507" class="s">preguntas frecuentes · tickets parecidos</text><text x="825" y="524" class="s">manuales · correcciones validadas</text><circle cx="700" cy="450" r="14"/><text x="700" y="455" class="b">5</text></g>
     <g style="--k:var(--k-ai)" class="n ia"><rect x="740" y="235" width="170" height="100"/><text x="825" y="269" class="t">🤖 IA</text><text x="825" y="292" class="s">Claude Haiku 5.5</text><text x="825" y="309" class="s">con las reglas del equipo</text><circle cx="740" cy="235" r="14"/><text x="740" y="240" class="b">6</text></g>
     <g style="--k:var(--k-ag)" class="n"><rect x="1050" y="110" width="210" height="70"/><text x="1155" y="144" class="t">✅ Borrador sugerido</text><text x="1155" y="167" class="s">responder o pedir datos (no se envía)</text></g>
-    <g style="--k:var(--k-api)" class="n"><rect x="1050" y="240" width="210" height="90"/><text x="1155" y="274" class="t">↪️ Derivar (sugerido)</text><text x="1155" y="297" class="s">Garantías · Postventa</text><text x="1155" y="314" class="s">Soporte · Proyectos</text></g>
+    <g style="--k:var(--k-api)" class="n"><rect x="1050" y="240" width="210" height="90"/><text x="1155" y="274" class="t">↪️ Derivar (sugerido)</text><text x="1155" y="297" class="s">nota «Para el equipo»:</text><text x="1155" y="314" class="s">Soporte · Garantías · Pedidos</text></g>
     <g style="--k:var(--k-no)" class="n"><rect x="1050" y="390" width="210" height="70"/><text x="1155" y="424" class="t">🙋 No sabe / falla</text><text x="1155" y="447" class="s">sin borrador · Reintentar</text></g>
     <g style="--k:var(--k-ag)" class="n"><rect x="1050" y="590" width="210" height="100"/><text x="1155" y="624" class="t">🧑‍💼 Agente decide</text><text x="1155" y="647" class="s">copia y envía él (panel)</text><text x="1155" y="664" class="s">👍 útil · 👎 corrige</text><circle cx="1050" cy="590" r="14"/><text x="1050" y="595" class="b">7</text></g>
     <g style="--k:var(--k-mem)" class="n"><rect x="700" y="590" width="250" height="100"/><text x="825" y="624" class="t">🛡️ Responsable valida</text><text x="825" y="647" class="s">Ajustes › Asistente IA</text><text x="825" y="664" class="s">sin validar, no llega a la IA</text><circle cx="700" cy="590" r="14"/><text x="700" y="595" class="b">8</text></g>
@@ -190,7 +190,7 @@
       <h2>Una de estas salidas (solo sugerencias: nada se envía al cliente)</h2>
       <div class="salidas">
         <div class="salida" style="--c: var(--k-ag)"><b>Borrador de respuesta</b><span>Una respuesta lista para revisar: explica, o pide datos al cliente.</span></div>
-        <div class="salida" style="--c: var(--k-api)"><b>Derivar</b><span>Un mensaje corto («hemos registrado la incidencia y el equipo la revisará»); destinos: Garantías, Postventa, Soporte/Programación, Proyectos.</span></div>
+        <div class="salida" style="--c: var(--k-api)"><b>Derivar</b><span>Un mensaje corto para el cliente («hemos registrado la incidencia y el equipo la revisará») y, aparte, un bloque <b>«Para el equipo»</b> en el panel: la categoría de la app a la que llevarlo (Soporte, Garantías o Pedidos y facturas) y el motivo en pocas palabras. Ese bloque lo ve el agente, no el cliente.</span></div>
         <div class="salida" style="--c: var(--k-no)"><b>No sabe / falla</b><span>No hay borrador: el agente ve «La IA no se atreve» o un aviso con Reintentar.</span></div>
       </div>
     </div>
