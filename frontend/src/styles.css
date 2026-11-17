@@ -4471,3 +4471,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-det > summary:hover { color: var(--ink); }
 .ai-det > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 .ai-det[open] > summary { margin-bottom: 4px; }
+/* Derivación: a qué categoría de la app debe llevarlo la persona del equipo (nota interna, no va al cliente) */
+.ai-dest { border-left: 3px solid var(--warn); padding-left: 12px; }
+.ai-dest-t { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; color: var(--ink); }
+.ai-dest-t svg { width: 16px; height: 16px; color: var(--warn); flex: none; }

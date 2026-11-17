@@ -51,6 +51,9 @@ class AiSuggestionService
     private ?string $hotelAmbiguo = null;
     /** Lo que hizo la IA en esta sugerencia, paso a paso (se guarda en `sources.traza` y se enseña al agente en el panel). */
     private array $traza = [];
+    /** A qué categoría de la app (soporte, garantías, pedidos) debe llevarlo una persona, si la IA derivó. Nota interna para el agente. */
+    private ?array $derivarA = null;
+    private const CATEGORIAS_DERIVAR = ['soporte' => 'Soporte', 'garantias' => 'Garantías', 'pedidos' => 'Pedidos y facturas'];
 
     /** Apunta un paso en la traza. $ok: true = bien, false = problema, null = informativo. */
     /** Quien llama (el panel del ticket) recibe cada paso al momento: así el agente ve lo que va haciendo la IA. */
@@ -239,6 +242,7 @@ class AiSuggestionService
     private function componer(object $t, array $conversacion, ?int $ticketId, AiProvider $ai, bool $anonimizar): array
     {
         $this->traza = [];
+        $this->derivarA = null;
         // Solo audios de WhatsApp (todavía no se transcriben): texto fijo y cortés, sin llamar al proveedor (no gasta nada).
         if (self::soloAudios($conversacion)) {
             $this->paso('filtro', null, 'El cliente solo ha enviado audios: se prepara el texto fijo de «no podemos escuchar audios» (sin llamar a la IA)');
@@ -258,7 +262,7 @@ class AiSuggestionService
         $this->paso('memoria', null, 'Memoria consultada: ' . count($faqs) . ' preguntas frecuentes · ' . count($ejemplos) . ' respuestas de ejemplo · ' . count($casos) . ' casos/manuales parecidos'
             . ($casos ? ' (' . implode('; ', array_map(fn ($d) => mb_substr((string) ($d->title ?? ''), 0, 60), array_slice($casos, 0, 4))) . ')' : ''),
             ['faqs' => count($faqs), 'ejemplos' => count($ejemplos), 'casos' => array_map(fn ($d) => ['tipo' => (string) ($d->source_type ?? ''), 'titulo' => mb_substr((string) ($d->title ?? ''), 0, 90)], array_slice($casos, 0, 6))]);
-        $fuentes = fn () => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos), 'traza' => $this->traza]);
+        $fuentes = fn () => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos), 'traza' => $this->traza, 'derivar' => $this->derivarA]);
         $fila = ['sources' => $fuentes()];
         $this->avisar('Redactando la respuesta…');
         try {
@@ -268,9 +272,10 @@ class AiSuggestionService
                 $fila += ['model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens']];   // se pagó aunque no sirva
                 throw new AiException('La respuesta de la IA salió incompleta');
             }
-            $texto = trim($r['text']);
+            [$texto, $this->derivarA] = self::sacarDerivacion(trim($r['text']));
             $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
-            $this->paso('salida', $sabe ? true : null, $sabe ? 'Respuesta preparada · ' . self::tipoDeRespuesta($texto) . ' (estimado)' : 'La IA no se atreve: no hay borrador, lo debe llevar una persona');
+            $dest = $this->derivarA ? ' · llevar a ' . $this->derivarA['categoria'] : '';
+            $this->paso('salida', $sabe ? true : null, $sabe ? 'Respuesta preparada · ' . ($this->derivarA ? 'deriva a una persona del equipo' : self::tipoDeRespuesta($texto)) . $dest . ' (estimado)' : 'La IA no se atreve: no hay borrador, lo debe llevar una persona' . $dest);
             $fila['sources'] = $fuentes();
             return $fila + [
                 'status' => $sabe ? 'ready' : 'abstained', 'body' => $sabe ? $texto : null,
@@ -304,6 +309,24 @@ class AiSuggestionService
     }
 
     /** ¿Lo último que escribió el cliente (tras la última respuesta) es solo un acuse de recibo? Solo cuenta si ya se le había contestado. */
+    /**
+     * La IA, al derivar, añade en una línea aparte «[[DERIVAR:categoria|motivo]]». Es una nota interna para el agente (a qué
+     * categoría de la app debe llevarlo): se quita del texto y se guarda aparte. Devuelve [texto limpio, ['categoria','motivo']|null].
+     */
+    public static function sacarDerivacion(string $texto): array
+    {
+        $dest = null;
+        $limpio = preg_replace_callback('/\s*\[\[DERIVAR:\s*([a-záéíóú]+)\s*(?:\|\s*([^\]]*?))?\s*\]\]\s*/iu', function ($m) use (&$dest) {
+            $k = strtr(mb_strtolower($m[1]), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+            $k = str_starts_with($k, 'pedido') ? 'pedidos' : (str_starts_with($k, 'garant') ? 'garantias' : $k);
+            if (isset(self::CATEGORIAS_DERIVAR[$k]) && $dest === null) {
+                $dest = ['categoria' => self::CATEGORIAS_DERIVAR[$k], 'motivo' => mb_substr(trim($m[2] ?? ''), 0, 160)];
+            }
+            return "\n";
+        }, $texto);
+        return [trim((string) $limpio), $dest];
+    }
+
     /** Clasificación aproximada de lo que hace el borrador, solo para el panel del agente. */
     private static function tipoDeRespuesta(string $t): string
     {
@@ -908,6 +931,7 @@ class AiSuggestionService
            . "- ASIGNAR, MOVER O CAMBIAR POSICIONES SIN CORREO VERIFICADO: si piden asignar etiquetas a posiciones, moverlas o cambiarlas (con o sin listado de códigos, aunque lo escriban como «¿podéis asignar…?» o «cuando pueda asignar las posiciones») y todavía no está verificado el correo, NO derives ni digas que un compañero lo revisará: pide el correo con el que accede a la aplicación (y el hotel si falta). Con el correo verificado se explica cómo hacerlo desde Posiciones.\n"
            . "- PEDIR EL CORREO PARA ACCESOS: si el cliente no puede entrar, no puede restablecer su contraseña o pide acceso a un usuario, y no sabes con qué correo accede, pídele ese correo (y el hotel si falta): no derives sin más.\n"
            . "- CONSULTA ANUNCIADA SIN CONTENIDO: un mensaje como «quería hacer una consulta» sin decir cuál NO se deriva: pregunta con amabilidad cuál es su consulta y de qué hotel o establecimiento escribe.\n"
+           . "- NOTA INTERNA AL DERIVAR: quien lee tu borrador es una persona del equipo de soporte, que no puede derivar a «un compañero» sin saber a quién. Cuando derives (con la frase corta o con " . self::NO_SABE . "), añade AL FINAL, en una línea aparte, «[[DERIVAR:categoria|motivo en pocas palabras]]». categoria es una de: soporte (uso de la aplicación, fallos, usuarios, permisos, cambios que hace el equipo), garantias (etiquetas que fallan, pilas, sustitución, recambios), pedidos (material, presupuestos, envíos, facturas). Esa línea no la ve el cliente. Si no derivas, no la añadas.\n"
            . "- AL DERIVAR sé breve: «Gracias por su mensaje. Hemos registrado la incidencia y el equipo la revisará.» No repitas ni resumas lo que cuenta el cliente, no enumeres sus incidencias ni añadas explicaciones.\n"
            . "- NUNCA le digas al cliente que existen varios hoteles con un mismo nombre, ni cuántos hay, ni nombres otros: quien escribe podría no ser del hotel. Si dudas de cuál habla, pregunta solo «¿Me indica el nombre completo del hotel?».\n"
            . "- AUDIOS: «" . self::MARCA_AUDIO . "» en la conversación es un audio de WhatsApp que no podemos escuchar. No supongas lo que decía. Si además hay texto del cliente, contesta solo al texto; si el texto remite al audio («como te dije en el audio»), pídele con tacto que lo escriba.\n"

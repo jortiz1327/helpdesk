@@ -104,6 +104,7 @@ export default function AiSuggestion({ ticketId, onClose }) {
   }, [onClose])
 
   const noSabe = s?.status === 'abstained'
+  const dest = s?.sources?.derivar || null   // {categoria, motivo}: a quién debe llevarlo una persona del equipo
   const guardada = Array.isArray(s?.sources?.traza) ? s.sources.traza : []
   const pasos = (cargando ? vivo : guardada.length ? guardada : vivo).filter((p) => p.k !== 'salida')
   const salida = guardada.find((p) => p.k === 'salida')
@@ -167,9 +168,16 @@ export default function AiSuggestion({ ticketId, onClose }) {
 
           {!cargando && !fallo && s && s.status !== 'failed' && (
             <>
+              {dest && (
+                <section className="ai-sec ai-dest" aria-label="Derivar">
+                  <h3>Para el equipo</h3>
+                  <p className="ai-dest-t"><Icon.warn aria-hidden="true" /> Llévalo a la categoría <b>{dest.categoria}</b></p>
+                  {dest.motivo ? <p className="ai-sub">{dest.motivo}</p> : null}
+                </section>
+              )}
               <section className="ai-sec ai-resp" aria-label="Respuesta preparada">
                 <div className="ai-resp-h">
-                  <h3>{noSabe ? 'La IA no se atreve' : 'Respuesta preparada'}{tipo && !noSabe ? <span className="ai-sub"> · {tipo}</span> : null}</h3>
+                  <h3>{noSabe ? 'La IA no se atreve' : dest ? 'Mensaje para el cliente (si quieres avisarle)' : 'Respuesta preparada'}{tipo && !noSabe ? <span className="ai-sub"> · {tipo}</span> : null}</h3>
                   {!noSabe && <button className="btn sm primary" onClick={copiar}>{copiado ? <><Icon.check aria-hidden="true" /> Copiado</> : <><Icon.copy aria-hidden="true" /> Copiar texto</>}</button>}
                 </div>
                 {noSabe
