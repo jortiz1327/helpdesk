@@ -28,7 +28,7 @@ Si lo que el cliente pide es que el equipo **haga** algo (cambiar de rueda de me
 
 ## Lo que el hotel hace por sí mismo: se explica cómo
 
-Crear posiciones o isletas, dar de alta y asignar posición a una etiqueta, girar etiquetas, activar o desactivar servicios… los hace una persona del propio hotel desde la aplicación. **Aunque el cliente lo pida como «¿podéis agregar estas etiquetas?» o «necesitamos crear posiciones nuevas»**, se le explica cómo hacerlo (Posiciones > Crear nueva posición, elegir isleta y etiqueta): el cliente no sabe que puede hacerlo él. Solo las altas de **usuarios** y los permisos los hace el equipo. Aquí la IA **explica cómo se hace** según la documentación (nunca confirma que algo «ya está hecho»), después de comprobar el hotel y el correo.
+Crear posiciones o isletas, dar de alta y asignar posición a una etiqueta, girar etiquetas, activar o desactivar servicios, **mover o intercambiar posiciones o platos entre etiquetas, y modificar lo que muestra un cartel** (también cuando mandan un listado de etiquetas a cambiar o piden «¿podéis modificar este cartel?»)… los hace una persona del propio hotel desde la aplicación. **Aunque el cliente lo pida como «¿podéis agregar estas etiquetas?» o «necesitamos crear posiciones nuevas»**, se le explica cómo hacerlo (Posiciones > Crear nueva posición, elegir isleta y etiqueta): el cliente no sabe que puede hacerlo él. Solo las altas de **usuarios** y los permisos los hace el equipo. Aquí la IA **explica cómo se hace** según la documentación (nunca confirma que algo «ya está hecho»), después de comprobar el hotel y el correo.
 
 ## Siempre se deriva, sin preguntar más
 

@@ -28,7 +28,8 @@ const FILTROS = [
     ['todos', 'Todos los casos', () => true],
     ['pend', 'Sin revisar', (c) => !c.revisado],
     ['dud', '🚩 Dudosos (los miro luego)', (c) => c.dudoso],
-    ['lote3', 'Lote 3 · para MEDIR (20 casos del 17-nov)', (c) => c.lote === 'lote3-20261117'],
+    ['lote4', 'Lote 4 · para MEDIR (20 casos nuevos del 17-nov)', (c) => c.lote === 'lote4-20261117'],
+    ['lote3', 'Lote 3 (20 casos del 17-nov, ya medido)', (c) => c.lote === 'lote3-20261117'],
     ['nuevos', 'Lote 2 (30 casos del 16-nov)', (c) => c.lote === 'lote2-20261116'],
   ]],
   ['Según tu decisión', [
@@ -145,7 +146,7 @@ function pintarCaso() {
   if (!c) { izq.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
   const pos = casos.indexOf(c) + 1
   $('titulo').textContent = c.asunto || 'Sin asunto'
-  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · ' + (c.lote.startsWith('lote3') ? 'lote 3 (para medir)' : 'lote 2') : '')
+  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · ' + (c.lote.startsWith('lote4') ? 'lote 4 (para medir)' : c.lote.startsWith('lote3') ? 'lote 3' : 'lote 2') : '')
   izq.append(bloque('client', 'El cliente escribió', c.pregunta, null, 'C'))
   izq.append(bloque('human', 'Lo que respondió una persona', c.humana, null, 'H'))
   if (c.ia) der.append(bloque('ia', 'Lo que hizo la IA (última prueba' + (c.ia.cuando ? ' · ' + c.ia.cuando : '') + ')', c.ia.texto || '(No escribió nada: dijo «no sé», es decir, lo deja a una persona.)', c.ia.obtenido, 'I'))
