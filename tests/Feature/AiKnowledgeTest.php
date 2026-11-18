@@ -99,10 +99,9 @@ class AiKnowledgeTest extends TestCase
         $id = (int) DB::table('ai_suggestions')->where('ticket_id', $t1)->value('id');
         $svc->rate($id, 'down', 'Debía pedir el código de la etiqueta antes de nada, Marta.', $this->uid);
 
-        // Pendiente (Ana no es responsable): todavía no es conocimiento.
-        $this->assertSame(0, DB::table('ai_documents')->where('source_type', 'correccion')->count());
-        $this->assertSame('pending', DB::table('ai_suggestions')->where('id', $id)->value('correction_status'));
-        $svc->revisarCorreccion($id, 'validated', $this->uid);
+        // Lo que corrige un agente pasa directo a la memoria: nadie lo revisa antes.
+        $this->assertSame('validated', DB::table('ai_suggestions')->where('id', $id)->value('correction_status'));
+        $this->assertSame(1, DB::table('ai_documents')->where('source_type', 'correccion')->count());
 
         $doc = DB::table('ai_documents')->where('source_type', 'correccion')->first();
         $this->assertNotNull($doc);

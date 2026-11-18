@@ -11,7 +11,7 @@ import { useToast } from '../App.jsx'
  * servidor, y esta pantalla solo dice si hay una.
  * ---------------------------------------------------------------------- */
 const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + ' M' : n >= 1e3 ? (n / 1e3).toFixed(1) + ' k' : String(n))
-const ESTADO = { pending: 'pendiente de revisar', validated: 'validada', rejected: 'rechazada' }
+const ESTADO = { pending: 'sin usar', validated: 'en uso', rejected: 'retirada' }
 const euros =(usd) => (usd > 0 && usd < 0.01 ? '< 0,01 $' : usd.toFixed(2).replace('.', ',') + ' $')
 
 export default function AiSettings() {
@@ -51,7 +51,7 @@ export default function AiSettings() {
     setBusy(true)
     const r = await api.aiAdminReview(id, status)
     setBusy(false)
-    if (r?.ok) { setD(r); toast(status === 'validated' ? 'Corrección validada: ya la usa la IA' : status === 'rejected' ? 'Corrección rechazada' : 'Corrección pendiente') }
+    if (r?.ok) { setD(r); toast(status === 'validated' ? 'Corrección en uso otra vez' : status === 'rejected' ? 'Corrección retirada: la IA ya no la usa' : 'Corrección sin usar') }
     else toast(r?.error || 'No se pudo guardar', 'err')
   }
 
@@ -65,7 +65,7 @@ export default function AiSettings() {
       <div className="card em-card">
         <p className="em-desc">
           En horario de atención, la IA <b>propone un borrador</b> de respuesta en la ficha del ticket. <b>Nunca envía nada</b>:
-          la persona lo revisa, lo usa o lo corrige. Cada 👎 con su corrección se guarda; cuando un responsable la valida, mejora las siguientes sugerencias.
+          la persona lo revisa, lo usa o lo corrige. Cada 👎 con su corrección se guarda y mejora las siguientes sugerencias al momento.
         </p>
         <label className="fb-req-row" style={{ marginTop: 4 }}>
           <span className="fb-switch"><input type="checkbox" checked={d.enabled} disabled={busy}
@@ -97,11 +97,6 @@ export default function AiSettings() {
         {valoradas > 0 && valoradas < 20 ? <p className="em-desc" style={{ marginTop: 8 }}>Con menos de 20 valoraciones el acierto aún dice poco.</p> : null}
       </div>
 
-      {d.review && d.review.stale > 0 && (
-        <p className="ai-revisar" role="alert">
-          <b>{d.review.stale === 1 ? '1 corrección lleva' : `${d.review.stale} correcciones llevan`} más de {d.review.days} días sin revisar.</b> La IA no las usa hasta que las valides o las rechaces (más abajo, en «Correcciones de los agentes»). La más antigua es del {fmtDate(d.review.oldest)}.
-        </p>
-      )}
 
       {d.budget && <AiBudget b={d.budget} busy={busy} onSave={guardarTope} />}
 
@@ -159,11 +154,11 @@ export default function AiSettings() {
       {d.corrections.length > 0 && (
         <div className="card em-card" style={{ marginTop: 12 }}>
           <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>
-            Correcciones de los agentes{d.corrections_pending > 0 ? ` · ${d.corrections_pending} por revisar` : ''}
+            Correcciones de los agentes
           </h3>
           <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>
-            Una corrección no llega a la IA hasta que la validas: así un error de un agente no se convierte en norma.
-            Las rechazadas tampoco se usan.
+            Lo que corrige un agente entra directo en la memoria de la IA: nadie tiene que validarlo antes.
+            No hace falta revisarlas una a una; solo si ves alguna mala, puedes retirarla y la IA deja de usarla.
           </p>
           <ul className="ai-corr">
             {d.corrections.map((c) => (
@@ -171,9 +166,9 @@ export default function AiSettings() {
                 <b className="mono">{c.ticket_code}</b> <small>{fmtDate(c.rated_at)} · {ESTADO[c.correction_status] || c.correction_status}</small>
                 <q>{c.correction}</q>
                 <span style={{ display: 'inline-flex', gap: 6, marginTop: 4 }}>
-                  {c.correction_status !== 'validated' && <button className="btn" disabled={busy} onClick={() => revisar(c.id, 'validated')}>Validar</button>}
-                  {c.correction_status !== 'rejected' && <button className="btn" disabled={busy} onClick={() => revisar(c.id, 'rejected')}>Rechazar</button>}
-                  {c.correction_status !== 'pending' && <button className="btn" disabled={busy} onClick={() => revisar(c.id, 'pending')}>Dejar pendiente</button>}
+                  {c.correction_status === 'rejected'
+                    ? <button className="btn" disabled={busy} onClick={() => revisar(c.id, 'validated')}>Volver a usarla</button>
+                    : <button className="btn" disabled={busy} onClick={() => revisar(c.id, 'rejected')}>Retirar</button>}
                 </span>
               </li>
             ))}
@@ -202,7 +197,7 @@ function AiHistorial() {
   }, [])
   useEffect(() => { if (abierto) cargar(filtro, q, 0) }, [abierto, filtro]) // eslint-disable-line react-hooks/exhaustive-deps
   const quien = (x) => x.type === 'review'
-    ? `${x.user || 'Alguien'} ${x.status === 'validated' ? 'validó' : x.status === 'rejected' ? 'rechazó' : 'dejó pendiente'} la corrección`
+    ? `${x.user || 'Alguien'} ${x.status === 'validated' ? 'volvió a usar' : x.status === 'rejected' ? 'retiró' : 'dejó sin usar'} la corrección`
     : `${x.user || 'Alguien'} valoró ${x.rating === 'up' ? '👍 bien' : '👎 mal'}`
   return (
     <div className="card em-card" style={{ marginTop: 12 }}>

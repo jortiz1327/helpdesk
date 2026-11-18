@@ -498,22 +498,15 @@ class AiSuggestionsTest extends TestCase
         $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $id, 'rating' => 'down', 'correction' => 'Debía pedir el código de la etiqueta primero.'])
             ->assertOk()->assertJsonPath('suggestion.rating', 'down');
 
-        // Pendiente de revisión: todavía NO viaja a la IA.
-        $tk2 = $this->ticket('Otra etiqueta que no conecta');
-        $this->withHeader('X-App-Token', $token)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk2")->assertOk();
-        $this->assertStringNotContainsString('Debía pedir el código de la etiqueta primero.', $this->fake->ultimoSistema);
-        $this->assertSame('pending', DB::table('ai_suggestions')->where('id', $id)->value('correction_status'));
-
-        // Un agente sin permiso no puede validar; un responsable sí, y entonces viaja como ejemplo.
-        $enc = $this->encargado();
-        $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=admin_review', ['id' => $id, 'status' => 'validated'])->assertStatus(403);
-        $this->withHeader('X-App-Token', $enc)->postJson('/api/ai_suggestions.php?action=admin_review', ['id' => $id, 'status' => 'validated'])
-            ->assertOk()->assertJsonPath('corrections_pending', 0);
+        // Sin revisión previa: lo que corrige un agente viaja ya a la IA como ejemplo.
+        $this->assertSame('validated', DB::table('ai_suggestions')->where('id', $id)->value('correction_status'));
         $tk3 = $this->ticket('Otra etiqueta más que no conecta');
         $this->withHeader('X-App-Token', $token)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk3")->assertOk();
         $this->assertStringContainsString('Debía pedir el código de la etiqueta primero.', $this->fake->ultimoSistema);
 
-        // Rechazada: deja de usarse.
+        // Un agente sin permiso no puede retirarla; un responsable sí (opcional): deja de usarse.
+        $enc = $this->encargado();
+        $this->withHeader('X-App-Token', $token)->postJson('/api/ai_suggestions.php?action=admin_review', ['id' => $id, 'status' => 'rejected'])->assertStatus(403);
         $this->withHeader('X-App-Token', $enc)->postJson('/api/ai_suggestions.php?action=admin_review', ['id' => $id, 'status' => 'rejected'])->assertOk();
         $tk4 = $this->ticket('Y otra etiqueta que no conecta');
         $this->withHeader('X-App-Token', $token)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk4")->assertOk();

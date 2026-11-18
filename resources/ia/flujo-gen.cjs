@@ -117,7 +117,7 @@ arr([prev.b, N.b1.t]);
 const yl = N.b1.y + N.b1.h + 30;
 const yTop = yl + 28;
 
-box('m1', L, yTop, 250, 'mem', '④ Memoria y guía', ['preguntas frecuentes', 'respuestas de ejemplo del equipo', 'casos parecidos y manuales', 'correcciones validadas (paso 10)']);
+box('m1', L, yTop, 250, 'mem', '④ Memoria y guía', ['preguntas frecuentes', 'respuestas de ejemplo del equipo', 'casos parecidos y manuales', 'correcciones de los agentes (paso 10)']);
 box('m2', L, N.m1.y + N.m1.h + IN, 250, 'mem', 'Memoria limpia', ['sin firmas, correos ni teléfonos', 'contraseñas tapadas', 'lo antiguo se marca como ANTIGUO', '(sirve para entender, no para copiar)']);
 arr([N.m1.b, N.m2.t]);
 
@@ -237,7 +237,7 @@ arr([[BUS, yb], [C, yb]], { noarrow: true });
 const bottomE = N.s1.y + N.s1.h + 18;
 
 /* ===================== F. AGENTE Y APRENDIZAJE ===================== */
-y = seccion('F', 'Agente y aprendizaje', 'La persona decide; lo que se valida hace que la IA acierte más', bottomE + 18);
+y = seccion('F', 'Agente y aprendizaje', 'La persona decide; lo que corrige mejora al momento a la IA', bottomE + 18);
 box('g1', C, y, 400, 'ag', '⑨ El agente ve la sugerencia', ['decide él: la IA nunca envía nada', 'aquí también llegan los casos de la sección A']);
 arr([N.s1.b, N.g1.t]);
 const yf = N.g1.y + N.g1.h + 28;
@@ -258,13 +258,9 @@ chip('r1', 335, yfEnd + 30, 350, 'cli', 'El cliente contesta: se vuelve al paso 
 arr([N.f3.b, [N.f3.cx, N.r1.y]]);
 arr([N.f2.b, [N.f2.cx, N.r1.y]]);
 
-// Valoración y validación
-dia('v1', 1085, yfEnd + 34, 270, 'mem', ['¿Un responsable da por', 'buena la corrección?'], { badge: '10' });
-arr([N.f4.b, N.v1.t]);
-box('v1x', 785, N.v1.y + N.v1.h / 2 - 30, 250, 'no', 'Se descarta', ['la IA no la verá nunca']);
-arr([N.v1.l, N.v1x.r]); lab('No', N.v1.l[0] - 10, N.v1.l[1] + 22, 'end');
-box('v2', 1085, N.v1.y + N.v1.h + 34, 260, 'mem', 'Pasa a la memoria', ['como corrección validada (queda', 'apuntado quién la validó y cuándo)']);
-arr([N.v1.b, N.v2.t]); lab('Sí', 1097, N.v1.b[1] + 22);
+// Valoración: la corrección pasa directa a la memoria (sin paso de validación)
+box('v2', 1085, N.f4.y + N.f4.h + 40, 260, 'mem', '⑩ Pasa directo a la memoria', ['sin revisión previa; queda apuntado', 'quién, cuándo y qué corrigió']);
+arr([N.f4.b, N.v2.t]);
 chip('r2', 1085, N.v2.y + N.v2.h + 28, 260, 'mem', 'Vuelve a la memoria (paso 4)');
 arr([N.v2.b, N.r2.t]);
 
@@ -277,7 +273,7 @@ const bandas = secciones.map((s, i) => {
   return `<g class="banda"><rect x="40" y="${s.y}" width="${W - 70}" height="${fin - s.y}" rx="18"/><circle cx="72" cy="${s.y + 32}" r="15"/><text x="72" y="${s.y + 37.5}" class="bl">${s.letra}</text><text x="98" y="${s.y + 31}" class="bt">${esc(s.titulo)}</text><text x="98" y="${s.y + 52}" class="bs">${esc(s.desc)}</text></g>`;
 }).join('\n');
 
-const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Flujo completo de la IA de soporte, de que el cliente escribe a que el responsable valida la corrección">
+const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Flujo completo de la IA de soporte, de que el cliente escribe a que la corrección del agente pasa a la memoria">
 <defs><marker id="p" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0.5 L10,5 L0,9.5 z" class="punta"/></marker></defs>
 ${bandas}
 <g class="fl" marker-end="url(#p)">${lines.join('')}</g>

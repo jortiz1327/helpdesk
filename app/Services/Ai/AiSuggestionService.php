@@ -517,17 +517,18 @@ class AiSuggestionService
             throw new InvalidArgumentException('Escribe qué debía responder (mínimo 5 letras) para poder aprender de ello');
         }
 
-        // Una corrección nueva o editada queda PENDIENTE: no llega a la IA hasta que la valide un
-        // responsable. Si quien corrige ya es responsable (support.config), cuenta como validada.
-        $responsable = $rating === 'down' && (bool) \App\Models\User::find($userId)?->can('support.config');
+        // Decisión de Juan (18-nov): nadie va a revisar lo que dijo cada agente, así que lo que corrige un agente pasa DIRECTO a la
+        // memoria (queda como validado por quien lo escribió; el historial guarda quién, cuándo y qué). Un responsable (support.config)
+        // puede seguir retirando una corrección mala desde Ajustes (admin_review → rejected), pero no es un paso obligatorio.
+        $propia = $rating === 'down';
         DB::table('ai_suggestions')->where('id', $id)->update([
             'rating' => $rating, 'correction' => $rating === 'down' ? mb_substr($correction, 0, 4000) : null,
             'rated_by' => $userId, 'rated_at' => now(), 'updated_at' => now(),
-            'correction_status' => $responsable ? 'validated' : 'pending',
-            'correction_reviewed_by' => $responsable ? $userId : null,
-            'correction_reviewed_at' => $responsable ? now() : null,
+            'correction_status' => $propia ? 'validated' : 'pending',
+            'correction_reviewed_by' => $propia ? $userId : null,
+            'correction_reviewed_at' => $propia ? now() : null,
         ]);
-        // Solo si está validada pasa a ser conocimiento buscable (y deja de serlo si cambia a 👍).
+        // Si la corrección está activa pasa a ser conocimiento buscable (y deja de serlo si cambia a 👍).
         $this->knowledge->indexarCorreccion($id);
         $fila = DB::table('ai_suggestions')->where('id', $id)->first();
         $this->apuntar($fila, 'rating', $userId);
