@@ -46,6 +46,9 @@ class AiKnowledge
             $doc = $this->documentoDeTicket($t);
             if (! $doc) {
                 $saltados++;
+                if ($rehacer) {
+                    DB::table('ai_documents')->where('source_type', 'ticket')->where('source_id', (string) $t->id)->delete();
+                }
                 continue;
             }
             DB::table('ai_documents')->updateOrInsert(
@@ -65,13 +68,13 @@ class AiKnowledge
 
         $pregunta = $msgs->firstWhere('direction', 'in');
         $respuestas = $msgs->filter(fn ($m) => $m->direction === 'out' && $m->author_user_id)   // solo personas, no avisos automáticos
-            ->map(fn ($m) => Scrub::plano((string) $m->body))->filter()->values();
+            ->map(fn ($m) => Scrub::firma(Scrub::plano((string) $m->body)))->filter()->values();
         if (! $pregunta || $respuestas->isEmpty()) {
             return null;
         }
 
         $nombre = (string) ($t->contact_name ?? '');
-        $q = trim(Scrub::tapar(Scrub::plano((string) $pregunta->body), $nombre));
+        $q = trim(Scrub::tapar(Scrub::firma(Scrub::plano((string) $pregunta->body)), $nombre));
         $r = trim(Scrub::tapar($respuestas->implode("\n\n"), $nombre));
         if (mb_strlen($q) < 15 || mb_strlen($r) < 40) {   // respuestas de una línea ("le llamo") no enseñan nada
             return null;
@@ -125,7 +128,7 @@ class AiKnowledge
         }
 
         $nombre = (string) ($s->contact_name ?? '');
-        $pregunta = Scrub::tapar(Scrub::plano((string) DB::table('messages')->where('id', $s->trigger_message_id)->value('body')), $nombre);
+        $pregunta = Scrub::tapar(Scrub::firma(Scrub::plano((string) DB::table('messages')->where('id', $s->trigger_message_id)->value('body'))), $nombre);
         $content = "Pregunta del cliente:\n" . mb_substr($pregunta, 0, 1200)
             . "\n\nLo que la IA respondió y estaba mal:\n" . mb_substr(Scrub::tapar((string) $s->body, $nombre), 0, 800)
             . "\n\nIndicación del equipo (qué estaba mal y cómo hay que responder; es un criterio a aplicar, no un texto para copiar):\n" . mb_substr(Scrub::tapar((string) $s->correction, $nombre), 0, 2000);

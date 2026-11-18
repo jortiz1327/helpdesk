@@ -52,4 +52,35 @@ class Scrub
         $h = preg_replace("/[ \t]+/", ' ', (string) $h);
         return trim((string) preg_replace("/\n{3,}/", "\n\n", (string) $h));
     }
+
+    /**
+     * Quita de UN mensaje lo que no es contenido y sí es dato personal de terceros: el aviso legal del final, el bloque de firma
+     * (nombre, cargo, dirección, teléfono, web) y las líneas sueltas de dirección, código postal, teléfono, web o cargo.
+     * Se aplica mensaje a mensaje (no a una conversación entera: cortaría lo que viene después).
+     */
+    public static function firma(string $texto): string
+    {
+        // Líneas en blanco o con solo espacios → vacías, y como mucho una en blanco seguida.
+        $t = "\n" . (string) preg_replace("/\n[ \t]*(?=\n)/", "\n", $texto);
+        $t = (string) preg_replace("/\n{3,}/", "\n\n", $t);
+        // 1. Historial citado y aviso legal: desde la marca (al inicio de línea) hasta el final del mensaje.
+        $t = (string) preg_replace('/\n[ \t>]*(el (lun|mar|mi[eé]|jue|vie|s[aá]b|dom)[\p{L}.]*,? .{0,80}escribi[oó]:?|on .{0,80}wrote:?|de:\s|from:\s|-{2,} ?(mensaje|original|forwarded)|_{5,}|aviso legal|de conformidad con|en cumplimiento (de|del)|este (mensaje|correo|e-?mail) (y sus|va dirigido|puede contener|contiene informaci)|la informaci[oó]n (contenida|transmitida) (en|a trav[eé]s)|this (e-?mail|message) (and|is|may|contains)|sus datos (est[aá]n|personales)|confidencialidad|antes de imprimir|please consider|enviado desde mi|sent from my)\b.*$/isu', '', $t);
+        // 2. Cierre («Un saludo», «Gracias»…) y, tras él, un bloque de hasta 25 líneas hasta el final: es la firma.
+        $t = (string) preg_replace('/(\n[ \t]*(?:un (?:cordial )?saludo|saludos?(?: cordiales)?(?:, saluti.*?)?|atentamente|cordialmente|muchas gracias|gracias|salut|cumprimentos|best regards|kind regards|regards)[ \t,.!]*)\n(?:[^\n]*\n?){1,25}\z/iu', '$1', $t);
+        // 3. Líneas sueltas con dirección, código postal + ciudad, teléfono/fax, web, CIF o cargo.
+        $lineas = preg_split('/\R/u', $t) ?: [];
+        $lineas = array_filter($lineas, function ($l) {
+            $x = trim($l);
+            if ($x === '') {
+                return true;
+            }
+            return ! (preg_match('/\b(calle|c\/|avda\.?|avenida|avinguda|carrer|plaza|paseo|carretera|ctra\.?|delegaci[oó]n de)\s+[\wÁÉÍÓÚáéíóúñ\' .-]{3,40},?\s*(n[ºo°.]?\s*)?\d*/iu', $x) && preg_match('/\d/', $x)
+                || preg_match('/\b\d{5}\b\s*[–-]?\s*[\p{Lu}]/u', $x)
+                || preg_match('/^\W*(tel|fax|m[oó]vil|tfno|cif|nif)\b/iu', $x)
+                || preg_match('/^\W*(www\.|https?:\/\/)\S+\W*$/iu', $x)
+                || (mb_strlen($x) <= 60 && preg_match('/^(jefe|jefa|director|directora|gerente|metre|maitre|responsable|t[eé]cnic[oa]|chef|segundo|coordinador|coordinadora|administraci[oó]n)\b/iu', $x))
+                || (mb_strlen($x) <= 60 && preg_match('/\b(f&b|f\&b)\b.*(coordinator|manager)|^(f&b|food).{0,20}(coordinator|manager)/iu', $x)));
+        });
+        return trim((string) preg_replace("/\n{3,}/", "\n\n", implode("\n", $lineas)));
+    }
 }
