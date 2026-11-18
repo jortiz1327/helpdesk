@@ -47,6 +47,7 @@ function pintar(escribiendo = false) {
     else if (m.status === 'abstained') r.append(el('div', 'bubble warn', 'Derivó a una persona: no se atrevió a contestar con fiabilidad.'))
     else r.append(el('div', 'bubble bad', 'La IA no pudo contestar' + (m.error ? ': ' + m.error : '.')))
     if (!m.superseded) r.append(...valoracion(m, m === ultimo))
+    else if (m.rating) r.append(el('div', 'verdict ' + m.rating, m.rating === 'up' ? '✔ Validada' : '✘ Corregida: ' + m.correction))   // la corrección sigue a la vista aunque ya se haya generado otra respuesta
     box.append(r)
   })
   if (resta > 0 && !escribiendo) { const r = el('div', 'row bot'); const w = el('div', 'bubble warn', 'El agente espera ' + resta + ' s por si el cliente sigue escribiendo… '); const b = el('button', 'btn sm', 'Responder ya'); b.onclick = () => responder(); w.append(b); r.append(w); box.append(r) }
