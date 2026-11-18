@@ -120,10 +120,21 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.22";
+const APP_VERSION = "1.6.0";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.6.0",
+        date: "18 nov 2026",
+        resumen: "Llega el asistente de IA: propone una respuesta en cada ticket y la persona decide si la usa.",
+        mejoras: [
+            "En la ficha del ticket aparece una sugerencia de respuesta. La IA nunca envía nada: tú la revisas, la editas o la ignoras.",
+            "Puedes valorarla con 👍 o 👎 y, si no te vale, escribir cómo debía ser. Así la IA aprende de lo que corriges.",
+            "En Ajustes, el responsable enciende o apaga el asistente, fija el tope de gasto mensual, ve el historial de valoraciones y valida las correcciones.",
+            "Antes de enviar datos a la IA se tapan contraseñas, IBAN, tarjetas y teléfonos.",
+        ],
+    },
     {
         version: "1.5.22",
         date: "13 nov 2026",

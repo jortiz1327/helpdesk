@@ -3,6 +3,19 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.0] — 2026-11-18
+
+### Mejoras
+
+- Asistente de IA (fase 1): sugiere una respuesta en la ficha del ticket; nunca envía nada.
+  Llega **apagado**: el responsable lo enciende en Ajustes (`ai_suggestions_enabled`).
+- Valoración 👍/👎 con corrección, validación de correcciones por quien tiene `support.config`,
+  historial de valoraciones, aviso de correcciones sin revisar (más de 3 días) y de memoria desactualizada.
+- Tope de gasto mensual configurable y límite de 30 sugerencias por minuto y agente.
+- Antes de salir hacia el proveedor se tapan contraseñas, IBAN, tarjetas y teléfonos.
+- Consulta de solo lectura al panel AdminHoteles (con cachés y tope de espera de 25 s).
+- 6 migraciones nuevas, todas aditivas (`ai_*`).
+
 ## [1.5.22] — 2026-11-13
 
 ### Mejoras
