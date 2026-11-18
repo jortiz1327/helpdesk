@@ -562,6 +562,10 @@ class AiSuggestionService
 
         return $rows->reverse()->map(function ($m) {
             $texto = $this->plano((string) $m->body);
+            // El correo arrastra el historial citado, la firma y el aviso legal (WhatsApp y el portal no): se quitan para que la IA lea
+            // lo que el cliente acaba de escribir y no se llene el límite de caracteres con ruido. Si no queda nada, se conserva el original.
+            $limpio = Scrub::firma($texto);
+            $texto = trim($limpio) !== '' ? $limpio : $texto;
             // Un audio de WhatsApp no trae texto: se deja una marca para saber que existió (no se transcribe, de momento).
             $esAudio = $m->direction === 'in' && ($m->type === 'audio' || str_starts_with((string) $m->media_mime, 'audio/'));
             return ['role' => $m->direction === 'in' ? 'user' : 'assistant', 'text' => $texto === '' && $esAudio ? self::MARCA_AUDIO : $texto];

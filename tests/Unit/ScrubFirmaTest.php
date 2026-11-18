@@ -41,4 +41,30 @@ class ScrubFirmaTest extends TestCase
         $t = "Hola, ¿cómo se asigna una etiqueta a una posición?\nGracias";
         $this->assertSame($t, Scrub::firma($t));
     }
+
+    public function test_correo_con_saltos_de_windows_y_aviso_pegado_a_la_firma(): void
+    {
+        $t = "Buenos días,
+
+Las etiquetas no cambian.
+
+Saludos,
+
+Ana
+Directora
+03188 Torrevieja (Alicante)
+Tel. 966921711 - Fax 
+
+Aviso Legal: De conformidad con el Reglamento (UE) 2016/679, Ud. puede ejercer sus derechos";
+        $r = Scrub::firma($t);
+        $this->assertStringContainsString('Las etiquetas no cambian', $r);
+        $this->assertStringNotContainsString('Aviso Legal', $r);
+        $this->assertStringNotContainsString('Torrevieja', $r);
+    }
+
+    public function test_una_linea_larga_sin_saltos_no_se_borra_entera(): void
+    {
+        $t = 'Buenos días, las etiquetas del buffet de planta baja siguen sin actualizarse desde ayer por la tarde y no sabemos qué hacer para que vuelvan a funcionar, el hotel está en 03188 Torrevieja Alicante y mañana abrimos.';
+        $this->assertStringContainsString('siguen sin actualizarse', Scrub::firma($t));
+    }
 }
