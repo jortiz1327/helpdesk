@@ -188,7 +188,7 @@ export default function AiSuggestion({ ticketId, onClose }) {
               </section>
 
               <section className="ai-sec" aria-label="Valoración">
-                <h3>¿Qué te parece?</h3>
+                <h3>¿Qué te parece? <a className="ai-sub" href="/formacion-ia.html" target="_blank" rel="noopener">¿Cómo se valora?</a></h3>
                 {s.rating ? (
                   <div className="ai-done">
                     <p>{s.rating === 'up' ? (noSabe ? 'Anotado: era un caso para una persona.' : 'Valoraste esta sugerencia como útil.') : 'Corrección guardada. Gracias, así aprende.'}</p>

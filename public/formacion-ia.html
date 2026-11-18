@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Tu ayudante IA en 1 minuto</title>
+<style>
+  @font-face { font-family: 'Lato'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/lato-400.woff2') format('woff2'); }
+  @font-face { font-family: 'Lato'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/lato-700.woff2') format('woff2'); }
+  @font-face { font-family: 'Lato'; font-style: normal; font-weight: 900; font-display: swap; src: url('/fonts/lato-900.woff2') format('woff2'); }
+
+  :root {
+    color-scheme: light;
+    --bg: #f3f5fa; --surface: #ffffff; --line: #dde2ee; --ink: #151b2b; --ink2: #424c61; --muted: #5d6881;
+    --brand: #3047d4; --brand-soft: #e6eaff;
+    --ok: #1d7a43; --ok-soft: #e0f3e8; --mal: #b8402f; --mal-soft: #fbe6e2; --aviso: #a8680a; --aviso-soft: #fdf0d9;
+    --sombra: 0 1px 2px rgb(20 30 60 / .08), 0 10px 26px -14px rgb(20 30 60 / .25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #0e1218; --surface: #1a212b; --line: #2a3340; --ink: #eaeef6; --ink2: #bac3d3; --muted: #9aa5ba;
+      --brand: #8ea0ff; --brand-soft: #212a52;
+      --ok: #5ccf8b; --ok-soft: #173326; --mal: #f0847a; --mal-soft: #3a1f1c; --aviso: #efb04a; --aviso-soft: #3a2c12;
+      --sombra: 0 1px 2px rgb(0 0 0 / .35), 0 10px 26px -14px rgb(0 0 0 / .6);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 400 18px/1.5 'Lato', system-ui, sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  header { text-align: center; padding: 16px 0 28px; }
+  header .ico { width: 72px; height: 72px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 22px; background: var(--brand); color: #fff; }
+  header .ico svg { width: 40px; height: 40px; }
+  h1 { margin: 0 0 8px; font: 900 clamp(30px, 6vw, 44px)/1.1 'Lato', sans-serif; letter-spacing: -0.02em; }
+  header p { margin: 0 auto; max-width: 30em; font-size: 20px; color: var(--ink2); }
+
+  .paso { display: grid; grid-template-columns: 1fr; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 22px; margin: 18px 0; box-shadow: var(--sombra); break-inside: avoid; }
+  .paso h2 { margin: 0; display: flex; align-items: center; gap: 12px; font: 900 26px/1.15 'Lato', sans-serif; letter-spacing: -0.01em; }
+  .num { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--surface); font: 900 20px 'Lato', sans-serif; }
+  .paso p { margin: 0; color: var(--ink2); }
+  .paso p b { color: var(--ink); }
+
+  .ico-s { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.12em; }
+
+  /* Escenas: fichas con icono grande y flechas entre ellas */
+  .escena { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 6px; padding: 18px 10px; border-radius: 16px; background: var(--bg); }
+  .ficha { display: grid; justify-items: center; gap: 8px; width: 132px; text-align: center; font: 700 15px/1.2 'Lato', sans-serif; color: var(--ink); }
+  .ficha i { width: 76px; height: 76px; display: grid; place-items: center; border-radius: 22px; background: var(--surface); border: 2px solid var(--line); color: var(--ink2); font-style: normal; }
+  .ficha i svg { width: 38px; height: 38px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .ficha.tu i { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+  .ficha.bien i { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
+  .ficha.mal i { border-color: var(--mal); background: var(--mal-soft); color: var(--mal); }
+  .ficha.ia i { border-color: #7a4fe0; background: color-mix(in srgb, #7a4fe0 14%, var(--surface)); color: #7a4fe0; }
+  .ficha small { font: 400 14px/1.25 'Lato', sans-serif; color: var(--muted); }
+  .flecha { width: 30px; height: 30px; color: var(--muted); flex: none; }
+  .flecha svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Botones de mentira (como los de la pantalla) */
+  .botones { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; padding: 18px 10px; border-radius: 16px; background: var(--bg); }
+  .boton { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 14px; border: 2px solid; font: 900 20px 'Lato', sans-serif; }
+  .boton svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .boton.bien { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
+  .boton.corr { color: var(--aviso); border-color: var(--aviso); background: var(--aviso-soft); }
+  .reloj { display: inline-flex; align-items: center; gap: 8px; margin: 0 auto; padding: 6px 14px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font: 900 16px 'Lato', sans-serif; }
+
+  /* Globos de «así sí / así no» */
+  .globos { display: grid; gap: 12px; }
+  .globo { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: start; padding: 14px 16px; border-radius: 18px; border: 2px solid; }
+  .globo .ic { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; color: #fff; }
+  .globo .ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  .globo strong { display: block; font: 900 15px 'Lato', sans-serif; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 2px; }
+  .globo q { quotes: none; font-size: 19px; color: var(--ink); }
+  .globo.no { background: var(--mal-soft); border-color: var(--mal); } .globo.no .ic { background: var(--mal); } .globo.no strong { color: var(--mal); }
+  .globo.si { background: var(--ok-soft); border-color: var(--ok); } .globo.si .ic { background: var(--ok); } .globo.si strong { color: var(--ok); }
+  .receta { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; font: 900 17px 'Lato', sans-serif; }
+  .receta span { padding: 8px 14px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); }
+  .receta b { align-self: center; color: var(--muted); }
+
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .mini { padding: 14px 16px; border-radius: 16px; border: 2px solid var(--line); background: var(--bg); }
+  .mini h3 { margin: 0 0 4px; font: 900 18px 'Lato', sans-serif; }
+  .mini p { font-size: 16px; }
+
+  .tres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+  .tres div { text-align: center; padding: 18px 12px; border-radius: 18px; background: var(--brand); color: #fff; font: 900 19px/1.25 'Lato', sans-serif; }
+  .tres div span { display: block; font: 900 34px 'Lato', sans-serif; opacity: .85; }
+  footer { text-align: center; margin-top: 22px; color: var(--muted); font-size: 15px; }
+
+  @media (max-width: 640px) {
+    body { font-size: 17px; }
+    .dos, .tres { grid-template-columns: 1fr; }
+    .flecha { transform: rotate(90deg); }
+    .ficha { width: 100%; grid-template-columns: 76px 1fr; justify-items: start; text-align: left; align-items: center; }
+  }
+  @media print {
+    @page { size: A4; margin: 12mm; }
+    :root { color-scheme: light; --bg: #ffffff; --sombra: none; }
+    body { font-size: 14px; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .wrap { padding: 0; max-width: none; }
+    header { padding: 0 0 10px; } header .ico { width: 56px; height: 56px; margin-bottom: 8px; } h1 { font-size: 32px; } header p { font-size: 16px; }
+    .paso { margin: 10px 0; padding: 14px; gap: 10px; border-radius: 16px; } .paso h2 { font-size: 21px; } .num { width: 32px; height: 32px; font-size: 16px; }
+    .escena, .botones { padding: 10px 6px; } .ficha { width: 112px; font-size: 13px; } .ficha i { width: 58px; height: 58px; border-radius: 16px; } .ficha i svg { width: 30px; height: 30px; }
+    .globo q { font-size: 15px; } .boton { font-size: 16px; padding: 10px 16px; } .tres div { font-size: 15px; padding: 12px 8px; } .tres div span { font-size: 26px; }
+    .paso, .tres { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 15l.7 1.8L21.5 17.5l-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7Z"/></svg></div>
+    <h1>Tu ayudante IA</h1>
+    <p>Es como un compañero nuevo, rapidísimo, que te deja un borrador. <b>Tú mandas.</b></p>
+  </header>
+
+  <section class="paso">
+    <h2><span class="num">1</span> Pídele un borrador</h2>
+    <div class="escena">
+      <div class="ficha"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></i>Abres un ticket</div>
+      <span class="flecha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="ficha tu"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></i><span>Pulsas <b>«Sugerir»</b></span></div>
+      <span class="flecha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="ficha ia"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/></svg></i>La IA te deja un borrador</div>
+    </div>
+    <p>Tarda unos segundos. Te enseña también <b>en qué se ha fijado</b>.</p>
+  </section>
+
+  <section class="paso">
+    <h2><span class="num">2</span> Tú decides lo que se envía</h2>
+    <div class="escena">
+      <div class="ficha ia"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></i>Borrador</div>
+      <span class="flecha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="ficha tu"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></i>Lo copias</div>
+      <span class="flecha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="ficha tu"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></i>Lo retocas</div>
+      <span class="flecha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="ficha tu"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></i>Lo envías tú</div>
+    </div>
+    <p><b>La IA nunca envía nada sola.</b> Si no te convence, ignóralo y contesta como siempre.</p>
+  </section>
+
+  <section class="paso">
+    <h2><span class="num">3</span> Dile qué tal lo ha hecho</h2>
+    <div class="botones">
+      <div class="boton bien"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Útil</div>
+      <div class="boton corr"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Corregir</div>
+    </div>
+    <p style="text-align:center"><span class="reloj"><svg class="ico-s" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Son 5 segundos</span></p>
+    <div class="dos">
+      <div class="mini"><h3>Útil</h3><p>«Me ha servido». La IA sabe que va bien.</p></div>
+      <div class="mini"><h3>Corregir</h3><p>«No era eso». Y le cuentas cómo era (paso 4).</p></div>
+    </div>
+  </section>
+
+  <section class="paso">
+    <h2><span class="num">4</span> Si corriges, explícaselo como a un compañero nuevo</h2>
+    <div class="globos">
+      <div class="globo no"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div><strong>Así no ayuda</strong><q>Está mal.</q></div></div>
+      <div class="globo si"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><div><strong>Así sí</strong><q>Para cambiar un plato se hace desde Posiciones. Explícaselo paso a paso.</q></div></div>
+    </div>
+    <div class="receta"><span>Qué ha fallado</span><b>+</b><span>Qué había que hacer</span></div>
+    <p style="text-align:center">No hace falta redactar el mensaje: basta con la idea.</p>
+  </section>
+
+  <section class="paso">
+    <h2><span class="num">5</span> ¿Y qué pasa con tu corrección?</h2>
+    <div class="escena">
+      <div class="ficha tu"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></i>Tú la escribes</div>
+      <span class="flecha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="ficha bien"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></i>Un responsable la revisa</div>
+      <span class="flecha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="ficha ia"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg></i>La IA aprende</div>
+    </div>
+    <p>Hasta que un responsable la da por buena, la IA <b>no la usa</b>. Así un despiste no se convierte en norma. Todo queda apuntado: quién valoró, cuándo y qué.</p>
+  </section>
+
+  <section class="paso">
+    <h2><span class="num">★</span> Si la IA dice «no sé»</h2>
+    <p>Es mejor que invente. Verás dos botones distintos:</p>
+    <div class="dos">
+      <div class="mini"><h3>Mejor una persona</h3><p>Tenía razón: esto lo lleva alguien. Púlsalo.</p></div>
+      <div class="mini"><h3>Sí sabía</h3><p>Tú sabías cómo contestar. Cuéntalo (como en el paso 4) y aprenderá.</p></div>
+    </div>
+  </section>
+
+  <div class="tres">
+    <div><span>1</span>Tú decides siempre</div>
+    <div><span>2</span>Valorar son 5 segundos</div>
+    <div><span>3</span>Una corrección clara vale oro</div>
+  </div>
+  <footer>Si algo no queda claro, pregunta a quien lleva el soporte.</footer>
+</div>
+</body>
+</html>
