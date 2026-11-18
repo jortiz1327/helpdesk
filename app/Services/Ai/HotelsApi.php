@@ -19,6 +19,9 @@ use Throwable;
  */
 class HotelsApi
 {
+    private const CACHE_HOTELES = 86400;   // 1 día
+    private const CACHE_CORREO = 14400;    // 4 horas
+
     public function configured(): bool
     {
         return $this->base() !== '' && (string) config('ai.support.key', '') !== '';
@@ -103,6 +106,14 @@ class HotelsApi
         if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return ['estado' => 'sin_correo', 'sitios' => []];
         }
+        // Un correo que figura se recuerda unas horas: el lookup obliga al panel a preguntar a cada app de hotel (a veces 12-25 s)
+        // y el mismo cliente se consulta varias veces (regenerar, varios mensajes). Solo se guarda «encontrado»: un fallo o un
+        // «no figura» se vuelve a comprobar siempre.
+        $clave = 'ai_support_lookup_' . sha1($email);
+        $guardado = Cache::get($clave);
+        if (is_array($guardado) && ! empty($guardado['sitios'])) {
+            return $guardado;
+        }
         $d = $this->get('/api/support/v1/users/lookup', ['email' => $email]);
         // El panel contesta pero a veces una de sus apps no: una segunda consulta suele salir bien, y evita decir «no hemos podido
         // comprobar su correo» cuando sí figura. Si el panel mismo no contesta (null, tras el tiempo máximo) NO se reintenta: sería
@@ -118,7 +129,11 @@ class HotelsApi
             return ['estado' => 'incompleto', 'sitios' => []];
         }
         if (! empty($d['encontrado'])) {
-            return ['estado' => 'encontrado', 'sitios' => $this->sitiosDe($d)];
+            $r = ['estado' => 'encontrado', 'sitios' => $this->sitiosDe($d)];
+            if ($r['sitios']) {
+                Cache::put($clave, $r, self::CACHE_CORREO);
+            }
+            return $r;
         }
         return ['estado' => ((array) ($d['apps_sin_respuesta'] ?? [])) ? 'incompleto' : 'no_encontrado', 'sitios' => []];
     }
@@ -179,6 +194,13 @@ class HotelsApi
         if (! $this->configured() || mb_strlen($nombre) < 3) {
             return null;
         }
+        // La lista de hoteles casi no cambia: lo que ya se encontró se recuerda un día. Lo que NO se encuentra no se guarda
+        // (puede ser un hotel recién dado de alta) y se vuelve a preguntar al panel.
+        $clave = 'ai_support_hoteles_' . sha1(self::norm($nombre));
+        $guardado = Cache::get($clave);
+        if (is_array($guardado) && $guardado) {
+            return $guardado;
+        }
         $d = $this->get('/api/support/v1/hotels', ['q' => $nombre, 'per_page' => 5]);
         if ($d === null) {
             return null;
@@ -190,7 +212,11 @@ class HotelsApi
                 $d = $this->get('/api/support/v1/hotels', ['q' => $sin, 'per_page' => 5]) ?? $d;
             }
         }
-        return array_map(fn ($h) => ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
+        $res = array_map(fn ($h) => ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
+        if ($res) {
+            Cache::put($clave, $res, self::CACHE_HOTELES);
+        }
+        return $res;
     }
 
     /**
