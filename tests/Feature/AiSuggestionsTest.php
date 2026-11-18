@@ -105,6 +105,33 @@ class AiSuggestionsTest extends TestCase
         $this->assertFalse(app(\App\Services\Ai\AiSuggestionService::class)->topeAlcanzado());
         $this->withHeader('X-App-Token', $this->agente())->postJson('/api/ai_suggestions.php?action=admin_budget', ['budget' => 10])->assertForbidden();
     }
+    public function test_historial_apunta_cada_valoracion_y_lo_que_se_envio_al_final(): void
+    {
+        $this->activar();
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $tok = $this->agente();
+        $id = $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->json('suggestion.id');
+        $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $id, 'rating' => 'down', 'correction' => 'Debía pedir el código primero.'])->assertOk();
+        $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $id, 'rating' => 'up'])->assertOk();
+        // El agente contesta al cliente después de la sugerencia.
+        DB::table('messages')->insert(['contact_id' => $this->cid, 'wa_id' => '', 'ticket_id' => $tk, 'direction' => 'out', 'body' => '<p>Hola, ya lo miramos.</p>', 'created_at' => now()->addMinute()]);
+
+        $h = app(\App\Services\Ai\AiSuggestionService::class)->historial();
+        $this->assertSame(2, $h['total'], 'las dos valoraciones quedan, la segunda no pisa a la primera');
+        $this->assertSame('up', $h['items'][0]['rating']);
+        $this->assertSame('down', $h['items'][1]['rating']);
+        $this->assertSame('Debía pedir el código primero.', $h['items'][1]['correction']);
+        $this->assertSame('Ana', $h['items'][1]['user']);
+        $this->assertNotEmpty($h['items'][1]['ai'], 'guarda lo que sugirió la IA');
+        $this->assertSame('Hola, ya lo miramos.', $h['items'][0]['sent']['text']);
+        $this->assertSame(1, app(\App\Services\Ai\AiSuggestionService::class)->historial('down')['total']);
+    }
+
+    public function test_el_historial_es_solo_para_quien_tiene_support_config(): void
+    {
+        $this->withHeader('X-App-Token', $this->agente())->getJson('/api/ai_suggestions.php?action=admin_history')->assertForbidden();
+    }
+
     public function test_lee_el_codigo_de_barras_de_la_foto_y_se_lo_da_a_la_ia(): void
     {
         $this->activar();

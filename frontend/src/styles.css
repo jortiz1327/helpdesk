@@ -4494,3 +4494,16 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-panel-h[data-level="aviso"] { border-left: 4px solid var(--warn, #d9a21b); }
 .ai-panel-h[data-level="mal"] { border-left: 4px solid var(--danger, #d4483b); }
 .ai-panel-h[data-level="ok"] { border-left: 4px solid var(--ok, #2e9e6a); }
+
+/* Historial de valoraciones */
+.ai-hist-filtros { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.ai-hist-filtros .input { width: 150px; }
+.ai-hist { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 8px; }
+.ai-hist li { border-left: 3px solid var(--line, #ccc); padding: 4px 0 4px 10px; font-size: 13px; }
+.ai-hist li[data-t="up"] { border-left-color: var(--ok, #2e9e6a); }
+.ai-hist li[data-t="down"] { border-left-color: var(--danger, #d4483b); }
+.ai-hist li[data-t="review"] { border-left-color: var(--warn, #d9a21b); }
+.ai-hist summary { cursor: pointer; color: var(--muted, #667); }
+.ai-hist dl { margin: 6px 0 0; display: grid; gap: 6px; }
+.ai-hist dt { font-weight: 700; font-size: 12px; }
+.ai-hist dd { margin: 0; white-space: pre-wrap; max-width: 80ch; }

@@ -527,7 +527,69 @@ class AiSuggestionService
         ]);
         // Solo si está validada pasa a ser conocimiento buscable (y deja de serlo si cambia a 👍).
         $this->knowledge->indexarCorreccion($id);
-        return DB::table('ai_suggestions')->where('id', $id)->first();
+        $fila = DB::table('ai_suggestions')->where('id', $id)->first();
+        $this->apuntar($fila, 'rating', $userId);
+        return $fila;
+    }
+
+    /** Historial: cada valoración o revisión queda apuntada (quién, cuándo y qué había sugerido la IA entonces). Nunca se pisa. */
+    private function apuntar(object $s, string $tipo, int $userId): void
+    {
+        DB::table('ai_rating_events')->insert([
+            'suggestion_id' => $s->id, 'ticket_id' => $s->ticket_id, 'user_id' => $userId, 'type' => $tipo,
+            'rating' => $tipo === 'rating' ? $s->rating : null, 'correction' => $s->correction,
+            'correction_status' => ($s->rating === 'down') ? $s->correction_status : null,
+            'ai_body' => $s->body, 'created_at' => now(),
+        ]);
+    }
+
+    private static function textoPlano(?string $t): ?string
+    {
+        if ($t === null) {
+            return null;
+        }
+        $h = preg_replace('#<(br|/p|/div|/li)\s*/?>#i', "\n", $t);
+        $h = html_entity_decode(strip_tags((string) $h), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return mb_substr(trim((string) preg_replace("/\n{3,}/", "\n\n", $h)), 0, 1500);
+    }
+
+    /**
+     * Historial de valoraciones para Ajustes (support.config): de más nuevo a más antiguo.
+     * $filtro: up | down | review | '' (todo). $q: código del ticket. Lo enviado al final es el primer mensaje
+     * saliente visible al cliente que el equipo escribió después de la sugerencia.
+     *
+     * @return array{total:int, items:array}
+     */
+    public function historial(string $filtro = '', string $q = '', int $desde = 0, int $limite = 30): array
+    {
+        $b = DB::table('ai_rating_events as e')->leftJoin('users as u', 'u.id', '=', 'e.user_id')
+            ->leftJoin('tickets as t', 't.id', '=', 'e.ticket_id')->leftJoin('ai_suggestions as s', 's.id', '=', 'e.suggestion_id');
+        if ($filtro === 'review') {
+            $b->where('e.type', 'review');
+        } elseif (in_array($filtro, ['up', 'down'], true)) {
+            $b->where('e.type', 'rating')->where('e.rating', $filtro);
+        }
+        if (trim($q) !== '') {
+            $b->where('t.code', 'like', '%' . trim($q) . '%');
+        }
+        $total = (clone $b)->count();
+        $filas = $b->orderByDesc('e.id')->offset(max(0, $desde))->limit(max(1, min(100, $limite)))
+            ->get(['e.id', 'e.type', 'e.rating', 'e.correction', 'e.correction_status', 'e.ai_body', 'e.created_at', 'e.ticket_id', 'e.suggestion_id',
+                'u.name as user_name', 't.code as ticket_code', 't.subject', 's.status as sug_status', 's.created_at as sug_at', 's.used_at']);
+        $items = $filas->map(function ($r) {
+            $enviado = DB::table('messages as m')->leftJoin('users as a', 'a.id', '=', DB::raw('COALESCE(m.sent_by, m.author_user_id)'))
+                ->where('m.ticket_id', $r->ticket_id)->where('m.direction', 'out')->where('m.is_internal_note', 0)
+                ->where('m.created_at', '>=', $r->sug_at ?? $r->created_at)->whereNotNull('m.body')->orderBy('m.id')
+                ->first(['m.body', 'm.created_at', 'a.name as by']);
+            return [
+                'id' => (int) $r->id, 'type' => $r->type, 'rating' => $r->rating, 'status' => $r->correction_status,
+                'user' => $r->user_name, 'at' => $r->created_at, 'ticket_id' => (int) $r->ticket_id, 'ticket_code' => $r->ticket_code, 'subject' => $r->subject,
+                'ai' => $r->sug_status === 'abstained' ? '(la IA no se atrevió a contestar)' : self::textoPlano($r->ai_body),
+                'correction' => $r->correction, 'used' => $r->used_at !== null,
+                'sent' => $enviado ? ['text' => self::textoPlano($enviado->body), 'by' => $enviado->by, 'at' => $enviado->created_at] : null,
+            ];
+        })->all();
+        return ['total' => $total, 'items' => $items];
     }
 
     /** Un responsable valida o rechaza una corrección. Solo las validadas alimentan a la IA. */
@@ -543,6 +605,9 @@ class AiSuggestionService
             'updated_at' => now(),
         ]);
         $this->knowledge->indexarCorreccion($id);
+        if ($n > 0) {
+            $this->apuntar(DB::table('ai_suggestions')->where('id', $id)->first(), 'review', $userId);
+        }
         return $n > 0;
     }
 

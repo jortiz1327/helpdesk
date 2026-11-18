@@ -101,6 +101,8 @@ export default function AiSettings() {
 
       {d.hotels_api && <AiPanelHoteles p={d.hotels_api} />}
 
+      <AiHistorial />
+
       {d.usage && (
         <div className="card em-card" style={{ marginTop: 12 }}>
           <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Consumo y coste estimado</h3>
@@ -163,6 +165,62 @@ export default function AiSettings() {
         </div>
       )}
     </>
+  )
+}
+
+/* Historial de valoraciones: quién valoró qué, cuándo, qué sugirió la IA, qué corrigió la persona y qué se envió al final. Solo se añade. */
+const FILTROS = [['', 'Todo'], ['up', '👍 Bien'], ['down', '👎 Corregidas'], ['review', 'Revisiones']]
+function AiHistorial() {
+  const [abierto, setAbierto] = useState(false)
+  const [filtro, setFiltro] = useState('')
+  const [q, setQ] = useState('')
+  const [h, setH] = useState({ total: 0, items: [] })
+  const [cargando, setCargando] = useState(false)
+  const cargar = useCallback(async (f, texto, offset) => {
+    setCargando(true)
+    try {
+      const r = await api.aiAdminHistory(f, texto, offset)
+      setH((p) => ({ total: r.total, items: offset ? [...p.items, ...r.items] : r.items }))
+    } catch { /* el historial es de consulta: si falla, se queda como estaba */ }
+    setCargando(false)
+  }, [])
+  useEffect(() => { if (abierto) cargar(filtro, q, 0) }, [abierto, filtro]) // eslint-disable-line react-hooks/exhaustive-deps
+  const quien = (x) => x.type === 'review'
+    ? `${x.user || 'Alguien'} ${x.status === 'validated' ? 'validó' : x.status === 'rejected' ? 'rechazó' : 'dejó pendiente'} la corrección`
+    : `${x.user || 'Alguien'} valoró ${x.rating === 'up' ? '👍 bien' : '👎 mal'}`
+  return (
+    <div className="card em-card" style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Historial de valoraciones</h3>
+      <p className="em-desc">Cada valoración y cada validación queda apuntada para siempre: quién, cuándo, qué sugirió la IA, qué corrigió la persona y qué se envió finalmente al cliente.</p>
+      {!abierto ? <button className="btn" onClick={() => setAbierto(true)}>Ver historial</button> : (
+        <>
+          <div className="ai-hist-filtros">
+            {FILTROS.map(([k, t]) => <button key={k} className={'btn' + (filtro === k ? ' primary' : '')} onClick={() => setFiltro(k)}>{t}</button>)}
+            <form onSubmit={(e) => { e.preventDefault(); cargar(filtro, q, 0) }}>
+              <input className="input" placeholder="Ticket (TK-…)" value={q} onChange={(e) => setQ(e.target.value)} />
+            </form>
+          </div>
+          {h.items.length === 0 && !cargando ? <p className="muted" style={{ margin: '8px 0 0', fontSize: 13 }}>No hay nada que enseñar con ese filtro.</p> : (
+            <ul className="ai-hist">
+              {h.items.map((x) => (
+                <li key={x.id} data-t={x.type === 'review' ? 'review' : x.rating}>
+                  <div className="ai-hist-cab"><b>{quien(x)}</b> <small>{fmtDate(x.at)} · <span className="mono">{x.ticket_code}</span>{x.used ? ' · la copió' : ''}</small></div>
+                  <details>
+                    <summary>{x.subject || 'Ver detalle'}</summary>
+                    <dl>
+                      <div><dt>La IA sugirió</dt><dd>{x.ai || '—'}</dd></div>
+                      {x.correction ? <div><dt>La persona indicó{x.status ? ` (${ESTADO[x.status] || x.status})` : ''}</dt><dd>{x.correction}</dd></div> : null}
+                      <div><dt>Se envió al cliente</dt><dd>{x.sent ? <>{x.sent.text}<small className="muted"> — {x.sent.by || 'sistema'}, {fmtDate(x.sent.at)}</small></> : 'Todavía nada tras esta sugerencia'}</dd></div>
+                    </dl>
+                  </details>
+                </li>
+              ))}
+            </ul>
+          )}
+          {h.items.length < h.total ? <button className="btn" disabled={cargando} onClick={() => cargar(filtro, q, h.items.length)}>{cargando ? 'Cargando…' : `Ver más (${h.total - h.items.length})`}</button> : null}
+        </>
+      )}
+    </div>
   )
 }
 

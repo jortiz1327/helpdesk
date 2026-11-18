@@ -245,8 +245,8 @@ const fx = [185, 485, 785, 1085];
 const fs2 = [
   ['f3', 'sys', 'Contesta sin la IA', ['si no hay propuesta o no le sirve', 'el cliente recibe su respuesta'], null],
   ['f2', 'ag', 'Copia y envía él', ['puede retocarla antes', 'se apunta como usada'], 'mail'],
-  ['f1', 'ag', 'Útil', ['se apunta para medir cuánto', 'acierta la IA'], 'up'],
-  ['f4', 'no', 'No sirve', ['escribe qué falló y cómo', 'había que responder'], 'down'],
+  ['f1', 'ag', 'Útil', ['queda en el historial', 'para medir cuánto acierta la IA'], 'up'],
+  ['f4', 'no', 'No sirve', ['escribe qué falló y cómo había', 'que responder · queda en el historial'], 'down'],
 ];
 arr([N.g1.b, [C, yf]], { noarrow: true });
 arr([[fx[0], yf], [fx[3], yf]], { noarrow: true });
@@ -263,7 +263,7 @@ dia('v1', 1085, yfEnd + 34, 270, 'mem', ['¿Un responsable da por', 'buena la co
 arr([N.f4.b, N.v1.t]);
 box('v1x', 785, N.v1.y + N.v1.h / 2 - 30, 250, 'no', 'Se descarta', ['la IA no la verá nunca']);
 arr([N.v1.l, N.v1x.r]); lab('No', N.v1.l[0] - 10, N.v1.l[1] + 22, 'end');
-box('v2', 1085, N.v1.y + N.v1.h + 34, 260, 'mem', 'Pasa a la memoria', ['como corrección validada', 'la IA la usará en las próximas consultas']);
+box('v2', 1085, N.v1.y + N.v1.h + 34, 260, 'mem', 'Pasa a la memoria', ['como corrección validada (queda', 'apuntado quién la validó y cuándo)']);
 arr([N.v1.b, N.v2.t]); lab('Sí', 1097, N.v1.b[1] + 22);
 chip('r2', 1085, N.v2.y + N.v2.h + 28, 260, 'mem', 'Vuelve a la memoria (paso 4)');
 arr([N.v2.b, N.r2.t]);

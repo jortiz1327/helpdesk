@@ -42,6 +42,7 @@ class AiSuggestionsController extends Controller
             'admin_budget' => $this->post($request) ?? $this->adminBudget($request),
             'admin_index' => $this->post($request) ?? $this->adminIndex($request),
             'admin_review' => $this->post($request) ?? $this->adminReview($request),
+            'admin_history' => $this->adminHistory($request),
             default     => response()->json(['ok' => true, 'enabled' => $this->ai->enabled()]),
         };
     }
@@ -96,6 +97,15 @@ class AiSuggestionsController extends Controller
         }
         return $ok ? response()->json(['ok' => true] + $this->ai->panel())
                    : response()->json(['ok' => false, 'error' => 'Corrección no encontrada'], 404);
+    }
+
+    /** Historial de valoraciones (quién, cuándo, qué sugirió la IA, qué corrigió la persona y qué se envió). Solo support.config. */
+    private function adminHistory(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        return response()->json(['ok' => true] + $this->ai->historial(
+            (string) $request->query('filter', ''), (string) $request->query('q', ''), (int) $request->query('offset', 0), 30,
+        ));
     }
 
     private function soloConfig(Request $request)
