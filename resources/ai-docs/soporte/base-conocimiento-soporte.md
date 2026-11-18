@@ -146,7 +146,7 @@ Las etiquetas de 7,5 pulgadas las cambia AEME Group. No indiques al cliente que 
 «Antes de confirmar la pila necesito saber el modelo de la etiqueta. Envíeme una foto del frontal y del código. Si ya la ha sustituido, confirme la marca y referencia utilizadas. Después del cambio, deje la etiqueta en su posición habitual y avísenos para que soporte revise su estado y solicite una actualización.»
 
 **Línea roja**
-No tramites pilas ni recambios. Para pedir material, deriva a `postventa@aemegroup.com` con material, cantidad y foto de referencia.
+No tramites pilas ni recambios. Para pedir material, indica que escriban a `postventa@aemegroup.com` con material, cantidad y foto de referencia.
 
 ## 9. Antena o repetidor desconectado, o etiquetas con poca señal
 

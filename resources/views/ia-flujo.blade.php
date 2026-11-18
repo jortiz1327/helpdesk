@@ -174,7 +174,8 @@
       <h2>Redacta con las reglas puestas</h2>
       <p>Recibe la conversación, lo que dijo AdminHoteles y lo que encontró en la memoria, más las reglas del equipo:</p>
       <ul>
-        <li><div><b>Siempre se deriva:</b> <span>alérgenos, garantías y material, presupuestos, altas de usuarios, tótems, dominios…</span></div></li>
+        <li><div><b>Siempre se deriva:</b> <span>alérgenos, garantías (sin dar correo: las lleva el responsable en la aplicación), presupuestos, estado de envíos, altas de usuarios, tótems, dominios…</span></div></li>
+        <li><div><b>No se deriva, se contesta con el correo:</b> <span>pedidos de material (pilas, soportes, recambios, etiquetas): «escriba a postventa@aemegroup.com con material, cantidad y foto de referencia».</span></div></li>
         <li><div><b>Verificar primero, explicar después:</b> <span>configurar algo del buffet pide el correo antes de dar los pasos.</span></div></li>
         <li><div><b>Máximo dos preguntas,</b> <span>sin preguntar lo obvio ni inventar datos.</span></div></li>
         <li><div><b>Antenas:</b> <span>todas en línea → pregunta y guía a forzar el menú; alguna caída → su personal técnico.</span></div></li>
