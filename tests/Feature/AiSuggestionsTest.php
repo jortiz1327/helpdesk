@@ -138,6 +138,35 @@ class AiSuggestionsTest extends TestCase
         $this->assertSame(1, app(\App\Services\Ai\AiSuggestionService::class)->historial('down')['total']);
     }
 
+    public function test_la_medicion_cuenta_cuanto_se_aprovecha_el_borrador_y_compara_tiempos(): void
+    {
+        $this->activar();
+        $borrador = 'Hola, para ayudarle necesito el nombre completo de su hotel y el correo con el que accede a la aplicación.';
+        $caso = function (string $enviado, ?int $min = 3) use ($borrador) {
+            $tk = $this->ticket('Mi etiqueta no conecta');
+            DB::table('ai_suggestions')->insert(['ticket_id' => $tk, 'trigger_message_id' => 0, 'status' => 'ready', 'body' => $borrador, 'sources' => '{}',
+                'created_at' => now(), 'updated_at' => now()]);
+            if ($enviado !== '') {
+                DB::table('messages')->insert(['contact_id' => $this->cid, 'wa_id' => '', 'ticket_id' => $tk, 'direction' => 'out', 'body' => "<p>$enviado</p>", 'created_at' => now()->addMinutes($min)]);
+            }
+            return $tk;
+        };
+        $caso($borrador);                                                                       // sin cambios
+        $caso('Hola, necesito el nombre de su hotel y el correo con el que entra en la aplicación, gracias.');   // retoques
+        $caso('Revisado: ya lo he arreglado desde el panel, pruebe ahora y me dice.');          // reescrita
+        $caso('');                                                                              // sin respuesta
+        $sinIa = $this->ticket('Otra consulta sin IA');
+        DB::table('messages')->insert(['contact_id' => $this->cid, 'wa_id' => '', 'ticket_id' => $sinIa, 'direction' => 'out', 'body' => 'Hecho.', 'created_at' => now()->addMinutes(30)]);
+
+        $m = app(\App\Services\Ai\AiSuggestionService::class)->medicion();
+        $this->assertSame(4, $m['borradores']);
+        $this->assertSame(['sin_cambios' => 1, 'retoques' => 1, 'reescrita' => 1, 'sin_respuesta' => 1], $m['por_uso']);
+        $this->assertSame(3, $m['min_hasta_enviar']);
+        $this->assertSame(3, $m['tickets_con_ia']);
+        $this->assertSame(1, $m['tickets_sin_ia']);
+        $this->assertSame(30, $m['min_primera_sin_ia']);
+    }
+
     public function test_avisa_de_las_correcciones_que_llevan_dias_sin_revisar(): void
     {
         $tk = $this->ticket('Mi etiqueta no cambia');

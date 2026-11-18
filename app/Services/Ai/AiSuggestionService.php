@@ -149,6 +149,7 @@ class AiSuggestionService
                 ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.correction_status', 'a.rated_at'])->all(),
             'corrections_pending' => DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->where('correction_status', 'pending')->count(),
             'review' => $this->revisionPendiente(),
+            'medicion' => \Illuminate\Support\Facades\Cache::remember('ai_medicion', 600, fn () => $this->medicion()),
             'docs_pending' => $this->knowledge->documentacionPendiente(),
         ];
     }
@@ -546,6 +547,66 @@ class AiSuggestionService
         return [
             'days' => self::DIAS_REVISION, 'pending' => (clone $q)->count(), 'stale' => (clone $viejas)->count(),
             'oldest' => (clone $q)->min('rated_at'),
+        ];
+    }
+
+    /**
+     * ¿Ayuda de verdad? Se mide con lo que ya ocurre en producción, sin pedir nada a los agentes ni enviar nada a nadie:
+     *  - cuánto del borrador llega al cliente: «sin cambios» (≥ 90 % parecido al enviado), «con retoques» (50-89 %) o «reescrita» (< 50 %),
+     *    y las que acabaron sin respuesta del equipo;
+     *  - cuánto tarda el agente desde que hay sugerencia hasta que contesta (mediana);
+     *  - tiempo hasta la primera respuesta de los tickets nuevos CON sugerencia frente a los SIN ella (orientativo: no es un ensayo
+     *    controlado, los tickets no se reparten al azar).
+     * El tiempo AHORRADO como tal no se puede medir sin comparar; esta es la mejor aproximación con datos reales.
+     */
+    public function medicion(int $dias = 30): array
+    {
+        $desde = now()->subDays($dias);
+        $sugs = DB::table('ai_suggestions')->where('status', 'ready')->whereNotNull('body')->where('created_at', '>=', $desde)
+            ->orderByDesc('id')->limit(400)->get(['id', 'ticket_id', 'body', 'created_at', 'used_at', 'rating']);
+        $norm = fn (?string $t) => trim((string) preg_replace('/\s+/u', ' ', mb_strtolower(mb_substr(Scrub::firma((string) self::textoPlano($t)), 0, 900))));
+        $c = ['sin_cambios' => 0, 'retoques' => 0, 'reescrita' => 0, 'sin_respuesta' => 0];
+        $tardan = [];
+        foreach ($sugs as $s) {
+            $m = DB::table('messages')->where('ticket_id', $s->ticket_id)->where('direction', 'out')->where('is_internal_note', 0)
+                ->where('created_at', '>=', $s->created_at)->whereNotNull('body')->orderBy('id')->first(['body', 'created_at']);
+            if (! $m) {
+                $c['sin_respuesta']++;
+                continue;
+            }
+            similar_text($norm($s->body), $norm($m->body), $pct);
+            $c[$pct >= 90 ? 'sin_cambios' : ($pct >= 50 ? 'retoques' : 'reescrita')]++;
+            $tardan[] = max(0, (int) round((strtotime((string) $m->created_at) - strtotime((string) $s->created_at)) / 60));
+        }
+        $mediana = function (array $v) {
+            if (! $v) {
+                return null;
+            }
+            sort($v);
+            $n = count($v);
+            return $n % 2 ? $v[intdiv($n, 2)] : (int) round(($v[$n / 2 - 1] + $v[$n / 2]) / 2);
+        };
+        // Primera respuesta pública del equipo a cada ticket nuevo (en minutos), con y sin sugerencia lista.
+        $filas = DB::table('tickets as t')
+            ->join('messages as m', function ($j) {
+                $j->on('m.ticket_id', '=', 't.id')->where('m.direction', 'out')->where('m.is_internal_note', 0);
+            })
+            ->where('t.created_at', '>=', $desde)
+            ->groupBy('t.id', 't.created_at')
+            ->limit(3000)
+            ->selectRaw("t.id, TIMESTAMPDIFF(MINUTE, t.created_at, MIN(m.created_at)) as min_resp, EXISTS(SELECT 1 FROM ai_suggestions a WHERE a.ticket_id = t.id AND a.status = 'ready') as con_ia")
+            ->get();
+        $con = $filas->where('con_ia', 1)->pluck('min_resp')->map(fn ($x) => max(0, (int) $x))->all();
+        $sin = $filas->where('con_ia', 0)->pluck('min_resp')->map(fn ($x) => max(0, (int) $x))->all();
+        $total = array_sum($c);
+
+        return [
+            'days' => $dias, 'borradores' => $total, 'por_uso' => $c,
+            'pct_sin_cambios' => $total ? (int) round($c['sin_cambios'] / $total * 100) : null,
+            'pct_aprovechada' => $total ? (int) round(($c['sin_cambios'] + $c['retoques']) / $total * 100) : null,
+            'min_hasta_enviar' => $mediana($tardan),
+            'tickets_con_ia' => count($con), 'tickets_sin_ia' => count($sin),
+            'min_primera_con_ia' => $mediana($con), 'min_primera_sin_ia' => $mediana($sin),
         ];
     }
 

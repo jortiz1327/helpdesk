@@ -97,6 +97,28 @@ export default function AiSettings() {
         {valoradas > 0 && valoradas < 20 ? <p className="em-desc" style={{ marginTop: 8 }}>Con menos de 20 valoraciones el acierto aún dice poco.</p> : null}
       </div>
 
+      {d.medicion && d.medicion.borradores > 0 && (() => {
+        const m = d.medicion, u = m.por_uso
+        const min = (x) => x === null || x === undefined ? '—' : x < 60 ? `${x} min` : `${Math.round(x / 6) / 10} h`
+        return (
+          <div className="card em-card" style={{ marginTop: 12 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>¿Ayuda de verdad? <small className="muted">· últimos {m.days} días</small></h3>
+            <dl className="ai-stats">
+              <div><dt>Borradores</dt><dd>{m.borradores}</dd></div>
+              <div><dt>Enviada casi igual</dt><dd>{m.pct_sin_cambios === null ? '—' : `${m.pct_sin_cambios} %`}</dd></div>
+              <div><dt>Aprovechada (igual o retocada)</dt><dd>{m.pct_aprovechada === null ? '—' : `${m.pct_aprovechada} %`}</dd></div>
+              <div><dt>Reescrita del todo</dt><dd>{u.reescrita}</dd></div>
+              <div><dt>Sin respuesta aún</dt><dd>{u.sin_respuesta}</dd></div>
+              <div><dt>Tarda en contestar tras la sugerencia</dt><dd>{min(m.min_hasta_enviar)}</dd></div>
+            </dl>
+            <p className="em-desc" style={{ marginTop: 8 }}>
+              Primera respuesta a un ticket nuevo: <b>{min(m.min_primera_con_ia)}</b> con sugerencia ({m.tickets_con_ia} tickets) frente a <b>{min(m.min_primera_sin_ia)}</b> sin ella ({m.tickets_sin_ia}).
+              Es orientativo: los tickets no se reparten al azar entre unos y otros, y no mide el tiempo que cada agente se ahorra al escribir.
+            </p>
+          </div>
+        )
+      })()}
+
 
       {d.budget && <AiBudget b={d.budget} busy={busy} onSave={guardarTope} />}
 
