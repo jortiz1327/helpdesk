@@ -31,12 +31,9 @@ class AiDecidirTest extends TestCase
         $this->assertNull(AiSuggestionService::decidir('Garantía de las etiquetas de la farmacia', $this->conv('x'), null, false));
     }
 
-    public function test_permisos_con_hotel_identificado_derivan_sin_preguntar(): void
+    public function test_permisos_y_roles_los_cambia_el_hotel_asi_que_no_se_deriva_en_codigo(): void
     {
-        $d = AiSuggestionService::decidir('Necesitamos ampliar permisos al jefe de cocina', $this->conv('x'), null, true);
-        $this->assertSame('derivar', $d['decision']);
-        // Sin hotel identificado no se decide en código.
-        $this->assertNull(AiSuggestionService::decidir('Necesitamos ampliar permisos al jefe de cocina', $this->conv('x'), null, false));
+        $this->assertNull(AiSuggestionService::decidir('Necesitamos ampliar permisos al jefe de cocina', $this->conv('x'), null, true));
     }
 
     public function test_problema_de_uso_sin_hotel_ni_correo_pide_datos_solo_la_primera_vez(): void
