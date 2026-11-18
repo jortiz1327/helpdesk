@@ -32,6 +32,23 @@
   .bar { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 8px 0 4px; }
   .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s ease-out; }
   select { font: inherit; width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+  #filtros { margin-top: 4px; }
+  #fpanel { max-height: 52vh; overflow-y: auto; padding-right: 4px; }
+  #filtros summary { cursor: pointer; font-size: 14px; font-weight: 600; padding: 6px 2px; list-style-position: inside; }
+  #filtros summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .frow { margin: 10px 0 12px; }
+  .ftit { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .fgrp { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { display: inline-flex; gap: 6px; align-items: baseline; font-size: 13px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); cursor: pointer; }
+  .chip small { color: var(--muted); font-size: 11px; }
+  .chip:hover { border-color: var(--accent); }
+  .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .chip[aria-pressed="true"] small { color: inherit; opacity: .85; }
+  .chip.vacio { opacity: .45; }
+  .fhint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .fquitar { font-size: 13px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); cursor: pointer; margin-bottom: 4px; }
+  .fquitar:hover { border-color: var(--accent); }
   #buscar { font: inherit; width: 100%; margin-top: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
   #buscar:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .item .num { font-size: 11px; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
@@ -142,7 +159,7 @@
       <p>Solo local · se guarda al instante · nada se envía</p>
       <div class="bar"><i id="barra"></i></div>
       <p id="prog" style="margin-bottom:10px"></p>
-      <select id="filtro" aria-label="Filtrar casos"></select>
+      <details id="filtros"><summary id="fsum">Filtros</summary><div id="fpanel"></div></details>
       <input id="buscar" type="search" placeholder="Buscar por nº, código o palabra" aria-label="Buscar caso" autocomplete="off">
 
     </header>

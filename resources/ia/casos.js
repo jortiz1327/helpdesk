@@ -22,51 +22,88 @@ const necesitaApi = (c) => /\[\s*API\s*\]/i.test(c.comentario || '')
 const verif = (c) => /\[\s*VERIF\s*\]/i.test(c.comentario || '')
 const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c.decision && !(verif(c) && c.decision === 'responder' && c.ia.obtenido === 'pedir_info')
 
-// Filtros agrupados por lo que quieres hacer; cada opción enseña cuántos casos tiene.
+// Filtros: cuatro grupos que SE COMBINAN (un caso tiene que cumplir uno de cada grupo). Cada botón enseña cuántos casos
+// quedarían si lo eliges, teniendo en cuenta lo que ya has elegido en los otros grupos.
 const FILTROS = [
-  ['Para revisar', [
-    ['todos', 'Todos los casos', () => true],
-    ['pend', 'Sin revisar', (c) => !c.revisado],
-    ['dud', '🚩 Dudosos (los miro luego)', (c) => c.dudoso],
-    ['seg', 'Seguimientos · 2.º/3.º mensaje del cliente (para MEDIR)', (c) => (c.lote || '').startsWith('seg-')],
-    ['lote5', 'Lote 5 · para MEDIR (20 casos nuevos del 17-nov)', (c) => c.lote === 'lote5-20261117'],
-    ['lote4', 'Lote 4 · ya usado para ajustar (no vale para medir)', (c) => c.lote === 'lote4-20261117'],
-    ['lote3', 'Lote 3 (20 casos del 17-nov, ya medido)', (c) => c.lote === 'lote3-20261117'],
-    ['nuevos', 'Lote 2 (30 casos del 16-nov)', (c) => c.lote === 'lote2-20261116'],
-  ]],
-  ['Según tu decisión', [
-    ['d-responder', 'Debe responder', (c) => c.decision === 'responder' && c.revisado],
-    ['d-pedir_info', 'Debe pedir dato', (c) => c.decision === 'pedir_info' && c.revisado],
-    ['d-derivar', 'Debe derivar', (c) => c.decision === 'derivar' && c.revisado],
-    ['desc', 'Descartados', (c) => c.decision === 'descartar'],
-  ]],
-  ['Según la IA y la API', [
-    ['ind', '⚠ Respuestas indebidas (contestó y no debía)', (c) => c.ia && c.ia.obtenido === 'responder' && (c.decision === 'pedir_info' || c.decision === 'derivar')],
-    ['dif', 'Donde la IA no coincide', (c) => difiere(c)],
-    ['ok', 'Donde la IA coincide', (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido === c.decision],
-    ['sinprobar', 'Que la IA aún no ha probado', (c) => !c.ia],
-    ['api', 'Necesitan [API]', (c) => necesitaApi(c)],
-    ['claude', 'Revalidados por Claude', (c) => !!c.nota],
-  ]],
+  { k: 'conj', t: 'Conjunto de casos', ops: [
+    ['todos', 'Todos', () => true, ''],
+    ['seg', 'Seguimientos', (c) => (c.lote || '').startsWith('seg-'), '20 casos nuevos: 2.º o 3.º mensaje del cliente. Para MEDIR.'],
+    ['lote5', 'Lote 5', (c) => c.lote === 'lote5-20261117', 'Ya NO vale para medir: se arreglaron a mano varios de sus casos.'],
+    ['lote4', 'Lote 4', (c) => c.lote === 'lote4-20261117', 'Ya usado para ajustar las reglas: no vale para medir.'],
+    ['lote3', 'Lote 3', (c) => c.lote === 'lote3-20261117', '20 casos del 17-nov, ya medidos.'],
+    ['nuevos', 'Lote 2', (c) => c.lote === 'lote2-20261116', '30 casos del 16-nov.'],
+  ] },
+  { k: 'rev', t: 'Revisión', ops: [
+    ['todos', 'Todos', () => true, ''],
+    ['pend', 'Sin revisar', (c) => !c.revisado, ''],
+    ['dud', '🚩 Dudosos', (c) => c.dudoso, 'Los que marcaste con «Dudoso: lo miro luego».'],
+  ] },
+  { k: 'dec', t: 'Tu decisión', ops: [
+    ['todos', 'Todas', () => true, ''],
+    ['responder', 'Responder', (c) => c.decision === 'responder' && c.revisado, ''],
+    ['pedir_info', 'Pedir dato', (c) => c.decision === 'pedir_info' && c.revisado, ''],
+    ['derivar', 'Derivar', (c) => c.decision === 'derivar' && c.revisado, ''],
+    ['descartar', 'Descartados', (c) => c.decision === 'descartar', ''],
+  ] },
+  { k: 'ia', t: 'Qué hizo la IA', ops: [
+    ['todos', 'Todo', () => true, ''],
+    ['ind', '⚠ Contestó y no debía', (c) => c.ia && c.ia.obtenido === 'responder' && (c.decision === 'pedir_info' || c.decision === 'derivar'), 'Respuestas indebidas: lo más grave.'],
+    ['dif', 'No coincide', (c) => difiere(c), ''],
+    ['ok', 'Coincide', (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido === c.decision, ''],
+    ['sinprobar', 'Sin probar', (c) => !c.ia, 'La IA aún no los ha probado.'],
+  ] },
+  { k: 'ext', t: 'Otros', ops: [
+    ['todos', 'Todos', () => true, ''],
+    ['api', 'Necesitan [API]', (c) => necesitaApi(c), ''],
+    ['claude', 'Revalidados por Claude', (c) => !!c.nota, ''],
+  ] },
 ]
-const FILTRO = Object.fromEntries(FILTROS.flatMap(([, o]) => o.map(([v, , fn]) => [v, fn])))
+const estadoFiltro = { conj: 'todos', rev: 'todos', dec: 'todos', ia: 'todos', ext: 'todos' }
+const predicado = (g, v) => (g.ops.find((o) => o[0] === v) || g.ops[0])[2]
+const cumple = (c, estado) => FILTROS.every((g) => predicado(g, estado[g.k])(c))
+const hayFiltros = () => FILTROS.some((g) => estadoFiltro[g.k] !== 'todos')
+
 function pintarFiltro() {
-  const s = $('filtro'), val = s.value || 'todos'; s.replaceChildren()
-  FILTROS.forEach(([grupo, ops]) => {
-    const g = document.createElement('optgroup'); g.label = grupo
-    ops.forEach(([v, n, fn]) => { const o = document.createElement('option'); o.value = v; o.textContent = n + ' (' + casos.filter(fn).length + ')'; g.append(o) })
-    s.append(g)
+  const box = $('filtros'); if (!box) return
+  const n = casos.filter((c) => cumple(c, estadoFiltro)).length
+  const activos = FILTROS.filter((g) => estadoFiltro[g.k] !== 'todos').map((g) => g.ops.find((o) => o[0] === estadoFiltro[g.k])[1].replace(/^⚠ |^🚩 /, ''))
+  $('fsum').textContent = (activos.length ? activos.join(' · ') : 'Todos los casos') + ' — ' + n + (n === 1 ? ' caso' : ' casos')
+  const panel = $('fpanel'); panel.replaceChildren()
+  FILTROS.forEach((g) => {
+    const fila = el('div', 'frow'), grupo = el('div', 'fgrp'); grupo.setAttribute('role', 'group'); grupo.setAttribute('aria-label', g.t)
+    fila.append(el('div', 'ftit', g.t))
+    g.ops.forEach(([v, nombre, , pista]) => {
+      const cuantos = casos.filter((c) => cumple(c, { ...estadoFiltro, [g.k]: v })).length
+      const b = el('button', 'chip'); b.type = 'button'
+      b.append(el('span', null, nombre), el('small', null, String(cuantos)))
+      b.setAttribute('aria-pressed', String(estadoFiltro[g.k] === v))
+      if (pista) b.title = pista
+      if (cuantos === 0 && estadoFiltro[g.k] !== v) b.classList.add('vacio')
+      b.onclick = () => { estadoFiltro[g.k] = v; cambioFiltro() }
+      grupo.append(b)
+    })
+    fila.append(grupo)
+    const pista = g.ops.find((o) => o[0] === estadoFiltro[g.k])[3]
+    if (pista) fila.append(el('div', 'fhint', pista))
+    panel.append(fila)
   })
-  s.value = val
+  if (hayFiltros()) {
+    const q = el('button', 'fquitar', 'Quitar todos los filtros'); q.type = 'button'
+    q.onclick = () => { FILTROS.forEach((g) => { estadoFiltro[g.k] = 'todos' }); cambioFiltro() }
+    panel.append(q)
+  }
+}
+
+function cambioFiltro() {
+  flushCom(); const v = visibles(); if (!v.find((c) => c.id === actual) && v[0]) actual = v[0].id
+  pintarFiltro(); pintarCaso(); pintarLista()
 }
 
 function visibles() {
-  const f = $('filtro').value
   // Buscador: por número de caso, código del ticket o palabras del asunto/mensaje.
   const q = ($('buscar') ? $('buscar').value : '').trim().toLowerCase().replace(/^#/, '')
   if (q) return casos.filter((c) => String(c.id).includes(q) || (c.code || '').toLowerCase().includes(q) || ((c.asunto || '') + ' ' + (c.pregunta || '')).toLowerCase().includes(q))
-  const fn = FILTRO[f] || FILTRO.todos
-  return casos.filter((c) => c.id === actual || fn(c))
+  return casos.filter((c) => c.id === actual || cumple(c, estadoFiltro))
 }
 
 function progreso() {
@@ -241,7 +278,6 @@ $('sig').onclick = confirmarYSeguir
 $('dudoso').onclick = alternarDudoso
 $('ant').onclick = () => mover(-1)
 $('buscar').oninput = () => { const v = visibles(); if (v.length && !v.find((c) => c.id === actual)) { flushCom(); actual = v[0].id; pintarCaso() } pintarLista() }
-$('filtro').onchange = () => { flushCom(); const v = visibles(); if (!v.find((c) => c.id === actual) && v[0]) actual = v[0].id; pintarCaso(); pintarLista() }
 
 ;(async () => {
   crearBotones()
