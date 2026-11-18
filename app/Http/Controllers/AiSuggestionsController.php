@@ -6,6 +6,7 @@ use App\Services\Ai\AiSuggestionService;
 use App\Support\TicketVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
 
 /**
@@ -118,11 +119,25 @@ class AiSuggestionsController extends Controller
         return $request->isMethod('post') ? null : response()->json(['ok' => false, 'error' => 'Método no permitido'], 405);
     }
 
+    /** Máximo de sugerencias que pide un agente por minuto: frena un bucle o un abuso que gastaría el tope mensual de todos. */
+    public const MAX_POR_MINUTO = 30;
+
+    private function demasiadas(Request $request)
+    {
+        $clave = 'ai-sugerir:' . (int) $request->user()?->id;
+        if (RateLimiter::tooManyAttempts($clave, self::MAX_POR_MINUTO)) {
+            return response()->json(['ok' => false, 'error' => 'Demasiadas sugerencias seguidas. Espera un minuto.'], 429);
+        }
+        RateLimiter::hit($clave, 60);
+        return null;
+    }
+
     private function suggest(Request $request, bool $regenerate)
     {
         if (! $this->ai->enabled()) {
             return response()->json(['ok' => true, 'enabled' => false, 'suggestion' => null]);
         }
+        if ($limite = $this->demasiadas($request)) return $limite;
         $ticket = (int) ($request->input('ticket') ?: $request->query('ticket'));
         if (! TicketVisibility::puedeVer($request->user(), $ticket)) {
             return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
@@ -137,6 +152,7 @@ class AiSuggestionsController extends Controller
         if (! $this->ai->enabled()) {
             return response()->json(['ok' => true, 'enabled' => false, 'suggestion' => null]);
         }
+        if ($limite = $this->demasiadas($request)) return $limite;
         $ticket = (int) $request->query('ticket');
         if (! TicketVisibility::puedeVer($request->user(), $ticket)) {
             return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);

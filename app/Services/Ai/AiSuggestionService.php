@@ -647,6 +647,8 @@ class AiSuggestionService
             // lo que el cliente acaba de escribir y no se llene el límite de caracteres con ruido. Si no queda nada, se conserva el original.
             $limpio = Scrub::firma($texto);
             $texto = trim($limpio) !== '' ? $limpio : $texto;
+            // Pase lo que pase con el correo y el nombre, contraseñas, IBAN, tarjetas y teléfonos no salen hacia el proveedor.
+            $texto = Scrub::sensibles($texto);
             // Un audio de WhatsApp no trae texto: se deja una marca para saber que existió (no se transcribe, de momento).
             $esAudio = $m->direction === 'in' && ($m->type === 'audio' || str_starts_with((string) $m->media_mime, 'audio/'));
             return ['role' => $m->direction === 'in' ? 'user' : 'assistant', 'text' => $texto === '' && $esAudio ? self::MARCA_AUDIO : $texto];

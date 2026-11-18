@@ -44,6 +44,23 @@ class Scrub
         );
     }
 
+    /**
+     * Mínimo que NUNCA debe salir hacia el proveedor, aunque el correo y el nombre del cliente sí viajen: contraseñas, IBAN,
+     * tarjetas y teléfonos. Conservador a propósito: no toca los códigos de aparato (9 a 12 caracteres sin separadores).
+     */
+    public static function sensibles(string $texto): string
+    {
+        $t = self::contrasenas($texto);
+        // IBAN (con o sin espacios)
+        $t = (string) preg_replace('/\b[A-Z]{2}\d{2}(?:[ -]?[A-Z0-9]{4}){3,7}(?:[ -]?[A-Z0-9]{1,4})?\b/', '[iban]', $t);
+        // Tarjeta: 13-19 cifras agrupadas con espacios o guiones
+        $t = (string) preg_replace('/(?<![\w])\d{4}(?:[ -]\d{3,5}){2,4}(?![\w])/', '[tarjeta]', $t);
+        // Teléfono con prefijo (+34 600 000 000) o español de 9 cifras (6/7/8/9) sueltas o agrupadas
+        $t = (string) preg_replace('/(?<![\w])\+\d{1,3}[ .-]?\d(?:[ .-]?\d){7,11}(?![\w])/', '[tel]', $t);
+        $t = (string) preg_replace('/(?<![\w])[6-9]\d{2}[ .-]?\d{3}[ .-]?\d{3}(?![\w])/', '[tel]', $t);
+        return $t;
+    }
+
     /** HTML de un correo → texto plano. */
     public static function plano(string $html): string
     {

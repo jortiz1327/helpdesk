@@ -83,6 +83,17 @@ class AiSuggestionsTest extends TestCase
         $this->assertTrue($r->json('suggestion.limit_reached'));
     }
 
+    public function test_un_agente_no_puede_pedir_mas_de_30_sugerencias_por_minuto(): void
+    {
+        $this->activar();
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $tok = $this->agente();
+        for ($i = 0; $i < \App\Http\Controllers\AiSuggestionsController::MAX_POR_MINUTO; $i++) {
+            $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        }
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertStatus(429);
+    }
+
     public function test_bajo_el_tope_sigue_sugiriendo_y_el_panel_avisa_al_80(): void
     {
         $this->activar();

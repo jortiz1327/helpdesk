@@ -62,6 +62,19 @@ Aviso Legal: De conformidad con el Reglamento (UE) 2016/679, Ud. puede ejercer s
         $this->assertStringNotContainsString('Torrevieja', $r);
     }
 
+    public function test_sensibles_tapa_iban_tarjeta_telefono_y_contrasena_pero_no_los_codigos(): void
+    {
+        $t = 'Mi IBAN es ES91 2100 0418 4502 0005 1332, tarjeta 4111 1111 1111 1111, llamadme al +34 600 123 456 o al 612345678. '
+            . "La contraseña es Hotel@2024x\nEl aparato A1B2C3D4E5F6 y 123456789012 no responden, serie AB1234567.";
+        $r = Scrub::sensibles($t);
+        foreach (['ES91', '4111', '600 123', '612345678', 'Hotel@2024x'] as $dato) {
+            $this->assertStringNotContainsString($dato, $r, $dato);
+        }
+        foreach (['A1B2C3D4E5F6', '123456789012', 'AB1234567'] as $codigo) {
+            $this->assertStringContainsString($codigo, $r, $codigo);
+        }
+    }
+
     public function test_una_linea_larga_sin_saltos_no_se_borra_entera(): void
     {
         $t = 'Buenos días, las etiquetas del buffet de planta baja siguen sin actualizarse desde ayer por la tarde y no sabemos qué hacer para que vuelvan a funcionar, el hotel está en 03188 Torrevieja Alicante y mañana abrimos.';
