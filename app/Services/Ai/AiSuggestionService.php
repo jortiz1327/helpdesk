@@ -132,6 +132,7 @@ class AiSuggestionService
             ],
             'usage'      => $this->consumo(),
             'budget'     => $this->presupuesto(),
+            'hotels_api' => app(HotelsApi::class)->configured() ? HotelsApi::estadoPanel() : null,
             'knowledge'  => [
                 'tickets' => DB::table('ai_documents')->where('source_type', 'ticket')->count(),
                 'manuals' => DB::table('ai_documents')->where('source_type', 'manual')->count(),

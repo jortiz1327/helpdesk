@@ -3,7 +3,9 @@
 namespace App\Services\Ai;
 
 use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -21,6 +23,9 @@ class HotelsApi
 {
     private const CACHE_HOTELES = 86400;   // 1 día
     private const CACHE_CORREO = 14400;    // 4 horas
+    private const ESPERA_CORREO = 8.0;      // lo máximo que espera un agente por la comprobación del correo (todo incluido)
+    private const LENTA = 6.0;              // una consulta que tarda más se anota como «lenta»
+    private const INCIDENCIAS = 'ai_support_incidencias';
 
     public function configured(): bool
     {
@@ -34,24 +39,65 @@ class HotelsApi
     }
 
     /** GET de una ruta fija. Devuelve data o null si falla. */
-    private function get(string $ruta, array $query = []): ?array
+    private function get(string $ruta, array $query = [], ?float $timeout = null): ?array
     {
         if (! $this->configured()) {
             return null;
         }
+        $t0 = microtime(true);
         try {
-            $r = Http::timeout((int) config('ai.support.timeout', 12))->acceptJson()
+            $r = Http::timeout($timeout ?? (float) config('ai.support.timeout', 12))->acceptJson()
                 ->withHeaders(['X-Api-Key' => (string) config('ai.support.key'), 'X-Actor' => 'IA-Soporte'])
                 ->get($this->base() . $ruta, $query);
             if (! $r->successful()) {
+                $this->anotar($ruta, microtime(true) - $t0, 'HTTP ' . $r->status());
                 return null;
             }
             $d = $r->json('data');
+            $seg = microtime(true) - $t0;
+            $sinApp = is_array($d) && ! empty($d['apps_sin_respuesta']);
+            if ($sinApp || $seg > self::LENTA) {
+                $this->anotar($ruta, $seg, $sinApp ? 'una app del panel no respondió' : 'lenta');
+            }
             return is_array($d) ? $d : null;
         } catch (Throwable $e) {
-            report($e);
+            $this->anotar($ruta, microtime(true) - $t0, 'sin respuesta');
             return null;
         }
+    }
+
+    /** Apunta que el panel ha ido lento o ha fallado (solo la ruta, nunca correos ni nombres). Se ve en Ajustes › Asistente IA. */
+    private function anotar(string $ruta, float $segundos, string $motivo): void
+    {
+        $ruta = preg_replace('#/[0-9a-fA-F-]{8,40}(?=/|$)|/[0-9]+(?=/|$)#', '/{id}', $ruta);
+        try {
+            $l = (array) Cache::get(self::INCIDENCIAS, []);
+            array_unshift($l, ['at' => now()->toIso8601String(), 'ruta' => $ruta, 'seg' => round($segundos, 1), 'motivo' => $motivo]);
+            Cache::put(self::INCIDENCIAS, array_slice($l, 0, 40), 604800);
+            Log::warning('AdminHoteles: ' . $motivo . ' (' . round($segundos, 1) . ' s) en ' . $ruta);
+        } catch (Throwable $e) {
+            // anotar nunca debe romper una sugerencia
+        }
+    }
+
+    /**
+     * Cómo ha ido el panel en las últimas 24 h, para avisar a quien lo gestiona.
+     *
+     * @return array{nivel:string, fallos:int, apps:int, lentas:int, ultima:?array, recientes:array}
+     */
+    public static function estadoPanel(): array
+    {
+        $desde = now()->subDay();
+        $l = array_values(array_filter((array) Cache::get(self::INCIDENCIAS, []), fn ($x) => ! empty($x['at']) && Carbon::parse($x['at'])->gte($desde)));
+        $apps = count(array_filter($l, fn ($x) => $x['motivo'] === 'una app del panel no respondió'));
+        $lentas = count(array_filter($l, fn ($x) => $x['motivo'] === 'lenta'));
+        $fallos = count($l) - $apps - $lentas;
+        return [
+            'nivel'     => $fallos + $apps >= 3 ? 'mal' : ($l ? 'aviso' : 'ok'),
+            'fallos'    => $fallos, 'apps' => $apps, 'lentas' => $lentas,
+            'ultima'    => $l[0] ?? null,
+            'recientes' => array_slice($l, 0, 5),
+        ];
     }
 
     /** Primer valor presente de una lista de posibles nombres de campo. */
@@ -114,13 +160,15 @@ class HotelsApi
         if (is_array($guardado) && ! empty($guardado['sitios'])) {
             return $guardado;
         }
-        $d = $this->get('/api/support/v1/users/lookup', ['email' => $email]);
+        $inicio = microtime(true);
+        $d = $this->get('/api/support/v1/users/lookup', ['email' => $email], self::ESPERA_CORREO);
         // El panel contesta pero a veces una de sus apps no: una segunda consulta suele salir bien, y evita decir «no hemos podido
         // comprobar su correo» cuando sí figura. Si el panel mismo no contesta (null, tras el tiempo máximo) NO se reintenta: sería
         // esperar otra vez lo mismo con el agente mirando.
-        if ($d !== null && empty($d['encontrado']) && ((array) ($d['apps_sin_respuesta'] ?? []))) {
+        $queda = self::ESPERA_CORREO - (microtime(true) - $inicio) - 0.7;
+        if ($d !== null && empty($d['encontrado']) && ((array) ($d['apps_sin_respuesta'] ?? [])) && $queda >= 2) {
             usleep(700000);
-            $d2 = $this->get('/api/support/v1/users/lookup', ['email' => $email]);
+            $d2 = $this->get('/api/support/v1/users/lookup', ['email' => $email], $queda);
             if ($d2 !== null) {
                 $d = $d2;
             }

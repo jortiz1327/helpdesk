@@ -51,4 +51,20 @@ class HotelsApiCacheTest extends TestCase
         $this->assertSame('incompleto', $api->verificar('c@d.es')['estado']);
         Http::assertSentCount(2);
     }
+
+    public function test_un_fallo_del_panel_se_anota_para_avisar(): void
+    {
+        $this->assertSame('ok', HotelsApi::estadoPanel()['nivel']);
+        Http::fake(['panel.test/*' => Http::response('', 500)]);
+        $api = new HotelsApi();
+        $api->verificar('x@y.es');
+        $e = HotelsApi::estadoPanel();
+        $this->assertSame('aviso', $e['nivel']);
+        $this->assertSame(1, $e['fallos']);
+        $this->assertSame('/api/support/v1/users/lookup', $e['ultima']['ruta']);
+        $this->assertStringNotContainsString('x@y.es', json_encode($e));
+        $api->verificar('x@y.es');
+        $api->verificar('x@y.es');
+        $this->assertSame('mal', HotelsApi::estadoPanel()['nivel']);
+    }
 }

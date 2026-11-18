@@ -99,6 +99,8 @@ export default function AiSettings() {
 
       {d.budget && <AiBudget b={d.budget} busy={busy} onSave={guardarTope} />}
 
+      {d.hotels_api && <AiPanelHoteles p={d.hotels_api} />}
+
       {d.usage && (
         <div className="card em-card" style={{ marginTop: 12 }}>
           <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Consumo y coste estimado</h3>
@@ -161,6 +163,28 @@ export default function AiSettings() {
         </div>
       )}
     </>
+  )
+}
+
+/* Panel de hoteles: avisa a quien lo gestiona si en las últimas 24 h ha ido lento o ha fallado. */
+const RUTA = { '/api/support/v1/users/lookup': 'comprobar un correo', '/api/support/v1/hotels': 'buscar un hotel' }
+function AiPanelHoteles({ p }) {
+  const nombre = (r) => RUTA[r] || (r.includes('/antennas') ? 'ver las antenas' : r.includes('/tags') ? 'ver una etiqueta' : r.includes('/buffets') ? 'ver los buffets' : r)
+  const titulo = p.nivel === 'ok' ? 'El panel de hoteles responde bien' : p.nivel === 'mal' ? 'El panel de hoteles está fallando' : 'El panel de hoteles ha ido algo lento'
+  return (
+    <div className="card em-card ai-panel-h" data-level={p.nivel} style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>{titulo}</h3>
+      {p.nivel === 'ok' ? <p className="em-desc">En las últimas 24 horas no ha habido esperas largas ni fallos al consultarlo.</p> : (
+        <>
+          <p className="em-desc">Últimas 24 horas: {p.fallos} sin respuesta o con error · {p.apps} con alguna app de hotel sin contestar · {p.lentas} lentas (más de 6 s). Cuando falla, la IA lo dice y no afirma nada sobre el hotel ni el correo; un agente espera como máximo unos 8 s. Conviene avisar a quien gestiona el panel.</p>
+          <ul className="ai-corr">
+            {p.recientes.map((x, i) => (
+              <li key={i}><small>{fmtDate(x.at)} · {x.seg} s · {x.motivo}</small><q>Al {nombre(x.ruta)}</q></li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   )
 }
 

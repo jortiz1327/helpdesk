@@ -4490,3 +4490,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-budget-form { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; flex-wrap: wrap; }
 .ai-budget-form label { display: grid; gap: 4px; font-size: 13px; }
 .ai-budget-form .input { width: 130px; }
+/* Panel de hoteles: borde de color según cómo ha ido en las últimas 24 h */
+.ai-panel-h[data-level="aviso"] { border-left: 4px solid var(--warn, #d9a21b); }
+.ai-panel-h[data-level="mal"] { border-left: 4px solid var(--danger, #d4483b); }
+.ai-panel-h[data-level="ok"] { border-left: 4px solid var(--ok, #2e9e6a); }
