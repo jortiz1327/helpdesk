@@ -175,6 +175,7 @@
       <p>Recibe la conversación, lo que dijo AdminHoteles y lo que encontró en la memoria, más las reglas del equipo:</p>
       <ul>
         <li><div><b>Siempre se deriva:</b> <span>alérgenos, garantías (sin dar correo: las lleva el responsable en la aplicación), estado de envíos, altas de usuarios, tótems, dominios…</span></div></li>
+        <li><div><b>Farmacias y precios:</b> <span>garantía de una farmacia → «lo gestiona Expofarm» (sin correo); cambio de precio en tienda → lo hace una persona de soporte.</span></div></li>
         <li><div><b>Presupuestos:</b> <span>el borrador es «Asignar al departamento de Pedidos y facturas».</span></div></li>
         <li><div><b>No se deriva, se contesta con el correo:</b> <span>pedidos de material (pilas, soportes, recambios, etiquetas): «escriba a postventa@aemegroup.com con material, cantidad y foto de referencia».</span></div></li>
         <li><div><b>Verificar primero, explicar después:</b> <span>configurar algo del buffet pide el correo antes de dar los pasos.</span></div></li>
