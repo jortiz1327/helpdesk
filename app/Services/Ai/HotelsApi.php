@@ -23,7 +23,7 @@ class HotelsApi
 {
     private const CACHE_HOTELES = 86400;   // 1 día
     private const CACHE_CORREO = 14400;    // 4 horas
-    private const ESPERA_CORREO = 8.0;      // lo máximo que espera un agente por la comprobación del correo (todo incluido)
+    private const ESPERA_CORREO = 25.0;     // lo máximo que espera un agente por la comprobación del correo (todo incluido)
     private const LENTA = 6.0;              // una consulta que tarda más se anota como «lenta»
     private const INCIDENCIAS = 'ai_support_incidencias';
 
