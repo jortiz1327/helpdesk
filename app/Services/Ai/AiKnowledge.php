@@ -264,8 +264,50 @@ class AiKnowledge
                 ]);
                 $n++;
             }
+            $vistos[] = $rel;
+        }
+        // Un archivo borrado o renombrado no debe seguir contestando por la IA.
+        foreach (DB::table('ai_documents')->where('source_type', 'manual')->where('source_id', 'like', 'doc:%')->pluck('source_id')->map(fn ($id) => substr((string) preg_replace('/#\d+$/', '', $id), 4))->unique() as $rel) {
+            if (! in_array($rel, $vistos, true)) {
+                DB::table('ai_documents')->where('source_type', 'manual')->where('source_id', 'like', 'doc:' . $rel . '#%')->delete();
+            }
         }
         return $n;
+    }
+
+    /**
+     * ¿Hay documentación o manuales que cambiaron (o son nuevos, o se borraron) desde la última vez que se metieron en la
+     * memoria de la IA? Sirve para avisar en Ajustes: sin indexado nocturno, alguien tiene que pulsar «Actualizar conocimiento».
+     *
+     * @return array{changed:int, nuevos:int, borrados:int, ejemplos:array<int,string>}
+     */
+    public function documentacionPendiente(): array
+    {
+        $indexado = DB::table('ai_documents')->where('source_type', 'manual')->where('source_id', 'like', 'doc:%')
+            ->selectRaw("SUBSTRING_INDEX(source_id, '#', 1) as k, MAX(indexed_at) as ult")->groupBy('k')->pluck('ult', 'k')->all();
+        $dir = resource_path('ai-docs');
+        $cambiados = $nuevos = 0;
+        $ejemplos = [];
+        $vistos = [];
+        if (is_dir($dir)) {
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)) as $f) {
+                if (! $f->isFile() || ! in_array(strtolower($f->getExtension()), ['md', 'txt'], true)) {
+                    continue;
+                }
+                $rel = str_replace('\\', '/', substr($f->getPathname(), strlen($dir) + 1));
+                $vistos['doc:' . $rel] = true;
+                $ult = $indexado['doc:' . $rel] ?? null;
+                if ($ult === null) {
+                    $nuevos++;
+                    $ejemplos[] = $rel;
+                } elseif ($f->getMTime() > \Carbon\Carbon::parse($ult)->getTimestamp() + 2) {
+                    $cambiados++;
+                    $ejemplos[] = $rel;
+                }
+            }
+        }
+        $borrados = count(array_diff_key($indexado, $vistos));
+        return ['changed' => $cambiados, 'nuevos' => $nuevos, 'borrados' => $borrados, 'ejemplos' => array_slice($ejemplos, 0, 5)];
     }
 
     private const PARADAS = 'a al algo algun alguna ante aqui asi aun aunque bien buen buena buenas buenos cada como con contra cual cuando de del desde donde dos el ella ellos en entre era eran eres es esa ese eso esta estaba estan este esto estos fue ha han hasta hay hemos hola la las le les lo los mas me mi mis mucho muy nos nosotros nuestro o os otra otro para pero por porque que quien se sea ser si sin sobre su sus te tiene tienen todo todos tu tus un una uno unos usted va ya yo buenas dias tardes noches saludos gracias favor tambien necesito necesitamos necesitaria queria queremos podrian podria pueden puedo puede hotel hoteles etiqueta etiquetas';

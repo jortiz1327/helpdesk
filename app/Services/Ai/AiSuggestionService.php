@@ -149,6 +149,7 @@ class AiSuggestionService
                 ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.correction_status', 'a.rated_at'])->all(),
             'corrections_pending' => DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->where('correction_status', 'pending')->count(),
             'review' => $this->revisionPendiente(),
+            'docs_pending' => $this->knowledge->documentacionPendiente(),
         ];
     }
 

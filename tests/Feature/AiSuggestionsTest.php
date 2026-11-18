@@ -140,6 +140,31 @@ class AiSuggestionsTest extends TestCase
         $this->assertNotNull($r['oldest']);
     }
 
+    public function test_avisa_de_la_documentacion_que_cambio_y_limpia_lo_borrado(): void
+    {
+        $k = app(\App\Services\Ai\AiKnowledge::class);
+        $k->indexarDocumentacion();   // punto de partida: todo lo que hay ya está en la memoria
+        $base = $k->documentacionPendiente();
+        $dir = resource_path('ai-docs/zz-prueba-test');
+        @mkdir($dir, 0777, true);
+        $f = $dir . '/uno.md';
+        file_put_contents($f, "# Uno\n\nTexto de prueba para la memoria de la IA, lo bastante largo para que se guarde como un trozo entero.");
+        try {
+            $this->assertSame($base['nuevos'] + 1, $k->documentacionPendiente()['nuevos'], 'un archivo nuevo se avisa');
+            $k->indexarDocumentacion();
+            $this->assertSame($base['nuevos'], $k->documentacionPendiente()['nuevos']);
+            touch($f, time() + 60);
+            $this->assertSame($base['changed'] + 1, $k->documentacionPendiente()['changed'], 'un archivo cambiado se avisa');
+            unlink($f);
+            $this->assertSame($base['borrados'] + 1, $k->documentacionPendiente()['borrados'], 'un archivo borrado se avisa');
+            $k->indexarDocumentacion();
+            $this->assertSame(0, DB::table('ai_documents')->where('source_id', 'like', 'doc:zz-prueba-test/%')->count(), 'lo borrado deja de estar en la memoria');
+        } finally {
+            @unlink($f);
+            @rmdir($dir);
+        }
+    }
+
     public function test_el_historial_es_solo_para_quien_tiene_support_config(): void
     {
         $this->withHeader('X-App-Token', $this->agente())->getJson('/api/ai_suggestions.php?action=admin_history')->assertForbidden();

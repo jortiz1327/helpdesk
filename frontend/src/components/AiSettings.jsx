@@ -131,6 +131,16 @@ export default function AiSettings() {
           {k.tickets} tickets resueltos y {k.manuals} trozos de la guía del cliente
           {k.last ? <> · actualizada {fmtDate(k.last)}</> : null}. Se quitan correos, teléfonos y nombres; las <b>notas internas nunca entran</b>.
         </p>
+        {d.docs_pending && (d.docs_pending.changed + d.docs_pending.nuevos + d.docs_pending.borrados) > 0 && (
+          <p className="ai-revisar" role="alert">
+            <b>La memoria está desactualizada:</b> {[
+              d.docs_pending.changed ? `${d.docs_pending.changed} documento${d.docs_pending.changed > 1 ? 's' : ''} cambiado${d.docs_pending.changed > 1 ? 's' : ''}` : null,
+              d.docs_pending.nuevos ? `${d.docs_pending.nuevos} nuevo${d.docs_pending.nuevos > 1 ? 's' : ''}` : null,
+              d.docs_pending.borrados ? `${d.docs_pending.borrados} borrado${d.docs_pending.borrados > 1 ? 's' : ''}` : null,
+            ].filter(Boolean).join(', ')}. Pulsa «Actualizar conocimiento» para que la IA use lo último.
+            {d.docs_pending.ejemplos.length > 0 ? <small className="muted"> Por ejemplo: {d.docs_pending.ejemplos.join(', ')}.</small> : null}
+          </p>
+        )}
         <button className="btn" disabled={busy} onClick={indexar}><Icon.refresh /> {busy ? 'Actualizando…' : 'Actualizar conocimiento'}</button>
       </div>
 
