@@ -14,7 +14,7 @@ use Illuminate\Console\Command;
  */
 class AiPrerrellenar extends Command
 {
-    protected $signature = 'ai:prerrellenar {--limite= : Máximo de casos (para probar)} {--rehacer : Vuelve a proponer también los que ya tienen propuesta}';
+    protected $signature = 'ai:prerrellenar {--limite= : Máximo de casos (para probar)} {--lote= : Solo los casos de este lote (nombre completo)} {--rehacer : Vuelve a proponer también los que ya tienen propuesta}';
     protected $description = 'Propone decisión y comentario para los casos sin revisar, imitando los ya revisados (gasta tokens)';
 
     private const CRITERIOS = <<<'TXT'
@@ -25,7 +25,11 @@ Criterios del revisor (aplícalos):
 - Si el cliente ya nombra el hotel, se busca en AdminHoteles con ese nombre; solo se pide el nombre exacto si no aparece. Cuando el caso depende de consultar AdminHoteles (hotel, usuario, buffet, antenas, ruedas de menú), el comentario empieza por [API].
 - «Pasar de buffet normal a reducido» es cambiar de rueda de menú del mismo buffet.
 - Si lo que pide el cliente lo ejecuta una persona del equipo (cambios en buffets, permisos, altas/bajas), la IA no puede confirmar que está hecho: deriva.
-- Garantías, precios, material/pilas y acceso remoto: derivar.
+- Garantías (etiquetas que fallan y hay que sustituir o enviar), precios y acceso remoto: derivar. Nunca se da un correo para garantías.
+- PEDIDOS DE MATERIAL (comprar o reponer pilas, soportes, recambios, etiquetas): se RESPONDE con «escriba a postventa@aemegroup.com con material, cantidad y foto». Decisión: responder, no derivar. Ignora los ejemplos antiguos que derivaban el material.
+- PRESUPUESTOS: derivar (el borrador es «Asignar al departamento de Pedidos y facturas.»).
+- Lo que hoy hace el propio hotel en la aplicación (posiciones, nombres de etiquetas, forzar menú con hotel y correo verificados, crear usuarios si tiene permiso) NO se deriva: se responde o se pide hotel y correo. Las respuestas humanas antiguas que lo hacían por el cliente están desfasadas.
+- Un caso de uso de la aplicación sin hotel ni correo conocidos: pedir_info (hotel y correo), no derivar. Un seguimiento («gracias», «ya funciona») sin petición nueva: descartar.
 TXT;
 
     private static function limpia(string $t, int $max): string
@@ -77,6 +81,9 @@ TXT;
 
         $pend = array_values(array_filter($cand, fn ($c) => empty(($marcas[$c['id']] ?? [])['revisado'])
             && ($this->option('rehacer') || ! isset($props[$c['id']]))));
+        if ($this->option('lote')) {
+            $pend = array_values(array_filter($pend, fn ($c) => ($c['lote'] ?? '') === (string) $this->option('lote')));
+        }
         if ($this->option('limite') !== null) {
             $pend = array_slice($pend, 0, max(1, (int) $this->option('limite')));
         }
