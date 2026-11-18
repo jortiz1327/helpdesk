@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 class AiIndexar extends Command
 {
     protected $signature = 'ai:indexar
-        {--solo= : tickets o manuales (por defecto, los dos)}
+        {--solo= : tickets, manuales o correcciones (por defecto, todo)}
         {--rehacer : Vuelve a generar lo ya indexado}
         {--limite= : Máximo de tickets nuevos por ejecución}';
 
@@ -23,19 +23,20 @@ class AiIndexar extends Command
     public function handle(AiKnowledge $k): int
     {
         $solo = (string) $this->option('solo');
-        if ($solo !== '' && ! in_array($solo, ['tickets', 'manuales'], true)) {
-            $this->error('--solo debe ser tickets o manuales');
+        if ($solo !== '' && ! in_array($solo, ['tickets', 'manuales', 'correcciones'], true)) {
+            $this->error('--solo debe ser tickets, manuales o correcciones');
             return self::FAILURE;
         }
 
-        if ($solo !== 'manuales') {
+        if ($solo === '' || $solo === 'tickets') {
             [$nuevos, $saltados] = $k->indexarTickets((bool) $this->option('rehacer'), $this->option('limite') !== null ? (int) $this->option('limite') : null);
             $this->line("Tickets: $nuevos indexados, $saltados saltados (ya estaban o no valían).");
         }
-        if ($solo === '') {
+        if ($solo === '' || $solo === 'correcciones') {
             $this->line('Correcciones de agentes: ' . $k->indexarCorrecciones() . '.');
+            $this->line('Correcciones base (del repositorio): ' . $k->importarCorreccionesBase() . '.');
         }
-        if ($solo !== 'tickets') {
+        if ($solo === '' || $solo === 'manuales') {
             $this->line('Manuales: ' . $k->indexarManuales() . ' trozos.');
         }
         $this->info('En la base de conocimiento: ' . DB::table('ai_documents')->count() . ' documentos.');

@@ -179,4 +179,20 @@ class AiKnowledgeTest extends TestCase
         $this->assertStringContainsString('Reinicie la etiqueta electrónica', $fake->sistema);
         $this->assertCount(1, json_decode($r['sources'], true)['docs']);
     }
+    public function test_las_correcciones_base_del_repositorio_se_importan_sin_duplicar_y_sin_datos_personales(): void
+    {
+        $k = new AiKnowledge();
+        $this->assertSame(2, $k->importarCorreccionesBase());
+        $this->assertSame(2, $k->importarCorreccionesBase());   // idempotente
+        $docs = DB::table('ai_documents')->where('source_type', 'correccion')->where('source_id', 'like', 'base:%')->get();
+        $this->assertCount(2, $docs);
+        foreach ($docs as $d) {
+            $this->assertDoesNotMatchRegularExpression('/@|\+?\d{9}|Calle|Avinguda/u', $d->content, 'sin datos personales');
+        }
+        // Una copia vieja del mismo criterio, indexada desde una sugerencia, se quita para no duplicar.
+        $j = json_decode(file_get_contents(resource_path('ai/correcciones-base.json')), true);
+        DB::table('ai_documents')->insert(['source_type' => 'correccion', 'source_id' => '47', 'title' => 'x', 'content' => $j[0]['contenido'], 'quality' => null, 'indexed_at' => now()]);
+        $k->importarCorreccionesBase();
+        $this->assertSame(0, DB::table('ai_documents')->where('source_type', 'correccion')->where('source_id', '47')->count());
+    }
 }

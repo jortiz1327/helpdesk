@@ -176,6 +176,36 @@ class AiKnowledge
         return $ids->count();
     }
 
+    /**
+     * Correcciones «base»: criterios validados que viajan con el código (resources/ai/correcciones-base.json) para que existan
+     * también en producción, donde las correcciones de agentes parten de cero. Idempotente. Si ya había una copia de la misma
+     * corrección indexada desde una sugerencia (p. ej. en local), se quita para no duplicarla.
+     */
+    public function importarCorreccionesBase(): int
+    {
+        $ruta = resource_path('ai/correcciones-base.json');
+        $lista = is_file($ruta) ? (json_decode((string) file_get_contents($ruta), true) ?: []) : [];
+        $n = 0;
+        foreach ($lista as $c) {
+            if (empty($c['clave']) || empty($c['contenido'])) {
+                continue;
+            }
+            $id = 'base:' . $c['clave'];
+            DB::table('ai_documents')->updateOrInsert(
+                ['source_type' => 'correccion', 'source_id' => $id],
+                ['title' => mb_substr((string) ($c['titulo'] ?? $c['clave']), 0, 255), 'content' => (string) $c['contenido'], 'quality' => null, 'indexed_at' => now()],
+            );
+            // Copias antiguas del mismo criterio (misma indicación del equipo), indexadas desde una sugerencia.
+            $indicacion = (string) preg_replace('/^.*?es un criterio a aplicar, no un texto para copiar\):\n/su', '', (string) $c['contenido']);
+            if (mb_strlen($indicacion) > 80) {
+                DB::table('ai_documents')->where('source_type', 'correccion')->where('source_id', '!=', $id)
+                    ->where('content', 'like', '%' . mb_substr($indicacion, 0, 120) . '%')->delete();
+            }
+            $n++;
+        }
+        return $n;
+    }
+
     /** Indexa los manuales declarados. Devuelve el número de trozos escritos. */
     public function indexarManuales(): int
     {

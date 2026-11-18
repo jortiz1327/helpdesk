@@ -162,7 +162,7 @@
         <li><div><b>Preguntas frecuentes</b> <span>publicadas en el portal.</span></div></li>
         <li><div><b>Tickets resueltos parecidos</b> <span>como patrón, nunca para citar datos de otro cliente. Los antiguos donde el equipo hacía por el cliente lo que hoy hace el hotel salen con aviso «ANTIGUO», y los que entregaban contraseñas no se usan.</span></div></li>
         <li><div><b>Guía de la aplicación de hoteles y reglas de soporte</b> <span>manuales y documentación (≈ 300 trozos).</span></div></li>
-        <li><div><b>Correcciones validadas</b> <span>lo que los agentes han enseñado con 👎; solo entran las que un responsable valida.</span></div></li>
+        <li><div><b>Correcciones validadas</b> <span>lo que los agentes han enseñado con 👎; solo entran las que un responsable valida, más unas pocas «base» guardadas en el repositorio.</span></div></li>
       </ul>
     </div>
   </div>
@@ -172,9 +172,10 @@
     <div class="card">
       <span class="quien">IA · Claude Haiku 5.5</span>
       <h2>Redacta con las reglas puestas</h2>
-      <p>Recibe la conversación, lo que dijo AdminHoteles y lo que encontró en la memoria, más las reglas del equipo:</p>
+      <p>Recibe la conversación, lo que dijo AdminHoteles y lo que encontró en la memoria, más las reglas del equipo. Antes de redactar, el sistema <b>fija en código</b> los casos claros (alérgenos, tótems y garantías → derivar; problema de uso sin hotel ni correo en el primer mensaje → pedir solo hotel y correo); el resto lo decide el modelo siguiendo un <b>orden de 7 puntos</b>: derivar sin preguntar · material y dinero · lo que ejecuta el equipo · lo que hace el hotel (explicar) · problema de uso sin hotel · antenas · duda = derivar.</p>
       <ul>
-        <li><div><b>Siempre se deriva:</b> <span>alérgenos, garantías (sin dar correo: las lleva el responsable en la aplicación), estado de envíos, altas de usuarios, tótems, dominios…</span></div></li>
+        <li><div><b>Siempre se deriva:</b> <span>alérgenos, garantías (sin dar correo: las lleva el responsable en la aplicación), estado de envíos, tótems, dominios, y lo que ejecuta el equipo (rueda de menú de un buffet, logos, plantillas, dar de alta etiquetas nuevas en la plataforma).</span></div></li>
+        <li><div><b>Lo gestiona el hotel, la IA explica cómo:</b> <span>altas de usuarios, permisos y roles (Ajustes &gt; Roles, Usuarios), posiciones, nombres de etiquetas y forzar el menú. Solo se deriva si nadie en el hotel puede.</span></div></li>
         <li><div><b>Farmacias y precios:</b> <span>garantía de una farmacia → «lo gestiona Expofarm» (sin correo); cambio de precio en tienda → lo hace una persona de soporte.</span></div></li>
         <li><div><b>Presupuestos:</b> <span>el borrador es «Asignar al departamento de Pedidos y facturas».</span></div></li>
         <li><div><b>No se deriva, se contesta con el correo:</b> <span>pedidos de material (pilas, soportes, recambios, etiquetas): «escriba a postventa@aemegroup.com con material, cantidad y foto de referencia».</span></div></li>
