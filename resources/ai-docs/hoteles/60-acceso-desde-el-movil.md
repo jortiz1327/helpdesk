@@ -4,7 +4,7 @@
 - La aplicación de hoteles es una **aplicación web**: no existe una app para descargar (ni en App Store ni en Google Play, ni un archivo APK). Se usa desde el navegador del móvil, igual que en el ordenador.
 - Cada grupo de hoteles tiene su propia dirección de acceso (la misma que ya usan en el ordenador). No hay que inventar ni dar una dirección de otro grupo.
 - Si la persona **ya tiene usuario creado**, no hace falta pedir nada al equipo: solo tiene que entrar con su correo y su contraseña.
-- Si la persona **no tiene usuario**, el alta de usuarios la hace una persona del equipo (se deriva).
+- Si la persona **no tiene usuario**, el propio hotel puede crearlo si su usuario tiene permiso (Usuarios > **Crear nuevo usuario**, ver [Usuarios](03-usuarios.md)). Si quien escribe no tiene ese permiso, que lo haga un administrador de su hotel. Nunca se envían usuarios ni contraseñas.
 
 ## Cómo se hace (paso a paso)
 
@@ -19,5 +19,5 @@
 
 ## Problemas frecuentes
 - «No encuentro la app en la tienda»: no existe en las tiendas, es web; se entra por el navegador.
-- «Me pide usuario y contraseña y no los tengo»: si el usuario no está creado lo da de alta una persona del equipo (derivar). Nunca se facilitan usuarios ni contraseñas.
-- Si no recuerda la dirección de acceso, es la misma que usa en el ordenador; si no la tiene a mano, la facilita una persona del equipo.
+- «Me pide usuario y contraseña y no los tengo»: si el usuario no está creado, lo crea un administrador de su hotel desde Usuarios > Crear nuevo usuario (se le explica cómo). Nunca se facilitan usuarios ni contraseñas.
+- Si no recuerda la dirección de acceso, es la misma que usa en el ordenador; si no la tiene a mano, la facilita una persona del equipo (esto sí se deriva).

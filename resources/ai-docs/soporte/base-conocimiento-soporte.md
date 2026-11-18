@@ -199,12 +199,15 @@ No tramites pilas ni recambios. Para pedir material, indica que escriban a `post
 **Solución habitual**
 - Confirmar primero que usa el portal correcto.
 - Verificar si se trata de credenciales existentes, alta de un nuevo usuario o permisos insuficientes.
-- Escalar cualquier recuperación o creación que requiera intervención interna.
+- Si el usuario existe y falla la contraseña: la propia persona la cambia desde su Perfil, o un administrador de su hotel desde Usuarios > Editar > Cambiar contraseña. Nunca se envían ni se piden contraseñas.
+- Si el usuario no existe: el alta la hace el propio hotel (ver sección 13). Se escala solo lo que requiera intervención interna (permisos o roles, cuentas bloqueadas).
 
 **Respuesta tipo adaptable**
 «Envíeme la dirección web exacta desde la que intenta acceder, el usuario o correo y una captura del error. No envíe su contraseña. Indíqueme también si antes podía entrar y desde qué dispositivo. Así podremos comprobar si está usando el portal correcto o si es necesario revisar el usuario y sus permisos.»
 
 ## 13. Crear usuarios o cambiar permisos
+
+**Quién hace qué:** el ALTA de usuarios la hace el propio hotel desde la aplicación (si su usuario tiene permiso). Los PERMISOS y ROLES los cambia una persona del equipo. Nunca se generan ni se comparten contraseñas.
 
 **Datos que conviene pedir**
 - Nombre, correo, hotel o sede y función de la persona.
@@ -212,7 +215,7 @@ No tramites pilas ni recambios. Para pedir material, indica que escriban a `post
 - No generar ni compartir contraseñas en el borrador salvo que exista un procedimiento seguro y autorizado fuera del agente.
 
 **Respuesta tipo adaptable**
-«Para solicitar el acceso, indíqueme nombre, correo, hotel y qué tareas debe poder realizar. Un agente humano revisará el alta o los permisos y facilitará el acceso por el canal autorizado.»
+«Para dar de alta a una persona, un usuario de su hotel con permiso puede hacerlo desde Usuarios > Crear nuevo usuario (nombre, correo, rol y buffets). Si no tiene ese permiso, que lo haga un administrador de su hotel. Los cambios de permisos o roles los revisa una persona de nuestro equipo.»
 
 ## 14. Pantalla dañada, con líneas, manchas, líquido o rotura
 
