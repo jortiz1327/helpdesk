@@ -54,10 +54,10 @@ function dia(id, cx, y, w, kind, ls, o = {}) {
   return N[id];
 }
 // Conector: «viene de / vuelve a»
-function chip(id, cx, y, w, kind, texto_) {
+function chip(id, cx, y, w, kind, texto_, sinIcono) {
   const h = 32;
   anchors(id, cx, y, w, h);
-  out.push(`<g style="--k:var(--k-${kind})" class="chip"><rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="16"/>${icono('loop', cx - w / 2 + 12, y + 8, 0.66)}<text x="${cx + 10}" y="${y + 20}" >${esc(texto_)}</text></g>`);
+  out.push(`<g style="--k:var(--k-${kind})" class="chip"><rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="16"/>${sinIcono ? '' : icono('loop', cx - w / 2 + 12, y + 8, 0.66)}<text x="${cx + (sinIcono ? 0 : 10)}" y="${y + 20}" >${esc(texto_)}</text></g>`);
   return N[id];
 }
 const P = (pts) => 'M' + pts.map((p) => p.join(',')).join(' L');
@@ -150,8 +150,9 @@ arr([[A, yl], N.h1.t]);
 
 const yBottomAll = Math.max(N.m2.y + N.m2.h, N.p2.y + N.p2.h, N.h5.y + N.h5.h);
 const yMerge = yBottomAll + 34;
-arr([N.p1.l, [C - 200, N.p1.l[1]], [C - 200, N.p2.y + N.p2.h + 18], [C, N.p2.y + N.p2.h + 18]], { noarrow: true });
-lab('No', N.p1.l[0] - 12, N.p1.l[1] - 7, 'end');
+chip('sf', N.p1.l[0] - 85, N.p1.l[1] - 16, 120, 'sys', 'Sin fotos: sigue', true);
+arr([N.p1.l, N.sf.r]);
+lab('No', N.p1.l[0] - 5, N.p1.l[1] - 22, 'end');
 arr([N.m2.b, [L, yMerge]], { noarrow: true });
 arr([N.p2.b, [C, yMerge]], { noarrow: true });
 arr([N.h5.b, [A, yMerge]], { noarrow: true });
