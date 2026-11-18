@@ -49,6 +49,9 @@ class AiSuggestionService
     private ?int $excluirTicket = null;
     /** Nombre de hotel que encaja con varios hoteles del panel (se rellena en contextoHotel). */
     private ?string $hotelAmbiguo = null;
+    /** Lo que se supo del correo y del hotel en la última consulta a AdminHoteles (para decidir en código). */
+    private ?string $estadoCorreo = null;
+    private bool $hotelLocalizado = false;
     /** Lo que hizo la IA en esta sugerencia, paso a paso (se guarda en `sources.traza` y se enseña al agente en el panel). */
     private array $traza = [];
     /** A qué categoría de la app (soporte, garantías, pedidos) debe llevarlo una persona, si la IA derivó. Nota interna para el agente. */
@@ -259,6 +262,12 @@ class AiSuggestionService
         $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
         $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente);
 
+        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? ''), $conversacion, $this->estadoCorreo, $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente));
+        $t->decision = $dec ? "\nDECISIÓN YA TOMADA POR EL SISTEMA (obligatoria; no la discutas ni la cambies): " . $dec['instruccion'] . "\n" : '';
+        if ($dec) {
+            $this->paso('decision', null, 'Decisión fijada en código: ' . $dec['resumen']);
+        }
+
         $this->paso('memoria', null, 'Memoria consultada: ' . count($faqs) . ' preguntas frecuentes · ' . count($ejemplos) . ' respuestas de ejemplo · ' . count($casos) . ' casos/manuales parecidos'
             . ($casos ? ' (' . implode('; ', array_map(fn ($d) => mb_substr((string) ($d->title ?? ''), 0, 60), array_slice($casos, 0, 4))) . ')' : ''),
             ['faqs' => count($faqs), 'ejemplos' => count($ejemplos), 'casos' => array_map(fn ($d) => ['tipo' => (string) ($d->source_type ?? ''), 'titulo' => mb_substr((string) ($d->title ?? ''), 0, 90)], array_slice($casos, 0, 6))]);
@@ -289,6 +298,44 @@ class AiSuggestionService
         }
     }
 
+    /**
+     * Decide EN CÓDIGO los casos claros que el modelo resolvía a veces de una forma y a veces de otra (derivar o pedir datos).
+     * Función pura: solo mira el último mensaje del cliente, la conversación y lo que se supo del correo y el hotel.
+     * Devuelve null si el caso no es claro: entonces decide el modelo con las reglas del prompt.
+     *
+     * @param  array<int, array{role:string, text:string}>  $conversacion
+     * @return array{decision:string, instruccion:string, resumen:string}|null
+     */
+    public static function decidir(string $texto, array $conversacion, ?string $estadoCorreo, bool $hotelNombrado): ?array
+    {
+        $t = mb_strtolower((string) preg_replace('/\p{Mn}/u', '', \Normalizer::normalize($texto, \Normalizer::FORM_D) ?: $texto));
+        $derivar = fn (string $cat, string $motivo) => ['decision' => 'derivar', 'resumen' => "derivar ($motivo)",
+            'instruccion' => "DERIVA. Responde con la frase corta «Gracias por su mensaje. Hemos registrado la incidencia y el equipo la revisará.» sin preguntar nada ni dar pasos, y añade al final «[[DERIVAR:$cat|$motivo]]»."];
+        $yaRespondio = (bool) array_filter($conversacion, fn ($m) => ($m['role'] ?? '') === 'assistant');
+
+        // Temas que SIEMPRE lleva una persona (la farmacia es otra regla: la lleva Expofarm).
+        $farmacia = str_contains($t, 'farmacia');
+        if (preg_match('/alergen/', $t)) {
+            return $derivar('soporte', 'alérgenos');
+        }
+        if (preg_match('/\btotems?\b/', $t)) {
+            return $derivar('soporte', 'tótem');
+        }
+        if (preg_match('/\bgarantia/', $t) && ! $farmacia) {
+            return $derivar('garantias', 'garantía');
+        }
+        // Lo que ejecuta el equipo y el hotel ya está identificado: se deriva sin pedir más datos.
+        if ($hotelNombrado && preg_match('/(amplia|dar|dad|cambia|modifica|pon|poner|activa)\w*\W+(\w+\W+){0,3}(permisos?|el rol|rol de)\b|\bpermisos? (de|para)\b/', $t)) {
+            return $derivar('soporte', 'permisos');
+        }
+        // Problema de uso, primera vez que escribe y no se sabe quién es: se piden hotel y correo (y nada más).
+        $uso = preg_match('/no (se )?(cambian|cambia|actualizan|actualiza|refrescan)|no (me )?(deja|dejan) (entrar|acceder)|no (puedo|podemos) (entrar|acceder)|unauthorized|error al (emparejar|vincular)/', $t);
+        if ($uso && ! $yaRespondio && ! $hotelNombrado && $estadoCorreo !== 'verificado') {
+            return ['decision' => 'pedir_datos', 'resumen' => 'pedir hotel y correo',
+                'instruccion' => 'PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas), sin dar pasos, diagnóstico ni derivar.'];
+        }
+        return null;
+    }
     /**
      * Chat de pruebas (página /ia, solo local): contesta al último mensaje de $conv como si fuera un ticket nuevo.
      * $chat: title, contact_name, contact_email. Devuelve lo mismo que redactar().
@@ -584,6 +631,8 @@ class AiSuggestionService
     private function contextoHotel(?string $contactEmail, array $codigos = [], string $textoCliente = ''): string
     {
         $this->hotelAmbiguo = null;
+        $this->estadoCorreo = null;
+        $this->hotelLocalizado = false;
         $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente);
         if ($s !== '' && $this->hotelAmbiguo !== null) {
             // El nombre encaja con varios hoteles (p. ej. «Hotel Poseidón» hay más de uno): nunca se asume cuál es.
@@ -660,6 +709,8 @@ class AiSuggestionService
         $this->avisar('Comprobando el correo en AdminHoteles…');
         $v = $api->verificar($e);
         $sitios = array_slice($v['sitios'], 0, 4);
+        $this->hotelLocalizado = (bool) $dir;
+        $this->estadoCorreo = ($v['estado'] === 'encontrado' && (! $dir || $this->coincideHotel($dir, $sitios))) ? 'verificado' : (string) $v['estado'];
         // Traza para el agente: hotel y correo (lo que ve el panel de la sugerencia).
         if ($v['estado'] === 'sin_correo') {
             $this->paso('correo', null, 'Sin correo que comprobar');
@@ -955,7 +1006,7 @@ class AiSuggestionService
         $leido = $codigos
             ? "\nCÓDIGO(S) DE BARRAS LEÍDO(S) DE LAS FOTOS DEL CLIENTE (lectura automática fiable): " . implode(', ', $codigos) . ". Úsalo(s) para identificar la etiqueta y menciónalo(s) cuando ayude; no pidas de nuevo el código.\n"
             : ($nFotos ? "\nEL CLIENTE HA ADJUNTADO " . $nFotos . " FOTO(S) pero NO se ha podido leer ningún código de barras en ellas. Si el código hace falta, pide una foto más cercana y frontal, con el código completo y enfocado, sin reflejos, o que lo escriba; no te inventes ningún código.\n" : '');
-        $s .= $leido . ($t->hotel ?? '');
+        $s .= $leido . ($t->hotel ?? '') . ($t->decision ?? '');
         $s .= 'TICKET: ' . ($t->subject ?? '') . ($t->category_name ? ' (categoría: ' . $t->category_name . ')' : '') . ' · canal ' . ($t->channel ?? '') . "\n";
         if (! empty($t->contact_name)) {
             $s .= 'CLIENTE: ' . $t->contact_name . "\n";
