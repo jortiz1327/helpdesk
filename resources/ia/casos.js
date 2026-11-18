@@ -27,7 +27,8 @@ const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c
 const FILTROS = [
   { k: 'conj', t: 'Conjunto de casos', ops: [
     ['todos', 'Todos', () => true, ''],
-    ['seg', 'Seguimientos', (c) => (c.lote || '').startsWith('seg-'), '20 casos nuevos: 2.º o 3.º mensaje del cliente. Para MEDIR.'],
+    ['seg2', 'Seguimientos 2', (c) => c.lote === 'seg2-20261118', '20 casos nuevos del 18-nov (2.º o 3.º mensaje del cliente). Para MEDIR: revísalos sin ajustar reglas después.'],
+    ['seg', 'Seguimientos 1', (c) => c.lote === 'seg-20261117', 'Ya NO vale para medir: se ajustaron reglas mirando sus casos.'],
     ['lote5', 'Lote 5', (c) => c.lote === 'lote5-20261117', 'Ya NO vale para medir: se arreglaron a mano varios de sus casos.'],
     ['lote4', 'Lote 4', (c) => c.lote === 'lote4-20261117', 'Ya usado para ajustar las reglas: no vale para medir.'],
     ['lote3', 'Lote 3', (c) => c.lote === 'lote3-20261117', '20 casos del 17-nov, ya medidos.'],
