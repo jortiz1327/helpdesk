@@ -5,272 +5,391 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cómo funciona la IA de soporte</title>
 <style>
+  @font-face { font-family: 'Lato'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/lato-400.woff2') format('woff2'); }
+  @font-face { font-family: 'Lato'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/lato-700.woff2') format('woff2'); }
+  @font-face { font-family: 'Lato'; font-style: normal; font-weight: 900; font-display: swap; src: url('/fonts/lato-900.woff2') format('woff2'); }
+
   :root {
-    --bg: #f4f5f7; --panel: #ffffff; --ink: #1c2230; --muted: #667085; --line: #e3e6ec; --accent: #2f5bea;
-    --k-cli: #2f5bea; --k-sys: #667085; --k-api: #b7791f; --k-ai: #7c4dd8; --k-ag: #1f8a4c; --k-mem: #0e8a9c; --k-no: #c0392b;
+    color-scheme: light;
+    --bg: #f2f4f8; --surface: #ffffff; --band: #e7ebf3; --line: #d5dae5; --edge: #6c7790;
+    --ink: #151b2b; --ink2: #424c61; --muted: #5d6881; --accent: #3047d4; --ok: #1d7a43;
+    --k-cli: #4f63e8; --k-sys: #6b7385; --k-api: #0c8f84; --k-mem: #2a7fc1; --k-ai: #7a4fe0; --k-ag: #25914f; --k-der: #c27a0e; --k-no: #c4473a;
+    --sombra: 0 1px 2px rgb(20 30 60 / .10), 0 6px 18px -8px rgb(20 30 60 / .18);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #12151c; --panel: #1b2029; --ink: #e8ebf2; --muted: #9aa3b5; --line: #2a303c; --accent: #6f93ff;
-      --k-cli: #6f93ff; --k-sys: #9aa3b5; --k-api: #e6b04c; --k-ai: #a98bff; --k-ag: #4fc883; --k-mem: #4cc3d4; --k-no: #ee7d70;
+      color-scheme: dark;
+      --bg: #0e1218; --surface: #1a212b; --band: #141a22; --line: #2a3340; --edge: #77839a;
+      --ink: #eaeef6; --ink2: #bac3d3; --muted: #9aa5ba; --accent: #8ea0ff; --ok: #5ccf8b;
+      --k-cli: #8a9bff; --k-sys: #98a2b6; --k-api: #3fc7b8; --k-mem: #5ab0ee; --k-ai: #ab8cff; --k-ag: #53cf86; --k-der: #efb04a; --k-no: #f0847a;
+      --sombra: 0 1px 2px rgb(0 0 0 / .35), 0 8px 22px -10px rgb(0 0 0 / .6);
     }
   }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0e1218; --surface: #1a212b; --band: #141a22; --line: #2a3340; --edge: #77839a;
+    --ink: #eaeef6; --ink2: #bac3d3; --muted: #9aa5ba; --accent: #8ea0ff; --ok: #5ccf8b;
+    --k-cli: #8a9bff; --k-sys: #98a2b6; --k-api: #3fc7b8; --k-mem: #5ab0ee; --k-ai: #ab8cff; --k-ag: #53cf86; --k-der: #efb04a; --k-no: #f0847a;
+    --sombra: 0 1px 2px rgb(0 0 0 / .35), 0 8px 22px -10px rgb(0 0 0 / .6);
+  }
+
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 1600px; margin: 0 auto; padding: 22px 18px 60px; }
-  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
-  h1 { font-size: 20px; margin: 0; }
-  header a { color: var(--accent); text-decoration: none; font-size: 14px; }
-  header a:hover { text-decoration: underline; }
-  .sub { color: var(--muted); margin: 2px 0 18px; font-size: 14px; }
-  .leyenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); margin-bottom: 20px; }
-  .leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  html { scroll-behavior: smooth; scrollbar-color: var(--line) transparent; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.55 'Lato', system-ui, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+  ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .wrap { width: min(1760px, 100% - 48px); margin: 0 auto; padding: 0 0 72px; }
 
-  .paso { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 0 14px; }
-  .num { width: 30px; height: 30px; border-radius: 50%; background: var(--k, var(--k-sys)); color: #fff; font-weight: 700; font-size: 14px; display: grid; place-items: center; margin-top: 12px; flex: none; }
-  .carril { display: flex; flex-direction: column; align-items: center; }
-  .carril::after { content: ""; flex: 1; width: 2px; background: var(--line); margin-top: 6px; }
-  .paso:last-of-type .carril::after { display: none; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--k, var(--k-sys)); border-radius: 12px; padding: 12px 16px; margin: 6px 0 14px; }
-  .card h2 { margin: 0 0 2px; font-size: 15.5px; }
-  .card .quien { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--k, var(--k-sys)); font-weight: 700; }
-  .card p { margin: 4px 0; color: var(--muted); font-size: 14px; }
-  .card ul { margin: 6px 0 2px; padding: 0; list-style: none; display: grid; gap: 6px; }
-  .card li { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 0 10px; font-size: 14px; }
-  .card li::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c, var(--k, var(--k-sys))); margin-top: 7px; }
-  .card li b { font-weight: 600; }
-  .card li span { color: var(--muted); }
-  .etq { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: color-mix(in srgb, var(--c, var(--k-sys)) 16%, transparent); color: var(--c, var(--k-sys)); margin-left: 6px; font-weight: 600; }
+  /* Cabecera */
+  .top { display: flex; gap: 22px; padding: 18px 0 0; font-size: 14px; font-weight: 700; }
+  .top a { text-decoration: none; }
+  .top a:hover { text-decoration: underline; }
+  .intro { padding: 44px 0 28px; max-width: 78ch; }
+  h1 { font-size: clamp(32px, 4.2vw, 52px); line-height: 1.05; letter-spacing: -0.025em; font-weight: 900; margin: 0 0 16px; text-wrap: balance; }
+  .lead { font-size: clamp(17px, 1.5vw, 20px); line-height: 1.55; color: var(--ink2); margin: 0; text-wrap: pretty; }
 
-  .salidas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 8px; }
-  .salida { border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 10px; padding: 10px 12px; background: var(--bg); font-size: 13.5px; }
-  .salida b { display: block; margin-bottom: 2px; }
-  .salida span { color: var(--muted); }
-  .aviso { background: color-mix(in srgb, var(--k-api) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--k-api) 40%, var(--line)); border-radius: 10px; padding: 10px 14px; font-size: 14px; margin-top: 6px; }
-  .lienzo { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px; overflow-x: auto; margin-bottom: 18px; }
-  .lienzo svg { width: 100%; min-width: 1100px; height: auto; display: block; }
-  .n rect { fill: var(--bg); stroke: var(--k); stroke-width: 2; rx: 12; }
-  .n circle { fill: var(--k); }
-  .n .b { fill: #fff; font: 700 12px system-ui, sans-serif; text-anchor: middle; }
-  .n .t { fill: var(--ink); font: 700 14px system-ui, sans-serif; text-anchor: middle; }
-  .n .s { fill: var(--muted); font: 12px system-ui, sans-serif; text-anchor: middle; }
-  .n polygon { fill: var(--bg); stroke: var(--k); stroke-width: 2; stroke-linejoin: round; }
-  .n .s.q { font-size: 12px; }
-  .sec { fill: var(--ink); font: 700 14px system-ui, sans-serif; letter-spacing: .02em; }
-  .secl { stroke: var(--line); stroke-width: 1; fill: none; }
-  .n.ia rect { fill: color-mix(in srgb, var(--k-ai) 14%, var(--bg)); stroke-width: 3; }
-  .fl path { fill: none; stroke: var(--muted); stroke-width: 2; }
-  .fl path.vuelta { stroke: var(--k-mem); stroke-dasharray: 5 4; }
-  .punta { fill: var(--muted); }
-  .et { fill: var(--muted); font: italic 12px system-ui, sans-serif; }
+  .garantias { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 1px solid var(--line); margin: 8px 0 34px; }
+  .garantias > div { padding: 20px 24px 20px 0; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0 14px; align-content: start; }
+  .garantias > div + div { padding-left: 24px; border-left: 1px solid var(--line); }
+  .garantias svg { width: 26px; height: 26px; stroke: var(--accent); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; margin-top: 2px; }
+  .garantias b { display: block; font-size: 16px; font-weight: 900; line-height: 1.3; }
+  .garantias span { display: block; font-size: 14px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+
+  /* Navegación por capítulos */
+  .caps { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 10px 0; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+  .caps a { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 99px; text-decoration: none; color: var(--ink2); font-size: 14px; font-weight: 700; transition: background .15s, color .15s; }
+  .caps a i { width: 24px; height: 24px; border-radius: 50%; background: var(--band); color: var(--ink); font: 900 12.5px/24px 'Lato', sans-serif; text-align: center; font-style: normal; transition: background .15s, color .15s; }
+  .caps a:hover { background: var(--band); color: var(--ink); }
+  .caps a.on { background: var(--ink); color: var(--surface); }
+  .caps a.on i { background: var(--surface); color: var(--ink); }
+  .caps .sep { flex: 1; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 16px 0 14px; font-size: 13.5px; color: var(--ink2); }
+  .leyenda > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+  .leyenda strong { font-weight: 900; color: var(--ink); margin-right: 2px; }
+  .leyenda span { display: inline-flex; align-items: center; gap: 7px; }
+  .leyenda i { width: 12px; height: 12px; border-radius: 4px; background: color-mix(in srgb, var(--c) 22%, var(--surface)); border: 2px solid var(--c); }
+  .leyenda .nodo i { border-radius: 3px; }
+  .leyenda .sal i { border-radius: 99px; }
+
+  /* Diagrama */
+  .lienzo { position: relative; margin: 0; overflow-x: auto; }
+  .lienzo svg { width: 100%; min-width: 1180px; height: auto; display: block; }
+  .ancla { position: absolute; left: 0; width: 1px; height: 1px; scroll-margin-top: 70px; }
+  .banda rect { fill: var(--band); }
+  .banda circle { fill: var(--ink); }
+  .banda .bl { fill: var(--surface); font: 900 15px 'Lato', sans-serif; text-anchor: middle; }
+  .banda .bt { fill: var(--ink); font: 900 19px 'Lato', sans-serif; letter-spacing: -0.01em; }
+  .banda .bs { fill: var(--muted); font: 400 14.5px 'Lato', sans-serif; }
+  .fl path { fill: none; stroke: var(--edge); stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+  .fl path.vuelta { stroke: var(--k); stroke-width: 2.2; stroke-dasharray: 7 6; }
+  .punta { fill: var(--edge); }
+  .n rect, .n polygon { fill: color-mix(in srgb, var(--k) 9%, var(--surface)); stroke: color-mix(in srgb, var(--k) 62%, var(--surface)); stroke-width: 1.6; stroke-linejoin: round; filter: drop-shadow(0 1px 1.5px rgb(20 30 60 / .13)); }
+  .n.q polygon { fill: var(--surface); stroke: color-mix(in srgb, var(--k) 70%, var(--surface)); stroke-width: 1.8; }
+  .n.ia rect { fill: color-mix(in srgb, var(--k) 15%, var(--surface)); stroke: var(--k); stroke-width: 2.6; filter: drop-shadow(0 4px 10px color-mix(in srgb, var(--k) 30%, transparent)); }
+  .n text { text-anchor: middle; }
+  .n .t { fill: var(--ink); font: 900 15.5px 'Lato', sans-serif; }
+  .n .s { fill: var(--ink2); font: 400 13.5px 'Lato', sans-serif; }
+  .n .s.q { fill: var(--ink); font-weight: 700; font-size: 14px; }
+  .n .bd { fill: var(--ink); stroke: var(--surface); stroke-width: 2.5; filter: none; }
+  .n .b { fill: var(--surface); font: 900 12.5px 'Lato', sans-serif; }
+  .n .ic { fill: none; stroke: var(--k); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .pill rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+  .pill text { font: 900 12px 'Lato', sans-serif; text-anchor: middle; }
+  .pill.si text { fill: var(--ok); }
+  .pill.no text { fill: var(--muted); }
+  .et { fill: var(--ink2); font: 700 13px 'Lato', sans-serif; paint-order: stroke; stroke: var(--band); stroke-width: 6px; stroke-linejoin: round; }
   .et.vu { fill: var(--k-mem); }
-  .det { margin-top: 6px; }
-  .det summary { cursor: pointer; color: var(--accent); font-size: 14px; margin-bottom: 12px; }
-  footer { margin-top: 22px; color: var(--muted); font-size: 13px; }
+
+  /* Detalle por capítulo */
+  .detalle { margin-top: 56px; }
+  .detalle > h2 { font-size: clamp(26px, 2.6vw, 34px); letter-spacing: -0.02em; line-height: 1.15; font-weight: 900; margin: 0 0 6px; text-wrap: balance; }
+  .detalle > p { color: var(--muted); margin: 0 0 24px; max-width: 70ch; }
+  .capitulo { display: grid; grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); gap: 8px 48px; padding: 30px 0; border-top: 1px solid var(--line); scroll-margin-top: 70px; }
+  .capitulo h3 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 900; letter-spacing: -0.01em; display: flex; gap: 12px; align-items: flex-start; }
+  .capitulo h3 i { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: var(--surface); font: 900 14px/30px 'Lato', sans-serif; text-align: center; font-style: normal; }
+  .capitulo .res { color: var(--muted); font-size: 14.5px; margin: 8px 0 0 42px; max-width: 28ch; }
+  dl { margin: 0; max-width: 96ch; }
+  dl > div { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); gap: 4px 24px; padding: 11px 0; border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  dl > div:first-child { border-top: 0; padding-top: 0; }
+  dt { font-weight: 900; font-size: 15px; line-height: 1.4; }
+  dd { margin: 0; color: var(--ink2); font-size: 15px; line-height: 1.55; text-wrap: pretty; }
+  dd b { color: var(--ink); font-weight: 700; }
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 900; padding: 1px 8px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); margin-left: 6px; vertical-align: 1px; }
+  .nota { margin: 14px 0 0; padding: 12px 16px; border-radius: 12px; background: var(--band); font-size: 14.5px; color: var(--ink2); max-width: 78ch; }
+  footer { margin-top: 40px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; max-width: 80ch; }
+
+  /* Un solo gesto de entrada, sin tocar el contenido */
+  @media (prefers-reduced-motion: no-preference) {
+    .intro > *, .garantias > div { animation: entra .6s cubic-bezier(.16, 1, .3, 1) both; }
+    .intro h1 { animation-delay: .04s; } .intro .lead { animation-delay: .12s; }
+    .garantias > div:nth-child(1) { animation-delay: .2s; } .garantias > div:nth-child(2) { animation-delay: .26s; }
+    .garantias > div:nth-child(3) { animation-delay: .32s; } .garantias > div:nth-child(4) { animation-delay: .38s; }
+    @keyframes entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  }
+  @media (max-width: 980px) {
+    .garantias { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .garantias > div:nth-child(3) { padding-left: 0; border-left: 0; }
+    .garantias > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .capitulo { grid-template-columns: minmax(0, 1fr); }
+    dl > div { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 760px) { .caps { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .caps a { flex: none; white-space: nowrap; } .caps .sep { display: none; } }
+  @media (max-width: 560px) { .garantias { grid-template-columns: minmax(0, 1fr); } .garantias > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } }
+  @media print { .caps, .top { display: none; } .lienzo { overflow: visible; } .lienzo svg { min-width: 0; } .capitulo { break-inside: avoid; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>Cómo funciona la IA de soporte (fase 1)</h1>
+  <nav class="top" aria-label="Secciones de la IA">
     <a href="/ia">← Chats de prueba</a>
     <a href="/ia/casos">Revisar casos →</a>
-  </header>
-  <p class="sub">Esto es lo que ocurre desde que el cliente escribe hasta que el agente decide. La IA solo sugiere cuando un agente pulsa el botón: no responde sola ni envía nada.</p>
-  <div class="leyenda">
-    <span><i style="background:var(--k-cli)"></i>Cliente</span>
-    <span><i style="background:var(--k-sys)"></i>Sistema (sin IA)</span>
-    <span><i style="background:var(--k-api)"></i>AdminHoteles (solo lectura)</span>
-    <span><i style="background:var(--k-mem)"></i>Memoria y documentación</span>
-    <span><i style="background:var(--k-ai)"></i>IA (Claude Haiku 5.5)</span>
-    <span><i style="background:var(--k-ag)"></i>Agente</span>
-  </div>
+  </nav>
 
-    <div class="lienzo"><svg viewBox="0 0 1520 4553" role="img" aria-label="Flujo completo de la IA de soporte, de que el cliente escribe a que el responsable valida la corrección">
-<defs><marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="punta"/></marker></defs>
-<g class="fl" marker-end="url(#p)"><path d="M640,132 L640,174"/><path d="M640,254 L640,296"/><path d="M820,342 L930,342"/><path d="M640,388 L640,430"/><path d="M820,476 L930,476"/><path d="M640,522 L640,564"/><path d="M820,610 L930,610"/><path d="M640,656 L640,698"/><path d="M820,744 L930,744"/><path d="M640,790 L640,872"/><path d="M200,1130 L200,1166"/><path d="M640,1108 L640,1144"/><path d="M1170,1062 L1225,1065.5"/><path d="M1000,1108 L1000,1144"/><path d="M1000,1224 L1000,1260"/><path d="M1170,1306 L1225,1306.5"/><path d="M1000,1352 L1000,1388"/><path d="M1170,1434 L1225,1434"/><path d="M1000,1480 L1000,1516"/><path marker-end="none" d="M640,952 L640,986"/><path marker-end="none" d="M200,986 L1000,986"/><path d="M200,986 L200,1016"/><path d="M640,986 L640,1016"/><path d="M1000,986 L1000,1016"/><path marker-end="none" d="M480,1062 L425,1062 L425,1244 L640,1244"/><path marker-end="none" d="M200,1280 L200,1636"/><path marker-end="none" d="M640,1224 L640,1636"/><path marker-end="none" d="M1000,1596 L1000,1636"/><path marker-end="none" d="M200,1636 L1000,1636"/><path d="M640,1636 L640,1690"/><path d="M460,1736 L350,1726"/><path d="M820,1736 L870,1726"/><path marker-end="none" d="M200,1766 L200,1810 L1040,1810"/><path marker-end="none" d="M1040,1766 L1040,1810"/><path d="M640,1782 L640,1846"/><path d="M640,1943 L640,1989"/><path d="M640,2086 L640,2150"/><path d="M850,2204.5 L920,2204.5"/><path d="M640,2259 L640,2295"/><path d="M850,2349.5 L920,2349.5"/><path d="M640,2404 L640,2468"/><path d="M850,2522.5 L920,2522.5"/><path d="M640,2577 L640,2613"/><path d="M850,2667.5 L920,2667.5"/><path d="M640,2722 L640,2758"/><path d="M850,2804 L920,2804"/><path d="M640,2850 L640,2886"/><path d="M850,2932 L920,2932"/><path d="M640,2978 L640,3014"/><path d="M850,3060 L920,3060"/><path d="M640,3106 L640,3142"/><path marker-end="none" d="M1340,2204.5 L1485,2204.5"/><path marker-end="none" d="M1340,2349.5 L1485,2349.5"/><path marker-end="none" d="M1340,2522.5 L1485,2522.5"/><path marker-end="none" d="M1340,2667.5 L1485,2667.5"/><path marker-end="none" d="M1340,2804 L1485,2804"/><path marker-end="none" d="M1340,2932 L1485,2932"/><path marker-end="none" d="M1340,3060 L1485,3060"/><path marker-end="none" d="M1485,2204.5 L1485,3260"/><path marker-end="none" d="M640,3222 L640,3260"/><path marker-end="none" d="M1485,3260 L640,3260"/><path d="M640,3296 L640,3316"/><path d="M830,3362 L920,3358"/><path d="M640,3408 L640,3446"/><path d="M830,3492 L920,3488"/><path d="M640,3538 L640,3576"/><path d="M830,3622 L920,3621"/><path d="M640,3668 L640,3706"/><path d="M640,3786 L640,3830"/><path marker-end="none" d="M1320,3358 L1485,3358"/><path marker-end="none" d="M1320,3488 L1485,3488"/><path marker-end="none" d="M1320,3621 L1485,3621"/><path marker-end="none" d="M1485,3358 L1485,3808"/><path marker-end="none" d="M1485,3808 L640,3808"/><path d="M640,3927 L640,4011"/><path marker-end="none" d="M640,4091 L640,4123"/><path marker-end="none" d="M190,4123 L1240,4123"/><path d="M190,4123 L190,4153"/><path d="M540,4123 L540,4153"/><path d="M890,4123 L890,4153"/><path d="M1240,4123 L1240,4153"/><path d="M1240,4233 L1240,4273"/><path d="M1075,4319 L1040,4318.5"/><path d="M1240,4365 L1240,4403"/><path class="vuelta" style="stroke:var(--k-cli)" d="M540,4233 L540,4523 L18,4523 L18,92 L450,92"/><path class="vuelta" style="stroke:var(--k-mem)" d="M1090,4443 L46,4443 L46,1073 L50,1073"/></g>
-<text x="760" y="24" class="sec" text-anchor="middle">A · Desde que el cliente escribe hasta que se decide llamar a la IA</text><path class="secl" d="M30,34 L1490,34"/><text x="828" y="334" class="et" text-anchor="start">Sí</text><text x="650" y="405" class="et" text-anchor="start">No</text><text x="828" y="468" class="et" text-anchor="start">Sí</text><text x="650" y="539" class="et" text-anchor="start">No</text><text x="828" y="602" class="et" text-anchor="start">Sí</text><text x="650" y="673" class="et" text-anchor="start">No</text><text x="828" y="736" class="et" text-anchor="start">Sí</text><text x="650" y="807" class="et" text-anchor="start">No</text><text x="760" y="838" class="sec" text-anchor="middle">B · La conversación y todo lo que se consulta antes de llamar a la IA</text><path class="secl" d="M30,848 L1490,848"/><text x="650" y="1132" class="et" text-anchor="start">Sí</text><text x="1178" y="1054" class="et" text-anchor="start">No</text><text x="1010" y="1132" class="et" text-anchor="start">Sí</text><text x="1178" y="1298" class="et" text-anchor="start">No</text><text x="1010" y="1376" class="et" text-anchor="start">Sí: rol, usuario activo, hoteles</text><text x="1178" y="1426" class="et" text-anchor="start">No</text><text x="1010" y="1504" class="et" text-anchor="start">Sí</text><text x="458" y="1054" class="et" text-anchor="end">No</text><text x="760" y="1670" class="sec" text-anchor="middle">C · Lo que decide el código antes de preguntar a la IA, y la instrucción que se le envía</text><path class="secl" d="M30,1680 L1490,1680"/><text x="452" y="1728" class="et" text-anchor="end">Sí</text><text x="828" y="1728" class="et" text-anchor="start">Sí</text><text x="650" y="1797" class="et" text-anchor="start">No: decide el modelo</text><text x="650" y="1971" class="et" text-anchor="start">una llamada: se pagan los tokens</text><text x="760" y="2126" class="sec" text-anchor="middle">D · Cómo decide el modelo: el primer punto que encaja manda</text><path class="secl" d="M30,2136 L1490,2136"/><text x="858" y="2196.5" class="et" text-anchor="start">Sí</text><text x="650" y="2289" class="et" text-anchor="start">No</text><text x="858" y="2341.5" class="et" text-anchor="start">Sí</text><text x="650" y="2462" class="et" text-anchor="start">No</text><text x="858" y="2514.5" class="et" text-anchor="start">Sí</text><text x="650" y="2607" class="et" text-anchor="start">No</text><text x="858" y="2659.5" class="et" text-anchor="start">Sí</text><text x="650" y="2752" class="et" text-anchor="start">No</text><text x="858" y="2796" class="et" text-anchor="start">Sí</text><text x="650" y="2880" class="et" text-anchor="start">No</text><text x="858" y="2924" class="et" text-anchor="start">Sí</text><text x="650" y="3008" class="et" text-anchor="start">No</text><text x="858" y="3052" class="et" text-anchor="start">Sí</text><text x="650" y="3123" class="et" text-anchor="start">No</text><text x="760" y="3284" class="sec" text-anchor="middle">E · Qué se hace con lo que contesta la IA</text><path class="secl" d="M30,3294 L1490,3294"/><text x="838" y="3354" class="et" text-anchor="start">No</text><text x="650" y="3433" class="et" text-anchor="start">Sí</text><text x="838" y="3484" class="et" text-anchor="start">No</text><text x="650" y="3563" class="et" text-anchor="start">Sí</text><text x="838" y="3614" class="et" text-anchor="start">Sí</text><text x="650" y="3693" class="et" text-anchor="start">No</text><text x="760" y="3981" class="sec" text-anchor="middle">F · El agente decide, valora, y lo validado vuelve a la memoria</text><path class="secl" d="M30,3991 L1490,3991"/><text x="1067" y="4311" class="et" text-anchor="end">No</text><text x="1250" y="4390" class="et" text-anchor="start">Sí</text><text x="30" y="4515" class="et" text-anchor="start">el cliente contesta → vuelve al paso 1</text><text x="640" y="4435" class="et vu" text-anchor="start">bucle: lo validado vuelve a la memoria</text>
-<g style="--k:var(--k-cli)" class="n"><rect x="450" y="52" width="380" height="80"/><text x="640" y="77" class="t">Cliente escribe</text><text x="640" y="97" class="s">correo · WhatsApp · formulario · portal</text><text x="640" y="114" class="s">se crea o se actualiza el ticket</text><circle cx="450" cy="52" r="13"/><text x="450" y="56.5" class="b">1</text></g>
-<g style="--k:var(--k-ag)" class="n"><rect x="450" y="174" width="380" height="80"/><text x="640" y="199" class="t">El agente pide la sugerencia</text><text x="640" y="219" class="s">abre el ticket y pulsa «Sugerir»</text><text x="640" y="236" class="s">la IA no actúa sola y no envía nada</text><circle cx="450" cy="174" r="13"/><text x="450" y="178.5" class="b">2</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,296 820,342 640,388 460,342"/><text x="640" y="337.5" class="s q">¿Asistente encendido y con</text><text x="640" y="354.5" class="s q">la clave del proveedor puesta?</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="930" y="310.5" width="380" height="63"/><text x="1120" y="335.5" class="t">Sin botón de sugerir</text><text x="1120" y="355.5" class="s">no sale ningún dato hacia fuera</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,430 820,476 640,522 460,476"/><text x="640" y="471.5" class="s q">¿Ya hay una sugerencia para</text><text x="640" y="488.5" class="s q">el último mensaje del cliente?</text></g>
-<g style="--k:var(--k-mem)" class="n"><rect x="930" y="427.5" width="380" height="97"/><text x="1120" y="452.5" class="t">Se enseña la que ya estaba</text><text x="1120" y="472.5" class="s">no se llama a la IA y no gasta</text><text x="1120" y="489.5" class="s">«Regenerar» salta esta puerta</text><text x="1120" y="506.5" class="s">→ sigue en el paso 9</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,564 820,610 640,656 460,610"/><text x="640" y="605.5" class="s q">¿Se ha llegado al tope</text><text x="640" y="622.5" class="s q">mensual de gasto? (50 USD)</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="930" y="561.5" width="380" height="97"/><text x="1120" y="586.5" class="t">Falla con aviso al agente</text><text x="1120" y="606.5" class="s">«Contesta tú; vuelve el día 1»</text><text x="1120" y="623.5" class="s">no se llama al proveedor</text><text x="1120" y="640.5" class="s">→ lo contesta el agente sin IA</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,698 820,744 640,790 460,744"/><text x="640" y="739.5" class="s q">¿El cliente solo ha enviado</text><text x="640" y="756.5" class="s q">audios de WhatsApp?</text></g>
-<g style="--k:var(--k-sys)" class="n"><rect x="930" y="695.5" width="380" height="97"/><text x="1120" y="720.5" class="t">Texto fijo, sin IA</text><text x="1120" y="740.5" class="s">«No podemos escuchar audios…»</text><text x="1120" y="757.5" class="s">no gasta nada</text><text x="1120" y="774.5" class="s">→ sigue en el paso 9</text></g>
-<g style="--k:var(--k-sys)" class="n"><rect x="430" y="872" width="420" height="80"/><text x="640" y="897" class="t">Prepara la conversación</text><text x="640" y="917" class="s">lee los mensajes del cliente y las respuestas del equipo</text><text x="640" y="934" class="s">(sin notas internas) y localiza la última pregunta</text><circle cx="430" cy="872" r="13"/><text x="430" y="876.5" class="b">3</text></g>
-<g style="--k:var(--k-mem)" class="n"><rect x="50" y="1016" width="300" height="114"/><text x="200" y="1041" class="t">Memoria y guía</text><text x="200" y="1061" class="s">preguntas frecuentes</text><text x="200" y="1078" class="s">respuestas de ejemplo del equipo</text><text x="200" y="1095" class="s">tickets parecidos y manuales</text><text x="200" y="1112" class="s">correcciones validadas por un responsable</text><circle cx="50" cy="1016" r="13"/><text x="50" y="1020.5" class="b">4</text></g>
-<g style="--k:var(--k-mem)" class="n"><rect x="50" y="1166" width="300" height="114"/><text x="200" y="1191" class="t">Cómo se limpia lo que se guarda</text><text x="200" y="1211" class="s">sin firmas, correos ni teléfonos</text><text x="200" y="1228" class="s">contraseñas tapadas</text><text x="200" y="1245" class="s">lo antiguo se marca ANTIGUO</text><text x="200" y="1262" class="s">(sirve para entender, no para copiar)</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,1016 800,1062 640,1108 480,1062"/><text x="640" y="1057.5" class="s q">¿El cliente ha enviado</text><text x="640" y="1074.5" class="s q">fotos?</text><circle cx="502" cy="1040" r="13"/><text x="502" y="1044.5" class="b">4</text></g>
-<g style="--k:var(--k-sys)" class="n"><rect x="480" y="1144" width="320" height="80"/><text x="640" y="1169" class="t">Lee el código de barras</text><text x="640" y="1189" class="s">en local (la foto no sale)</text><text x="640" y="1206" class="s">saca los códigos de etiqueta</text></g>
-<g style="--k:var(--k-api)" class="n q"><polygon points="1000,1016 1170,1062 1000,1108 830,1062"/><text x="1000" y="1057.5" class="s q">¿AdminHoteles está</text><text x="1000" y="1074.5" class="s q">configurado? (solo lectura)</text><circle cx="852" cy="1040" r="13"/><text x="852" y="1044.5" class="b">4</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="1225" y="1034" width="230" height="63"/><text x="1340" y="1059" class="t">Sin datos del hotel</text><text x="1340" y="1079" class="s">la IA pregunta por él</text></g>
-<g style="--k:var(--k-api)" class="n"><rect x="830" y="1144" width="340" height="80"/><text x="1000" y="1169" class="t">Busca el hotel</text><text x="1000" y="1189" class="s">por el correo del ticket, el nombre en</text><text x="1000" y="1206" class="s">el mensaje o la firma, o los códigos</text></g>
-<g style="--k:var(--k-api)" class="n q"><polygon points="1000,1260 1170,1306 1000,1352 830,1306"/><text x="1000" y="1301.5" class="s q">¿El correo está dado de alta</text><text x="1000" y="1318.5" class="s q">en la aplicación?</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="1225" y="1258" width="230" height="97"/><text x="1340" y="1283" class="t">Correo sin verificar</text><text x="1340" y="1303" class="s">no se dan datos de hoteles</text><text x="1340" y="1320" class="s">si el hotel viene nombrado:</text><text x="1340" y="1337" class="s">solo se cuentan las antenas</text></g>
-<g style="--k:var(--k-api)" class="n q"><polygon points="1000,1388 1170,1434 1000,1480 830,1434"/><text x="1000" y="1429.5" class="s q">¿El hotel que dice el cliente</text><text x="1000" y="1446.5" class="s q">coincide con el del correo?</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="1225" y="1394" width="230" height="80"/><text x="1340" y="1419" class="t">No coincide</text><text x="1340" y="1439" class="s">se explica con tacto</text><text x="1340" y="1456" class="s">y se deriva a una persona</text></g>
-<g style="--k:var(--k-api)" class="n"><rect x="830" y="1516" width="340" height="80"/><text x="1000" y="1541" class="t">Datos del hotel para la IA</text><text x="1000" y="1561" class="s">antenas conectadas y desconectadas</text><text x="1000" y="1578" class="s">estado de la etiqueta</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,1690 820,1736 640,1782 460,1736"/><text x="640" y="1731.5" class="s q">¿Es un tema de los que</text><text x="640" y="1748.5" class="s q">fija el código?</text><circle cx="482" cy="1714" r="13"/><text x="482" y="1718.5" class="b">5</text></g>
-<g style="--k:var(--k-api)" class="n"><rect x="50" y="1686" width="300" height="80"/><text x="200" y="1711" class="t">Derivar, sin preguntar nada</text><text x="200" y="1731" class="s">alérgenos · tótem</text><text x="200" y="1748" class="s">garantía (si no es de farmacia)</text></g>
-<g style="--k:var(--k-cli)" class="n"><rect x="870" y="1686" width="340" height="80"/><text x="1040" y="1711" class="t">Pedir hotel y correo</text><text x="1040" y="1731" class="s">problema de uso, primer mensaje,</text><text x="1040" y="1748" class="s">sin hotel ni correo verificado</text></g>
-<g style="--k:var(--k-sys)" class="n"><rect x="405" y="1846" width="470" height="97"/><text x="640" y="1871" class="t">Compone la instrucción para la IA</text><text x="640" y="1891" class="s">reglas del equipo + orden de decisión</text><text x="640" y="1908" class="s">+ memoria + datos del hotel + códigos de las fotos</text><text x="640" y="1925" class="s">+ «DECISIÓN YA TOMADA» si el código decidió</text><circle cx="405" cy="1846" r="13"/><text x="405" y="1850.5" class="b">5</text></g>
-<g style="--k:var(--k-ai)" class="n ia"><rect x="420" y="1989" width="440" height="97"/><text x="640" y="2014" class="t">IA · Claude Haiku 5.5</text><text x="640" y="2034" class="s">recibe la conversación y la instrucción</text><text x="640" y="2051" class="s">aplica el orden de decisión (7 puntos)</text><text x="640" y="2068" class="s">y redacta el borrador</text><circle cx="420" cy="1989" r="13"/><text x="420" y="1993.5" class="b">6</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2150 850,2204.5 640,2259 430,2204.5"/><text x="640" y="2191.5" class="s q">¿Alérgenos, contenido erróneo en</text><text x="640" y="2208.5" class="s q">las etiquetas, tótem, formación o</text><text x="640" y="2225.5" class="s q">cliente que no es hotel ni tienda?</text><circle cx="452" cy="2182.5" r="13"/><text x="452" y="2187" class="b">1</text></g>
-<g style="--k:var(--k-api)" class="n"><rect x="920" y="2164.5" width="420" height="80"/><text x="1130" y="2189.5" class="t">DERIVAR</text><text x="1130" y="2209.5" class="s">sin preguntar nada</text><text x="1130" y="2226.5" class="s">nota «Para el equipo» → Soporte</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2295 850,2349.5 640,2404 430,2349.5"/><text x="640" y="2336.5" class="s q">¿Es material o dinero?</text><text x="640" y="2353.5" class="s q">(pedido, presupuesto,</text><text x="640" y="2370.5" class="s q">garantía o cambio de precio)</text><circle cx="452" cy="2327.5" r="13"/><text x="452" y="2332" class="b">2</text></g>
-<g style="--k:var(--k-api)" class="n"><rect x="920" y="2267" width="420" height="165"/><text x="1130" y="2292" class="t">Según qué sea</text><text x="1130" y="2312" class="s">pedido de material → escribir a postventa</text><text x="1130" y="2329" class="s">   (material, cantidad y foto)</text><text x="1130" y="2346" class="s">presupuesto → «Asignar al departamento de</text><text x="1130" y="2363" class="s">   Pedidos y facturas.»</text><text x="1130" y="2380" class="s">garantía → DERIVAR a Garantías (nunca correo)</text><text x="1130" y="2397" class="s">garantía de farmacia → «lo gestiona Expofarm»</text><text x="1130" y="2414" class="s">cambio de precio en tienda → DERIVAR</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2468 850,2522.5 640,2577 430,2522.5"/><text x="640" y="2509.5" class="s q">¿Lo ejecuta el equipo?</text><text x="640" y="2526.5" class="s q">(rueda de menú, logos, plantillas,</text><text x="640" y="2543.5" class="s q">alta de etiquetas en la plataforma)</text><circle cx="452" cy="2500.5" r="13"/><text x="452" y="2505" class="b">3</text></g>
-<g style="--k:var(--k-api)" class="n"><rect x="920" y="2482.5" width="420" height="80"/><text x="1130" y="2507.5" class="t">DERIVAR</text><text x="1130" y="2527.5" class="s">si el hotel ya consta no se pide</text><text x="1130" y="2544.5" class="s">hotel ni correo para derivarlo</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2613 850,2667.5 640,2722 430,2667.5"/><text x="640" y="2654.5" class="s q">¿Lo hace el propio hotel?</text><text x="640" y="2671.5" class="s q">(usuarios, roles y permisos, posiciones,</text><text x="640" y="2688.5" class="s q">«Sin plato», forzar menú, horarios)</text><circle cx="452" cy="2645.5" r="13"/><text x="452" y="2650" class="b">4</text></g>
-<g style="--k:var(--k-ag)" class="n"><rect x="920" y="2619" width="420" height="97"/><text x="1130" y="2644" class="t">EXPLICAR los pasos</text><text x="1130" y="2664" class="s">Ajustes › Roles, Usuarios, Posiciones…</text><text x="1130" y="2681" class="s">solo con el correo verificado</text><text x="1130" y="2698" class="s">si nadie del hotel puede → DERIVAR</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2758 850,2804 640,2850 430,2804"/><text x="640" y="2799.5" class="s q">¿Es un problema de uso y no se</text><text x="640" y="2816.5" class="s q">sabe quién escribe?</text><circle cx="452" cy="2782" r="13"/><text x="452" y="2786.5" class="b">5</text></g>
-<g style="--k:var(--k-cli)" class="n"><rect x="920" y="2764" width="420" height="80"/><text x="1130" y="2789" class="t">PEDIR hotel y correo</text><text x="1130" y="2809" class="s">como máximo esas dos preguntas</text><text x="1130" y="2826" class="s">los demás datos se piden después</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2886 850,2932 640,2978 430,2932"/><text x="640" y="2927.5" class="s q">¿Hay antenas desconectadas?</text><text x="640" y="2944.5" class="s q">(dato de AdminHoteles)</text><circle cx="452" cy="2910" r="13"/><text x="452" y="2914.5" class="b">6</text></g>
-<g style="--k:var(--k-ag)" class="n"><rect x="920" y="2892" width="420" height="80"/><text x="1130" y="2917" class="t">Avisar a su personal técnico</text><text x="1130" y="2937" class="s">que lo revise su mantenimiento</text><text x="1130" y="2954" class="s">si ya se le dijo y sigue igual → DERIVAR</text></g>
-<g style="--k:var(--k-sys)" class="n q"><polygon points="640,3014 850,3060 640,3106 430,3060"/><text x="640" y="3055.5" class="s q">¿El contexto trae los pasos</text><text x="640" y="3072.5" class="s q">o la respuesta?</text><circle cx="452" cy="3038" r="13"/><text x="452" y="3042.5" class="b">7</text></g>
-<g style="--k:var(--k-ag)" class="n"><rect x="920" y="3020" width="420" height="80"/><text x="1130" y="3045" class="t">RESPONDER</text><text x="1130" y="3065" class="s">solo con lo que dice el contexto</text><text x="1130" y="3082" class="s">nunca inventa pasos, datos ni plazos</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="450" y="3142" width="380" height="80"/><text x="640" y="3167" class="t">Si no encaja o hay duda</text><text x="640" y="3187" class="s">DERIVAR (o «no sé»: sin borrador)</text><text x="640" y="3204" class="s">es preferible derivar a dar una respuesta dudosa</text><circle cx="450" cy="3142" r="13"/><text x="450" y="3146.5" class="b">8</text></g>
-<g style="--k:var(--k-ai)" class="n q"><polygon points="640,3316 830,3362 640,3408 450,3362"/><text x="640" y="3357.5" class="s q">¿La respuesta llegó completa</text><text x="640" y="3374.5" class="s q">y el proveedor contestó?</text><circle cx="472" cy="3340" r="13"/><text x="472" y="3344.5" class="b">7</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="920" y="3318" width="400" height="80"/><text x="1120" y="3343" class="t">No pudo preparar la respuesta</text><text x="1120" y="3363" class="s">botón «Reintentar»</text><text x="1120" y="3380" class="s">si ya se pagó, los tokens se cuentan</text></g>
-<g style="--k:var(--k-ai)" class="n q"><polygon points="640,3446 830,3492 640,3538 450,3492"/><text x="640" y="3487.5" class="s q">¿La IA se atreve a contestar?</text><text x="640" y="3504.5" class="s q">(si no, responde «NO SÉ»)</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="920" y="3448" width="400" height="80"/><text x="1120" y="3473" class="t">No sabe: no hay borrador</text><text x="1120" y="3493" class="s">lo debe llevar una persona</text><text x="1120" y="3510" class="s">queda como hueco en Ajustes › Asistente IA</text></g>
-<g style="--k:var(--k-ai)" class="n q"><polygon points="640,3576 830,3622 640,3668 450,3622"/><text x="640" y="3617.5" class="s q">¿Lleva el marcador interno</text><text x="640" y="3634.5" class="s q">[[DERIVAR: categoría | motivo]]?</text></g>
-<g style="--k:var(--k-api)" class="n"><rect x="920" y="3564" width="400" height="114"/><text x="1120" y="3589" class="t">Derivar (sugerido)</text><text x="1120" y="3609" class="s">nota «Para el equipo»:</text><text x="1120" y="3626" class="s">«Llévalo a Soporte · Garantías · Pedidos» + motivo</text><text x="1120" y="3643" class="s">más un mensaje para el cliente (opcional)</text><text x="1120" y="3660" class="s">el marcador no se enseña al agente</text></g>
-<g style="--k:var(--k-ag)" class="n"><rect x="440" y="3706" width="400" height="80"/><text x="640" y="3731" class="t">Borrador sugerido</text><text x="640" y="3751" class="s">responder · pedir datos · indicar el canal</text><text x="640" y="3768" class="s">se enseña en el panel: no se envía solo</text></g>
-<g style="--k:var(--k-sys)" class="n"><rect x="405" y="3830" width="470" height="97"/><text x="640" y="3855" class="t">Se guarda la sugerencia</text><text x="640" y="3875" class="s">con los tokens gastados → coste estimado del mes</text><text x="640" y="3892" class="s">aviso al 80 % y al 100 % del tope (50 USD, mes natural)</text><text x="640" y="3909" class="s">el panel de Ajustes muestra el gasto por día</text><circle cx="405" cy="3830" r="13"/><text x="405" y="3834.5" class="b">8</text></g>
-<g style="--k:var(--k-ag)" class="n"><rect x="420" y="4011" width="440" height="80"/><text x="640" y="4036" class="t">El agente ve la sugerencia</text><text x="640" y="4056" class="s">lo decide todo él: la IA no envía nada</text><text x="640" y="4073" class="s">lo que llegó de las puertas de A también se ve aquí</text><circle cx="420" cy="4011" r="13"/><text x="420" y="4015.5" class="b">9</text></g>
-<g style="--k:var(--k-ag)" class="n"><rect x="40" y="4153" width="300" height="80"/><text x="190" y="4178" class="t">👍 Útil</text><text x="190" y="4198" class="s">cuenta para el acierto</text><text x="190" y="4215" class="s">de la IA en el panel</text></g>
-<g style="--k:var(--k-ag)" class="n"><rect x="390" y="4153" width="300" height="80"/><text x="540" y="4178" class="t">✉️ Copia y envía él</text><text x="540" y="4198" class="s">lo edita si quiere</text><text x="540" y="4215" class="s">se marca como usada</text></g>
-<g style="--k:var(--k-sys)" class="n"><rect x="740" y="4153" width="300" height="80"/><text x="890" y="4178" class="t">Lo contesta sin la IA</text><text x="890" y="4198" class="s">si no hay borrador o no sirve</text><text x="890" y="4215" class="s">el cliente recibe su respuesta</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="1090" y="4153" width="300" height="80"/><text x="1240" y="4178" class="t">👎 No sirve</text><text x="1240" y="4198" class="s">escribe qué estaba mal y</text><text x="1240" y="4215" class="s">cómo había que responder</text></g>
-<g style="--k:var(--k-mem)" class="n q"><polygon points="1240,4273 1405,4319 1240,4365 1075,4319"/><text x="1240" y="4314.5" class="s q">¿Un responsable valida</text><text x="1240" y="4331.5" class="s q">la corrección?</text><circle cx="1097" cy="4297" r="13"/><text x="1097" y="4301.5" class="b">10</text></g>
-<g style="--k:var(--k-no)" class="n"><rect x="740" y="4287" width="300" height="63"/><text x="890" y="4312" class="t">Se descarta</text><text x="890" y="4332" class="s">no llega nunca a la IA</text></g>
-<g style="--k:var(--k-mem)" class="n"><rect x="1090" y="4403" width="300" height="80"/><text x="1240" y="4428" class="t">Entra en la memoria</text><text x="1240" y="4448" class="s">como corrección validada</text><text x="1240" y="4465" class="s">la IA la lee en la próxima consulta</text></g>
-</svg></div>
-  <details class="det"><summary>Ver el detalle paso a paso</summary>
-  <div class="paso" style="--k: var(--k-cli)">
-    <div class="carril"><div class="num">1</div></div>
-    <div class="card">
-      <span class="quien">Cliente</span>
-      <h2>Escribe un mensaje</h2>
-      <p>Por correo, WhatsApp o el formulario del portal. Se crea o se actualiza el ticket.</p>
+  <section class="intro">
+    <h1>Cómo funciona la IA de soporte</h1>
+    <p class="lead">Este es el recorrido completo, desde que el cliente escribe hasta que el agente decide. En esta fase la IA solo sugiere cuando un agente pulsa el botón: no responde sola ni envía nada.</p>
+  </section>
+
+  <section class="garantias" aria-label="Garantías de la fase 1">
+    <div>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
+      <p style="margin:0"><b>La IA solo sugiere</b><span>Nada llega al cliente sin que un agente lo decida y lo envíe él.</span></p>
+    </div>
+    <div>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+      <p style="margin:0"><b>Memoria sin datos personales</b><span>Lo que aprende no guarda correos, teléfonos, firmas ni contraseñas.</span></p>
+    </div>
+    <div>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+      <p style="margin:0"><b>Gasto acotado</b><span>Tope de 50 USD al mes. Al llegar, la IA se pausa hasta el día 1.</span></p>
+    </div>
+    <div>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="m16 11 2 2 4-4"/></svg>
+      <p style="margin:0"><b>Aprende de las personas</b><span>Solo mejora con lo que un responsable valida.</span></p>
+    </div>
+  </section>
+
+  <nav class="caps" id="caps" aria-label="Capítulos del flujo">
+    <a href="#cap-a"><i>A</i>Puertas</a>
+    <a href="#cap-b"><i>B</i>Contexto</a>
+    <a href="#cap-c"><i>C</i>Decisión en código</a>
+    <a href="#cap-d"><i>D</i>Orden de decisión</a>
+    <a href="#cap-e"><i>E</i>Salida</a>
+    <a href="#cap-f"><i>F</i>Aprendizaje</a>
+    <span class="sep"></span>
+    <a href="#detalle">Detalle por capítulo</a>
+  </nav>
+
+  <div class="leyenda" aria-label="Leyenda">
+    <div class="nodo"><strong>Quién actúa</strong>
+      <span style="--c:var(--k-cli)"><i></i>Cliente</span>
+      <span style="--c:var(--k-sys)"><i></i>Sistema (sin IA)</span>
+      <span style="--c:var(--k-api)"><i></i>AdminHoteles (solo lectura)</span>
+      <span style="--c:var(--k-mem)"><i></i>Memoria</span>
+      <span style="--c:var(--k-ai)"><i></i>IA (Claude Haiku 5.5)</span>
+      <span style="--c:var(--k-ag)"><i></i>Agente</span>
+    </div>
+    <div class="sal"><strong>Resultado</strong>
+      <span style="--c:var(--k-der)"><i></i>Derivar a una persona</span>
+      <span style="--c:var(--k-no)"><i></i>Sin respuesta o fallo</span>
     </div>
   </div>
 
-  <div class="paso" style="--k: var(--k-ag)">
-    <div class="carril"><div class="num">2</div></div>
-    <div class="card">
-      <span class="quien">Agente</span>
-      <h2>Abre el ticket y pide la sugerencia</h2>
-      <p>Pestaña «Sugerencia de IA». Hasta que el agente la pide, la IA no hace nada. Fuera de horario tampoco responde (eso es la fase 2).</p>
-    </div>
-  </div>
+  <div class="lienzo"><!--LIENZO--><svg viewBox="0 0 1520 5358" role="img" aria-label="Flujo completo de la IA de soporte, de que el cliente escribe a que el responsable valida la corrección">
+<defs><marker id="p" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0.5 L10,5 L0,9.5 z" class="punta"/></marker></defs>
+<g class="banda"><rect x="44" y="20" width="1446" height="920" rx="20"/><circle cx="82" cy="58" r="16"/><text x="82" y="64" class="bl">A</text><text x="110" y="64" class="bt">Puertas de entrada</text><text x="316.79999999999995" y="64" class="bs">Antes de gastar nada, el sistema comprueba si procede llamar a la IA</text></g>
+<g class="banda"><rect x="44" y="962" width="1446" height="968" rx="20"/><circle cx="82" cy="1000" r="16"/><text x="82" y="1006" class="bl">B</text><text x="110" y="1006" class="bt">Contexto</text><text x="210.8" y="1006" class="bs">Se reúne en paralelo lo que la IA necesita saber: memoria, fotos y datos del hotel</text></g>
+<g class="banda"><rect x="44" y="1952" width="1446" height="558" rx="20"/><circle cx="82" cy="1990" r="16"/><text x="82" y="1996" class="bl">C</text><text x="110" y="1996" class="bt">Decisión en código</text><text x="316.79999999999995" y="1996" class="bs">Lo claro se fija sin preguntar al modelo; después se compone la instrucción</text></g>
+<g class="banda"><rect x="44" y="2532" width="1446" height="1304" rx="20"/><circle cx="82" cy="2570" r="16"/><text x="82" y="2576" class="bl">D</text><text x="110" y="2576" class="bt">Orden de decisión</text><text x="306.2" y="2576" class="bs">El modelo recorre estos puntos en orden; el primero que encaja manda</text></g>
+<g class="banda"><rect x="44" y="3858" width="1446" height="770" rx="20"/><circle cx="82" cy="3896" r="16"/><text x="82" y="3902" class="bl">E</text><text x="110" y="3902" class="bt">Salida</text><text x="189.6" y="3902" class="bs">Qué se hace con lo que contesta la IA, y cuánto cuesta</text></g>
+<g class="banda"><rect x="44" y="4650" width="1446" height="688" rx="20"/><circle cx="82" cy="4688" r="16"/><text x="82" y="4694" class="bl">F</text><text x="110" y="4694" class="bt">Agente y aprendizaje</text><text x="338" y="4694" class="bs">La persona decide; lo validado vuelve a la memoria y mejora las siguientes</text></g>
+<g class="fl" marker-end="url(#p)"><path d="M640,208 L640,252"/><path d="M640,340 L640,384"/><path d="M830,432 L925,432"/><path d="M640,480 L640,524"/><path d="M830,572 L925,572"/><path d="M640,620 L640,664"/><path d="M830,712 L925,712"/><path d="M640,760 L640,804"/><path d="M830,852 L925,852"/><path d="M640,900 L640,1062"/><path d="M215,1342 L215,1382"/><path d="M640,1314 L640,1354"/><path d="M1175,1266 L1225,1271"/><path d="M1000,1314 L1000,1354"/><path d="M1000,1442 L1000,1482"/><path d="M1175,1530 L1225,1531"/><path d="M1000,1578 L1000,1618"/><path d="M1175,1666 L1225,1668"/><path d="M1000,1714 L1000,1754"/><path marker-end="none" d="M640,1150 L640,1186"/><path marker-end="none" d="M215,1186 L1000,1186"/><path d="M215,1186 L215,1218"/><path d="M640,1186 L640,1218"/><path d="M1000,1186 L1000,1218"/><path marker-end="none" d="M470,1266 L410,1266 L410,1464 L640,1464"/><path marker-end="none" d="M215,1506 L215,1904"/><path marker-end="none" d="M640,1442 L640,1904"/><path marker-end="none" d="M1000,1860 L1000,1904"/><path marker-end="none" d="M215,1904 L1000,1904"/><path d="M640,1904 L640,2052"/><path d="M450,2100 L360,2092"/><path d="M830,2100 L890,2092"/><path marker-end="none" d="M215,2136 L215,2178 L1060,2178"/><path marker-end="none" d="M1060,2136 L1060,2178"/><path d="M640,2148 L640,2218"/><path d="M640,2324 L640,2374"/><path d="M640,2480 L640,2632"/><path d="M860,2689 L920,2689"/><path d="M640,2746 L640,2786"/><path d="M860,2843 L920,2843"/><path d="M640,2900 L640,2972"/><path d="M860,3029 L920,3029"/><path d="M640,3086 L640,3126"/><path d="M860,3183 L920,3183"/><path d="M640,3240 L640,3280"/><path d="M860,3328 L920,3328"/><path d="M640,3376 L640,3416"/><path d="M860,3464 L920,3464"/><path d="M640,3512 L640,3552"/><path d="M860,3600 L920,3600"/><path d="M640,3648 L640,3688"/><path marker-end="none" d="M1350,2689 L1485,2689"/><path marker-end="none" d="M1350,2843 L1485,2843"/><path marker-end="none" d="M1350,3029 L1485,3029"/><path marker-end="none" d="M1350,3183 L1485,3183"/><path marker-end="none" d="M1350,3328 L1485,3328"/><path marker-end="none" d="M1350,3464 L1485,3464"/><path marker-end="none" d="M1350,3600 L1485,3600"/><path marker-end="none" d="M1485,2689 L1485,3816"/><path marker-end="none" d="M640,3776 L640,3816"/><path marker-end="none" d="M1485,3816 L640,3816"/><path d="M640,3816 L640,3958"/><path d="M840,4006 L915,4002"/><path d="M640,4054 L640,4094"/><path d="M840,4142 L915,4138"/><path d="M640,4190 L640,4230"/><path d="M840,4278 L915,4276"/><path d="M640,4326 L640,4366"/><path d="M640,4454 L640,4500"/><path marker-end="none" d="M1325,4002 L1485,4002"/><path marker-end="none" d="M1325,4138 L1485,4138"/><path marker-end="none" d="M1325,4276 L1485,4276"/><path marker-end="none" d="M1485,4002 L1485,4476"/><path marker-end="none" d="M1485,4476 L640,4476"/><path d="M640,4606 L640,4750"/><path marker-end="none" d="M640,4838 L640,4872"/><path marker-end="none" d="M215,4872 L1235,4872"/><path d="M215,4872 L215,4904"/><path d="M555,4872 L555,4904"/><path d="M895,4872 L895,4904"/><path d="M1235,4872 L1235,4904"/><path d="M1235,4992 L1235,5036"/><path d="M1065,5084 L1045,5085"/><path d="M1235,5132 L1235,5174"/><path class="vuelta" style="--k:var(--k-cli)" d="M555,4992 L555,5308 L14,5308 L14,164 L440,164"/><path class="vuelta" style="--k:var(--k-mem)" d="M1085,5218 L38,5218 L38,1280 L70,1280"/></g>
+<g style="--k:var(--k-cli)" class="n"><rect x="440" y="120" width="400" height="88" rx="12"/><text x="640" y="148" class="t">Cliente escribe</text><text x="640" y="170" class="s">correo · WhatsApp · formulario · portal</text><text x="640" y="188" class="s">se crea o se actualiza el ticket</text><circle class="bd" cx="440" cy="120" r="13"/><text x="440" y="124.5" class="b">1</text></g>
+<g style="--k:var(--k-ag)" class="n"><rect x="440" y="252" width="400" height="88" rx="12"/><text x="640" y="280" class="t">El agente pide la sugerencia</text><text x="640" y="302" class="s">abre el ticket y pulsa «Sugerir»</text><text x="640" y="320" class="s">la IA no actúa sola y no envía nada</text><circle class="bd" cx="440" cy="252" r="13"/><text x="440" y="256.5" class="b">2</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,384 830,432 640,480 450,432"/><text x="640" y="427.5" class="s q">¿Asistente encendido y con</text><text x="640" y="445.5" class="s q">la clave del proveedor puesta?</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="925" y="397" width="390" height="70" rx="12"/><text x="1120" y="425" class="t">Sin botón de sugerir</text><text x="1120" y="447" class="s">no sale ningún dato hacia fuera</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,524 830,572 640,620 450,572"/><text x="640" y="567.5" class="s q">¿Ya hay una sugerencia para</text><text x="640" y="585.5" class="s q">el último mensaje del cliente?</text></g>
+<g style="--k:var(--k-mem)" class="n"><rect x="925" y="519" width="390" height="106" rx="12"/><text x="1120" y="547" class="t">Se enseña la que ya estaba</text><text x="1120" y="569" class="s">no se llama a la IA y no gasta</text><text x="1120" y="587" class="s">«Regenerar» salta esta puerta</text><text x="1120" y="605" class="s">→ sigue en el paso 9</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,664 830,712 640,760 450,712"/><text x="640" y="707.5" class="s q">¿Se ha llegado al tope</text><text x="640" y="725.5" class="s q">mensual de gasto? (50 USD)</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="925" y="659" width="390" height="106" rx="12"/><text x="1120" y="687" class="t">Falla con aviso al agente</text><text x="1120" y="709" class="s">«Contesta tú; vuelve el día 1»</text><text x="1120" y="727" class="s">no se llama al proveedor</text><text x="1120" y="745" class="s">→ lo contesta el agente sin IA</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,804 830,852 640,900 450,852"/><text x="640" y="847.5" class="s q">¿El cliente solo ha enviado</text><text x="640" y="865.5" class="s q">audios de WhatsApp?</text></g>
+<g style="--k:var(--k-sys)" class="n"><rect x="925" y="799" width="390" height="106" rx="12"/><text x="1120" y="827" class="t">Texto fijo, sin IA</text><text x="1120" y="849" class="s">«No podemos escuchar audios…»</text><text x="1120" y="867" class="s">no gasta nada</text><text x="1120" y="885" class="s">→ sigue en el paso 9</text></g>
+<g style="--k:var(--k-sys)" class="n"><rect x="420" y="1062" width="440" height="88" rx="12"/><text x="640" y="1090" class="t">Prepara la conversación</text><text x="640" y="1112" class="s">lee los mensajes del cliente y las respuestas del equipo</text><text x="640" y="1130" class="s">(sin notas internas) y localiza la última pregunta</text><circle class="bd" cx="420" cy="1062" r="13"/><text x="420" y="1066.5" class="b">3</text></g>
+<g style="--k:var(--k-mem)" class="n"><rect x="70" y="1218" width="290" height="124" rx="12"/><text x="215" y="1246" class="t">Memoria y guía</text><text x="215" y="1268" class="s">preguntas frecuentes</text><text x="215" y="1286" class="s">respuestas de ejemplo del equipo</text><text x="215" y="1304" class="s">tickets parecidos y manuales</text><text x="215" y="1322" class="s">correcciones validadas</text><circle class="bd" cx="70" cy="1218" r="13"/><text x="70" y="1222.5" class="b">4</text></g>
+<g style="--k:var(--k-mem)" class="n"><rect x="70" y="1382" width="290" height="124" rx="12"/><text x="215" y="1410" class="t">Cómo se limpia</text><text x="215" y="1432" class="s">sin firmas, correos ni teléfonos</text><text x="215" y="1450" class="s">contraseñas tapadas</text><text x="215" y="1468" class="s">lo antiguo se marca ANTIGUO</text><text x="215" y="1486" class="s">(sirve para entender, no copiar)</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,1218 810,1266 640,1314 470,1266"/><text x="640" y="1261.5" class="s q">¿El cliente ha enviado</text><text x="640" y="1279.5" class="s q">fotos?</text><circle class="bd" cx="496" cy="1242" r="13"/><text x="496" y="1246.5" class="b">4</text></g>
+<g style="--k:var(--k-sys)" class="n"><rect x="480" y="1354" width="320" height="88" rx="12"/><text x="640" y="1382" class="t">Lee el código de barras</text><text x="640" y="1404" class="s">en local (la foto no sale)</text><text x="640" y="1422" class="s">saca los códigos de etiqueta</text></g>
+<g style="--k:var(--k-api)" class="n q"><polygon points="1000,1218 1175,1266 1000,1314 825,1266"/><text x="1000" y="1261.5" class="s q">¿AdminHoteles está</text><text x="1000" y="1279.5" class="s q">configurado? (solo lectura)</text><circle class="bd" cx="851" cy="1242" r="13"/><text x="851" y="1246.5" class="b">4</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="1225" y="1236" width="230" height="70" rx="12"/><text x="1340" y="1264" class="t">Sin datos del hotel</text><text x="1340" y="1286" class="s">la IA pregunta por él</text></g>
+<g style="--k:var(--k-api)" class="n"><rect x="825" y="1354" width="350" height="88" rx="12"/><text x="1000" y="1382" class="t">Busca el hotel</text><text x="1000" y="1404" class="s">por el correo del ticket, el nombre en</text><text x="1000" y="1422" class="s">el mensaje o la firma, o los códigos</text></g>
+<g style="--k:var(--k-api)" class="n q"><polygon points="1000,1482 1175,1530 1000,1578 825,1530"/><text x="1000" y="1525.5" class="s q">¿El correo está dado de alta</text><text x="1000" y="1543.5" class="s q">en la aplicación?</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="1225" y="1478" width="230" height="106" rx="12"/><text x="1340" y="1506" class="t">Correo sin verificar</text><text x="1340" y="1528" class="s">no se dan datos de hoteles</text><text x="1340" y="1546" class="s">si el hotel viene nombrado:</text><text x="1340" y="1564" class="s">solo se cuentan las antenas</text></g>
+<g style="--k:var(--k-api)" class="n q"><polygon points="1000,1618 1175,1666 1000,1714 825,1666"/><text x="1000" y="1661.5" class="s q">¿El hotel que dice el cliente</text><text x="1000" y="1679.5" class="s q">coincide con el del correo?</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="1225" y="1624" width="230" height="88" rx="12"/><text x="1340" y="1652" class="t">No coincide</text><text x="1340" y="1674" class="s">se explica con tacto</text><text x="1340" y="1692" class="s">y se deriva a una persona</text></g>
+<g style="--k:var(--k-api)" class="n"><rect x="825" y="1754" width="350" height="106" rx="12"/><text x="1000" y="1782" class="t">Datos del hotel para la IA</text><text x="1000" y="1804" class="s">rol y usuario activo del correo</text><text x="1000" y="1822" class="s">antenas conectadas y desconectadas</text><text x="1000" y="1840" class="s">estado de la etiqueta</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2052 830,2100 640,2148 450,2100"/><text x="640" y="2095.5" class="s q">¿Es un tema de los que</text><text x="640" y="2113.5" class="s q">fija el código?</text></g>
+<g style="--k:var(--k-der)" class="n"><rect x="70" y="2048" width="290" height="88" rx="12"/><text x="215" y="2076" class="t">Derivar, sin preguntar nada</text><text x="215" y="2098" class="s">alérgenos · tótem</text><text x="215" y="2116" class="s">garantía (si no es de farmacia)</text></g>
+<g style="--k:var(--k-cli)" class="n"><rect x="890" y="2048" width="340" height="88" rx="12"/><text x="1060" y="2076" class="t">Pedir hotel y correo</text><text x="1060" y="2098" class="s">problema de uso, primer mensaje,</text><text x="1060" y="2116" class="s">sin hotel ni correo verificado</text></g>
+<g style="--k:var(--k-sys)" class="n"><rect x="390" y="2218" width="500" height="106" rx="12"/><text x="640" y="2246" class="t">Compone la instrucción para la IA</text><text x="640" y="2268" class="s">reglas del equipo + orden de decisión</text><text x="640" y="2286" class="s">+ memoria + datos del hotel + códigos de las fotos</text><text x="640" y="2304" class="s">+ «DECISIÓN YA TOMADA» si el código decidió</text><circle class="bd" cx="390" cy="2218" r="13"/><text x="390" y="2222.5" class="b">5</text></g>
+<g style="--k:var(--k-ai)" class="n ia"><rect x="410" y="2374" width="460" height="106" rx="12"/><text x="640" y="2402" class="t">IA · Claude Haiku 5.5</text><text x="640" y="2424" class="s">recibe la conversación y la instrucción</text><text x="640" y="2442" class="s">aplica el orden de decisión (7 puntos)</text><text x="640" y="2460" class="s">y redacta el borrador</text><circle class="bd" cx="410" cy="2374" r="13"/><text x="410" y="2378.5" class="b">6</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2632 860,2689 640,2746 420,2689"/><text x="640" y="2675.5" class="s q">¿Alérgenos, contenido erróneo en</text><text x="640" y="2693.5" class="s q">las etiquetas, tótem, formación o</text><text x="640" y="2711.5" class="s q">cliente que no es hotel ni tienda?</text><circle class="bd" cx="446" cy="2665" r="13"/><text x="446" y="2669.5" class="b">1</text></g>
+<g style="--k:var(--k-der)" class="n"><rect x="920" y="2645" width="430" height="88" rx="12"/><text x="1135" y="2673" class="t">DERIVAR</text><text x="1135" y="2695" class="s">sin preguntar nada</text><text x="1135" y="2713" class="s">nota «Para el equipo» → Soporte</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2786 860,2843 640,2900 420,2843"/><text x="640" y="2829.5" class="s q">¿Es material o dinero?</text><text x="640" y="2847.5" class="s q">(pedido, presupuesto,</text><text x="640" y="2865.5" class="s q">garantía o cambio de precio)</text><circle class="bd" cx="446" cy="2819" r="13"/><text x="446" y="2823.5" class="b">2</text></g>
+<g style="--k:var(--k-der)" class="n"><rect x="920" y="2754" width="430" height="178" rx="12"/><text x="1135" y="2782" class="t">Según qué sea</text><text x="1135" y="2804" class="s">pedido de material → escribir a postventa</text><text x="1135" y="2822" class="s">   (material, cantidad y foto)</text><text x="1135" y="2840" class="s">presupuesto → «Asignar al departamento de</text><text x="1135" y="2858" class="s">   Pedidos y facturas.»</text><text x="1135" y="2876" class="s">garantía → DERIVAR a Garantías (nunca correo)</text><text x="1135" y="2894" class="s">garantía de farmacia → «lo gestiona Expofarm»</text><text x="1135" y="2912" class="s">cambio de precio en tienda → DERIVAR</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,2972 860,3029 640,3086 420,3029"/><text x="640" y="3015.5" class="s q">¿Lo ejecuta el equipo?</text><text x="640" y="3033.5" class="s q">(rueda de menú, logos, plantillas,</text><text x="640" y="3051.5" class="s q">alta de etiquetas en la plataforma)</text><circle class="bd" cx="446" cy="3005" r="13"/><text x="446" y="3009.5" class="b">3</text></g>
+<g style="--k:var(--k-der)" class="n"><rect x="920" y="2985" width="430" height="88" rx="12"/><text x="1135" y="3013" class="t">DERIVAR</text><text x="1135" y="3035" class="s">si el hotel ya consta no se pide</text><text x="1135" y="3053" class="s">hotel ni correo para derivarlo</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,3126 860,3183 640,3240 420,3183"/><text x="640" y="3169.5" class="s q">¿Lo hace el propio hotel?</text><text x="640" y="3187.5" class="s q">(usuarios, roles y permisos, posiciones,</text><text x="640" y="3205.5" class="s q">«Sin plato», forzar menú, horarios)</text><circle class="bd" cx="446" cy="3159" r="13"/><text x="446" y="3163.5" class="b">4</text></g>
+<g style="--k:var(--k-ag)" class="n"><rect x="920" y="3130" width="430" height="106" rx="12"/><text x="1135" y="3158" class="t">EXPLICAR los pasos</text><text x="1135" y="3180" class="s">Ajustes › Roles, Usuarios, Posiciones…</text><text x="1135" y="3198" class="s">solo con el correo verificado</text><text x="1135" y="3216" class="s">si nadie del hotel puede → DERIVAR</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,3280 860,3328 640,3376 420,3328"/><text x="640" y="3323.5" class="s q">¿Es un problema de uso y no se</text><text x="640" y="3341.5" class="s q">sabe quién escribe?</text><circle class="bd" cx="446" cy="3304" r="13"/><text x="446" y="3308.5" class="b">5</text></g>
+<g style="--k:var(--k-cli)" class="n"><rect x="920" y="3284" width="430" height="88" rx="12"/><text x="1135" y="3312" class="t">PEDIR hotel y correo</text><text x="1135" y="3334" class="s">como máximo esas dos preguntas</text><text x="1135" y="3352" class="s">los demás datos se piden después</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,3416 860,3464 640,3512 420,3464"/><text x="640" y="3459.5" class="s q">¿Hay antenas desconectadas?</text><text x="640" y="3477.5" class="s q">(dato de AdminHoteles)</text><circle class="bd" cx="446" cy="3440" r="13"/><text x="446" y="3444.5" class="b">6</text></g>
+<g style="--k:var(--k-ag)" class="n"><rect x="920" y="3420" width="430" height="88" rx="12"/><text x="1135" y="3448" class="t">Avisar a su personal técnico</text><text x="1135" y="3470" class="s">que lo revise su mantenimiento</text><text x="1135" y="3488" class="s">si ya se le dijo y sigue igual → DERIVAR</text></g>
+<g style="--k:var(--k-sys)" class="n q"><polygon points="640,3552 860,3600 640,3648 420,3600"/><text x="640" y="3595.5" class="s q">¿El contexto trae los pasos</text><text x="640" y="3613.5" class="s q">o la respuesta?</text><circle class="bd" cx="446" cy="3576" r="13"/><text x="446" y="3580.5" class="b">7</text></g>
+<g style="--k:var(--k-ag)" class="n"><rect x="920" y="3556" width="430" height="88" rx="12"/><text x="1135" y="3584" class="t">RESPONDER</text><text x="1135" y="3606" class="s">solo con lo que dice el contexto</text><text x="1135" y="3624" class="s">nunca inventa pasos, datos ni plazos</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="440" y="3688" width="400" height="88" rx="12"/><text x="640" y="3716" class="t">Si no encaja o hay duda</text><text x="640" y="3738" class="s">DERIVAR (o «no sé»: sin borrador)</text><text x="640" y="3756" class="s">es preferible derivar a una respuesta dudosa</text></g>
+<g style="--k:var(--k-ai)" class="n q"><polygon points="640,3958 840,4006 640,4054 440,4006"/><text x="640" y="4001.5" class="s q">¿La respuesta llegó completa</text><text x="640" y="4019.5" class="s q">y el proveedor contestó?</text><circle class="bd" cx="466" cy="3982" r="13"/><text x="466" y="3986.5" class="b">7</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="915" y="3958" width="410" height="88" rx="12"/><text x="1120" y="3986" class="t">No pudo preparar la respuesta</text><text x="1120" y="4008" class="s">botón «Reintentar»</text><text x="1120" y="4026" class="s">si ya se pagó, los tokens se cuentan</text></g>
+<g style="--k:var(--k-ai)" class="n q"><polygon points="640,4094 840,4142 640,4190 440,4142"/><text x="640" y="4137.5" class="s q">¿La IA se atreve a contestar?</text><text x="640" y="4155.5" class="s q">(si no, responde «NO SÉ»)</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="915" y="4094" width="410" height="88" rx="12"/><text x="1120" y="4122" class="t">No sabe: no hay borrador</text><text x="1120" y="4144" class="s">lo debe llevar una persona</text><text x="1120" y="4162" class="s">queda como hueco en Ajustes › Asistente IA</text></g>
+<g style="--k:var(--k-ai)" class="n q"><polygon points="640,4230 840,4278 640,4326 440,4278"/><text x="640" y="4273.5" class="s q">¿Lleva el marcador interno</text><text x="640" y="4291.5" class="s q">[[DERIVAR: categoría | motivo]]?</text></g>
+<g style="--k:var(--k-der)" class="n"><rect x="915" y="4214" width="410" height="124" rx="12"/><text x="1120" y="4242" class="t">Derivar (sugerido)</text><text x="1120" y="4264" class="s">nota «Para el equipo»:</text><text x="1120" y="4282" class="s">«Llévalo a Soporte · Garantías · Pedidos» + motivo</text><text x="1120" y="4300" class="s">más un mensaje para el cliente (opcional)</text><text x="1120" y="4318" class="s">el marcador no se enseña al agente</text></g>
+<g style="--k:var(--k-ag)" class="n"><rect x="430" y="4366" width="420" height="88" rx="12"/><text x="640" y="4394" class="t">Borrador sugerido</text><text x="640" y="4416" class="s">responder · pedir datos · indicar el canal</text><text x="640" y="4434" class="s">se enseña en el panel: no se envía solo</text></g>
+<g style="--k:var(--k-sys)" class="n"><rect x="390" y="4500" width="500" height="106" rx="12"/><text x="640" y="4528" class="t">Se guarda la sugerencia</text><text x="640" y="4550" class="s">con los tokens gastados → coste estimado del mes</text><text x="640" y="4568" class="s">aviso al 80 % y al 100 % del tope (50 USD, mes natural)</text><text x="640" y="4586" class="s">el panel de Ajustes muestra el gasto por día</text><circle class="bd" cx="390" cy="4500" r="13"/><text x="390" y="4504.5" class="b">8</text></g>
+<g style="--k:var(--k-ag)" class="n"><rect x="410" y="4750" width="460" height="88" rx="12"/><text x="640" y="4778" class="t">El agente ve la sugerencia</text><text x="640" y="4800" class="s">lo decide todo él: la IA no envía nada</text><text x="640" y="4818" class="s">también llegan aquí las puertas de A</text><circle class="bd" cx="410" cy="4750" r="13"/><text x="410" y="4754.5" class="b">9</text></g>
+<g style="--k:var(--k-ag)" class="n"><rect x="65" y="4904" width="300" height="88" rx="12"/><g class="ic" transform="translate(186.2,4913) scale(0.8)"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></g><text x="228" y="4932" class="t">Útil</text><text x="215" y="4954" class="s">cuenta para el acierto</text><text x="215" y="4972" class="s">de la IA en el panel</text></g>
+<g style="--k:var(--k-ag)" class="n"><rect x="405" y="4904" width="300" height="88" rx="12"/><g class="ic" transform="translate(475.8,4913) scale(0.8)"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></g><text x="568" y="4932" class="t">Copia y envía él</text><text x="555" y="4954" class="s">lo edita si quiere</text><text x="555" y="4972" class="s">se marca como usada</text></g>
+<g style="--k:var(--k-sys)" class="n"><rect x="745" y="4904" width="300" height="88" rx="12"/><text x="895" y="4932" class="t">Lo contesta sin la IA</text><text x="895" y="4954" class="s">si no hay borrador o no sirve</text><text x="895" y="4972" class="s">el cliente recibe su respuesta</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="1085" y="4904" width="300" height="88" rx="12"/><g class="ic" transform="translate(1189.4,4913) scale(0.8)"><g transform="translate(0,24) scale(1,-1)"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></g></g><text x="1248" y="4932" class="t">No sirve</text><text x="1235" y="4954" class="s">escribe qué estaba mal y</text><text x="1235" y="4972" class="s">cómo había que responder</text></g>
+<g style="--k:var(--k-mem)" class="n q"><polygon points="1235,5036 1405,5084 1235,5132 1065,5084"/><text x="1235" y="5079.5" class="s q">¿Un responsable valida</text><text x="1235" y="5097.5" class="s q">la corrección?</text><circle class="bd" cx="1091" cy="5060" r="14"/><text x="1091" y="5064.5" class="b">10</text></g>
+<g style="--k:var(--k-no)" class="n"><rect x="745" y="5050" width="300" height="70" rx="12"/><text x="895" y="5078" class="t">Se descarta</text><text x="895" y="5100" class="s">no llega nunca a la IA</text></g>
+<g style="--k:var(--k-mem)" class="n"><rect x="1085" y="5174" width="300" height="88" rx="12"/><text x="1235" y="5202" class="t">Entra en la memoria</text><text x="1235" y="5224" class="s">como corrección validada</text><text x="1235" y="5242" class="s">la IA la lee en la próxima consulta</text></g>
+<g class="pill si"><rect x="838" y="411" width="30" height="19" rx="9.5"/><text x="853" y="424.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="489" width="30" height="19" rx="9.5"/><text x="665" y="502.5">No</text></g>
+<g class="pill si"><rect x="838" y="551" width="30" height="19" rx="9.5"/><text x="853" y="564.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="629" width="30" height="19" rx="9.5"/><text x="665" y="642.5">No</text></g>
+<g class="pill si"><rect x="838" y="691" width="30" height="19" rx="9.5"/><text x="853" y="704.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="769" width="30" height="19" rx="9.5"/><text x="665" y="782.5">No</text></g>
+<g class="pill si"><rect x="838" y="831" width="30" height="19" rx="9.5"/><text x="853" y="844.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="909" width="30" height="19" rx="9.5"/><text x="665" y="922.5">No</text></g>
+<g class="pill si"><rect x="650" y="1327" width="30" height="19" rx="9.5"/><text x="665" y="1340.5">Sí</text></g>
+<g class="pill no"><rect x="1183" y="1245" width="30" height="19" rx="9.5"/><text x="1198" y="1258.5">No</text></g>
+<g class="pill si"><rect x="1010" y="1327" width="30" height="19" rx="9.5"/><text x="1025" y="1340.5">Sí</text></g>
+<g class="pill no"><rect x="1183" y="1509" width="30" height="19" rx="9.5"/><text x="1198" y="1522.5">No</text></g>
+<g class="pill si"><rect x="1010" y="1591" width="30" height="19" rx="9.5"/><text x="1025" y="1604.5">Sí</text></g>
+<g class="pill no"><rect x="1183" y="1645" width="30" height="19" rx="9.5"/><text x="1198" y="1658.5">No</text></g>
+<g class="pill si"><rect x="1010" y="1727" width="30" height="19" rx="9.5"/><text x="1025" y="1740.5">Sí</text></g>
+<g class="pill no"><rect x="430" y="1245" width="30" height="19" rx="9.5"/><text x="445" y="1258.5">No</text></g>
+<g class="pill si"><rect x="412" y="2079" width="30" height="19" rx="9.5"/><text x="427" y="2092.5">Sí</text></g>
+<g class="pill si"><rect x="838" y="2079" width="30" height="19" rx="9.5"/><text x="853" y="2092.5">Sí</text></g>
+<text x="654" y="2166" class="et" text-anchor="start">No: decide el modelo</text>
+<text x="654" y="2354" class="et" text-anchor="start">una llamada: se pagan los tokens</text>
+<g class="pill si"><rect x="868" y="2668" width="30" height="19" rx="9.5"/><text x="883" y="2681.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="2765" width="30" height="19" rx="9.5"/><text x="665" y="2778.5">No</text></g>
+<g class="pill si"><rect x="868" y="2822" width="30" height="19" rx="9.5"/><text x="883" y="2835.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="2951" width="30" height="19" rx="9.5"/><text x="665" y="2964.5">No</text></g>
+<g class="pill si"><rect x="868" y="3008" width="30" height="19" rx="9.5"/><text x="883" y="3021.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="3105" width="30" height="19" rx="9.5"/><text x="665" y="3118.5">No</text></g>
+<g class="pill si"><rect x="868" y="3162" width="30" height="19" rx="9.5"/><text x="883" y="3175.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="3259" width="30" height="19" rx="9.5"/><text x="665" y="3272.5">No</text></g>
+<g class="pill si"><rect x="868" y="3307" width="30" height="19" rx="9.5"/><text x="883" y="3320.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="3395" width="30" height="19" rx="9.5"/><text x="665" y="3408.5">No</text></g>
+<g class="pill si"><rect x="868" y="3443" width="30" height="19" rx="9.5"/><text x="883" y="3456.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="3531" width="30" height="19" rx="9.5"/><text x="665" y="3544.5">No</text></g>
+<g class="pill si"><rect x="868" y="3579" width="30" height="19" rx="9.5"/><text x="883" y="3592.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="3657" width="30" height="19" rx="9.5"/><text x="665" y="3670.5">No</text></g>
+<g class="pill no"><rect x="848" y="3985" width="30" height="19" rx="9.5"/><text x="863" y="3998.5">No</text></g>
+<g class="pill si"><rect x="650" y="4067" width="30" height="19" rx="9.5"/><text x="665" y="4080.5">Sí</text></g>
+<g class="pill no"><rect x="848" y="4121" width="30" height="19" rx="9.5"/><text x="863" y="4134.5">No</text></g>
+<g class="pill si"><rect x="650" y="4203" width="30" height="19" rx="9.5"/><text x="665" y="4216.5">Sí</text></g>
+<g class="pill si"><rect x="848" y="4257" width="30" height="19" rx="9.5"/><text x="863" y="4270.5">Sí</text></g>
+<g class="pill no"><rect x="650" y="4339" width="30" height="19" rx="9.5"/><text x="665" y="4352.5">No</text></g>
+<g class="pill no"><rect x="1027" y="5095" width="30" height="19" rx="9.5"/><text x="1042" y="5108.5">No</text></g>
+<g class="pill si"><rect x="1245" y="5145" width="30" height="19" rx="9.5"/><text x="1260" y="5158.5">Sí</text></g>
+<text x="32" y="5296" class="et" text-anchor="start">el cliente contesta → vuelve al paso 1</text>
+<text x="660" y="5206" class="et vu" text-anchor="start">bucle: lo validado vuelve a la memoria</text>
+</svg><span class="ancla" id="cap-a" style="top:0.373%"></span><span class="ancla" id="cap-b" style="top:17.954%"></span><span class="ancla" id="cap-c" style="top:36.432%"></span><span class="ancla" id="cap-d" style="top:47.256%"></span><span class="ancla" id="cap-e" style="top:72.004%"></span><span class="ancla" id="cap-f" style="top:86.786%"></span><!--/LIENZO--></div>
 
-  <div class="paso" style="--k: var(--k-sys)">
-    <div class="carril"><div class="num">3</div></div>
-    <div class="card">
-      <span class="quien">Sistema · sin IA, sin coste</span>
-      <h2>Filtros previos</h2>
-      <ul>
-        <li><div><b>Tope mensual de gasto</b> <span>→ 50 USD al mes (mes natural, se cambia en Ajustes › Asistente IA). Al 80 % y al 100 % el panel avisa; al llegar al tope el botón dice «Contesta tú» y no se llama al proveedor hasta el día 1. Solo cuentan las sugerencias de los agentes: los chats de prueba y las evaluaciones no cortan a nadie.</span></div></li>
-        <li><div><b>Sugerencia ya guardada</b> <span>→ si ya hay una para el último mensaje del cliente se enseña sin gastar; «Regenerar» fuerza otra nueva.</span></div></li>
-        <li><div><b>Solo audios de WhatsApp</b> <span>→ texto fijo: «Lo sentimos, ahora mismo no podemos escuchar este audio…». No se llama a la IA.</span></div></li>
-        <li><div><b>Datos personales</b> <span>→ en la memoria (tickets parecidos y correcciones) se quitan correos, teléfonos y nombres. La conversación del ticket que se está contestando viaja tal cual al proveedor de IA, porque necesita leerla. Las notas internas nunca entran.</span></div></li>
-        <li><div><b>Lectura local del código de barras</b> <span>→ si hay fotos, se leen en el servidor; la foto no sale.</span></div></li>
-      </ul>
-    </div>
-  </div>
+  <section class="detalle" id="detalle">
+    <h2>Detalle de cada capítulo</h2>
+    <p>Lo mismo que muestra el diagrama, con las reglas y los matices de cada paso.</p>
 
-  <div class="paso" style="--k: var(--k-api)">
-    <div class="carril"><div class="num">4</div></div>
-    <div class="card">
-      <span class="quien">AdminHoteles · solo lectura</span>
-      <h2>Consulta quién escribe y cómo está su hotel <span class="etq">API</span></h2>
-      <ul>
-        <li><div><b>¿De qué hotel habla?</b> <span>→ busca los nombres que aparecen en el mensaje o la firma y los localiza en el panel.</span></div></li>
-        <li><div><b>¿El correo figura?</b> <span>→ comprueba el correo contra los usuarios: hotel, buffet, <b>rol</b> y si el usuario está activo. Si no cuadra con el hotel que dice, no revela nada.</span></div></li>
-        <li><div><b>Estado de las antenas</b> <span>→ cuántas hay y cuáles están sin conexión (el estado es el de ahora, no el del día del ticket).</span></div></li>
-        <li><div><b>Etiqueta concreta</b> <span>→ si hay un código, su batería, señal, última actualización y la antena que la sirve.</span></div></li>
-      </ul>
-      <div class="aviso">Si el panel tarda o no contesta, la IA lo sabe y no afirma nada que no haya podido comprobar.</div>
-    </div>
-  </div>
+    <article class="capitulo" id="det-a">
+      <div><h3><i>A</i>Puertas de entrada</h3><p class="res">Qué se comprueba antes de gastar nada.</p></div>
+      <dl>
+        <div><dt>Asistente apagado o sin clave</dt><dd>No aparece el botón y ningún dato sale hacia fuera. Se enciende en Ajustes › Asistente IA.</dd></div>
+        <div><dt>Sugerencia ya guardada</dt><dd>Si ya hay una para el último mensaje del cliente, se enseña sin gastar. «Regenerar» fuerza una nueva.</dd></div>
+        <div><dt>Tope mensual de gasto</dt><dd>50 USD al mes (mes natural; se cambia en Ajustes › Asistente IA). Al 80 % y al 100 % el panel avisa. Al llegar al tope el botón dice «Contesta tú» y no se llama al proveedor hasta el día 1. Solo cuentan las sugerencias de los agentes: los chats de prueba y las evaluaciones no cortan a nadie.</dd></div>
+        <div><dt>Solo audios de WhatsApp</dt><dd>Texto fijo: «Lo sentimos, ahora mismo no podemos escuchar este audio…». No se llama a la IA y no cuesta nada.</dd></div>
+      </dl>
+    </article>
 
-  <div class="paso" style="--k: var(--k-mem)">
-    <div class="carril"><div class="num">5</div></div>
-    <div class="card">
-      <span class="quien">Memoria y documentación</span>
-      <h2>Busca en lo que ya sabemos <span class="etq">RAG</span></h2>
-      <ul>
-        <li><div><b>Preguntas frecuentes</b> <span>publicadas en el portal.</span></div></li>
-        <li><div><b>Tickets resueltos parecidos</b> <span>como patrón, nunca para citar datos de otro cliente. Los antiguos donde el equipo hacía por el cliente lo que hoy hace el hotel salen con aviso «ANTIGUO», y los que entregaban contraseñas no se usan.</span></div></li>
-        <li><div><b>Guía de la aplicación de hoteles y reglas de soporte</b> <span>manuales y documentación (≈ 300 trozos).</span></div></li>
-        <li><div><b>Correcciones validadas</b> <span>lo que los agentes han enseñado con 👎; solo entran las que un responsable valida, más unas pocas «base» guardadas en el repositorio.</span></div></li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="paso" style="--k: var(--k-ai)">
-    <div class="carril"><div class="num">6</div></div>
-    <div class="card">
-      <span class="quien">IA · Claude Haiku 5.5</span>
-      <h2>Redacta con las reglas puestas</h2>
-      <p>Recibe la conversación, lo que dijo AdminHoteles y lo que encontró en la memoria, más las reglas del equipo. Antes de redactar, el sistema <b>fija en código</b> los casos claros (alérgenos, tótems y garantías → derivar; problema de uso sin hotel ni correo en el primer mensaje → pedir solo hotel y correo); el resto lo decide el modelo siguiendo un <b>orden de 7 puntos</b>: derivar sin preguntar · material y dinero · lo que ejecuta el equipo · lo que hace el hotel (explicar) · problema de uso sin hotel · antenas · duda = derivar.</p>
-      <ul>
-        <li><div><b>Siempre se deriva:</b> <span>alérgenos, garantías (sin dar correo: las lleva el responsable en la aplicación), estado de envíos, tótems, dominios, y lo que ejecuta el equipo (rueda de menú de un buffet, logos, plantillas, dar de alta etiquetas nuevas en la plataforma).</span></div></li>
-        <li><div><b>Lo gestiona el hotel, la IA explica cómo:</b> <span>altas de usuarios, permisos y roles (Ajustes &gt; Roles, Usuarios), posiciones, nombres de etiquetas y forzar el menú. Solo se deriva si nadie en el hotel puede.</span></div></li>
-        <li><div><b>Farmacias y precios:</b> <span>garantía de una farmacia → «lo gestiona Expofarm» (sin correo); cambio de precio en tienda → lo hace una persona de soporte.</span></div></li>
-        <li><div><b>Presupuestos:</b> <span>el borrador es «Asignar al departamento de Pedidos y facturas».</span></div></li>
-        <li><div><b>No se deriva, se contesta con el correo:</b> <span>pedidos de material (pilas, soportes, recambios, etiquetas): «escriba a postventa@aemegroup.com con material, cantidad y foto de referencia».</span></div></li>
-        <li><div><b>Verificar primero, explicar después:</b> <span>configurar algo del buffet pide el correo antes de dar los pasos.</span></div></li>
-        <li><div><b>Máximo dos preguntas,</b> <span>sin preguntar lo obvio ni inventar datos.</span></div></li>
-        <li><div><b>Antenas:</b> <span>todas en línea → pregunta y guía a forzar el menú; alguna caída → su personal técnico.</span></div></li>
-        <li><div><b>Nunca inventa:</b> <span>si no está seguro, no contesta («no sé»).</span></div></li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="paso" style="--k: var(--k-sys)">
-    <div class="carril"><div class="num">7</div></div>
-    <div class="card">
-      <span class="quien">Resultado</span>
-      <h2>Una de estas salidas (solo sugerencias: nada se envía al cliente)</h2>
-      <div class="salidas">
-        <div class="salida" style="--c: var(--k-ag)"><b>Borrador de respuesta</b><span>Una respuesta lista para revisar: explica, o pide datos al cliente.</span></div>
-        <div class="salida" style="--c: var(--k-api)"><b>Derivar</b><span>Un mensaje corto para el cliente («hemos registrado la incidencia y el equipo la revisará») y, aparte, un bloque <b>«Para el equipo»</b> en el panel: la categoría de la app a la que llevarlo (Soporte, Garantías o Pedidos y facturas) y el motivo en pocas palabras. Ese bloque lo ve el agente, no el cliente.</span></div>
-        <div class="salida" style="--c: var(--k-no)"><b>No sabe / falla</b><span>No hay borrador: el agente ve «La IA no se atreve» o un aviso con Reintentar.</span></div>
+    <article class="capitulo" id="det-b">
+      <div><h3><i>B</i>Contexto</h3><p class="res">Lo que la IA lee antes de redactar: memoria, fotos y datos del hotel.</p></div>
+      <div>
+        <dl>
+          <div><dt>¿De qué hotel habla? <span class="tag">AdminHoteles</span></dt><dd>Busca los nombres que aparecen en el mensaje o la firma y los localiza en el panel. Todo es de solo lectura.</dd></div>
+          <div><dt>¿El correo figura?</dt><dd>Lo comprueba contra los usuarios: hotel, buffet, <b>rol</b> y si el usuario está activo. Si no cuadra con el hotel que dice, no revela nada.</dd></div>
+          <div><dt>Antenas y etiqueta</dt><dd>Cuántas antenas hay y cuáles están sin conexión (el estado de ahora, no el del día del ticket). Si hay un código de etiqueta: batería, señal, última actualización y la antena que la sirve.</dd></div>
+          <div><dt>Si el panel no contesta</dt><dd>La IA lo sabe y no afirma nada que no haya podido comprobar.</dd></div>
+          <div><dt>Preguntas frecuentes</dt><dd>Las publicadas en el portal.</dd></div>
+          <div><dt>Tickets resueltos parecidos <span class="tag">RAG</span></dt><dd>Como patrón, nunca para citar datos de otro cliente. Los antiguos, donde el equipo hacía por el cliente lo que hoy hace el hotel, salen con el aviso «ANTIGUO». Los que entregaban contraseñas no se usan.</dd></div>
+          <div><dt>Guía y reglas de soporte</dt><dd>Manuales de la aplicación de hoteles y documentación del equipo (unos 300 trozos).</dd></div>
+          <div><dt>Correcciones validadas</dt><dd>Lo que los agentes han enseñado con «No sirve». Solo entran las que un responsable valida, más unas pocas «base» guardadas en el repositorio.</dd></div>
+          <div><dt>Lectura de fotos</dt><dd>Si hay fotos, el código de barras se lee en el servidor: la foto no sale.</dd></div>
+        </dl>
+        <p class="nota"><b>Datos personales.</b> En la memoria se quitan correos, teléfonos, nombres, firmas y avisos legales. La conversación del ticket que se está contestando viaja tal cual al proveedor de IA, porque necesita leerla. Las notas internas nunca entran.</p>
       </div>
-    </div>
-  </div>
+    </article>
 
-  <div class="paso" style="--k: var(--k-ag)">
-    <div class="carril"><div class="num">8</div></div>
-    <div class="card">
-      <span class="quien">Agente</span>
-      <h2>Decide y valora</h2>
-      <ul>
-        <li><div><b>Panel lateral de solo lectura</b> <span>→ va enseñando cada paso al momento (hotel, correo, rol, antenas con su estado, memoria) y deja el borrador. Solo se puede <b>copiar</b>: no se escribe en el editor y la IA nunca envía.</span></div></li>
-        <li><div><b>Útil</b> <span>→ queda anotado para medir el acierto.</span></div></li>
-        <li><div><b>Corregir</b> <span>→ escribe qué debía decir. Se guarda como pendiente (o validada si la hace un responsable).</span></div></li>
-        <li><div><b>Otra sugerencia</b> <span>→ vuelve al paso 6 con la indicación.</span></div></li>
-      </ul>
-    </div>
-  </div>
+    <article class="capitulo" id="det-c">
+      <div><h3><i>C</i>Decisión en código</h3><p class="res">Lo claro no se deja a la suerte del modelo.</p></div>
+      <dl>
+        <div><dt>Siempre derivan</dt><dd>Alérgenos, tótems y garantías (salvo las de farmacia): respuesta corta, sin preguntar nada, y nota «Para el equipo».</dd></div>
+        <div><dt>Piden hotel y correo</dt><dd>Un problema de uso en el primer mensaje, sin hotel ni correo verificado: solo se pregunta eso.</dd></div>
+        <div><dt>El resto</dt><dd>Lo decide el modelo. La instrucción reúne las reglas del equipo, el orden de decisión, la memoria, los datos del hotel y, si el código decidió, «DECISIÓN YA TOMADA».</dd></div>
+      </dl>
+    </article>
 
-  <div class="paso" style="--k: var(--k-mem)">
-    <div class="carril"><div class="num">9</div></div>
-    <div class="card">
-      <span class="quien">Responsable de soporte</span>
-      <h2>Valida las correcciones</h2>
-      <p>Ajustes › Asistente IA. Una corrección no llega a la IA hasta que se valida; las rechazadas tampoco. Las validadas vuelven al paso 5 y mejoran las siguientes sugerencias.</p>
-    </div>
-  </div>
+    <article class="capitulo" id="det-d">
+      <div><h3><i>D</i>Orden de decisión</h3><p class="res">Siete puntos, en este orden. Si dos reglas chocan, gana el orden.</p></div>
+      <dl>
+        <div><dt>Siempre se deriva</dt><dd>Alérgenos, garantías (sin dar correo: las lleva el responsable en la aplicación), estado de envíos, tótems, dominios, y lo que ejecuta el equipo (rueda de menú de un buffet, logos, plantillas, dar de alta etiquetas nuevas en la plataforma).</dd></div>
+        <div><dt>Lo gestiona el hotel</dt><dd>La IA explica cómo: altas de usuarios, permisos y roles (Ajustes › Roles, Usuarios), posiciones, nombres de etiquetas y forzar el menú. Solo se deriva si nadie en el hotel puede.</dd></div>
+        <div><dt>Farmacias y precios</dt><dd>Garantía de una farmacia: «lo gestiona Expofarm», sin correo. Cambio de precio en tienda: lo hace una persona de soporte.</dd></div>
+        <div><dt>Presupuestos</dt><dd>El borrador es «Asignar al departamento de Pedidos y facturas».</dd></div>
+        <div><dt>Se contesta con el correo</dt><dd>Pedidos de material (pilas, soportes, recambios, etiquetas): «escriba a postventa@aemegroup.com con material, cantidad y foto de referencia».</dd></div>
+        <div><dt>Verificar primero</dt><dd>Configurar algo del buffet pide el correo antes de dar los pasos.</dd></div>
+        <div><dt>Antenas</dt><dd>Todas en línea: pregunta y guía a forzar el menú. Alguna caída: que lo revise su personal técnico; si ya se le dijo, se deriva.</dd></div>
+        <div><dt>Máximo dos preguntas</dt><dd>Sin preguntar lo obvio ni inventar datos.</dd></div>
+        <div><dt>Nunca inventa</dt><dd>Si no está seguro, no contesta («no sé») y una persona lo lleva. Es preferible derivar a dar una respuesta dudosa.</dd></div>
+      </dl>
+    </article>
 
-  </details>
+    <article class="capitulo" id="det-e">
+      <div><h3><i>E</i>Salida</h3><p class="res">Solo sugerencias: nada se envía al cliente.</p></div>
+      <dl>
+        <div><dt>Borrador de respuesta</dt><dd>Una respuesta lista para revisar: explica, pide datos o indica el canal.</dd></div>
+        <div><dt>Derivar</dt><dd>Un mensaje corto para el cliente («hemos registrado la incidencia y el equipo la revisará») y, aparte, un bloque <b>«Para el equipo»</b> en el panel: la categoría a la que llevarlo (Soporte, Garantías o Pedidos y facturas) y el motivo. Ese bloque lo ve el agente, no el cliente.</dd></div>
+        <div><dt>No sabe o falla</dt><dd>No hay borrador: el agente ve «La IA no se atreve» o un aviso con «Reintentar». Los huecos quedan anotados en Ajustes para saber qué documentar.</dd></div>
+        <div><dt>Coste</dt><dd>Cada llamada guarda sus tokens. El panel suma el gasto estimado del mes, avisa al 80 % y al 100 % del tope y muestra el gasto por día.</dd></div>
+      </dl>
+    </article>
+
+    <article class="capitulo" id="det-f">
+      <div><h3><i>F</i>Agente y aprendizaje</h3><p class="res">La persona decide; lo validado mejora las siguientes sugerencias.</p></div>
+      <dl>
+        <div><dt>Panel lateral de solo lectura</dt><dd>Enseña cada paso al momento (hotel, correo, rol, antenas, memoria) y deja el borrador. Solo se puede <b>copiar</b>: no se escribe en el editor y la IA nunca envía.</dd></div>
+        <div><dt>Útil</dt><dd>Queda anotado para medir el acierto.</dd></div>
+        <div><dt>No sirve</dt><dd>El agente escribe qué estaba mal y cómo había que responder. Se guarda como pendiente (o validada, si la hace un responsable).</dd></div>
+        <div><dt>Otra sugerencia</dt><dd>Vuelve a pedir a la IA, con la indicación del agente.</dd></div>
+        <div><dt>El responsable valida</dt><dd>En Ajustes › Asistente IA. Una corrección no llega a la IA hasta que se valida; las rechazadas tampoco. Las validadas entran en la memoria.</dd></div>
+      </dl>
+    </article>
+  </section>
+
   <footer>Fase 2 (respuesta automática fuera de horario) todavía no está hecha: usaría este mismo recorrido, con un aviso fijo de que habla una IA y salida a una persona.</footer>
 </div>
+<script src="/ia-flujo.js" defer></script>
 </body>
 </html>
