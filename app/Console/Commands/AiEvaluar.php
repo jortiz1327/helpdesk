@@ -45,15 +45,30 @@ class AiEvaluar extends Command
     }
 
     /**
-     * Lo que hizo la IA, juzgado por el propio modelo (una llamada corta): más fiable que mirar palabras sueltas.
-     * Si el juez falla o no contesta algo válido, se cae a la regla por palabras (clasificar).
-     *
-     * @return array{0:string, 1:int, 2:int} decisión, tokens de entrada, tokens de salida
+     * ¿Derivó la IA? Se lee de las MARCAS que ella misma deja, sin llamar a nadie: «no sé» o fallo (sin borrador) o la línea
+     * interna `[[DERIVAR:categoria|motivo]]` que queda guardada en `sources.derivar`. Null = no hay marca: es un borrador
+     * normal, que hay que clasificar como pedir_info o responder.
      */
-    public static function juzgar(\App\Services\Ai\AiProvider $ai, string $cliente, string $status, ?string $body): array
+    public static function porMarca(string $status, ?string $body, ?string $fuentes = null): ?string
     {
         if ($status !== 'ready' || trim((string) $body) === '') {
-            return ['derivar', 0, 0];   // «no sé» o fallo: nada llega al cliente
+            return 'derivar';
+        }
+        $f = $fuentes ? json_decode($fuentes, true) : null;
+        return is_array($f) && ! empty($f['derivar']) ? 'derivar' : null;
+    }
+
+    /**
+     * Lo que hizo la IA. Primero por la marca (derivar / no sabe, sin gastar nada); solo los borradores sin marca se juzgan por el
+     * propio modelo (una llamada corta, más fiable que mirar palabras sueltas) como pedir_info o responder. Si el juez falla o
+     * no contesta algo válido, se cae a la regla por palabras (clasificar).
+     *
+     * @return array{0:string, 1:int, 2:int, 3:bool} decisión, tokens de entrada, tokens de salida, ¿salió de la marca?
+     */
+    public static function juzgar(\App\Services\Ai\AiProvider $ai, string $cliente, string $status, ?string $body, ?string $fuentes = null): array
+    {
+        if ($marca = self::porMarca($status, $body, $fuentes)) {
+            return [$marca, 0, 0, true];
         }
         $sistema = "Eres un revisor de calidad de un servicio de soporte. Se te da el mensaje de un cliente y el borrador que ha escrito un asistente. "
             . "Clasifica lo que HACE el borrador, con UNA sola palabra:\n"
@@ -66,12 +81,12 @@ class AiEvaluar extends Command
             $palabra = mb_strtolower(trim((string) ($r['text'] ?? '')));
             foreach (['pedir_info', 'responder', 'derivar'] as $d) {
                 if (str_contains($palabra, $d)) {
-                    return [$d, (int) ($r['input_tokens'] ?? 0), (int) ($r['output_tokens'] ?? 0)];
+                    return [$d, (int) ($r['input_tokens'] ?? 0), (int) ($r['output_tokens'] ?? 0), false];
                 }
             }
-            return [self::clasificar($status, $body), (int) ($r['input_tokens'] ?? 0), (int) ($r['output_tokens'] ?? 0)];
+            return [self::clasificar($status, $body), (int) ($r['input_tokens'] ?? 0), (int) ($r['output_tokens'] ?? 0), false];
         } catch (\Throwable $e) {
-            return [self::clasificar($status, $body), 0, 0];
+            return [self::clasificar($status, $body), 0, 0, false];
         }
     }
 
@@ -107,13 +122,17 @@ class AiEvaluar extends Command
         $conf = [];      // casos que la IA puede resolver con lo que tiene (la nota principal)
         $confApi = [];   // casos marcados [API]: dependen de consultar AdminHoteles, que esta prueba no hace
         $in = $out = 0;
+        $porMarca = $sinMarca = 0;   // decisiones tomadas por la marca (sin llamada) / derivaciones que solo el juez vio
         $bar = $this->output->createProgressBar(count($casos));
         foreach ($casos as $c) {
             $esperado = $marcas[$c['id']]['decision'];
             // Los casos [API] se miden CON la consulta real (solo lectura) a AdminHoteles del hotel que nombra el mensaje.
             $conApi = ! $this->option('sin-consulta') && self::necesitaApi($marcas[$c['id']]['comentario'] ?? null);
             $r = $svc->evaluarCaso((string) $c['asunto'], (string) $c['pregunta'], isset($locales[$c['code']]) ? (int) $locales[$c['code']] : null, $ai, $conApi, $c['conversacion'] ?? null);
-            [$obtenido, $jin, $jout] = self::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null);
+            [$obtenido, $jin, $jout, $deMarca] = self::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null, $r['sources'] ?? null);
+            $porMarca += $deMarca ? 1 : 0;
+            // Derivó con palabras pero SIN dejar la marca: la IA se ha saltado la regla de añadir `[[DERIVAR:…]]` (a vigilar).
+            $sinMarca += (! $deMarca && $obtenido === 'derivar') ? 1 : 0;
             // [VERIF] en el comentario: «responder, pero solo tras verificar hotel y correo». Sin correo conocido, que la IA lo pida es acierto.
             if ($esperado === 'responder' && $obtenido === 'pedir_info' && preg_match('/\[\s*VERIF\s*\]/i', (string) ($marcas[$c['id']]['comentario'] ?? ''))) {
                 $esperado = 'pedir_info';
@@ -134,6 +153,7 @@ class AiEvaluar extends Command
         }
         $bar->finish();
         $this->newLine(2);
+        $this->line(sprintf('Decididos por la marca (derivar / no sabe, sin llamada extra): %d de %d · derivaciones SIN marca (solo las vio el juez): %d', $porMarca, count($casos), $sinMarca));
 
         $this->info('— SIN API (la nota principal: casos que la IA puede resolver sin consultar AdminHoteles) —');
         $this->resumen($conf, $in, $out);

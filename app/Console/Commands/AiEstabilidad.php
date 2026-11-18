@@ -47,7 +47,7 @@ class AiEstabilidad extends Command
             $vistas = [];
             for ($i = 0; $i < $veces; $i++) {
                 $r = $svc->evaluarCaso((string) $c['asunto'], (string) $c['pregunta'], isset($locales[$c['code']]) ? (int) $locales[$c['code']] : null, $ai, $conApi, $c['conversacion'] ?? null);
-                [$obt] = AiEvaluar::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null);
+                [$obt] = AiEvaluar::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null, $r['sources'] ?? null);
                 $vistas[] = $obt;
             }
             $esperado = $m['decision'];

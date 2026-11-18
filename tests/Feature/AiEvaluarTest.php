@@ -46,6 +46,26 @@ class AiEvaluarTest extends TestCase
         $this->assertSame('pedir_info', AiEvaluar::juzgar($falla, 'x', 'ready', '¿De qué hotel nos escribe?')[0]);   // cae a la regla
     }
 
+    public function test_derivar_y_no_sabe_se_miden_por_la_marca_sin_llamar_al_juez(): void
+    {
+        $noDebeLlamar = new class implements AiProvider {
+            public function configured(): bool { return true; }
+            public function complete(string $system, array $messages): array { throw new \LogicException('no debía llamarse al juez'); }
+        };
+        $conMarca = json_encode(['faqs' => [], 'derivar' => ['categoria' => 'Garantías', 'motivo' => 'garantía']]);
+        $sinMarca = json_encode(['faqs' => [], 'derivar' => null]);
+
+        // Con la marca [[DERIVAR]]: derivar, aunque el texto parezca otra cosa, sin tokens y sin llamada.
+        $this->assertSame(['derivar', 0, 0, true], AiEvaluar::juzgar($noDebeLlamar, 'x', 'ready', 'Entra en Usuarios y pulsa Guardar.', $conMarca));
+        // «No sé» (sin borrador): derivar por la marca.
+        $this->assertSame(['derivar', 0, 0, true], AiEvaluar::juzgar($noDebeLlamar, 'x', 'abstained', null, $sinMarca));
+        // Borrador sin marca: sigue juzgándose como pedir_info o responder (aquí el juez cae a la regla porque falla).
+        $r = AiEvaluar::juzgar($noDebeLlamar, 'x', 'ready', '¿De qué hotel nos escribe?', $sinMarca);
+        $this->assertSame(['pedir_info', false], [$r[0], $r[3]]);
+        $this->assertNull(AiEvaluar::porMarca('ready', 'Hola', null));
+        $this->assertNull(AiEvaluar::porMarca('ready', 'Hola', 'no es json'));
+    }
+
     public function test_un_caso_no_se_copia_a_si_mismo_ni_guarda_nada(): void
     {
         $fake = new class implements AiProvider {
