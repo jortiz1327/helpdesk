@@ -4507,3 +4507,6 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-hist dl { margin: 6px 0 0; display: grid; gap: 6px; }
 .ai-hist dt { font-weight: 700; font-size: 12px; }
 .ai-hist dd { margin: 0; white-space: pre-wrap; max-width: 80ch; }
+
+/* Aviso de correcciones sin revisar */
+.ai-revisar { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 14px; border-left: 4px solid var(--warn, #d9a21b); background: color-mix(in srgb, var(--warn, #d9a21b) 16%, transparent); }

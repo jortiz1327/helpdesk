@@ -97,6 +97,12 @@ export default function AiSettings() {
         {valoradas > 0 && valoradas < 20 ? <p className="em-desc" style={{ marginTop: 8 }}>Con menos de 20 valoraciones el acierto aún dice poco.</p> : null}
       </div>
 
+      {d.review && d.review.stale > 0 && (
+        <p className="ai-revisar" role="alert">
+          <b>{d.review.stale === 1 ? '1 corrección lleva' : `${d.review.stale} correcciones llevan`} más de {d.review.days} días sin revisar.</b> La IA no las usa hasta que las valides o las rechaces (más abajo, en «Correcciones de los agentes»). La más antigua es del {fmtDate(d.review.oldest)}.
+        </p>
+      )}
+
       {d.budget && <AiBudget b={d.budget} busy={busy} onSave={guardarTope} />}
 
       {d.hotels_api && <AiPanelHoteles p={d.hotels_api} />}

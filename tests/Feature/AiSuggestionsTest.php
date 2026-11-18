@@ -127,6 +127,19 @@ class AiSuggestionsTest extends TestCase
         $this->assertSame(1, app(\App\Services\Ai\AiSuggestionService::class)->historial('down')['total']);
     }
 
+    public function test_avisa_de_las_correcciones_que_llevan_dias_sin_revisar(): void
+    {
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $fila = ['ticket_id' => $tk, 'trigger_message_id' => 0, 'status' => 'ready', 'body' => 'x', 'sources' => '{}', 'rating' => 'down', 'correction' => 'Debía pedir el código.', 'correction_status' => 'pending', 'created_at' => now(), 'updated_at' => now()];
+        DB::table('ai_suggestions')->insert($fila + ['rated_at' => now()->subDays(5)]);
+        DB::table('ai_suggestions')->insert($fila + ['rated_at' => now()->subDay()]);
+        DB::table('ai_suggestions')->insert(['correction_status' => 'validated'] + $fila + ['rated_at' => now()->subDays(9)]);
+        $r = app(\App\Services\Ai\AiSuggestionService::class)->revisionPendiente();
+        $this->assertSame(2, $r['pending']);
+        $this->assertSame(1, $r['stale'], 'solo la de hace 5 días lleva más de 3 sin revisar; la validada no cuenta');
+        $this->assertNotNull($r['oldest']);
+    }
+
     public function test_el_historial_es_solo_para_quien_tiene_support_config(): void
     {
         $this->withHeader('X-App-Token', $this->agente())->getJson('/api/ai_suggestions.php?action=admin_history')->assertForbidden();

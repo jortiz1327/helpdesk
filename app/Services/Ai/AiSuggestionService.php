@@ -148,6 +148,7 @@ class AiSuggestionService
                 ->orderByRaw("a.correction_status = 'pending' DESC")->orderByDesc('a.rated_at')->limit(15)
                 ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.correction_status', 'a.rated_at'])->all(),
             'corrections_pending' => DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->where('correction_status', 'pending')->count(),
+            'review' => $this->revisionPendiente(),
         ];
     }
 
@@ -530,6 +531,20 @@ class AiSuggestionService
         $fila = DB::table('ai_suggestions')->where('id', $id)->first();
         $this->apuntar($fila, 'rating', $userId);
         return $fila;
+    }
+
+    /** Correcciones de agentes que llevan demasiado esperando a que un responsable las valide (aviso en Ajustes, sin correos). */
+    public const DIAS_REVISION = 3;
+
+    public function revisionPendiente(): array
+    {
+        $q = DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->where('correction_status', 'pending');
+        $limite = now()->subDays(self::DIAS_REVISION);
+        $viejas = (clone $q)->where('rated_at', '<', $limite);
+        return [
+            'days' => self::DIAS_REVISION, 'pending' => (clone $q)->count(), 'stale' => (clone $viejas)->count(),
+            'oldest' => (clone $q)->min('rated_at'),
+        ];
     }
 
     /** Historial: cada valoración o revisión queda apuntada (quién, cuándo y qué había sugerido la IA entonces). Nunca se pisa. */
