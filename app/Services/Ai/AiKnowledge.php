@@ -77,11 +77,34 @@ class AiKnowledge
             return null;
         }
 
+        $plano = $respuestas->implode("\n\n");
         return [
             'title'   => mb_substr(Scrub::tapar((string) $t->subject, $nombre), 0, 255),
             'content' => "Pregunta del cliente:\n" . mb_substr($q, 0, 1500) . "\n\nRespuesta del equipo:\n" . mb_substr($r, 0, 2500),
             'quality' => $t->score !== null ? (int) $t->score : null,
+            'desfasado' => Scrub::contrasenas($plano) !== $plano ? 2 : self::desfase($r),
         ];
+    }
+
+    /**
+     * ¿La respuesta del equipo describe algo que hoy hace el propio hotel (alta de usuarios, posiciones y nombres de etiquetas,
+     * permisos)? Entonces el caso solo sirve para entender el problema, no para copiar los pasos. 1 = desfasado, 0 = normal.
+     * No se decide por fecha porque cada hotel pasó a la aplicación nueva en un mes distinto.
+     */
+    public static function desfase(string $respuestaEquipo): int
+    {
+        $verbo = '\b(he|hemos|ya)\s+(te\s+)?';
+        foreach ([
+            '/' . $verbo . '(creado|dado de alta|registrado|a[ñn]adido)\b[^.\n]{0,60}\b(usuario|cuenta|acceso)/iu',
+            '/\b(usuario|cuenta)\b[^.\n]{0,40}\b(creado|creada|dado de alta|dada de alta)\b/iu',
+            '/' . $verbo . '(activado|asignado|vinculado|puesto|cambiado|configurado|modificado)\b[^.\n]{0,60}\b(etiqueta|posici[oó]n|posiciones)/iu',
+            '/' . $verbo . '(ampliado|activado|dado|habilitado|a[ñn]adido|asignado)\b[^.\n]{0,50}\b(permisos?|rol|roles|perfil)/iu',
+        ] as $re) {
+            if (preg_match($re, $respuestaEquipo)) {
+                return 1;
+            }
+        }
+        return 0;
     }
 
     /**
@@ -279,8 +302,11 @@ class AiKnowledge
             // del mensaje (saludos, nombres…): FULLTEXT natural no sabe de plurales. Lo del asunto pesa más.
             [$modo, $consulta] = $tipo === 'manual' && ($b = $this->consultaManual($asunto, $texto)) !== '' ? ['BOOLEAN', $b] : ['NATURAL LANGUAGE', $q];
             $f = DB::table('ai_documents')->where('source_type', $tipo)
-                ->selectRaw("id, source_type, source_id, title, content, quality, MATCH(title, content) AGAINST(? IN $modo MODE) AS score", [$consulta])
+                ->selectRaw("id, source_type, source_id, title, content, quality, desfasado, MATCH(title, content) AGAINST(? IN $modo MODE) AS score", [$consulta])
                 ->whereRaw("MATCH(title, content) AGAINST(? IN $modo MODE)", [$consulta]);
+            if ($tipo === 'ticket') {
+                $f->where('desfasado', '<', 2);   // el equipo daba credenciales: nunca como ejemplo
+            }
             if ($tipo === 'ticket' && $ticketId) {
                 $f->where('source_id', '!=', (string) $ticketId);
             }

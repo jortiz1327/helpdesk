@@ -160,7 +160,7 @@
       <h2>Busca en lo que ya sabemos <span class="etq">RAG</span></h2>
       <ul>
         <li><div><b>Preguntas frecuentes</b> <span>publicadas en el portal.</span></div></li>
-        <li><div><b>Tickets resueltos parecidos</b> <span>como patrón, nunca para citar datos de otro cliente.</span></div></li>
+        <li><div><b>Tickets resueltos parecidos</b> <span>como patrón, nunca para citar datos de otro cliente. Los antiguos donde el equipo hacía por el cliente lo que hoy hace el hotel salen con aviso «ANTIGUO», y los que entregaban contraseñas no se usan.</span></div></li>
         <li><div><b>Guía de la aplicación de hoteles y reglas de soporte</b> <span>manuales y documentación (≈ 300 trozos).</span></div></li>
         <li><div><b>Correcciones validadas</b> <span>lo que los agentes han enseñado con 👎; solo entran las que un responsable valida.</span></div></li>
       </ul>

@@ -976,7 +976,10 @@ class AiSuggestionService
         if ($previos) {
             $s .= "\n\nCASOS ANTERIORES RESUELTOS (úsalos solo si encajan con esta consulta: de ahí sacas el tono del equipo; no copies datos de otros clientes ni mezcles casos distintos. OJO: muchos son de antes de que los hoteles pasaran a la aplicación nueva, cuando solo el equipo podía hacer posiciones, nombres de etiquetas, usuarios o forzar menús; hoy lo hace el propio hotel, así que si un caso antiguo muestra al equipo haciéndolo por el cliente, NO lo imites: el criterio lo dan la guía oficial y las reglas de arriba)\n";
             foreach ($previos as $d) {
-                $s .= '[Caso resuelto: ' . $d->title . "]\n" . mb_substr((string) $d->content, 0, 1400) . "\n\n";
+                $aviso = (int) ($d->desfasado ?? 0) === 1
+                    ? ' · ANTIGUO: el equipo hizo por el cliente algo que hoy hace el propio hotel; sirve para entender el problema, NO copies sus pasos'
+                    : '';
+                $s .= '[Caso resuelto: ' . $d->title . $aviso . "]\n" . mb_substr((string) $d->content, 0, 1400) . "\n\n";
             }
         }
 

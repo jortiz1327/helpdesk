@@ -11,6 +11,7 @@ class Scrub
         $t = (string) preg_replace('/\+?\d[\d .\/-]{6,}\d/', '[tel]', $t);
         // Enlaces con parámetros o muy largos: pueden llevar tokens o identificadores de un cliente.
         $t = (string) preg_replace_callback('#https?://[^\s)>"\]]+#i', fn ($m) => (str_contains($m[0], '?') || strlen($m[0]) > 70) ? '[enlace]' : $m[0], $t);
+        $t = self::contrasenas($t);
         $nombre = trim((string) $nombre);
         if (mb_strlen($nombre) >= 3) {
             $t = str_ireplace($nombre, '[cliente]', $t);
@@ -22,6 +23,25 @@ class Scrub
             }
         }
         return $t;
+    }
+
+    /**
+     * Tapa las contraseñas que el equipo escribía en las respuestas («la contraseña es X»): tras la palabra contraseña/clave/password,
+     * en la misma línea, cualquier palabra de 6 o más caracteres que mezcle letras con cifras o símbolos.
+     */
+    public static function contrasenas(string $texto): string
+    {
+        // Las contraseñas con la forma «PalabraAño» (HotelX@2024), aunque no vayan tras la palabra contraseña.
+        $texto = (string) preg_replace('/(?<![\w.+-])(\[cliente\]|[\p{L}\d]{2,})@(19|20)\d\d\w*/u', '[contraseña]', $texto);
+        return (string) preg_replace_callback(
+            '/(contrase[ñn]a|contra?ssenya|constrase[ñn]a|password|senha|claves?|credenciales|\bpas)([^\n]{0,90})/iu',
+            fn ($m) => $m[1] . preg_replace_callback('/\S{6,}/u', function ($w) {
+                $x = $w[0];
+                $esClave = ! str_contains($x, '/') && ! str_starts_with($x, '[') && preg_match('/\p{L}/u', $x) && preg_match('/[\d@#$%&!*]/', $x);
+                return $esClave ? '[contraseña]' : $x;
+            }, $m[2]),
+            $texto,
+        );
     }
 
     /** HTML de un correo → texto plano. */
