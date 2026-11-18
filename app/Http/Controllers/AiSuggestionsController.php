@@ -39,6 +39,7 @@ class AiSuggestionsController extends Controller
             'used'       => $this->post($request) ?? $this->used($request),
             'admin'      => $this->admin($request),
             'admin_save' => $this->post($request) ?? $this->adminSave($request),
+            'admin_budget' => $this->post($request) ?? $this->adminBudget($request),
             'admin_index' => $this->post($request) ?? $this->adminIndex($request),
             'admin_review' => $this->post($request) ?? $this->adminReview($request),
             default     => response()->json(['ok' => true, 'enabled' => $this->ai->enabled()]),
@@ -60,6 +61,18 @@ class AiSuggestionsController extends Controller
             return response()->json(['ok' => false, 'error' => 'Falta la clave del proveedor de IA en el servidor (.env)'], 422);
         }
         \App\Models\Setting::put('ai_suggestions_enabled', $quiere ? '1' : '0');
+        return response()->json(['ok' => true] + $this->ai->panel());
+    }
+
+    /** Tope mensual de gasto (USD, mes natural). 0 = sin tope. */
+    private function adminBudget(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        $v = $request->input('budget');
+        if (! is_numeric($v) || $v < 0 || $v > 100000) {
+            return response()->json(['ok' => false, 'error' => 'Escribe un importe en dólares entre 0 y 100000'], 422);
+        }
+        \App\Models\Setting::put('ai_budget_month_usd', (string) round((float) $v, 2));
         return response()->json(['ok' => true] + $this->ai->panel());
     }
 
@@ -180,6 +193,8 @@ class AiSuggestionsController extends Controller
             'sources' => json_decode((string) $s->sources, true) ?: ['faqs' => [], 'examples' => []],
             'rating' => $s->rating, 'correction' => $s->correction, 'used' => $s->used_at !== null,
             'model' => $s->model, 'created_at' => $s->created_at,
+            // Solo este motivo se enseña al agente; el resto de errores técnicos no salen del servidor.
+            'limit_reached' => str_starts_with((string) ($s->error ?? ''), 'Se alcanzó el tope mensual'),
         ];
     }
 }

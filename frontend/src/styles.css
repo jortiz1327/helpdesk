@@ -4475,3 +4475,18 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-dest { border-left: 3px solid var(--warn); padding-left: 12px; }
 .ai-dest-t { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; color: var(--ink); }
 .ai-dest-t svg { width: 16px; height: 16px; color: var(--warn); flex: none; }
+
+/* Tope mensual de gasto de la IA */
+.ai-budget-aviso { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; background: color-mix(in srgb, var(--warn, #d9a21b) 16%, transparent); }
+.ai-budget[data-level="over"] .ai-budget-aviso { background: color-mix(in srgb, var(--danger, #d4483b) 16%, transparent); }
+.ai-budget-top { margin-bottom: 6px; }
+.ai-budget-bar { height: 8px; border-radius: 99px; background: color-mix(in srgb, currentColor 12%, transparent); overflow: hidden; }
+.ai-budget-bar i { display: block; height: 100%; background: var(--ok, #2e9b6a); }
+.ai-budget[data-level="warn"] .ai-budget-bar i { background: var(--warn, #d9a21b); }
+.ai-budget[data-level="over"] .ai-budget-bar i { background: var(--danger, #d4483b); }
+.ai-budget-days { display: flex; align-items: flex-end; gap: 3px; height: 48px; margin-top: 10px; }
+.ai-budget-days span { flex: 1; max-width: 18px; height: 100%; display: flex; align-items: flex-end; }
+.ai-budget-days i { display: block; width: 100%; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--accent, #4c6ef5) 70%, transparent); }
+.ai-budget-form { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; flex-wrap: wrap; }
+.ai-budget-form label { display: grid; gap: 4px; font-size: 13px; }
+.ai-budget-form .input { width: 130px; }

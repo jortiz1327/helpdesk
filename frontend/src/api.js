@@ -492,6 +492,9 @@ export const api = {
   aiAdminSave: (enabled) => req('ai_suggestions.php?action=admin_save', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
   }),
+  aiAdminBudget: (budget) => req('ai_suggestions.php?action=admin_budget', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ budget }),
+  }),
   aiAdminIndex: () => req('ai_suggestions.php?action=admin_index', { method: 'POST' }),
   aiAdminReview: (id, status) => req('ai_suggestions.php?action=admin_review', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }),

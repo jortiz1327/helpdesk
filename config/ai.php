@@ -25,6 +25,8 @@ return [
     // Laboratorio de validación (tickets resueltos, sin enviar nada). Solo existe en local; en producción no se enciende.
     'lab'        => (bool) env('AI_LAB', env('APP_ENV') === 'local'),
     'timeout'    => (int) env('AI_TIMEOUT', 30),
+    // Tope mensual de gasto (USD, mes natural) del uso real de los agentes. Se puede cambiar en Ajustes › Asistente IA.
+    'budget_month_usd' => (float) env('AI_BUDGET_MONTH_USD', 50),
 
 
     // Consulta de SOLO LECTURA a la API de soporte del panel de AppHoteles (hotel del cliente, antenas, etiquetas).

@@ -161,8 +161,10 @@ export default function AiSuggestion({ ticketId, onClose }) {
 
           {!cargando && !fallo && s && s.status === 'failed' && (
             <div className="ai-soft" role="alert">
-              <span><b>La IA no pudo preparar una sugerencia.</b> Suele ser un fallo puntual: reintenta, y si sigue igual, respóndelo tú.</span>
-              <button className="btn sm" onClick={() => cargar(true)}>Reintentar</button>
+              {s.limit_reached
+                ? <span><b>La IA ha llegado al tope de gasto de este mes.</b> Respóndelo tú; volverá a sugerir el día 1 (o cuando un responsable suba el tope).</span>
+                : <span><b>La IA no pudo preparar una sugerencia.</b> Suele ser un fallo puntual: reintenta, y si sigue igual, respóndelo tú.</span>}
+              {!s.limit_reached && <button className="btn sm" onClick={() => cargar(true)}>Reintentar</button>}
             </div>
           )}
 

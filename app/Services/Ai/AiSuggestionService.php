@@ -131,6 +131,7 @@ class AiSuggestionService
                 'accuracy' => ($arriba + $abajo) > 0 ? round($arriba / ($arriba + $abajo) * 100) : null,
             ],
             'usage'      => $this->consumo(),
+            'budget'     => $this->presupuesto(),
             'knowledge'  => [
                 'tickets' => DB::table('ai_documents')->where('source_type', 'ticket')->count(),
                 'manuals' => DB::table('ai_documents')->where('source_type', 'manual')->count(),
@@ -147,6 +148,61 @@ class AiSuggestionService
                 ->get(['a.id', 't.code as ticket_code', 'a.correction', 'a.correction_status', 'a.rated_at'])->all(),
             'corrections_pending' => DB::table('ai_suggestions')->where('rating', 'down')->whereNotNull('correction')->where('correction_status', 'pending')->count(),
         ];
+    }
+
+    /** Precio estimado en USD de las filas de una tabla desde una fecha (por modelo). */
+    private function gastoTabla(string $tabla, \Carbon\CarbonInterface $desde): float
+    {
+        $precios = (array) config('ai.prices', []);
+        $coste = 0.0;
+        foreach (DB::table($tabla)->whereNotNull('input_tokens')->where('created_at', '>=', $desde)
+            ->selectRaw('model, SUM(input_tokens) i, SUM(output_tokens) o')->groupBy('model')->get() as $r) {
+            [$pi, $po] = $precios[$r->model] ?? $precios['default'] ?? [0, 0];
+            $coste += $r->i / 1e6 * $pi + $r->o / 1e6 * $po;
+        }
+        return $coste;
+    }
+
+    /** Tope mensual (USD, mes natural) del uso REAL de los agentes. 0 = sin tope. Se cambia en Ajustes. */
+    public function topeMensual(): float
+    {
+        return max(0.0, (float) Setting::get('ai_budget_month_usd', (string) config('ai.budget_month_usd', 50)));
+    }
+
+    /**
+     * Gasto estimado del mes natural en curso frente al tope, y el desglose para el panel. Solo cuentan para el tope
+     * las sugerencias de los agentes; los chats de prueba (/ia) se enseñan aparte.
+     */
+    public function presupuesto(): array
+    {
+        $desde = now()->startOfMonth();
+        $tope = $this->topeMensual();
+        $gasto = $this->gastoTabla('ai_suggestions', $desde);
+        $pct = $tope > 0 ? round($gasto / $tope * 100, 1) : null;
+        $precios = (array) config('ai.prices', []);
+        $dias = [];
+        foreach (DB::table('ai_suggestions')->whereNotNull('input_tokens')->where('created_at', '>=', $desde)
+            ->selectRaw('DATE(created_at) d, model, SUM(input_tokens) i, SUM(output_tokens) o, COUNT(*) n')->groupBy('d', 'model')->orderBy('d')->get() as $r) {
+            [$pi, $po] = $precios[$r->model] ?? $precios['default'] ?? [0, 0];
+            $dias[$r->d] = [
+                'dia' => $r->d, 'cost' => round(($dias[$r->d]['cost'] ?? 0) + $r->i / 1e6 * $pi + $r->o / 1e6 * $po, 4),
+                'calls' => ($dias[$r->d]['calls'] ?? 0) + (int) $r->n,
+            ];
+        }
+        return [
+            'limit' => $tope, 'spent' => round($gasto, 4), 'pct' => $pct,
+            'level' => $tope <= 0 ? 'none' : ($gasto >= $tope ? 'over' : ($gasto >= $tope * 0.8 ? 'warn' : 'ok')),
+            'from' => $desde->toDateString(), 'resets' => now()->startOfMonth()->addMonth()->toDateString(),
+            'days' => array_values($dias),
+            'lab' => round($this->gastoTabla('ai_lab_messages', $desde), 4),
+        ];
+    }
+
+    /** ¿Se ha llegado al tope mensual? Entonces no se llama al proveedor para los agentes. */
+    public function topeAlcanzado(): bool
+    {
+        $tope = $this->topeMensual();
+        return $tope > 0 && $this->gastoTabla('ai_suggestions', now()->startOfMonth()) >= $tope;
     }
 
     /** Tokens y coste ESTIMADO (config ai.prices) de hoy, los últimos 30 días y el total. */
@@ -199,7 +255,15 @@ class AiSuggestionService
 
     private function generate(int $ticketId, int $messageId, ?int $userId, string $modo = 'suggest', ?int $hasta = null): object
     {
-        $fila = $this->redactar($ticketId, $this->ai, false, $hasta) + [
+        if ($this->topeAlcanzado()) {
+            // Sin llamar al proveedor: el agente lo ve como un fallo con el motivo y puede contestar él.
+            $tope = rtrim(rtrim(number_format($this->topeMensual(), 2, '.', ''), '0'), '.');
+            $fila = ['sources' => json_encode(['faqs' => [], 'examples' => [], 'docs' => [], 'traza' => [['paso' => 'tope', 'ok' => false, 'texto' => 'Tope mensual de gasto de la IA alcanzado: no se llama al proveedor']]]),
+                'status' => 'failed', 'body' => null, 'error' => "Se alcanzó el tope mensual de gasto de la IA ($tope USD). Contesta tú; se reactiva el día 1."];
+        } else {
+            $fila = $this->redactar($ticketId, $this->ai, false, $hasta);
+        }
+        $fila += [
             'ticket_id' => $ticketId, 'trigger_message_id' => $messageId, 'mode' => $modo,
             'created_by' => $userId, 'created_at' => now(), 'updated_at' => now(),
         ];

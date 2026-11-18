@@ -62,6 +62,49 @@ class AiSuggestionsTest extends TestCase
         Setting::put('ai_suggestions_enabled', '1');
     }
 
+    private function gastar(float $usd): void
+    {
+        // Con la tarifa de prueba 1 $/M de entrada, 1 M de tokens = 1 $.
+        config(['ai.prices' => ['default' => [1.0, 1.0]]]);
+        $tk = $this->ticket('Gasto previo');
+        DB::table('ai_suggestions')->insert(['ticket_id' => $tk, 'trigger_message_id' => 0, 'status' => 'ready', 'body' => 'x', 'sources' => '{}', 'model' => 'm',
+            'input_tokens' => (int) round($usd * 1e6), 'output_tokens' => 0, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    public function test_con_el_tope_alcanzado_no_se_llama_a_la_ia_y_se_explica(): void
+    {
+        $this->activar();
+        Setting::put('ai_budget_month_usd', '50');
+        $this->gastar(50.0);
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $r = $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertSame(0, $this->fake->llamadas, 'no sale ninguna llamada al proveedor');
+        $this->assertSame('failed', $r->json('suggestion.status'));
+        $this->assertTrue($r->json('suggestion.limit_reached'));
+    }
+
+    public function test_bajo_el_tope_sigue_sugiriendo_y_el_panel_avisa_al_80(): void
+    {
+        $this->activar();
+        Setting::put('ai_budget_month_usd', '50');
+        $this->gastar(41.0);
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $tok = $this->agente();
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertSame(1, $this->fake->llamadas);
+        $b = app(\App\Services\Ai\AiSuggestionService::class)->presupuesto();
+        $this->assertSame('warn', $b['level']);
+        $this->assertSame(50.0, $b['limit']);
+    }
+
+    public function test_tope_cero_es_sin_tope_y_solo_el_responsable_lo_cambia(): void
+    {
+        $this->activar();
+        Setting::put('ai_budget_month_usd', '0');
+        $this->gastar(500.0);
+        $this->assertFalse(app(\App\Services\Ai\AiSuggestionService::class)->topeAlcanzado());
+        $this->withHeader('X-App-Token', $this->agente())->postJson('/api/ai_suggestions.php?action=admin_budget', ['budget' => 10])->assertForbidden();
+    }
     public function test_lee_el_codigo_de_barras_de_la_foto_y_se_lo_da_a_la_ia(): void
     {
         $this->activar();
