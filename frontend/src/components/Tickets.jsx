@@ -2322,6 +2322,20 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                         </div>
                         )}
 
+                        {/* Mensaje de WhatsApp que responde a otro: la cita, como en el móvil. */}
+                        {m.reply_to && (
+                          <div className={'wa-quote' + (m.reply_to.direction === 'out' ? ' out' : '')} title="Responde a este mensaje">
+                            {m.reply_to.id ? (
+                              <>
+                                <b>{m.reply_to.direction === 'out' ? (m.reply_to.author || 'Atención al cliente') : 'Cliente'}</b>
+                                <span>{m.reply_to.preview || ({ image: 'Foto', video: 'Vídeo', audio: 'Audio', document: 'Documento', sticker: 'Sticker' }[m.reply_to.type] || 'Mensaje')}</span>
+                              </>
+                            ) : (
+                              <span className="wa-quote-na">Responde a un mensaje que no tenemos guardado</span>
+                            )}
+                          </div>
+                        )}
+
                         {sinArchivo && (
                           <div className="wa-nofile">
                             <span className="wa-nofile-ic">{(Icon[sinArchivo.icon] || Icon.file)({})}</span>

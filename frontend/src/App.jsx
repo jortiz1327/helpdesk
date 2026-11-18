@@ -120,10 +120,19 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.5.21";
+const APP_VERSION = "1.5.22";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.5.22",
+        date: "13 nov 2026",
+        resumen: "En los chats de WhatsApp se ve a qué mensaje responde cada respuesta citada.",
+        mejoras: [
+            "Cuando el cliente (o el móvil) responde citando un mensaje, encima aparece la cita con el nombre de quién lo escribió y un extracto, como en WhatsApp.",
+            "Si el mensaje citado no está guardado en el helpdesk, se avisa en vez de dejar el texto sin contexto.",
+        ],
+    },
     {
         version: "1.5.21",
         date: "10 nov 2026",

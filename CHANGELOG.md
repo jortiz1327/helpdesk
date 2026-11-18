@@ -3,6 +3,15 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.5.22] — 2026-11-13
+
+### Mejoras
+
+- Chats de WhatsApp: un mensaje que cita a otro (el `context.id` que manda la API, el `wamid` del
+  citado) muestra encima la cita (quién la escribió y un extracto). Si el citado no está guardado
+  se avisa. No hay migración: se lee del `payload` ya guardado, también en los mensajes antiguos
+  (`TicketsController::messagesFor`).
+
 ## [1.5.21] — 2026-11-10
 
 ### Mejoras
