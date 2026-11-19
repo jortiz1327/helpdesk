@@ -120,10 +120,21 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.7.0",
+        date: "19 nov 2026",
+        resumen: "El asistente de IA responde con más criterio y aprovecha las plantillas de respuesta del equipo.",
+        mejoras: [
+            "Si una plantilla de respuesta del equipo encaja con lo que pide el cliente, la IA la usa como base en su sugerencia, adaptada al caso.",
+            "Las instrucciones de la IA se han ordenado y acortado: sigue una sola prioridad y se contradice menos.",
+            "Distingue mejor entre pedir un correo para un presupuesto (se le da el de postventa) y pedir que se lo preparemos (pasa a Pedidos y facturas).",
+            "Aclara qué hace el propio hotel (usuarios, permisos, cambiar etiquetas por otras que ya tiene) y qué hace el equipo.",
+        ],
+    },
     {
         version: "1.6.0",
         date: "18 nov 2026",

@@ -3,6 +3,25 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.7.0] — 2026-11-19
+
+### Mejoras
+
+- Asistente de IA (fase 2, bloque A): las plantillas de respuesta (`canned_responses`) activas se indexan como
+  conocimiento (`ai:indexar --solo=plantillas`; también en la pasada nocturna y en «Actualizar conocimiento»). La IA
+  ve las 2 más parecidas y, si una encaja, la usa casi literal. Se excluyen las de cierre/estado automático, saludos,
+  pruebas, con huecos sin rellenar y las de garantía. No cambian el orden de decisión (si manda derivar, deriva).
+- Prompt reescrito: reglas en `resources/ai/prompt-reglas.md`, una sola prioridad, de 43.000 a 29.500 caracteres,
+  con test de auditoría de contradicciones. Medido sobre 19 casos nuevos (4 repeticiones): 67 % frente a 66 % del
+  prompt anterior (sin mejora medible, sí más corto y coherente).
+- Reglas ajustadas: presupuestos (pedir el correo vs. pedir que lo preparemos), sustituir una etiqueta estropeada por
+  una sobrante y errores de permisos con hotel nombrado (lo hace el hotel; se pide el correo).
+- Sin migraciones.
+
+### Arreglos
+
+- Una concatenación PHP dejaba «'. self::NO_SABE .'» como texto literal en el prompt.
+
 ## [1.6.0] — 2026-11-18
 
 ### Mejoras
