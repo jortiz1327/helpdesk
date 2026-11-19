@@ -27,6 +27,7 @@ const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c
 const FILTROS = [
   { k: 'conj', t: 'Conjunto de casos', ops: [
     ['todos', 'Todos', () => true, ''],
+    ['fase2', 'Fase 2 (para medir el prompt nuevo)', (c) => c.lote === 'fase2', '20 casos reales nuevos del 19-nov (10 correo, 10 WhatsApp). Revísalos SIN ajustar reglas después: sirven para medir el prompt reescrito frente al anterior.'],
     ['seg4', 'Seguimientos 4', (c) => c.lote === 'seg4-20261118', '20 casos nuevos del 18-nov (2.º o 3.º mensaje del cliente). Para MEDIR: revísalos sin ajustar reglas después.'],
     ['seg3', 'Seguimientos 3', (c) => c.lote === 'seg3-20261118', 'Medido el 18-nov (77 %). Ya NO vale para medir: de él salieron las reglas del orden de decisión.'],
     ['seg2', 'Seguimientos 2', (c) => c.lote === 'seg2-20261118', 'Medido el 18-nov (50 %). Ya NO vale para medir: después se cambiaron reglas de material y presupuestos.'],
@@ -194,7 +195,7 @@ function pintarCaso() {
   if (!c) { izq.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
   const pos = casos.indexOf(c) + 1
   $('titulo').textContent = c.asunto || 'Sin asunto'
-  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · ' + (c.lote.startsWith('lote5') ? 'lote 5 (para medir)' : c.lote.startsWith('lote4') ? 'lote 4 (ya usado)' : c.lote.startsWith('lote3') ? 'lote 3' : 'lote 2') : '')
+  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · ' + (c.lote === 'fase2' ? 'FASE 2 (para medir)' : c.lote.startsWith('lote5') ? 'lote 5 (para medir)' : c.lote.startsWith('lote4') ? 'lote 4 (ya usado)' : c.lote.startsWith('lote3') ? 'lote 3' : 'lote 2') : '')
   if (c.historial) izq.append(bloque('hist', 'Antes de este mensaje (solo contexto)', etiquetarHistorial(c.historial), null, null))
   izq.append(bloque('client', c.historial ? 'El cliente escribe ahora' : 'El cliente escribió', c.pregunta, null, 'C'))
   if (c.humana) izq.append(el('div', 'aviso-hum', 'Ojo: puede ser de antes de migrar a la app nueva (entonces solo el equipo podía hacer muchas cosas). Si es así, marca [ANTIGUO] y decide por lo que hoy puede hacer el hotel.'))
