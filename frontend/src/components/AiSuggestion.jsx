@@ -96,12 +96,16 @@ export default function AiSuggestion({ ticketId, onClose }) {
   }
 
   useEffect(() => { cargar(); return () => { seq.current++ } }, [ticketId])   // eslint-disable-line react-hooks/exhaustive-deps
+  // onClose llega como función nueva en cada pintado del padre: si fuera dependencia del efecto, el foco volvería al botón de cerrar
+  // mientras escribes la corrección (y la siguiente tecla Espacio/Intro lo pulsaría). Se guarda en una ref y el efecto corre una sola vez.
+  const alCerrar = useRef(onClose)
+  alCerrar.current = onClose
   useEffect(() => {
     cierre.current?.focus()
-    const h = (e) => { if (e.key === 'Escape') onClose() }
+    const h = (e) => { if (e.key === 'Escape') alCerrar.current() }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
-  }, [onClose])
+  }, [])
 
   const noSabe = s?.status === 'abstained'
   const dest = s?.sources?.derivar || null   // {categoria, motivo}: a quién debe llevarlo una persona del equipo
