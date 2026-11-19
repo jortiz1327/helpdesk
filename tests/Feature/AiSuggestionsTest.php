@@ -304,13 +304,11 @@ class AiSuggestionsTest extends TestCase
         $tk = $this->ticket('Las etiquetas no se actualizan');
         $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
         $p = $this->fake->ultimoSistema;
-        $this->assertStringContainsString('como máximo DOS preguntas por mensaje', $p);   // base del prompt (resources/ai/prompt-soporte.md)
-        $this->assertStringContainsString('como máximo DOS por mensaje', $p);              // línea fija del código
+        $this->assertStringContainsString('Como máximo DOS preguntas por mensaje', $p);
         $this->assertStringContainsString('el correo con el que accede', $p);
-        $this->assertStringContainsString('NUNCA le digas al cliente que existen varios hoteles', $p);
-        $this->assertStringContainsString('NO PREGUNTES LO OBVIO NI LO INVENTADO', $p);   // línea fija
-        $this->assertStringContainsString('No preguntes lo obvio ni lo inventado', $p);   // prompt base
-        $this->assertStringContainsString('SIEMPRE DERIVA a una persona', $p);             // criterios de la revisión de casos
+        $this->assertStringContainsString('nunca digas que hay varios con ese nombre', $p);
+        $this->assertStringContainsString('No preguntes lo obvio ni lo inventado', $p);
+        $this->assertStringContainsString('DERIVA sin preguntar nada', $p);
     }
 
     public function test_un_correo_que_no_esta_en_la_app_no_recibe_datos_de_hoteles(): void

@@ -89,7 +89,29 @@ class AiEvaluarTest extends TestCase
         app(AiSuggestionService::class)->evaluarCaso('Etiqueta', 'Mi etiqueta no cambia', null, $fake);
         $this->assertStringNotContainsString('self::', $fake->sistema);
         $this->assertStringNotContainsString("'. ", $fake->sistema);
-        $this->assertStringContainsString('NO derives ni respondas con [[NO_SABE]]', $fake->sistema);
+        $this->assertStringContainsString('No derives ni contestes [[NO_SABE]]', $fake->sistema);
+    }
+
+    /** Auditoría de contradicciones: se ejecuta con toda la suite, así cada cambio de reglas pasa por aquí. */
+    public function test_auditoria_del_prompt_una_sola_prioridad_y_sin_reglas_repetidas(): void
+    {
+        $base = file_get_contents(resource_path('ai/prompt-soporte.md'));
+        $reglas = file_get_contents(resource_path('ai/prompt-reglas.md'));
+        $todo = $base . "\n" . $reglas;
+
+        // Una única norma que manda: nadie más se declara supremo.
+        $this->assertSame(0, preg_match_all('/prevalece sobre|manda sobre|anula lo que|gana este orden/iu', $todo), 'Hay más de una norma que se declara suprema');
+        $this->assertStringContainsString('ORDEN DE DECISIÓN', $reglas);
+        // Una sola instrucción sobre cómo derivar: nada de proponer otro correo de destino.
+        $this->assertStringNotContainsString('etiquetaselectronicas.com', $todo);
+        // Cada regla grande vive en un único sitio.
+        foreach (['Como máximo DOS preguntas por mensaje', 'PRESUPUESTOS, dos casos', 'GARANTÍAS DE FARMACIAS', 'ACTIVAR una etiqueta en una posición', 'Hemos registrado la incidencia'] as $frase) {
+            $this->assertSame(1, substr_count($todo, $frase), "«{$frase}» debería aparecer una sola vez");
+        }
+        // Presupuesto de postventa y material: las dos frases literales existen una vez.
+        $this->assertSame(1, substr_count($todo, 'EXACTAMENTE «Asignar al departamento de Pedidos y facturas.»'));
+        // Tamaño: sin las reglas el prompt vuelve a engordar sin que nadie lo note.
+        $this->assertLessThan(16000, strlen($todo), 'El prompt fijo ha crecido demasiado: adelgázalo antes de añadir reglas');
     }
 
     public function test_un_caso_no_se_copia_a_si_mismo_ni_guarda_nada(): void
