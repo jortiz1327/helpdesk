@@ -188,7 +188,8 @@ class AiKnowledge
         if (preg_match('/garant|autom[aá]tic|cierre|resuelto|estado|sin contestaci|esperando|saludo|espera|enseguida|trabajando|test/iu', $atajo . ' ' . $titulo)) {
             return true;
         }
-        return (bool) preg_match('/XX|\{\{/u', $cuerpo) || mb_strlen(trim($cuerpo)) < 40;
+        // Con una dirección postal es un envío de etiquetas (garantía): eso lo gestiona una persona.
+        return (bool) preg_match('/XX|\{\{|direcci[oó]n|avenida/iu', $cuerpo) || mb_strlen(trim($cuerpo)) < 40;
     }
 
     /**

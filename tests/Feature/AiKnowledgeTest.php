@@ -130,6 +130,7 @@ class AiKnowledgeTest extends TestCase
         $this->assertTrue(AiKnowledge::plantillaExcluida('garantia-envio', 'Garantía: pedir el envío', str_repeat('Texto largo. ', 10)));
         $this->assertTrue(AiKnowledge::plantillaExcluida('menu-info', 'Pedir datos', 'El día XX de XXXXXX se guardó el menú y hay que revisar el dispositivo.'));
         $this->assertTrue(AiKnowledge::plantillaExcluida('corta', 'Corta', 'Hola'));
+        $this->assertTrue(AiKnowledge::plantillaExcluida('no-funciona', 'No funciona', 'Si la etiqueta no funciona, envíela a la siguiente dirección: Avenida Santos Patronos, 32, Alzira.'));
         $this->assertFalse(AiKnowledge::plantillaExcluida('exportar-menus', 'Cómo exportar la rueda de menús', 'Puedes descargar tu rueda de menús desde la aplicación pulsando Exportar menús.'));
 
         DB::table('canned_responses')->whereIn('shortcut', ['t-exportar', 't-garantia', 't-off'])->delete();
