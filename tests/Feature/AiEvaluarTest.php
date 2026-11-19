@@ -66,6 +66,19 @@ class AiEvaluarTest extends TestCase
         $this->assertNull(AiEvaluar::porMarca('ready', 'Hola', 'no es json'));
     }
 
+    public function test_el_prompt_distingue_pedir_el_correo_de_un_presupuesto_de_pedir_que_lo_preparemos(): void
+    {
+        $fake = new class implements AiProvider {
+            public string $sistema = '';
+            public function configured(): bool { return true; }
+            public function complete(string $system, array $messages): array { $this->sistema = $system; return ['text' => 'Borrador', 'model' => 'f', 'input_tokens' => 1, 'output_tokens' => 1]; }
+        };
+        app(AiSuggestionService::class)->evaluarCaso('Presupuesto', 'Me podéis pasar un correo para pedir presupuestos de etiquetas rotas', null, $fake);
+        $this->assertStringContainsString('El cliente pide EL CORREO, A QUIÉN o DÓNDE pedir un presupuesto', $fake->sistema);
+        $this->assertStringContainsString('escriba a postventa@aemegroup.com', $fake->sistema);
+        $this->assertStringContainsString('EXACTAMENTE «Asignar al departamento de Pedidos y facturas.»', $fake->sistema);
+    }
+
     public function test_un_caso_no_se_copia_a_si_mismo_ni_guarda_nada(): void
     {
         $fake = new class implements AiProvider {
