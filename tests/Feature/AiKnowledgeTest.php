@@ -124,6 +124,43 @@ class AiKnowledgeTest extends TestCase
         $this->assertSame(0, DB::table('ai_documents')->where('source_type', 'correccion')->count());
     }
 
+    public function test_las_plantillas_del_equipo_se_indexan_filtradas_y_se_ofrecen_a_la_ia_cuando_encajan(): void
+    {
+        $this->assertTrue(AiKnowledge::plantillaExcluida('estado-ticket', 'Estado ticket', str_repeat('Texto largo. ', 10)));
+        $this->assertTrue(AiKnowledge::plantillaExcluida('garantia-envio', 'Garantía: pedir el envío', str_repeat('Texto largo. ', 10)));
+        $this->assertTrue(AiKnowledge::plantillaExcluida('menu-info', 'Pedir datos', 'El día XX de XXXXXX se guardó el menú y hay que revisar el dispositivo.'));
+        $this->assertTrue(AiKnowledge::plantillaExcluida('corta', 'Corta', 'Hola'));
+        $this->assertFalse(AiKnowledge::plantillaExcluida('exportar-menus', 'Cómo exportar la rueda de menús', 'Puedes descargar tu rueda de menús desde la aplicación pulsando Exportar menús.'));
+
+        DB::table('canned_responses')->whereIn('shortcut', ['t-exportar', 't-garantia', 't-off'])->delete();
+        $fila = fn ($s, $t, $b, $a = 1) => DB::table('canned_responses')->insert(['shortcut' => $s, 'title' => $t, 'body' => $b, 'active' => $a]);
+        $fila('t-exportar', 'Cómo exportar la rueda de menús', 'Puede descargar su rueda de menús desde la aplicación: entre en Rueda de menús y pulse el botón Exportar menús. Se descargará un Excel.');
+        $fila('t-garantia', 'Garantía de etiqueta defectuosa', 'Para revisar la etiqueta por garantía necesitamos tres fotos de la etiqueta defectuosa y su código.');
+        $fila('t-off', 'Exportar menús desactivada', 'Plantilla desactivada que explica cómo exportar la rueda de menús en un Excel descargable.', 0);
+        $k = new AiKnowledge();
+        $this->assertSame(1, $k->indexarPlantillas());                         // solo la activa y válida
+        $this->assertSame(1, DB::table('ai_documents')->where('source_type', 'plantilla')->count());
+
+        $fake = new class implements AiProvider {
+            public string $sistema = '';
+            public function configured(): bool { return true; }
+            public function complete(string $system, array $messages): array { $this->sistema = $system; return ['text' => 'Borrador', 'model' => 'f', 'input_tokens' => 1, 'output_tokens' => 1]; }
+        };
+        $svc = new AiSuggestionService($fake);
+        $t = $this->ticket('abierto', 'Exportar la rueda de menús', 'Buenas, ¿cómo puedo exportar la rueda de menús a un Excel?', null);
+        $svc->forTicket($t, $this->uid);
+        $this->assertStringContainsString('PLANTILLAS DE RESPUESTA DEL EQUIPO', $fake->sistema);
+        $this->assertStringContainsString('[Plantilla: Cómo exportar la rueda de menús]', $fake->sistema);
+        $this->assertStringContainsString('No cambian el ORDEN DE DECISIÓN', $fake->sistema);
+        $this->assertStringNotContainsString('tres fotos', $fake->sistema);       // la de garantía no se ofrece
+
+        // Si se desactiva, deja de ser conocimiento.
+        DB::table('canned_responses')->where('shortcut', 't-exportar')->update(['active' => 0]);
+        $this->assertSame(0, $k->indexarPlantillas());
+        $this->assertSame(0, DB::table('ai_documents')->where('source_type', 'plantilla')->count());
+        DB::table('canned_responses')->whereIn('shortcut', ['t-exportar', 't-garantia', 't-off'])->delete();
+    }
+
     public function test_la_guia_se_encuentra_por_raiz_de_palabra_y_sin_ruido_del_saludo(): void
     {
         foreach ([['Usuarios', 'Crear y eliminar usuarios: entra en Usuarios, pulsa Eliminar y confirma con tu contraseña.'], ['Wellness: Iconos', 'Gestionar las fuentes tipográficas de iconos y los distintivos de las ofertas wellness.']] as $i => [$tit, $c]) {

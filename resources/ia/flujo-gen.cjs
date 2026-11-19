@@ -117,7 +117,7 @@ arr([prev.b, N.b1.t]);
 const yl = N.b1.y + N.b1.h + 30;
 const yTop = yl + 28;
 
-box('m1', L, yTop, 250, 'mem', '④ Memoria y guía', ['preguntas frecuentes', 'respuestas de ejemplo del equipo', 'casos parecidos y manuales', 'correcciones de los agentes (paso 10)']);
+box('m1', L, yTop, 250, 'mem', '④ Memoria y guía', ['preguntas frecuentes', 'respuestas de ejemplo del equipo', 'plantillas de respuesta del equipo', 'casos parecidos y manuales', 'correcciones de los agentes (paso 10)']);
 box('m2', L, N.m1.y + N.m1.h + IN, 250, 'mem', 'Memoria limpia', ['sin firmas, correos ni teléfonos', 'contraseñas tapadas', 'lo antiguo se marca como ANTIGUO', '(sirve para entender, no para copiar)']);
 arr([N.m1.b, N.m2.t]);
 

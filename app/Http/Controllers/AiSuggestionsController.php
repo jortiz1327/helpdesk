@@ -84,6 +84,7 @@ class AiSuggestionsController extends Controller
         $k = app(\App\Services\Ai\AiKnowledge::class);
         [$nuevos] = $k->indexarTickets();
         $trozos = $k->indexarManuales();
+        $k->indexarPlantillas();
         return response()->json(['ok' => true, 'nuevos' => $nuevos, 'trozos' => $trozos] + $this->ai->panel());
     }
 

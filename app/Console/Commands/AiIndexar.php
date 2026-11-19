@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 class AiIndexar extends Command
 {
     protected $signature = 'ai:indexar
-        {--solo= : tickets, manuales o correcciones (por defecto, todo)}
+        {--solo= : tickets, manuales, correcciones o plantillas (por defecto, todo)}
         {--rehacer : Vuelve a generar lo ya indexado}
         {--limite= : Máximo de tickets nuevos por ejecución}';
 
@@ -23,8 +23,8 @@ class AiIndexar extends Command
     public function handle(AiKnowledge $k): int
     {
         $solo = (string) $this->option('solo');
-        if ($solo !== '' && ! in_array($solo, ['tickets', 'manuales', 'correcciones'], true)) {
-            $this->error('--solo debe ser tickets, manuales o correcciones');
+        if ($solo !== '' && ! in_array($solo, ['tickets', 'manuales', 'correcciones', 'plantillas'], true)) {
+            $this->error('--solo debe ser tickets, manuales, correcciones o plantillas');
             return self::FAILURE;
         }
 
@@ -35,6 +35,9 @@ class AiIndexar extends Command
         if ($solo === '' || $solo === 'correcciones') {
             $this->line('Correcciones de agentes: ' . $k->indexarCorrecciones() . '.');
             $this->line('Correcciones base (del repositorio): ' . $k->importarCorreccionesBase() . '.');
+        }
+        if ($solo === '' || $solo === 'plantillas') {
+            $this->line('Plantillas de respuesta: ' . $k->indexarPlantillas() . '.');
         }
         if ($solo === '' || $solo === 'manuales') {
             $this->line('Manuales: ' . $k->indexarManuales() . ' trozos.');

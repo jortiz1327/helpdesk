@@ -180,6 +180,39 @@ class AiKnowledge
     }
 
     /**
+     * Plantillas que NO sirven como base de una sugerencia: textos de cierre, estado o respuesta automática, saludos y esperas
+     * genéricos, pruebas, las que traen huecos sin rellenar (XX, {{…}}) y las de garantía (la IA las deriva, nunca las gestiona).
+     */
+    public static function plantillaExcluida(string $atajo, string $titulo, string $cuerpo): bool
+    {
+        if (preg_match('/garant|autom[aá]tic|cierre|resuelto|estado|sin contestaci|esperando|saludo|espera|enseguida|trabajando|test/iu', $atajo . ' ' . $titulo)) {
+            return true;
+        }
+        return (bool) preg_match('/XX|\{\{/u', $cuerpo) || mb_strlen(trim($cuerpo)) < 40;
+    }
+
+    /**
+     * Pasa a la base de conocimiento las plantillas de respuesta (canned_responses) activas que valen como base, y retira las que
+     * ya no (desactivadas, borradas o excluidas). La IA las ve como «plantillas del equipo» cuando una encaja con la consulta.
+     */
+    public function indexarPlantillas(): int
+    {
+        $validas = [];
+        foreach (DB::table('canned_responses')->where('active', 1)->get(['id', 'shortcut', 'title', 'body']) as $p) {
+            if (self::plantillaExcluida((string) $p->shortcut, (string) $p->title, (string) $p->body)) {
+                continue;
+            }
+            $validas[] = (string) $p->id;
+            DB::table('ai_documents')->updateOrInsert(
+                ['source_type' => 'plantilla', 'source_id' => (string) $p->id],
+                ['title' => mb_substr((string) $p->title, 0, 255), 'content' => mb_substr(trim((string) $p->body), 0, 2000), 'quality' => null, 'indexed_at' => now()],
+            );
+        }
+        DB::table('ai_documents')->where('source_type', 'plantilla')->whereNotIn('source_id', $validas ?: [''])->delete();
+        return count($validas);
+    }
+
+    /**
      * Correcciones «base»: criterios validados que viajan con el código (resources/ai/correcciones-base.json) para que existan
      * también en producción, donde las correcciones de agentes parten de cero. Idempotente. Si ya había una copia de la misma
      * corrección indexada desde una sugerencia (p. ej. en local), se quita para no duplicarla.
@@ -364,7 +397,7 @@ class AiKnowledge
      * El documento viene sin datos personales. Solo cuentan los que puntúan al menos el 40 % del mejor
      * (y más que config('ai.knowledge_min_score'), 0 por defecto).
      */
-    public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 4, int $nCorrecciones = 2, string $asunto = ''): array
+    public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 4, int $nCorrecciones = 2, string $asunto = '', int $nPlantillas = 2): array
     {
         $q = trim(mb_substr(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $texto), 0, 600));
         if (mb_strlen($q) < 6) {
@@ -392,6 +425,6 @@ class AiKnowledge
                 ->take($n)->values()->all();
         };
 
-        return array_merge($buscar('correccion', $nCorrecciones), $buscar('ticket', $nTickets), $buscar('manual', $nManuales));
+        return array_merge($buscar('correccion', $nCorrecciones), $buscar('plantilla', $nPlantillas), $buscar('ticket', $nTickets), $buscar('manual', $nManuales));
     }
 }

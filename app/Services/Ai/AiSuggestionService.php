@@ -1202,7 +1202,17 @@ class AiSuggestionService
 
         // Las correcciones parecidas (indexadas) van aparte y primero; las que ya salen en «errores anteriores» no se repiten.
         $correcciones = array_values(array_filter($casos, fn ($d) => $d->source_type === 'correccion' && ! in_array((int) $d->source_id, array_column($ejemplos, 'id'), true)));
-        $casos = array_values(array_filter($casos, fn ($d) => $d->source_type !== 'correccion'));
+        $plantillas = array_values(array_filter($casos, fn ($d) => $d->source_type === 'plantilla'));
+        $casos = array_values(array_filter($casos, fn ($d) => ! in_array($d->source_type, ['correccion', 'plantilla'], true)));
+        if ($plantillas) {
+            $s .= "\n\nPLANTILLAS DE RESPUESTA DEL EQUIPO (textos ya redactados que usa el equipo)\n"
+                . "Si una encaja con lo que pide el cliente, úsala como base casi literal: cambia solo lo necesario (de usted, el idioma del cliente, lo que ya sabes de este caso). "
+                . "Si ninguna encaja, ignóralas y redacta tú. No cambian el ORDEN DE DECISIÓN: si el orden manda derivar, deriva aunque haya una plantilla; "
+                . "no des por hecho nada que la plantilla afirme como ya hecho y no copies correos, direcciones ni plazos que las reglas prohíben.\n";
+            foreach ($plantillas as $d) {
+                $s .= '[Plantilla: ' . $d->title . "]\n" . mb_substr((string) $d->content, 0, 1200) . "\n\n";
+            }
+        }
         if ($correcciones) {
             $s .= "\n\nCORRECCIONES DEL EQUIPO A CONSULTAS PARECIDAS (son indicaciones del equipo sobre cómo responder; aplícalas como criterio y redacta con tus palabras, adaptado a este cliente)\n";
             foreach ($correcciones as $d) {
