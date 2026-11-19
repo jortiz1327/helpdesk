@@ -79,6 +79,19 @@ class AiEvaluarTest extends TestCase
         $this->assertStringContainsString('EXACTAMENTE «Asignar al departamento de Pedidos y facturas.»', $fake->sistema);
     }
 
+    public function test_el_prompt_no_lleva_codigo_php_sin_resolver(): void
+    {
+        $fake = new class implements AiProvider {
+            public string $sistema = '';
+            public function configured(): bool { return true; }
+            public function complete(string $system, array $messages): array { $this->sistema = $system; return ['text' => 'Borrador', 'model' => 'f', 'input_tokens' => 1, 'output_tokens' => 1]; }
+        };
+        app(AiSuggestionService::class)->evaluarCaso('Etiqueta', 'Mi etiqueta no cambia', null, $fake);
+        $this->assertStringNotContainsString('self::', $fake->sistema);
+        $this->assertStringNotContainsString("'. ", $fake->sistema);
+        $this->assertStringContainsString('NO derives ni respondas con [[NO_SABE]]', $fake->sistema);
+    }
+
     public function test_un_caso_no_se_copia_a_si_mismo_ni_guarda_nada(): void
     {
         $fake = new class implements AiProvider {
