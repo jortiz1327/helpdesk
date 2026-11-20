@@ -3,6 +3,17 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.3] — 2026-11-22
+
+### Mejoras
+
+- Ticket › Sugerencia de IA: botón «Insertar en la respuesta» (pasa el borrador al editor, lo marca como usado y no envía nada; si ya hay texto, pide confirmación) y sección «En qué se basa» (manuales, tickets parecidos, correcciones y plantillas consultados).
+- Ayuda › Manuales › «Flujo de la IA»: página aparte en pantalla completa (`/flujo-ia`) con el recorrido completo de la IA, burbujas con el detalle de cada nodo y botón fijo «Volver a la app». Solo para agentes: la API da un enlace firmado de 1 h (`ai_flow.php`); sin firma, 403. `node resources/ia/flujo-gen.cjs` regenera también `/ia/flujo` (solo local).
+- Norma de la dirección: en un hotel se verifica SIEMPRE (hotel y correo) antes de contestar, pedir otros datos o derivar (`decidir()` y punto 0 del orden de decisión). Excepciones: pedidos de material, presupuestos, farmacias, tiendas y quien nombra un sitio que no consta en el listado de hoteles (quizá no sea un hotel). Las evaluaciones no la aplican (miden la decisión de fondo).
+- `/ia/flujo` (laboratorio): capítulos contiguos, sin cortes entre bloques.
+- Incluye todo lo de la 1.6.2 (no llegó a desplegarse por separado).
+- Sin migraciones.
+
 ## [1.6.2] — 2026-11-21
 
 ### Mejoras

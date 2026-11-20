@@ -120,10 +120,22 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.6.2";
+const APP_VERSION = "1.6.3";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.6.3",
+        date: "22 nov 2026",
+        resumen: "La sugerencia de IA se inserta en tu respuesta con un clic, te dice en qué se basa y ahora hay una página con el flujo completo de la IA.",
+        mejoras: [
+            "Nuevo botón «Insertar en la respuesta»: pasa la sugerencia al editor con un clic (revísala antes de enviar; si ya habías escrito algo, te pregunta).",
+            "Nuevo apartado «En qué se basa»: ves qué manuales, tickets parecidos y plantillas ha usado la IA, para fiarte o descartarla.",
+            "Ayuda › Manuales › «Flujo de la IA»: página aparte, a pantalla completa, que explica paso a paso cómo piensa la IA. Pasa el ratón por cada recuadro para ver el detalle.",
+            "La IA verifica siempre hotel y correo antes de explicar, pedir otros datos o pasar el caso a una persona (salvo pedidos de material, presupuestos, farmacias y tiendas).",
+            "Si el sitio que nombra el cliente no está en el listado de hoteles, no lo da por hotel: pide el nombre exacto y, si sigue sin constar, lo pasa a una persona.",
+        ],
+    },
     {
         version: "1.6.2",
         date: "21 nov 2026",
