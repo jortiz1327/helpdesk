@@ -402,6 +402,21 @@ class AiSuggestionService
             return ['decision' => 'pedir_datos', 'resumen' => 'pedir hotel y correo',
                 'instruccion' => 'PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas), sin dar pasos, diagnóstico ni derivar.'];
         }
+        // Lo que parece garantía pero lo hace el hotel: sustituir una etiqueta rota por otra que ya tienen (dan su código) y darla de alta
+        // en la posición, o poner pilas nuevas y forzar. Sin pedir envío ni garantía. No se deriva: primero se identifica y luego se explica.
+        $sinEnvio = ! preg_match('/envi|garantia|repuesto|pedido|presupuesto|nuevas etiquetas|comprar/', $t);
+        $reasignar = $sinEnvio && preg_match('/(sustitu|reempla|cambiar).{0,120}(rot[ao]s?|pantalla)|(rot[ao]s?|pantalla).{0,120}(sustitu|reempla)/s', $t) && preg_match('/\balta\b/', $t);
+        $pilasForzar = $sinEnvio && preg_match('/pilas?.{0,60}(forz|actualiz)|(forz|actualiz).{0,60}pilas?/s', $t);
+        if ($reasignar || $pilasForzar) {
+            if (! $yaRespondio && ! $hotelNombrado && $estadoCorreo !== 'verificado') {
+                return ['decision' => 'pedir_datos', 'resumen' => 'pedir hotel y correo (no es garantía)',
+                    'instruccion' => 'PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas), sin dar pasos, diagnóstico ni derivar. NO lo trates como garantía.'];
+            }
+            return ['decision' => 'responder', 'resumen' => 'no es garantía: lo hace el hotel',
+                'instruccion' => $reasignar
+                    ? 'NO es una garantía ni se deriva: sustituir una etiqueta por otra que el hotel ya tiene y darla de alta en la posición lo hace el propio hotel. EXPLICA los pasos de la guía (Posiciones), sin confirmar que ya está hecho.'
+                    : 'NO es una garantía ni se deriva: poner pilas nuevas y forzar la etiqueta lo hace el propio hotel. EXPLICA con la guía el reinicio de la etiqueta y cómo forzar el menú; solo se deriva si ya lo hizo y sigue igual.'];
+        }
         return null;
     }
     /**

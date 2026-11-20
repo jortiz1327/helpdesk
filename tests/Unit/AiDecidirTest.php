@@ -28,6 +28,17 @@ class AiDecidirTest extends TestCase
         $this->assertSame('derivar', AiSuggestionService::decidir('Queremos un tótem nuevo', $this->conv('x'), 'verificado', true)['decision']);
     }
 
+    public function test_sustituir_etiqueta_rota_por_otra_que_ya_tienen_o_pilas_y_forzar_no_es_garantia(): void
+    {
+        $d = AiSuggestionService::decidir('Tenemos que sustituir las etiquetas, se ha roto la pantalla. Se puede dar de alta la siguiente', $this->conv('x'), null, false);
+        $this->assertSame('pedir_datos', $d['decision']);
+        $d = AiSuggestionService::decidir('Le pongo pilas nuevas y me la forzais', $this->conv('x'), 'verificado', true);
+        $this->assertSame('responder', $d['decision']);
+        $this->assertStringNotContainsString('DERIVAR', $d['instruccion']);
+        // Si piden que les enviemos etiquetas, sigue siendo cosa de otra regla.
+        $this->assertNull(AiSuggestionService::decidir('Hay que sustituir una etiqueta con la pantalla rota, envíennos una nueva y denla de alta', $this->conv('x'), null, false));
+    }
+
     public function test_garantia_deriva_pero_la_de_farmacia_la_decide_el_modelo(): void
     {
         $this->assertSame('garantias', explode('|', explode('DERIVAR:', AiSuggestionService::decidir('Queremos la garantía', $this->conv('x'), null, false)['instruccion'])[1])[0]);
