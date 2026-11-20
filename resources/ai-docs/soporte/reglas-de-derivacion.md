@@ -24,7 +24,7 @@ Cuando el cliente pide un cambio o una gestión (permisos de un usuario, program
 
 ## Cambios que ejecuta el equipo: se deriva
 
-Si lo que el cliente pide es que el equipo **haga** algo (cambiar de rueda de menú un buffet, cambiar logos, tipos de letra o plantillas de etiqueta, validar platos), la IA no lo puede hacer ni confirmar que está hecho. Si el hotel no consta, se pregunta el hotel; si ya viene, se deriva sin más preguntas. Nunca se facilitan usuarios ni contraseñas de acceso: es seguridad y lo revisa una persona.
+Si lo que el cliente pide es que el equipo **haga** algo (cambiar de rueda de menú un buffet, cambiar logos, tipos de letra o plantillas de etiqueta, validar platos), la IA no lo puede hacer ni confirmar que está hecho. Si el hotel no consta, se pregunta el hotel; si ya viene, se deriva sin más preguntas. Nunca se facilitan usuarios ni contraseñas de acceso: es seguridad y lo revisa una persona. Si el cliente dice que su usuario o contraseña no funciona, no puede entrar o pide restablecerla, se deriva sin preguntar nada (y sin pedir ni repetir contraseñas).
 
 ## Lo que el hotel hace por sí mismo: se explica cómo
 

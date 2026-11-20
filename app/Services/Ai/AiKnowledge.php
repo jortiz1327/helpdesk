@@ -369,6 +369,40 @@ class AiKnowledge
         return implode(' ', array_map(fn ($r, $fuerte) => ($fuerte ? '>' : '') . $r . '*', array_keys($terminos), $terminos));
     }
 
+    /**
+     * Guías cuyo TÍTULO nombra lo que dice el asunto («no sale el segundo idioma» → la guía «Idiomas»): la búsqueda por texto las
+     * pierde cuando otras guías repiten más la palabra. Hasta 2, el primer trozo de cada una, las de título más corto primero.
+     */
+    private function guiasPorTitulo(string $asunto, array $yaIncluidos): array
+    {
+        $paradas = array_flip(explode(' ', self::PARADAS));
+        $raices = [];
+        foreach (preg_split('/\s+/u', mb_strtolower(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $asunto))) ?: [] as $p) {
+            $p = strtr($p, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+            $l = mb_strlen($p);
+            if ($l < 6 || isset($paradas[$p]) || ctype_digit($p)) {
+                continue;   // palabras cortas dan raíces de 3 letras que casan con cualquier título
+            }
+            $raices[] = mb_substr($p, 0, $l <= 6 ? $l - 2 : $l - 3);
+        }
+        if (! $raices) {
+            return [];
+        }
+        $q = DB::table('ai_documents')->where('source_type', 'manual')->where('source_id', 'like', 'doc:%#1')
+            ->where(function ($w) use ($raices) {
+                foreach (array_slice(array_unique($raices), 0, 8) as $r) {
+                    $w->orWhere('title', 'like', '%' . str_replace(['%', '_'], '', $r) . '%');
+                }
+            });
+        if ($yaIncluidos) {
+            $q->whereNotIn('id', $yaIncluidos);
+        }
+        return $q->orderByRaw('CHAR_LENGTH(title)')->limit(2)->get()->map(function ($d) {
+            $d->score = 0;
+            return $d;
+        })->all();
+    }
+
     /** Párrafos agrupados en trozos de ~TROZO caracteres. */
     private function trocear(string $texto): array
     {
@@ -426,6 +460,11 @@ class AiKnowledge
                 ->take($n)->values()->all();
         };
 
-        return array_merge($buscar('correccion', $nCorrecciones), $buscar('plantilla', $nPlantillas), $buscar('ticket', $nTickets), $buscar('manual', $nManuales));
+        $manuales = $buscar('manual', $nManuales);
+        if ($nManuales > 0) {
+            $manuales = array_merge($this->guiasPorTitulo($asunto, array_column($manuales, 'id')), $manuales);
+        }
+
+        return array_merge($buscar('correccion', $nCorrecciones), $buscar('plantilla', $nPlantillas), $buscar('ticket', $nTickets), $manuales);
     }
 }

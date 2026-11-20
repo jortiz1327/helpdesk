@@ -162,6 +162,20 @@ class AiKnowledgeTest extends TestCase
         DB::table('canned_responses')->whereIn('shortcut', ['t-exportar', 't-garantia', 't-off'])->delete();
     }
 
+    public function test_la_guia_cuyo_titulo_nombra_el_asunto_llega_aunque_otras_repitan_mas_la_palabra(): void
+    {
+        $k = new AiKnowledge();
+        $ins = fn ($id, $titulo, $c) => DB::table('ai_documents')->updateOrInsert(['source_type' => 'manual', 'source_id' => $id], ['title' => $titulo, 'content' => $c, 'quality' => null, 'indexed_at' => now()]);
+        $ins('doc:test/idiomas-x.md#1', 'Idiomas', 'Activa o desactiva cada idioma con el interruptor de Ajustes.');
+        for ($i = 1; $i <= 6; $i++) {
+            $ins("doc:test/otra-$i.md#1", 'Traducciones ' . $i, 'El segundo idioma, el segundo idioma y otra vez el segundo idioma de las etiquetas, segundo idioma siempre. Aparece el idioma, idioma, idioma.');
+        }
+        $r = $k->buscar('no sale el segundo idioma necesito que salga el segundo idioma', null, 0, 3, 0, 'no sale el segundo idioma');
+        $ids = array_map(fn ($d) => $d->source_id, $r);
+        $this->assertContains('doc:test/idiomas-x.md#1', $ids);
+        DB::table('ai_documents')->where('source_id', 'like', 'doc:test/%')->delete();
+    }
+
     public function test_la_guia_se_encuentra_por_raiz_de_palabra_y_sin_ruido_del_saludo(): void
     {
         foreach ([['Usuarios', 'Crear y eliminar usuarios: entra en Usuarios, pulsa Eliminar y confirma con tu contraseña.'], ['Wellness: Iconos', 'Gestionar las fuentes tipográficas de iconos y los distintivos de las ofertas wellness.']] as $i => [$tit, $c]) {
