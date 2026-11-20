@@ -105,9 +105,13 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
   // mientras escribes la corrección (y la siguiente tecla Espacio/Intro lo pulsaría). Se guarda en una ref y el efecto corre una sola vez.
   const alCerrar = useRef(onClose)
   alCerrar.current = onClose
+  const atajo = useRef(null)   // Ctrl/⌘+Intro: guarda la corrección si la estás escribiendo; si no, inserta la respuesta
   useEffect(() => {
     cierre.current?.focus()
-    const h = (e) => { if (e.key === 'Escape') alCerrar.current() }
+    const h = (e) => {
+      if (e.key === 'Escape') alCerrar.current()
+      else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); atajo.current?.() }
+    }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
   }, [])
@@ -143,6 +147,12 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
     setGuardando(false)
     if (r?.ok) { setS(r.suggestion); setCorrigiendo(false); setMotivando(false); toast?.(rating === 'up' ? 'Gracias: anotado' : correction ? 'Corrección guardada: la IA la tendrá en cuenta' : 'Anotado: gracias') }
     else toast?.(r?.error || 'No se pudo guardar la valoración', 'err')
+  }
+
+  atajo.current = () => {
+    if (!s || guardando) return
+    if (corrigiendo) { if (texto.trim().length >= 5) valorar('down', texto) }
+    else if (!motivando && !cargando && !noSabe && s.status !== 'failed' && onInsert) insertar()
   }
 
   return (
@@ -201,7 +211,7 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
                   <h3>{noSabe ? 'La IA no se atreve' : dest ? 'Mensaje para el cliente (si quieres avisarle)' : 'Respuesta preparada'}{tipo && !noSabe ? <span className="ai-sub"> · {tipo}</span> : null}</h3>
                   {!noSabe && (
                     <div className="ai-act">
-                      {onInsert && <button className="btn sm primary" onClick={insertar}><Icon.pencil aria-hidden="true" /> Insertar en la respuesta</button>}
+                      {onInsert && <button className="btn sm primary" onClick={insertar}><Icon.pencil aria-hidden="true" /> Insertar en la respuesta <kbd className="ai-kbd" aria-hidden="true">Ctrl+↵</kbd></button>}
                       <button className={`btn sm ${onInsert ? '' : 'primary'}`} onClick={copiar}>{copiado ? <><Icon.check aria-hidden="true" /> Copiado</> : <><Icon.copy aria-hidden="true" /> Copiar</>}</button>
                     </div>
                   )}
@@ -241,7 +251,7 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
                     <textarea id={`aifix-${s.id}`} rows={4} value={texto} onChange={(e) => setTexto(e.target.value)} autoFocus
                       placeholder="Ej.: es ambiguo; para cambiar platos en un hotel se hace desde Posiciones, indícaselo paso a paso." />
                     <div className="ai-act">
-                      <button className="btn sm primary" disabled={guardando || texto.trim().length < 5} onClick={() => valorar('down', texto)}>Guardar corrección</button>
+                      <button className="btn sm primary" disabled={guardando || texto.trim().length < 5} onClick={() => valorar('down', texto)}>Guardar corrección <kbd className="ai-kbd" aria-hidden="true">Ctrl+↵</kbd></button>
                       <button className="btn sm ghost" onClick={() => setCorrigiendo(false)}>Cancelar</button>
                     </div>
                   </div>
