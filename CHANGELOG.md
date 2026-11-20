@@ -3,6 +3,22 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.2] — 2026-11-21
+
+### Mejoras
+
+- Asistente de IA (fase 2, bloque A, cierre): reinicio de pilas antes de derivar una etiqueta bloqueada o que no cambia;
+  la garantía solo cuando piden que sustituyamos o enviemos etiquetas. En código (`decidir()`): sustituir una etiqueta rota
+  por otra que ya tienen y darla de alta, y poner pilas nuevas y forzar, no son garantía (se piden hotel y correo y se explica).
+- Antenas: se revisa su estado antes de decidir; nunca se deriva solo por urgencia o por el número de clientes afectados.
+- Cambio de menú por fecha y de buffet estándar a premium: lo hace el hotel. Etiquetas con luces de colores incompletas: se derivan.
+- Alérgenos: qué alérgenos se muestran es configuración del hotel (la IA lo explica); lo de un plato concreto sigue derivándose.
+- Informe semanal de correcciones: no suponer que el cliente es un hotel; no presentarse más allá del saludo; si el correo
+  no figura, el nombre del dominio de empresa sirve como pista sin confirmar para preguntar por el hotel (nunca como verificación).
+- Documentación: farmacias, dos productos en una misma etiqueta (solo 4,2" y 7,5"); alérgenos separados en configuración y contenido.
+- `ai:prerrellenar` decide solo por lo que pide el cliente y los criterios (sin la respuesta del equipo) y usa los ejemplos más recientes.
+- Medido en un lote limpio (7 casos, 4 repeticiones): 82 % (23/28) frente a 57 % (16/28) del prompt de 1.6.0.
+- Sin migraciones.
 ## [1.6.1] — 2026-11-20
 
 ### Mejoras

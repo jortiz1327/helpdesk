@@ -120,10 +120,24 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.6.2";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
+    {
+        version: "1.6.2",
+        date: "21 nov 2026",
+        resumen: "El asistente de IA se equivoca menos al decidir cuándo pedir datos, cuándo explicar y cuándo pasar el caso a una persona.",
+        mejoras: [
+            "Cuando una etiqueta no cambia o se bloquea, primero propone el reinicio de las pilas, y solo pasa el caso a una persona si el cliente ya lo hizo y sigue igual.",
+            "Cambiar una etiqueta rota por otra que el hotel ya tiene, o poner pilas nuevas y forzar, ya no se trata como garantía: pide hotel y correo y lo explica.",
+            "Con problemas de antenas revisa su estado antes de decidir, y ya no deriva solo porque el cliente diga que son muchos o que es urgente.",
+            "Sabe que cambiar de menú por fecha (por ejemplo, pasar al menú de invierno) o de buffet estándar a premium lo hace el propio hotel.",
+            "Alérgenos: explica cómo activar o desactivar los que se muestran, y sigue pasando a una persona cualquier duda sobre lo que lleva un plato.",
+            "No da por hecho que el cliente es un hotel, no se presenta de más y, si el correo no consta, puede orientarse por el nombre del dominio para preguntar «¿se refiere a…?».",
+            "Sabe explicar por qué una farmacia no puede mostrar dos productos en una misma etiqueta pequeña.",
+        ],
+    },
     {
         version: "1.6.1",
         date: "20 nov 2026",
