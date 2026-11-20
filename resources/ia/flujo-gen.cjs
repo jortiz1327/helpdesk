@@ -269,8 +269,11 @@ const H = bottomF + 16;
 
 /* ---------- bandas de capítulo (detrás de todo) ---------- */
 const bandas = secciones.map((s, i) => {
-  const fin = i < secciones.length - 1 ? secciones[i + 1].y - 18 : bottomF;
-  return `<g class="banda"><rect x="40" y="${s.y}" width="${W - 70}" height="${fin - s.y}" rx="18"/><circle cx="72" cy="${s.y + 32}" r="15"/><text x="72" y="${s.y + 37.5}" class="bl">${s.letra}</text><text x="98" y="${s.y + 31}" class="bt">${esc(s.titulo)}</text><text x="98" y="${s.y + 52}" class="bs">${esc(s.desc)}</text></g>`;
+  // Bandas contiguas (sin hueco): las flechas que bajan de un capítulo al siguiente ya no se cortan. Solo se redondean las esquinas de fuera.
+  const ultima = i === secciones.length - 1, fin = ultima ? bottomF : secciones[i + 1].y;
+  const x0 = 40, x1 = W - 30, r = 18, rt = i === 0 ? r : 0, rb = ultima ? r : 0;
+  const d = `M${x0 + rt} ${s.y}H${x1 - rt}` + (rt ? `Q${x1} ${s.y} ${x1} ${s.y + rt}` : "") + `V${fin - rb}` + (rb ? `Q${x1} ${fin} ${x1 - rb} ${fin}` : "") + `H${x0 + rb}` + (rb ? `Q${x0} ${fin} ${x0} ${fin - rb}` : "") + `V${s.y + rt}` + (rt ? `Q${x0} ${s.y} ${x0 + rt} ${s.y}` : "") + "Z";
+  return `<g class="banda"><path d="${d}"/>${i > 0 ? `<line class="sep" x1="${x0 + 24}" x2="${x1 - 24}" y1="${s.y}" y2="${s.y}"/>` : ""}<circle cx="72" cy="${s.y + 32}" r="15"/><text x="72" y="${s.y + 37.5}" class="bl">${s.letra}</text><text x="98" y="${s.y + 31}" class="bt">${esc(s.titulo)}</text><text x="98" y="${s.y + 52}" class="bs">${esc(s.desc)}</text></g>`;
 }).join('\n');
 
 const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Flujo completo de la IA de soporte, de que el cliente escribe a que la corrección del agente pasa a la memoria">
