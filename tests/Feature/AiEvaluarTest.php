@@ -102,6 +102,8 @@ class AiEvaluarTest extends TestCase
         // Una única norma que manda: nadie más se declara supremo.
         $this->assertSame(0, preg_match_all('/prevalece sobre|manda sobre|anula lo que|gana este orden/iu', $todo), 'Hay más de una norma que se declara suprema');
         $this->assertStringContainsString('ORDEN DE DECISIÓN', $reglas);
+        // Las garantías se derivan sin preguntar desde el primer punto del orden (al reescribir el prompt se perdió y bajó el acierto).
+        $this->assertStringContainsString('DERIVA sin preguntar nada: garantías', $reglas);
         // Una sola instrucción sobre cómo derivar: nada de proponer otro correo de destino.
         $this->assertStringNotContainsString('etiquetaselectronicas.com', $todo);
         // Cada regla grande vive en un único sitio.
