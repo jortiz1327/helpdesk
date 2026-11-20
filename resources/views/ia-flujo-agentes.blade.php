@@ -149,6 +149,28 @@
   .tip li::before { content: ""; position: absolute; left: 2px; top: .55em; width: 6px; height: 6px; border-radius: 50%; background: var(--k, var(--accent)); }
   @media (prefers-reduced-motion: reduce) { .tip { transition: none; } }
   .pista { font-size: 13.5px; color: var(--muted); margin: 0 0 10px; }
+  /* Pantalla completa */
+  .pant { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    font: 900 13px/1 'Lato', sans-serif; cursor: pointer; transition: transform .16s cubic-bezier(.23,1,.32,1), background .15s; }
+  .pant:hover { background: var(--band); } .pant:active { transform: scale(.97); }
+  .pant svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .pant .out { display: none; } .pant[aria-pressed="true"] .in { display: none; } .pant[aria-pressed="true"] .out { display: inline; }
+  .modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .modal[hidden] { display: none; }
+  .modal-c { width: min(440px, 100%); padding: 32px 30px 26px; border-radius: 22px; background: var(--surface); border: 1px solid var(--line); text-align: center;
+    box-shadow: 0 2px 4px rgb(0 0 0 / .08), 0 40px 90px -20px rgb(0 0 0 / .55); animation: modal-in .32s cubic-bezier(.16,1,.3,1) both; }
+  .modal-c > svg { width: 38px; height: 38px; stroke: var(--accent); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .modal-c h2 { margin: 14px 0 8px; font: 900 24px/1.15 'Lato', sans-serif; letter-spacing: -0.02em; }
+  .modal-c p { margin: 0 0 22px; color: var(--ink2); font-size: 15.5px; line-height: 1.5; }
+  .modal-c kbd { font: 900 12.5px 'Lato', sans-serif; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--band); }
+  .modal-b { display: grid; gap: 8px; }
+  .modal-b button { height: 46px; border-radius: 99px; font: 900 15px/1 'Lato', sans-serif; cursor: pointer; border: 0; transition: transform .16s cubic-bezier(.23,1,.32,1); }
+  .modal-b button:active { transform: scale(.98); }
+  .b-prim { background: var(--ink); color: var(--bg); } .b-sec { background: transparent; color: var(--muted); }
+  @keyframes modal-in { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .modal-c { animation: none; } }
+  @media (max-width: 560px) { .pant span { display: none; } .pant { padding: 0 11px; } }
+  @media print { .modal, .pant { display: none !important; } }
 </style>
 </head>
 <body>
@@ -162,8 +184,19 @@
     <a href="#cap-e"><i>E</i>Salida</a>
     <a href="#cap-f"><i>F</i>Aprendizaje</a>
   </nav>
-  <span class="marca">Flujo de la IA</span>
+  <button type="button" class="pant" id="pant" hidden aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="in" d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/><path class="out" d="M3 8h3a2 2 0 0 0 2-2V3M16 3v3a2 2 0 0 0 2 2h3M21 16h-3a2 2 0 0 0-2 2v3M8 21v-3a2 2 0 0 0-2-2H3"/></svg><span>Pantalla completa</span></button>
 </header>
+<div class="modal" id="modal-pant" role="dialog" aria-modal="true" aria-labelledby="modal-t" hidden>
+  <div class="modal-c">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+    <h2 id="modal-t">Mejor en pantalla completa</h2>
+    <p>El recorrido tiene muchos pasos y se ve mejor con todo el espacio. Con <kbd>Esc</kbd> sales cuando quieras.</p>
+    <div class="modal-b">
+      <button type="button" class="b-prim" id="modal-si">Ver en pantalla completa</button>
+      <button type="button" class="b-sec" id="modal-no">Ahora no</button>
+    </div>
+  </div>
+</div>
 <main class="wrap">
   <section class="hero">
     <div>

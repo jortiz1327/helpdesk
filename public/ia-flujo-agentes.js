@@ -50,3 +50,35 @@
   addEventListener('keydown', function (e) { if (e.key === 'Escape') ocultar(); });
   document.addEventListener('click', function (e) { if (fijo && !nodo(e) && !tip.contains(e.target)) ocultar(); });
 })();
+
+// Pantalla completa (API del navegador: hace falta un gesto del usuario, por eso el aviso con botón). Esc la cierra.
+(function () {
+  var el = document.documentElement;
+  var pedir = el.requestFullscreen || el.webkitRequestFullscreen;
+  var salir = document.exitFullscreen || document.webkitExitFullscreen;
+  var btn = document.getElementById('pant'), modal = document.getElementById('modal-pant');
+  if (!pedir || !btn) return;   // sin soporte (p. ej. iPhone): se queda la página normal
+  function activa() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function entrar() { try { var p = pedir.call(el); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+  function sale() { try { var p = salir.call(document); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+  function pinta() {
+    var on = activa();
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.querySelector('span').textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa';
+  }
+  btn.hidden = false;
+  btn.addEventListener('click', function () { activa() ? sale() : entrar(); });
+  document.addEventListener('fullscreenchange', pinta); document.addEventListener('webkitfullscreenchange', pinta);
+  function cierra() { modal.hidden = true; try { sessionStorage.setItem('flujo-pant', '1'); } catch (e) {} btn.focus(); }
+  var visto = false; try { visto = sessionStorage.getItem('flujo-pant') === '1'; } catch (e) {}
+  if (!activa() && !visto) {
+    modal.hidden = false;
+    var si = document.getElementById('modal-si'); si.focus();
+    si.addEventListener('click', function () { entrar(); cierra(); });
+    document.getElementById('modal-no').addEventListener('click', cierra);
+    addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) cierra(); });
+  }
+  // «Volver a la app» desde pantalla completa: primero se sale de ella.
+  var v = document.getElementById('volver');
+  if (v) v.addEventListener('click', function () { if (activa()) sale(); }, true);
+})();
