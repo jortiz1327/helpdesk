@@ -19,7 +19,7 @@ class AiPrerrellenar extends Command
 
     private const CRITERIOS = <<<'TXT'
 Criterios del revisor (aplícalos):
-- Alérgenos: SIEMPRE derivar, sin preguntar nada más.
+- Alérgenos: lo que afecta a un PLATO concreto (qué lleva, falta o está mal) se deriva sin preguntar. Qué alérgenos y distintivos se muestran (Configuración > Alérgenos: activar o desactivar, «solo salen 17») lo hace el propio hotel: responder explicando los pasos.
 - Como mucho DOS preguntas por mensaje; si no se sabe quién escribe, solo hotel y correo.
 - No inventar preguntas: solo se pregunta lo que cambia lo que hay que hacer y no está ya en el mensaje (nunca «si afecta a todos los servicios» ni «si las fechas son de este año»).
 - Si el cliente ya nombra el hotel, se busca en AdminHoteles con ese nombre; solo se pide el nombre exacto si no aparece. Cuando el caso depende de consultar AdminHoteles (hotel, usuario, buffet, antenas, ruedas de menú), el comentario empieza por [API].

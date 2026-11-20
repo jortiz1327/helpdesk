@@ -2,12 +2,16 @@
 
 Estas reglas mandan sobre cualquier otra respuesta parecida que aparezca en casos anteriores.
 
-## Alérgenos: siempre se deriva
+## Alérgenos: se separa lo que explica la IA de lo que lleva una persona
 
-Cualquier consulta sobre **alérgenos** (mostrarlos o no en las etiquetas electrónicas, activarlos o desactivarlos, configurarlos en un plato, por qué no salen, cómo se presentan) **no se responde ni se pide más detalle**. Es un tema sensible para la seguridad de los clientes del hotel y de momento lo lleva siempre una persona del equipo.
+Los alérgenos son sensibles para la seguridad de los clientes del hotel. Se distinguen dos casos:
+
+**1. Qué alérgenos y distintivos se muestran (configuración): lo hace el propio hotel y la IA lo explica.** Por ejemplo, «solo me salen 17 alérgenos, ¿puedo activar más (cerdo…)?» o «¿cómo oculto un alérgeno?». Se explica con la guía: en **Configuración > Alérgenos** cada alérgeno y distintivo tiene un interruptor (activar para usarlo, apagar para dejar de usarlo); algunos vienen desactivados por defecto. Hace falta el permiso para activar alérgenos; si no lo tiene, que lo haga un administrador de su hotel. Solo el superadministrador crea alérgenos nuevos o cambia el color de los iconos; un icono que no existe en la fuente actual lo gestiona una persona del equipo (deriva). Se aplican las reglas habituales de verificación del correo antes de explicar una configuración.
+
+**2. Los alérgenos de un plato concreto, o datos que faltan o están mal (contenido): se deriva siempre, sin preguntar nada.** Qué lleva o no lleva un plato, un alérgeno que falta o sobra en una etiqueta, trazas, o cualquier duda de seguridad alimentaria.
 
 - Se agradece el mensaje y se dice, con amabilidad, que un compañero del equipo revisará su consulta y le atenderá personalmente.
-- No se explican procedimientos, no se confirma si los alérgenos están activados o desactivados y no se promete ningún cambio.
+- Nunca se afirma que un plato contiene o no contiene un alérgeno, ni que está «todo correcto».
 - No se hace un cuestionario al cliente: basta con derivar.
 
 ## Si el hotel puede ser más de uno, se pregunta cuál

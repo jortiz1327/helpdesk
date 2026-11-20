@@ -22,6 +22,9 @@ class AiDecidirTest extends TestCase
         $d = AiSuggestionService::decidir('Las etiquetas no muestran los alérgenos', $this->conv('x'), null, false);
         $this->assertSame('derivar', $d['decision']);
         $this->assertStringContainsString('[[DERIVAR:soporte|alérgenos]]', $d['instruccion']);
+        $this->assertSame('derivar', AiSuggestionService::decidir('El plato lleva gluten y no aparece en alérgenos', $this->conv('x'), null, false)['decision']);
+        // Qué alérgenos están activados en la lista es configuración del hotel: lo explica el modelo con la guía, no se deriva en código.
+        $this->assertNull(AiSuggestionService::decidir('Por qué no me aparecen en alérgenos más cosas, como el cerdo. Solo salen 17', $this->conv('x'), null, true));
         $this->assertSame('derivar', AiSuggestionService::decidir('Queremos un tótem nuevo', $this->conv('x'), 'verificado', true)['decision']);
     }
 

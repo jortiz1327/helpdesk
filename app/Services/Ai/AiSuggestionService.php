@@ -383,7 +383,11 @@ class AiSuggestionService
 
         // Temas que SIEMPRE lleva una persona (la farmacia es otra regla: la lleva Expofarm).
         $farmacia = str_contains($t, 'farmacia');
-        if (preg_match('/alergen/', $t)) {
+        // Alérgenos: lo sensible (qué lleva un plato, datos mal o ausentes) lo lleva una persona; qué alérgenos se muestran lo configura el hotel.
+        $configuraAlergenos = preg_match('/alergen/', $t)
+            && preg_match('/\b(activar|activa|activado|desactivar|apagar|encender|ocultar|aparec\w*|salen|lista|cuantos)\b|configuracion/', $t)
+            && ! preg_match('/plato|receta|ingrediente|contiene|\blleva|traza|gluten|celiac|intoleran|reaccion|incorrect|erron|\bmal\b|falta/', $t);
+        if (preg_match('/alergen/', $t) && ! $configuraAlergenos) {
             return $derivar('soporte', 'alérgenos');
         }
         if (preg_match('/\btotems?\b/', $t)) {

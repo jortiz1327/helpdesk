@@ -12,3 +12,12 @@ Cuando una farmacia cuenta que, con la nueva versión de la aplicación de etiqu
 
 - Una farmacia no es un hotel: **no se busca en AdminHoteles ni se pide hotel** antes de responder, y no hace falta pedir el código nacional ni el estado de la antena para dar esta explicación.
 - No se confirma que el stock ya esté activado ni se promete un plazo distinto de la actualización de las 23:00.
+
+# Farmacias: dos productos en una misma etiqueta
+
+Cuando una farmacia quiere compartir una misma etiqueta entre dos productos (dos códigos nacionales en una etiqueta) y la aplicación le da error:
+
+- La función de **mostrar 2 productos en una misma etiqueta** solo está disponible para etiquetas de **4,2" y 7,5" pulgadas**.
+- Las etiquetas de **2,13"** no son compatibles con este proceso, por eso da error.
+- Se le explica con tacto y, si no sabe qué tamaño tiene su etiqueta, se le dice que lo compruebe (el tamaño suele figurar en la propia etiqueta o en su ficha); no se confirma el tamaño de una etiqueta concreta que no se pueda verificar.
+- Es una farmacia: no se busca en AdminHoteles ni se pide hotel.
