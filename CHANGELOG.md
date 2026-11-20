@@ -18,6 +18,7 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
 - Reglas ajustadas: presupuestos (pedir el correo vs. pedir que lo preparemos), sustituir/codificar/parametrizar una
   etiqueta (lo hace el hotel), activar o crear servicios e idiomas (lo hace el hotel), errores de permisos con hotel
   nombrado, y usuario/contraseña que no funciona (derivar sin preguntar).
+- Idiomas: el asistente contesta en español, inglés, portugués, catalán o valenciano (en la lengua y variante del cliente).
 - Documentación nueva: stock en farmacias tras la nueva versión (`resources/ai-docs/soporte/farmacias-stock-en-etiquetas.md`).
 - Los criterios de las propuestas de `ai:prerrellenar` se alinean con las reglas actuales.
 - Medido en un lote nuevo de 20 casos revisados (4 repeticiones): 75 % (60/80) frente a 65 % (52/80) del prompt de 1.6.0.

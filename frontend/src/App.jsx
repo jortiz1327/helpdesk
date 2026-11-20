@@ -135,6 +135,7 @@ const VERSIONS = [
             "Distingue mejor entre pedir un correo para un presupuesto (se le da el de postventa) y pedir que se lo preparemos (pasa a Pedidos y facturas).",
             "Los problemas de usuario o contraseña y las garantías se derivan a una persona sin hacer preguntas.",
             "Sabe explicar qué hacer cuando una farmacia deja de ver el stock en las etiquetas.",
+            "Contesta también en catalán y valenciano, en la lengua que use el cliente.",
         ],
     },
     {
