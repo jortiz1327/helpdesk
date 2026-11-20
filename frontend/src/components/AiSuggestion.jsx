@@ -4,14 +4,16 @@ import { Icon } from '../icons.jsx'
 import { useToast } from '../App.jsx'
 
 /* -------------------------------------------------------------------------
- * PANEL DE LA SUGERENCIA DE LA IA (cajón lateral, SOLO LECTURA).
- * La IA no responde ni escribe nada en el editor. Mientras trabaja, el panel va
+ * PANEL DE LA SUGERENCIA DE LA IA (cajón lateral).
+ * La IA no responde sola: el borrador solo pasa al editor si la persona pulsa «Insertar en la respuesta»
+ * (y sigue sin enviarse). Mientras trabaja, el panel va
  * enseñando cada paso (hotel, correo, antenas, memoria…); al acabar queda el
  * detalle de lo que ha consultado y el borrador. La persona puede COPIARLO y,
  * sobre todo, valorarlo: «Útil», o «Corregir» con lo que debía decir. Esa
  * valoración se guarda y alimenta las siguientes sugerencias.
  * ---------------------------------------------------------------------- */
 const ROTULO = { filtro: 'Filtro', hotel: 'Hotel', correo: 'Correo', rol: 'Usuario', antenas: 'Antenas', etiqueta: 'Etiqueta', memoria: 'Memoria' }
+const TIPO = { manual: 'Manual', ticket: 'Ticket parecido', correccion: 'Corrección', plantilla: 'Plantilla' }
 const hora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
 
 function Marca({ ok }) {
@@ -67,7 +69,7 @@ function Fila({ p }) {
   )
 }
 
-export default function AiSuggestion({ ticketId, onClose }) {
+export default function AiSuggestion({ ticketId, onClose, onInsert }) {
   const toast = useToast()
   const [s, setS] = useState(null)
   const [vivo, setVivo] = useState([])         // pasos que van llegando
@@ -114,6 +116,9 @@ export default function AiSuggestion({ ticketId, onClose }) {
   const salida = guardada.find((p) => p.k === 'salida')
   const tipo = salida?.texto?.match(/·\s*([^(]+?)\s*\(estimado\)/)?.[1]
 
+  const memoria = guardada.find((p) => p.k === 'memoria')?.datos
+  const base = Array.isArray(memoria?.casos) ? memoria.casos : []
+
   const copiar = async () => {
     try {
       await navigator.clipboard.writeText(s.body)
@@ -121,6 +126,13 @@ export default function AiSuggestion({ ticketId, onClose }) {
       setCopiado(true); setS({ ...s, used: true })
       toast?.('Texto copiado: pégalo en tu respuesta y revísalo antes de enviar')
     } catch { toast?.('No se pudo copiar: selecciona el texto a mano', 'err') }
+  }
+  const insertar = () => {
+    if (onInsert?.(s.body) === false) return   // el agente decidió no pisar lo que ya había escrito
+    api.aiUsed(s.id)
+    setS({ ...s, used: true })
+    toast?.('Insertada en la respuesta: revísala antes de enviar')
+    onClose?.()
   }
   const valorar = async (rating, correction) => {
     setGuardando(true)
@@ -137,7 +149,7 @@ export default function AiSuggestion({ ticketId, onClose }) {
         <header className="ai-dh">
           <div>
             <h2><Icon.bolt aria-hidden="true" /> Sugerencia de la IA</h2>
-            <p>Solo lectura: no se envía nada al cliente</p>
+            <p>Nada se envía al cliente: tú revisas y envías</p>
           </div>
           <button ref={cierre} className="ai-x" onClick={onClose} aria-label="Cerrar el panel"><Icon.x aria-hidden="true" /></button>
         </header>
@@ -184,12 +196,27 @@ export default function AiSuggestion({ ticketId, onClose }) {
               <section className="ai-sec ai-resp" aria-label="Respuesta preparada">
                 <div className="ai-resp-h">
                   <h3>{noSabe ? 'La IA no se atreve' : dest ? 'Mensaje para el cliente (si quieres avisarle)' : 'Respuesta preparada'}{tipo && !noSabe ? <span className="ai-sub"> · {tipo}</span> : null}</h3>
-                  {!noSabe && <button className="btn sm primary" onClick={copiar}>{copiado ? <><Icon.check aria-hidden="true" /> Copiado</> : <><Icon.copy aria-hidden="true" /> Copiar texto</>}</button>}
+                  {!noSabe && (
+                    <div className="ai-act">
+                      {onInsert && <button className="btn sm primary" onClick={insertar}><Icon.pencil aria-hidden="true" /> Insertar en la respuesta</button>}
+                      <button className={`btn sm ${onInsert ? '' : 'primary'}`} onClick={copiar}>{copiado ? <><Icon.check aria-hidden="true" /> Copiado</> : <><Icon.copy aria-hidden="true" /> Copiar</>}</button>
+                    </div>
+                  )}
                 </div>
                 {noSabe
                   ? <p className="ai-body">No tiene claro cómo responder y prefiere no inventar: respóndelo tú. Si sí sabías qué contestar, díselo con «Sí sabía» y aprenderá.</p>
                   : <p className="ai-body ai-borrador">{s.body}</p>}
               </section>
+
+              {!noSabe && base.length > 0 && (
+                <section className="ai-sec" aria-label="En qué se basa">
+                  <h3>En qué se basa <span className="ai-sub">· para que te fíes o la descartes</span></h3>
+                  <ul className="ai-lista ai-base">
+                    {base.map((c, i) => <li key={i}><span className={`ai-tag ${c.tipo}`}>{TIPO[c.tipo] || c.tipo}</span> {c.titulo || '(sin título)'}</li>)}
+                    {memoria?.faqs > 0 && <li><span className="ai-tag faq">FAQ</span> {memoria.faqs} preguntas frecuentes</li>}
+                  </ul>
+                </section>
+              )}
 
               <section className="ai-sec" aria-label="Valoración">
                 <h3>¿Qué te parece? <a className="ai-sub" href="/formacion-ia.html" target="_blank" rel="noopener">¿Cómo se valora?</a></h3>

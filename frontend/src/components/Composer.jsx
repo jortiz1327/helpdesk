@@ -36,7 +36,14 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
     ed.current?.setHtml(html); setEmpty(false)
     return true
   }
-  /* WhatsApp (`wa` = { window_open, window_closes }): fuera de la ventana de 24 h Meta no
+  /* Un clic desde el panel: pasa la sugerencia al editor de respuesta (no la envía). Si ya hay texto, pide confirmación antes de pisarlo. */
+  const insertarSugerencia = (texto) => {
+    if (ed.current && !ed.current.isEmpty() && !window.confirm('Ya hay texto escrito en la respuesta. ¿Sustituirlo por la sugerencia?')) return false
+    setMode('reply')
+    ponerSugerencia(texto)
+    return true
+  }
+  /* WhatsApp (`wa` ={ window_open, window_closes }): fuera de la ventana de 24 h Meta no
      deja escribir al cliente, así que la respuesta se bloquea (la nota interna no). */
   const waCerrada = !!wa && !note && !wa.window_open
   const waCierra = wa?.window_open && wa.window_closes ? new Date(wa.window_closes) : null
@@ -156,7 +163,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
           </button>
         )}
       </div>
-      {aiOpen && ticketId && <AiSuggestion ticketId={ticketId} onClose={() => setAiOpen(false)} />}
+      {aiOpen && ticketId && <AiSuggestion ticketId={ticketId} onClose={() => setAiOpen(false)} onInsert={insertarSugerencia} />}
       {/* Destinatarios: solo al responder (una nota interna no se envía a nadie). */}
       {!note && to && (
         <div className="cmp-dest">
