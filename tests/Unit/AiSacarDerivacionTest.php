@@ -22,6 +22,14 @@ class AiSacarDerivacionTest extends TestCase
         $this->assertSame([ 'Hola', null ], AiSuggestionService::sacarDerivacion('Hola'));
     }
 
+    public function test_nombre_de_dominio_solo_en_correos_de_empresa(): void
+    {
+        $this->assertSame('estivalcenturion', AiSuggestionService::nombreDeDominio('info@hotelestivalcenturion.com'));
+        $this->assertSame('playasguardamar', AiSuggestionService::nombreDeDominio('Recepcion@playasguardamar.es'));
+        $this->assertNull(AiSuggestionService::nombreDeDominio('juan@gmail.com'));
+        $this->assertNull(AiSuggestionService::nombreDeDominio('no-es-un-correo'));
+    }
+
     public function test_categoria_desconocida_se_ignora(): void
     {
         [, $d] = AiSuggestionService::sacarDerivacion('Hola [[DERIVAR:ventas|x]]');

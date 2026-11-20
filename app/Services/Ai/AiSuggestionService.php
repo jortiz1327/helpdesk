@@ -872,6 +872,34 @@ class AiSuggestionService
         return $s;
     }
 
+    /** Parte del dominio de un correo de empresa que sirve de nombre («info@hotelestival.com» → «estival»); null en correos genéricos. */
+    public static function nombreDeDominio(string $email): ?string
+    {
+        $d = mb_strtolower(substr(strrchr($email, '@') ?: '', 1));
+        $partes = explode('.', $d);
+        if (count($partes) < 2) {
+            return null;
+        }
+        $etq = $partes[count($partes) - 2];
+        if (in_array($etq, ['gmail', 'googlemail', 'hotmail', 'outlook', 'live', 'msn', 'yahoo', 'icloud', 'me', 'proton', 'protonmail', 'telefonica', 'movistar', 'terra', 'ono', 'orange', 'aemegroup'], true)) {
+            return null;
+        }
+        $n = preg_replace('/^(hotel|grupo)/', '', preg_replace('/[^a-z0-9]/', '', $etq));
+        return strlen((string) $n) >= 5 ? $n : null;
+    }
+
+    /** ¿Hay UN solo hotel en el panel cuyo nombre (sin espacios) contiene el nombre del dominio? Devuelve su nombre o null. */
+    private function hotelPorDominio(HotelsApi $api, string $email): ?string
+    {
+        $n = self::nombreDeDominio($email);
+        if ($n === null) {
+            return null;
+        }
+        $r = $api->buscarHoteles($n) ?? [];
+        $r = array_values(array_filter($r, fn ($h) => str_contains(str_replace(' ', '', HotelsApi::norm($h['nombre'])), $n)));
+        return count($r) === 1 ? $r[0]['nombre'] : null;
+    }
+
     private function contextoHotelBase(?string $contactEmail, array $codigos = [], string $textoCliente = ''): string
     {
         $api = app(HotelsApi::class);
@@ -984,7 +1012,13 @@ class AiSuggestionService
                 . "- Di que un compañero comprobará sus datos y le atenderá. Si aún no sabemos el hotel, pregúntalo.\n" . $comun;
         }
         if ($v['estado'] === 'no_encontrado') {
+            // Correo que no figura: el dominio (si es de empresa) puede orientar sobre el hotel. Es solo una pista, nunca una verificación.
+            $pista = (! $dir && ! $nombres) ? $this->hotelPorDominio($api, $e) : null;
+            if ($pista) {
+                $this->paso('hotel', null, 'Pista por el dominio del correo: «' . $pista . '» (sin confirmar)');
+            }
             return $cab . "- El correo del cliente ($e) NO figura como usuario en la aplicación de hoteles.\n"
+                . ($pista ? "- PISTA SIN CONFIRMAR: el dominio de su correo se parece al hotel «$pista». NO lo afirmes, NO des datos de él ni cambies lo que sigue: úsalo solo para preguntar «¿Se refiere a $pista?» al pedirle el nombre del hotel.\n" : '')
                 . "- Explícaselo con tacto: con ese correo no podemos asociarle a un hotel en nuestro sistema.\n" . $pedir . $tacto . $comun . $derivar;
         }
         // encontrado: ¿coincide con el hotel que dice ser?
