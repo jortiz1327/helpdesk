@@ -59,14 +59,15 @@ TXT;
 
         $ejemplos = '';
         $nEj = 0;
-        foreach ($cand as $c) {
+        // Solo los ejemplos revisados más recientes: los antiguos son de cuando las reglas eran otras (y derivaban cosas que hoy hace el hotel).
+        $revisados = array_values(array_filter($cand, fn ($c) => ! empty(($marcas[$c['id']] ?? [])['revisado'])));
+        foreach (array_slice($revisados, -60) as $c) {
             $m = $marcas[$c['id']] ?? null;
             if (! $m || empty($m['revisado'])) {
                 continue;
             }
             $nEj++;
             $ejemplos .= "--- EJEMPLO $nEj ---\nCliente: " . self::limpia((string) $c['pregunta'], 350)
-                . "\nRespondió una persona: " . self::limpia((string) $c['respuesta_humana'], 200)
                 . "\nDECISIÓN DEL REVISOR: {$m['decision']}\nCOMENTARIO DEL REVISOR: " . self::limpia((string) ($m['comentario'] ?? ''), 600) . "\n\n";
         }
         if ($nEj === 0) {
@@ -80,7 +81,7 @@ TXT;
             . self::CRITERIOS . "\n\nEjemplos ya revisados por la persona (imítalos en decisión y en estilo del comentario, breve y concreto):\n\n$ejemplos"
             . "Contesta SOLO con un JSON {\"decision\":\"responder|pedir_info|derivar|descartar\",\"comentario\":\"...\"}. "
             . "El comentario es 1-3 frases: qué debería hacer la IA y por qué. NO inventes procedimientos ni preguntas que no estén en los criterios o en lo que hizo la persona. "
-            . "Si dudas de la decisión, elige la más prudente (derivar) y empieza el comentario por «DUDA:».";
+            . "IMPORTANTE: que en el ticket real lo ejecutara una persona del equipo NO significa que deba derivarse: muchos tickets son antiguos y hoy lo hace el propio hotel (posiciones, servicios, ruedas, cambios de menú por fecha, usuarios, etiquetas ya dadas de alta, forzar el menú). Si los CRITERIOS dicen que lo hace el hotel, la decisión es responder (o pedir_info si falta hotel o correo), aunque los ejemplos o el ticket digan otra cosa. Deriva solo si los criterios lo dicen. Si dudas entre dos decisiones, empieza el comentario por «DUDA:» y di cuáles.";
 
         $pend = array_values(array_filter($cand, fn ($c) => empty(($marcas[$c['id']] ?? [])['revisado'])
             && ($this->option('rehacer') || ! isset($props[$c['id']]))));
@@ -96,8 +97,7 @@ TXT;
         $bar = $this->output->createProgressBar(count($pend));
         foreach ($pend as $c) {
             $user = "CASO\nAsunto: " . self::limpia((string) $c['asunto'], 150) . (! empty($c['historial']) ? "\nCONVERSACIÓN PREVIA (es un SEGUIMIENTO: se evalúa solo el último mensaje del cliente):\n" . self::limpia((string) $c['historial'], 2500) : '') . "\nCliente: " . self::limpia((string) $c['pregunta'], 1500)
-                . "\nLo que respondió una persona: " . self::limpia((string) $c['respuesta_humana'], 600)
-                . "\nDecisión sugerida por la extracción automática: " . ($c['decision_propuesta'] ?? '?');
+                . "\n(No se te enseña lo que respondió el equipo en su día: decide solo por lo que pide el cliente y por los criterios.)";
             try {
                 $r = $ai->complete($sistema, [['role' => 'user', 'content' => $user]]);
                 $in += (int) ($r['input_tokens'] ?? 0);
