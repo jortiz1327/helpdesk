@@ -51,6 +51,8 @@ class AiSuggestionService
     private ?string $hotelAmbiguo = null;
     /** Lo que se supo del correo y del hotel en la última consulta a AdminHoteles (para decidir en código). */
     private ?string $estadoCorreo = null;
+    /** El cliente nombra un sitio y el listado de hoteles del panel (consultado, no caído) no lo conoce: quizá no sea un hotel. */
+    private bool $hotelNoEncontrado = false;
     private bool $hotelLocalizado = false;
     /** Lo que hizo la IA en esta sugerencia, paso a paso (se guarda en `sources.traza` y se enseña al agente en el panel). */
     private array $traza = [];
@@ -330,7 +332,9 @@ class AiSuggestionService
         $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
         $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente);
 
-        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? '') . ' ' . (string) ($t->contact_email ?? ''), $conversacion, $this->estadoCorreo, $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente));
+        $hotelNombrado = $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente);
+        // Evaluaciones: los casos van anonimizados y sin correo, así que la norma de verificar primero NO se aplica (se mide la decisión de fondo; la norma la cubren los tests).
+        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? '') . ' ' . (string) ($t->contact_email ?? ''), $conversacion, $this->estadoCorreo, $hotelNombrado, $this->hotelNoEncontrado || $anonimizar);
         $t->decision = $dec ? "\nDECISIÓN YA TOMADA POR EL SISTEMA (obligatoria; no la discutas ni la cambies): " . $dec['instruccion'] . "\n" : '';
         if ($dec) {
             $this->paso('decision', null, 'Decisión fijada en código: ' . $dec['resumen']);
@@ -374,7 +378,7 @@ class AiSuggestionService
      * @param  array<int, array{role:string, text:string}>  $conversacion
      * @return array{decision:string, instruccion:string, resumen:string}|null
      */
-    public static function decidir(string $texto, array $conversacion, ?string $estadoCorreo, bool $hotelNombrado): ?array
+    public static function decidir(string $texto, array $conversacion, ?string $estadoCorreo, bool $hotelNombrado, bool $noEsHotel = false): ?array
     {
         $t = mb_strtolower((string) preg_replace('/\p{Mn}/u', '', \Normalizer::normalize($texto, \Normalizer::FORM_D) ?: $texto));
         $derivar = fn (string $cat, string $motivo) => ['decision' => 'derivar', 'resumen' => "derivar ($motivo)",
@@ -389,11 +393,12 @@ class AiSuggestionService
         $farmacia = str_contains($t, 'farmacia');
         // REGLA DE LA DIRECCIÓN (20-nov): en un hotel, SIEMPRE se verifica antes de contestar, pedir otros datos o derivar. Si aún no hay
         // correo verificado (ni se intentó comprobar), lo primero es pedir hotel y correo. Salvo: pedidos de material y presupuestos (no
-        // dependen del hotel), farmacias, tiendas y supermercados (otras áreas, otra verificación).
+        // dependen del hotel), farmacias, tiendas y supermercados (otras áreas, otra verificación) y quien nombra un sitio que el listado de
+        // hoteles no conoce (quizá no sea un hotel; ahí manda VERIFICACIÓN DEL CLIENTE: pedir el nombre exacto y, si sigue sin constar, derivar).
         $material = preg_match('/presupuesto|(comprar|compra|pedir|pedido|reponer|necesit[a-z]+)\b.{0,40}(pilas|soportes?|recambios?|pinzas|etiquetas)/s', $t);
         $otraArea = $farmacia || preg_match('/tienda|supermercado/', $t);
         $acuse = mb_strlen($t) < 200 && preg_match('/gracias|ya funciona|solucionado|resuelto/', $t) && ! str_contains($t, '?');
-        if (! $acuse && ! in_array($estadoCorreo, ['verificado', 'incompleto', 'no_encontrado'], true) && ! $material && ! $otraArea) {
+        if (! $acuse && ! $noEsHotel && ! in_array($estadoCorreo, ['verificado', 'incompleto', 'no_encontrado'], true) && ! $material && ! $otraArea) {
             return ['decision' => 'pedir_datos', 'resumen' => $hotelNombrado ? 'verificar primero: pedir el correo' : 'verificar primero: pedir hotel y correo',
                 'instruccion' => ($hotelNombrado
                     ? 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. El hotel ya consta: PIDE SOLO el correo con el que accede a la aplicación.'
@@ -910,6 +915,7 @@ class AiSuggestionService
         $this->hotelAmbiguo = null;
         $this->estadoCorreo = null;
         $this->hotelLocalizado = false;
+        $this->hotelNoEncontrado = false;
         $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente);
         if ($s !== '' && $this->hotelAmbiguo !== null) {
             // El nombre encaja con varios hoteles (p. ej. «Hotel Poseidón» hay más de uno): nunca se asume cuál es.
@@ -1015,6 +1021,7 @@ class AiSuggestionService
         $v = $api->verificar($e);
         $sitios = array_slice($v['sitios'], 0, 4);
         $this->hotelLocalizado = (bool) $dir;
+        $this->hotelNoEncontrado = ! $dir && $nombres && ! $dirFalla;
         $this->estadoCorreo = ($v['estado'] === 'encontrado' && (! $dir || $this->coincideHotel($dir, $sitios))) ? 'verificado' : (string) $v['estado'];
         // Traza para el agente: hotel y correo (lo que ve el panel de la sugerencia).
         if ($v['estado'] === 'sin_correo') {
