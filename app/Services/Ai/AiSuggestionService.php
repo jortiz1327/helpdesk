@@ -330,7 +330,7 @@ class AiSuggestionService
         $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
         $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente);
 
-        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? ''), $conversacion, $this->estadoCorreo, $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente));
+        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? '') . ' ' . (string) ($t->contact_email ?? ''), $conversacion, $this->estadoCorreo, $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente));
         $t->decision = $dec ? "\nDECISIÓN YA TOMADA POR EL SISTEMA (obligatoria; no la discutas ni la cambies): " . $dec['instruccion'] . "\n" : '';
         if ($dec) {
             $this->paso('decision', null, 'Decisión fijada en código: ' . $dec['resumen']);
@@ -381,6 +381,10 @@ class AiSuggestionService
             'instruccion' => "DERIVA. Responde con la frase corta «Gracias por su mensaje. Hemos registrado la incidencia y el equipo la revisará.» sin preguntar nada ni dar pasos, y añade al final «[[DERIVAR:$cat|$motivo]]»."];
         $yaRespondio = (bool) array_filter($conversacion, fn ($m) => ($m['role'] ?? '') === 'assistant');
 
+        // Hotel Don Pancho: la aplicación de ese hotel no la gestionamos nosotros; cualquier incidencia la lleva una persona.
+        if (preg_match('/don ?pancho/', $t)) {
+            return $derivar('soporte', 'Don Pancho (su app no la gestionamos nosotros)');
+        }
         // Temas que SIEMPRE lleva una persona (la farmacia es otra regla: la lleva Expofarm).
         $farmacia = str_contains($t, 'farmacia');
         // Alérgenos: lo sensible (qué lleva un plato, datos mal o ausentes) lo lleva una persona; qué alérgenos se muestran lo configura el hotel.

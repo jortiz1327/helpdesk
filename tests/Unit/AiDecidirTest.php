@@ -49,6 +49,13 @@ class AiDecidirTest extends TestCase
         $this->assertNull(AiSuggestionService::decidir($t . ' Ya cambiamos las pilas', $this->conv('x'), null, true), 'si ya probó el reinicio, decide el modelo');
     }
 
+    public function test_hotel_don_pancho_siempre_deriva(): void
+    {
+        $d = AiSuggestionService::decidir('Problema con nuevas etiquetas (Hotel Don Pancho, Benidorm). Template not matched', $this->conv('x'), null, true);
+        $this->assertSame('derivar', $d['decision']);
+        $this->assertSame('derivar', AiSuggestionService::decidir('Duda sobre el menu info@donpancho.com', $this->conv('x'), 'verificado', true)['decision']);
+    }
+
     public function test_garantia_deriva_pero_la_de_farmacia_la_decide_el_modelo(): void
     {
         $this->assertSame('garantias', explode('|', explode('DERIVAR:', AiSuggestionService::decidir('Queremos la garantía', $this->conv('x'), null, false)['instruccion'])[1])[0]);

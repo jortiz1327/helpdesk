@@ -12,6 +12,7 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
   por otra que ya tienen y darla de alta, y poner pilas nuevas y forzar, no son garantía (se piden hotel y correo y se explica).
 - Etiquetas que muestran un plato o menú viejo: primero se le dice que revise Cambios programados (los de hoy sustituyen a la rueda) antes de derivar.
 - Si piden etiquetas nuevas pero alguna solo está bloqueada o no cambia (sin daño visible), primero va el reinicio de esa y no se menciona la dañada (decisión en código). «Tampoco cambia» cuenta como etiqueta que no cambia.
+- Hotel Don Pancho: siempre se deriva (su aplicación no la gestionamos nosotros); se detecta por el nombre en el asunto, el mensaje o el correo.
 - Antenas: se revisa su estado antes de decidir; nunca se deriva solo por urgencia o por el número de clientes afectados.
 - Cambio de menú por fecha y de buffet estándar a premium: lo hace el hotel. Etiquetas con luces de colores incompletas: se derivan.
 - Alérgenos: qué alérgenos se muestran es configuración del hotel (la IA lo explica); lo de un plato concreto sigue derivándose.
