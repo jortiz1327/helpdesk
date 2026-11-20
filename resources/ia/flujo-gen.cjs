@@ -129,7 +129,7 @@ lab('Sí', C + 12, N.p1.b[1] + 22);
 dia('h1', A, yTop, 280, 'api', ['¿Podemos consultar el panel', 'de hoteles? (solo lectura)'], { badge: '4' });
 box('h1x', T, N.h1.y + N.h1.h / 2 - 28, 200, 'no', 'Sin datos del hotel', ['la IA se los pregunta', 'al cliente']);
 arr([N.h1.r, N.h1x.l]); lab('No', N.h1.r[0] + 10, N.h1.r[1] - 7);
-box('h2', A, N.h1.y + N.h1.h + IN, 280, 'api', 'Busca el hotel', ['por el correo del ticket, el nombre', 'del mensaje o la firma, o la etiqueta']);
+box('h2', A, N.h1.y + N.h1.h + IN, 280, 'api', 'Busca el hotel', ['por el correo del ticket, el nombre', 'del mensaje o la firma, o la etiqueta', '(listado en caché; si no consta,', 'quizá no sea un hotel)']);
 arr([N.h1.b, N.h2.t]); lab('Sí', A + 12, N.h1.b[1] + 22);
 dia('h3', A, N.h2.y + N.h2.h + IN, 280, 'api', ['¿Reconocemos el correo como', 'usuario de la aplicación?']);
 arr([N.h2.b, N.h3.t]);
@@ -165,7 +165,7 @@ dia('d5', C, y, 290, 'sys', ['¿Es un caso tan claro que', 'no hace falta pensar
 arr([[C, yMerge], N.d5.t]);
 box('c1', L, N.d5.y + N.d5.h / 2 - 40, 250, 'der', 'Pasa a una persona', ['con el cliente verificado: alérgenos,', 'tótems y garantías (salvo farmacias)']);
 arr([N.d5.l, N.c1.r]); lab('Sí', N.d5.l[0] - 10, N.d5.l[1] - 7, 'end');
-box('c2', 960, N.d5.y + N.d5.h / 2 - 40, 290, 'cli', 'Pedir hotel y correo', ['norma de la dirección: en un hotel sin correo', 'verificado, se verifica ANTES de todo', '(salvo material, presupuestos, farmacias, tiendas)']);
+box('c2', 960, N.d5.y + N.d5.h / 2 - 40, 290, 'cli', 'Pedir hotel y correo', ['norma de la dirección: en un hotel sin correo', 'verificado, se verifica ANTES de todo', '(salvo material, presupuestos, farmacias,', 'tiendas y sitios que no son hoteles)']);
 arr([N.d5.r, N.c2.l]); lab('Sí', N.d5.r[0] + 10, N.d5.r[1] - 7);
 const yBar = Math.max(N.c1.y + N.c1.h, N.c2.y + N.c2.h, N.d5.y + N.d5.h) + 26;
 box('pr', C, yBar + 34, 440, 'sys', '⑤ Prepara las instrucciones para la IA', ['las reglas del equipo + el orden de decisión', '+ lo que sabemos del cliente y del hotel', '+ «decisión ya tomada» si el caso era claro']);
