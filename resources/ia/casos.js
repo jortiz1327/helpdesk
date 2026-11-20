@@ -27,7 +27,7 @@ const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c
 const FILTROS = [
   { k: 'conj', t: 'Conjunto de casos', ops: [
     ['todos', 'Todos', () => true, ''],
-    ['fase2e', 'Fase 2e (para medir)', (c) => c.lote === 'fase2e', '20 casos reales nuevos (10 correo, 10 WhatsApp). Revísalos SIN ajustar reglas después: confirman si el prompt final llega al 70 % antes de subir la 1.7.0.'],
+    ['fase2e', 'Fase 2e (para medir)', (c) => c.lote === 'fase2e', '20 casos reales nuevos (10 correo, 10 WhatsApp). Revísalos SIN ajustar reglas después: confirman si el prompt final llega al 70 % antes de subir la 1.6.1.'],
     ['fase2d', 'Fase 2d', (c) => c.lote === 'fase2d', 'Medido el 20-nov (final 65 %, original 66 %). Ya NO vale para medir: se miraron sus fallos para documentar stock de farmacias, guías por título, contraseñas y servicios.'],
     ['fase2c', 'Fase 2c', (c) => c.lote === 'fase2c', 'Medido el 20-nov. Ya NO vale para medir: se miraron sus fallos para arreglar el orden de decisión (garantías).'],
     ['fase2b', 'Fase 2b', (c) => c.lote === 'fase2b', 'Medido el 19-nov (prompt nuevo 51/76 = 67 %, original 50/76 = 66 %). Ya NO vale para medir si se ajustan reglas mirándolo.'],

@@ -120,13 +120,13 @@ function ConfirmDialog({ opts, onClose }) {
     );
 }
 
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.6.1";
 // Historial de versiones (la primera es la actual). Frases CORTAS y claras, sin tecnicismos.
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión.
 const VERSIONS = [
     {
-        version: "1.7.0",
-        date: "19 nov 2026",
+        version: "1.6.1",
+        date: "20 nov 2026",
         resumen: "El asistente de IA acierta más: conoce mejor la aplicación de hoteles y aprovecha las plantillas de respuesta del equipo.",
         mejoras: [
             "La IA tiene siempre a mano el mapa de la aplicación de hoteles, así que ya no dice que el equipo hace lo que el propio hotel puede hacer (servicios, idiomas, posiciones, usuarios…).",

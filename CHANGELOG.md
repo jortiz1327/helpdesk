@@ -3,7 +3,7 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
-## [1.7.0] — 2026-11-19
+## [1.6.1] — 2026-11-20
 
 ### Mejoras
 
