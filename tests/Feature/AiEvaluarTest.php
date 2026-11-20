@@ -90,6 +90,10 @@ class AiEvaluarTest extends TestCase
         $this->assertStringNotContainsString('self::', $fake->sistema);
         $this->assertStringNotContainsString("'. ", $fake->sistema);
         $this->assertStringContainsString('No derives ni contestes [[NO_SABE]]', $fake->sistema);
+        // El mapa de la aplicación de hoteles va SIEMPRE en el prompt (sin depender de la búsqueda de guías).
+        $this->assertStringContainsString('MAPA DE LA APLICACIÓN DE HOTELES', $fake->sistema);
+        $this->assertStringContainsString('- Servicios — desayuno, comida, cena', $fake->sistema);
+        $this->assertStringNotContainsString('](15-servicios.md)', $fake->sistema);
     }
 
     /** Auditoría de contradicciones: se ejecuta con toda la suite, así cada cambio de reglas pasa por aquí. */

@@ -24,11 +24,13 @@ Criterios del revisor (aplícalos):
 - No inventar preguntas: solo se pregunta lo que cambia lo que hay que hacer y no está ya en el mensaje (nunca «si afecta a todos los servicios» ni «si las fechas son de este año»).
 - Si el cliente ya nombra el hotel, se busca en AdminHoteles con ese nombre; solo se pide el nombre exacto si no aparece. Cuando el caso depende de consultar AdminHoteles (hotel, usuario, buffet, antenas, ruedas de menú), el comentario empieza por [API].
 - «Pasar de buffet normal a reducido» es cambiar de rueda de menú del mismo buffet.
-- Si lo que pide el cliente lo ejecuta una persona del equipo (cambios en buffets, permisos, altas/bajas), la IA no puede confirmar que está hecho: deriva.
-- Garantías (etiquetas que fallan y hay que sustituir o enviar), precios y acceso remoto: derivar. Nunca se da un correo para garantías.
-- PEDIDOS DE MATERIAL (comprar o reponer pilas, soportes, recambios, etiquetas): se RESPONDE con «escriba a postventa@aemegroup.com con material, cantidad y foto». Decisión: responder, no derivar. Ignora los ejemplos antiguos que derivaban el material.
-- PRESUPUESTOS: derivar (el borrador es «Asignar al departamento de Pedidos y facturas.»).
-- Lo que hoy hace el propio hotel en la aplicación (posiciones, nombres de etiquetas, forzar menú con hotel y correo verificados, crear usuarios si tiene permiso) NO se deriva: se responde o se pide hotel y correo. Las respuestas humanas antiguas que lo hacían por el cliente están desfasadas.
+- Lo que EJECUTA el equipo y se deriva: cargar o cambiar los PLATOS de la rueda de menú de un buffet, logos, tipos de letra, plantillas y el ALTA de etiquetas nuevas en la plataforma. La IA no puede confirmar que está hecho.
+- LO QUE HACE EL PROPIO HOTEL en la aplicación NO se deriva, y el equipo NO lo gestiona: crear o activar SERVICIOS y sus horarios (también uno nuevo como «snacks», con su ventana de apertura y cierre), isletas, posiciones, asignar/codificar/parametrizar/vincular una etiqueta a una posición, idiomas, usuarios, roles y permisos, forzar el menú. Decisión: pedir_info si el correo no está verificado (solo el correo si el hotel ya consta) o responder explicando con la guía. Las respuestas humanas antiguas que lo hacían por el cliente están desfasadas.
+- Usuario o contraseña que no funciona, no poder entrar o pedir restablecerla: derivar sin preguntar nada. Crear usuarios nuevos lo hace el hotel.
+- Garantías (etiquetas que fallan y hay que sustituir o enviar, también un lote grande) y acceso remoto: derivar sin preguntar. Nunca se da un correo para garantías. Una farmacia con garantía: la gestiona Expofarm, sin pedir datos.
+- PEDIDOS DE MATERIAL (comprar o reponer pilas, soportes, recambios, etiquetas, pinzas): se RESPONDE con «escriba a postventa@aemegroup.com con material, cantidad y foto». Decisión: responder, no derivar. Ignora los ejemplos antiguos que derivaban el material.
+- PRESUPUESTOS, dos casos: si pide EL CORREO o dónde pedirlo, responder con el correo de postventa; si pide que NOSOTROS lo preparemos, derivar (el borrador es «Asignar al departamento de Pedidos y facturas.»).
+- Farmacias: no se busca en AdminHoteles ni se pide hotel. Si el stock ya no se ve en las etiquetas tras la nueva versión, se responde: activar el stock en Configuración y esperar la actualización de las 23:00.
 - Un caso de uso de la aplicación sin hotel ni correo conocidos: pedir_info (hotel y correo), no derivar. Un seguimiento («gracias», «ya funciona») sin petición nueva: descartar.
 TXT;
 

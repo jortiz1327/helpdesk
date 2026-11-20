@@ -505,6 +505,24 @@ class AiSuggestionService
     }
 
     /**
+     * Mapa de la aplicación de hoteles: el índice de la documentación (apartados de uso diario), SIEMPRE presente en el prompt.
+     * La búsqueda de guías puede no traer la del apartado que toca; con el mapa la IA sabe qué hace el propio hotel (servicios,
+     * idiomas, posiciones, usuarios…) y no lo toma por trabajo del equipo.
+     */
+    private function mapaApp(): string
+    {
+        $ruta = resource_path('ai-docs/hoteles/00-indice.md');
+        if (! is_file($ruta)) {
+            return '';
+        }
+        $t = (string) file_get_contents($ruta);
+        $t = (string) preg_replace('/^.*?(?=^## General)/ms', '', $t);               // quita título y párrafo de presentación
+        $t = (string) preg_replace('/^## (Desperdicio|Operativa|Eventos|Wellness|Restaurante).*\z/ms', '', $t);   // módulos de nicho
+        $t = (string) preg_replace('/\[([^\]]+)\]\([^)]+\)/u', '$1', $t);            // [Servicios](15-servicios.md) → Servicios
+        return "\nMAPA DE LA APLICACIÓN DE HOTELES (todo esto lo hace el PROPIO HOTEL desde la aplicación, con su usuario y su rol; NO es trabajo del equipo de AEME. Si lo que pide el cliente está aquí, explícalo con la guía (el equipo solo carga platos de ruedas de menú, logos, plantillas y altas de etiquetas nuevas). La guía detallada de cada apartado, si hace falta, sale más abajo)\n" . trim($t) . "\n";
+    }
+
+    /**
      * Valora una sugerencia. «down» exige la corrección: sin ella no hay nada de lo que
      * aprender, y es justo lo que se guarda para alimentar a la IA.
      */
@@ -1197,6 +1215,7 @@ class AiSuggestionService
             $s .= 'CLIENTE: ' . $t->contact_name . "\n";
         }
 
+        $s .= $this->mapaApp();
         $s .= "\nBASE DE CONOCIMIENTO (preguntas frecuentes publicadas)\n";
         $s .= $faqs ? implode("\n\n", array_map(fn ($f) => '• ' . $f['question'] . "\n" . $f['answer'], $faqs)) : '(ninguna coincide con esta consulta)';
 

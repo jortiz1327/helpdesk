@@ -173,6 +173,10 @@ class AiKnowledgeTest extends TestCase
         $r = $k->buscar('no sale el segundo idioma necesito que salga el segundo idioma', null, 0, 3, 0, 'no sale el segundo idioma');
         $ids = array_map(fn ($d) => $d->source_id, $r);
         $this->assertContains('doc:test/idiomas-x.md#1', $ids);
+        // «Menú de snacks con ventana de apertura y cierre» es crear un servicio aunque no diga «servicio».
+        $ins('doc:test/servicios-x.md#1', 'Servicios', 'Crea un servicio con su horario de apertura y cierre desde Ajustes.');
+        $r = $k->buscar('Se solicitaba que se crease el menú de snacks en la plataforma. Debe tener sólo una ventana de tiempo (apertura y cierre)', null, 0, 3, 0, 'Criar separador de snack para labels');
+        $this->assertContains('doc:test/servicios-x.md#1', array_map(fn ($d) => $d->source_id, $r));
         DB::table('ai_documents')->where('source_id', 'like', 'doc:test/%')->delete();
     }
 

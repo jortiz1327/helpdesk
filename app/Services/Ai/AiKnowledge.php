@@ -366,7 +366,23 @@ class AiKnowledge
         };
         $anadir($asunto, true);
         $anadir(mb_substr($texto, 0, 500), false);
+        foreach ($this->raicesPorSinonimo($asunto . ' ' . mb_substr($texto, 0, 500)) as $r) {
+            $terminos[$r] = true;
+        }
         return implode(' ', array_map(fn ($r, $fuerte) => ($fuerte ? '>' : '') . $r . '*', array_keys($terminos), $terminos));
+    }
+
+    /**
+     * Palabras del cliente que no nombran la guía pero apuntan a ella: «menú de snacks con una ventana de apertura y cierre»
+     * es crear un SERVICIO, aunque no diga «servicio». Devuelve las raíces de las guías a buscar.
+     */
+    private function raicesPorSinonimo(string $texto): array
+    {
+        $raices = [];
+        if (preg_match('/\b(desayuno|almuerzo|comida|cena|snacks?|brunch|merienda|horarios?|apertura|cierre|abrimos|ventana de tiempo)\b/iu', $texto)) {
+            $raices[] = 'servic';
+        }
+        return $raices;
     }
 
     /**
@@ -385,6 +401,7 @@ class AiKnowledge
             }
             $raices[] = mb_substr($p, 0, $l <= 6 ? $l - 2 : $l - 3);
         }
+        $raices = array_merge($raices, $this->raicesPorSinonimo($asunto));
         if (! $raices) {
             return [];
         }
