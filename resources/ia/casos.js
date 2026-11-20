@@ -27,7 +27,8 @@ const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c
 const FILTROS = [
   { k: 'conj', t: 'Conjunto de casos', ops: [
     ['todos', 'Todos', () => true, ''],
-    ['fase2i', 'Fase 2i (para medir)', (c) => c.lote === 'fase2i', '10 casos reales nuevos (5 correo, 5 WhatsApp), después de arreglar sustituir etiqueta rota y pilas+forzar. Revísalos sin ajustar reglas después.'],
+    ['fase2j', 'Fase 2j (para medir)', (c) => c.lote === 'fase2j', '10 casos reales nuevos (5 correo, 5 WhatsApp) para confirmar el 80 % de la 1.6.2. Revísalos sin ajustar reglas después.'],
+    ['fase2i', 'Fase 2i (medido)', (c) => c.lote === 'fase2i', '7 casos medidos: 82 % la versión 1.6.2 frente a 57 % la original.'],
     ['fase2h', 'Fase 2h (ya usado)', (c) => c.lote === 'fase2h', '10 casos medidos (60 % la versión actual, 63 % la original) y usados después para ajustar reglas.'],
     ['fase2g', 'Fase 2g (ya usado)', (c) => c.lote === 'fase2g', '9 casos medidos (53 % la versión actual, 58 % la original) y usados después para ajustar reglas.'],
     ['fase2f', 'Fase 2f (medido)', (c) => c.lote === 'fase2f', '10 casos del cierre del bloque A, ya medidos (48 % con la versión actual, 28 % con la original).'],
@@ -203,7 +204,7 @@ function pintarCaso() {
   if (!c) { izq.append(el('div', 'empty', 'No hay casos que mostrar con este filtro.')); $('titulo').textContent = 'Sin casos'; $('com').value = ''; pintarBotones(null); return }
   const pos = casos.indexOf(c) + 1
   $('titulo').textContent = c.asunto || 'Sin asunto'
-  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · ' + (c.lote === 'fase2i' ? 'FASE 2i (para medir)' : c.lote === 'fase2h' ? 'fase 2h (ya usado)' : c.lote === 'fase2g' ? 'fase 2g (ya usado)' : c.lote === 'fase2f' ? 'fase 2f (medido)' : c.lote === 'fase2e' ? 'fase 2e (ya usado)' : c.lote === 'fase2d' ? 'fase 2d (ya usado)' : c.lote === 'fase2c' ? 'fase 2c (ya usado)' : c.lote === 'fase2b' ? 'fase 2b (ya usado)' : c.lote === 'fase2' ? 'fase 2 (ya usado)' : c.lote.startsWith('lote5') ? 'lote 5 (para medir)' : c.lote.startsWith('lote4') ? 'lote 4 (ya usado)' : c.lote.startsWith('lote3') ? 'lote 3' : 'lote 2') : '')
+  $('meta').textContent = 'Caso ' + pos + ' de ' + casos.length + ' · ' + c.canal + ' · nº ' + c.id + (c.code ? ' · ' + c.code : '') + (c.lote ? ' · ' + (c.lote === 'fase2j' ? 'FASE 2j (para medir)' : c.lote === 'fase2i' ? 'fase 2i (medido)' : c.lote === 'fase2h' ? 'fase 2h (ya usado)' : c.lote === 'fase2g' ? 'fase 2g (ya usado)' : c.lote === 'fase2f' ? 'fase 2f (medido)' : c.lote === 'fase2e' ? 'fase 2e (ya usado)' : c.lote === 'fase2d' ? 'fase 2d (ya usado)' : c.lote === 'fase2c' ? 'fase 2c (ya usado)' : c.lote === 'fase2b' ? 'fase 2b (ya usado)' : c.lote === 'fase2' ? 'fase 2 (ya usado)' : c.lote.startsWith('lote5') ? 'lote 5 (para medir)' : c.lote.startsWith('lote4') ? 'lote 4 (ya usado)' : c.lote.startsWith('lote3') ? 'lote 3' : 'lote 2') : '')
   if (c.historial) izq.append(bloque('hist', 'Antes de este mensaje (solo contexto)', etiquetarHistorial(c.historial), null, null))
   izq.append(bloque('client', c.historial ? 'El cliente escribe ahora' : 'El cliente escribió', c.pregunta, null, 'C'))
   if (c.humana) izq.append(el('div', 'aviso-hum', 'Ojo: puede ser de antes de migrar a la app nueva (entonces solo el equipo podía hacer muchas cosas). Si es así, marca [ANTIGUO] y decide por lo que hoy puede hacer el hotel.'))
