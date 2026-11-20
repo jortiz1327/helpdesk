@@ -580,22 +580,28 @@ class AiSuggestionService
      * Valora una sugerencia. «down» exige la corrección: sin ella no hay nada de lo que
      * aprender, y es justo lo que se guarda para alimentar a la IA.
      */
-    public function rate(int $id, string $rating, ?string $correction, int $userId): object
+    /** Motivos de un 👎 rápido (un clic). */
+    public const MOTIVOS = ['tema' => 'Se equivocó de tema', 'dato' => 'Faltó un dato o preguntó de más', 'derivar' => 'Debía pasarlo a una persona', 'responder' => 'Podía responder y no lo hizo', 'inventa' => 'Inventó o dio algo incorrecto', 'tono' => 'Tono o redacción'];
+
+    public function rate(int $id, string $rating, ?string $correction, int $userId, ?string $reason = null): object
     {
         if (! in_array($rating, ['up', 'down'], true)) {
             throw new InvalidArgumentException('Valoración no válida');
         }
         $correction = trim((string) $correction);
-        if ($rating === 'down' && mb_strlen($correction) < 5) {
-            throw new InvalidArgumentException('Escribe qué debía responder (mínimo 5 letras) para poder aprender de ello');
+        $reason = $rating === 'down' && $reason !== null && isset(self::MOTIVOS[$reason]) ? $reason : null;
+        // Un 👎 vale con un motivo de un clic (queda apuntado) o con una corrección escrita; solo la corrección alimenta a la IA.
+        if ($rating === 'down' && mb_strlen($correction) < 5 && $reason === null) {
+            throw new InvalidArgumentException('Elige un motivo o escribe qué debía responder (mínimo 5 letras)');
         }
+        $conCorreccion = $rating === 'down' && mb_strlen($correction) >= 5;
 
         // Decisión de Juan (18-nov): nadie va a revisar lo que dijo cada agente, así que lo que corrige un agente pasa DIRECTO a la
         // memoria (queda como validado por quien lo escribió; el historial guarda quién, cuándo y qué). Un responsable (support.config)
         // puede seguir retirando una corrección mala desde Ajustes (admin_review → rejected), pero no es un paso obligatorio.
-        $propia = $rating === 'down';
+        $propia = $conCorreccion;
         DB::table('ai_suggestions')->where('id', $id)->update([
-            'rating' => $rating, 'correction' => $rating === 'down' ? mb_substr($correction, 0, 4000) : null,
+            'rating' => $rating, 'correction' => $conCorreccion ? mb_substr($correction, 0, 4000) : null, 'reason' => $reason,
             'rated_by' => $userId, 'rated_at' => now(), 'updated_at' => now(),
             'correction_status' => $propia ? 'validated' : 'pending',
             'correction_reviewed_by' => $propia ? $userId : null,
@@ -687,7 +693,7 @@ class AiSuggestionService
     {
         DB::table('ai_rating_events')->insert([
             'suggestion_id' => $s->id, 'ticket_id' => $s->ticket_id, 'user_id' => $userId, 'type' => $tipo,
-            'rating' => $tipo === 'rating' ? $s->rating : null, 'correction' => $s->correction,
+            'rating' => $tipo === 'rating' ? $s->rating : null, 'correction' => $s->correction, 'reason' => $s->reason ?? null,
             'correction_status' => ($s->rating === 'down') ? $s->correction_status : null,
             'ai_body' => $s->body, 'created_at' => now(),
         ]);
@@ -724,7 +730,7 @@ class AiSuggestionService
         }
         $total = (clone $b)->count();
         $filas = $b->orderByDesc('e.id')->offset(max(0, $desde))->limit(max(1, min(100, $limite)))
-            ->get(['e.id', 'e.type', 'e.rating', 'e.correction', 'e.correction_status', 'e.ai_body', 'e.created_at', 'e.ticket_id', 'e.suggestion_id',
+            ->get(['e.id', 'e.type', 'e.rating', 'e.correction', 'e.reason', 'e.correction_status', 'e.ai_body', 'e.created_at', 'e.ticket_id', 'e.suggestion_id',
                 'u.name as user_name', 't.code as ticket_code', 't.subject', 's.status as sug_status', 's.created_at as sug_at', 's.used_at']);
         $items = $filas->map(function ($r) {
             $enviado = DB::table('messages as m')->leftJoin('users as a', 'a.id', '=', DB::raw('COALESCE(m.sent_by, m.author_user_id)'))
@@ -735,7 +741,7 @@ class AiSuggestionService
                 'id' => (int) $r->id, 'type' => $r->type, 'rating' => $r->rating, 'status' => $r->correction_status,
                 'user' => $r->user_name, 'at' => $r->created_at, 'ticket_id' => (int) $r->ticket_id, 'ticket_code' => $r->ticket_code, 'subject' => $r->subject,
                 'ai' => $r->sug_status === 'abstained' ? '(la IA no se atrevió a contestar)' : self::textoPlano($r->ai_body),
-                'correction' => $r->correction, 'used' => $r->used_at !== null,
+                'correction' => $r->correction, 'reason' => $r->reason ? (self::MOTIVOS[$r->reason] ?? $r->reason) : null, 'used' => $r->used_at !== null,
                 'sent' => $enviado ? ['text' => self::textoPlano($enviado->body), 'by' => $enviado->by, 'at' => $enviado->created_at] : null,
             ];
         })->all();

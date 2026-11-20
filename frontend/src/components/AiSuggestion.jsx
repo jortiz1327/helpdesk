@@ -14,6 +14,8 @@ import { useToast } from '../App.jsx'
  * ---------------------------------------------------------------------- */
 const ROTULO = { filtro: 'Filtro', hotel: 'Hotel', correo: 'Correo', rol: 'Usuario', antenas: 'Antenas', etiqueta: 'Etiqueta', memoria: 'Memoria' }
 const TIPO = { manual: 'Manual', ticket: 'Ticket parecido', correccion: 'Corrección', plantilla: 'Plantilla' }
+// Motivos de un 👎 rápido (un clic): deben coincidir con AiSuggestionService::MOTIVOS.
+const MOTIVOS = { tema: 'Se equivocó de tema', dato: 'Faltó un dato o preguntó de más', derivar: 'Debía pasarlo a una persona', responder: 'Podía responder y no lo hizo', inventa: 'Inventó o dio algo incorrecto', tono: 'Tono o redacción' }
 const hora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
 
 function Marca({ ok }) {
@@ -77,6 +79,7 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
   const [cargando, setCargando] = useState(true)
   const [fallo, setFallo] = useState(null)
   const [corrigiendo, setCorrigiendo] = useState(false)
+  const [motivando, setMotivando] = useState(false)   // eligiendo el motivo de un 👎 rápido
   const [texto, setTexto] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [copiado, setCopiado] = useState(false)
@@ -85,7 +88,7 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
 
   const cargar = async (regenerar = false) => {
     const mia = ++seq.current
-    setCargando(true); setFallo(null); setVivo([]); setHace('Empezando…'); setCorrigiendo(false); setTexto(''); setCopiado(false)
+    setCargando(true); setFallo(null); setVivo([]); setHace('Empezando…'); setCorrigiendo(false); setMotivando(false); setTexto(''); setCopiado(false)
     const r = await api.aiSuggestStream(ticketId, regenerar, (e) => {
       if (mia !== seq.current) return
       if (e.paso) setVivo((v) => [...v, e.paso])
@@ -134,11 +137,11 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
     toast?.('Insertada en la respuesta: revísala antes de enviar')
     onClose?.()
   }
-  const valorar = async (rating, correction) => {
+  const valorar = async (rating, correction, reason) => {
     setGuardando(true)
-    const r = await api.aiRate(s.id, rating, correction)
+    const r = await api.aiRate(s.id, rating, correction, reason ?? s.reason)
     setGuardando(false)
-    if (r?.ok) { setS(r.suggestion); setCorrigiendo(false); toast?.(rating === 'up' ? 'Gracias: anotado' : 'Corrección guardada: la IA la tendrá en cuenta') }
+    if (r?.ok) { setS(r.suggestion); setCorrigiendo(false); setMotivando(false); toast?.(rating === 'up' ? 'Gracias: anotado' : correction ? 'Corrección guardada: la IA la tendrá en cuenta' : 'Anotado: gracias') }
     else toast?.(r?.error || 'No se pudo guardar la valoración', 'err')
   }
 
@@ -222,9 +225,15 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
                 <h3>¿Qué te parece? <a className="ai-sub" href="/formacion-ia.html" target="_blank" rel="noopener">¿Cómo se valora?</a></h3>
                 {s.rating ? (
                   <div className="ai-done">
-                    <p>{s.rating === 'up' ? (noSabe ? 'Anotado: era un caso para una persona.' : 'Valoraste esta sugerencia como útil.') : 'Corrección guardada. Gracias, así aprende.'}</p>
+                    <p>{s.rating === 'up' ? (noSabe ? 'Anotado: era un caso para una persona.' : 'Valoraste esta sugerencia como útil.') : s.correction ? 'Corrección guardada. Gracias, así aprende.' : `Anotado: ${MOTIVOS[s.reason] || 'no te sirvió'}.`}</p>
                     {s.rating === 'down' && s.correction ? <q>{s.correction}</q> : null}
-                    {s.rating === 'down' && <div className="ai-act"><button className="btn sm primary" onClick={() => cargar(true)}>Generar de nuevo con esta indicación</button></div>}
+                    {s.rating === 'down' && (
+                      <div className="ai-act">
+                        {s.correction
+                          ? <button className="btn sm primary" onClick={() => cargar(true)}>Generar de nuevo con esta indicación</button>
+                          : <button className="btn sm" onClick={() => { setS({ ...s, rating: null }); setCorrigiendo(true) }}><Icon.pencil aria-hidden="true" /> Añadir cómo debía responder</button>}
+                      </div>
+                    )}
                   </div>
                 ) : corrigiendo ? (
                   <div className="ai-fix">
@@ -236,10 +245,21 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
                       <button className="btn sm ghost" onClick={() => setCorrigiendo(false)}>Cancelar</button>
                     </div>
                   </div>
+                ) : motivando ? (
+                  <div className="ai-motivos">
+                    <p className="ai-sub">¿Qué falló? Un clic y queda anotado.</p>
+                    <div className="ai-chips">
+                      {Object.entries(MOTIVOS).map(([k, t]) => <button key={k} className="ai-chip" disabled={guardando} onClick={() => valorar('down', '', k)}>{t}</button>)}
+                    </div>
+                    <div className="ai-act">
+                      <button className="btn sm" onClick={() => { setMotivando(false); setCorrigiendo(true) }}><Icon.pencil aria-hidden="true" /> Prefiero explicarlo</button>
+                      <button className="btn sm ghost" onClick={() => setMotivando(false)}>Cancelar</button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="ai-act">
                     <button className="btn sm" onClick={() => valorar('up')} disabled={guardando}><Icon.check aria-hidden="true" /> {noSabe ? 'Mejor una persona' : 'Útil'}</button>
-                    <button className="btn sm" onClick={() => setCorrigiendo(true)}><Icon.pencil aria-hidden="true" /> {noSabe ? 'Sí sabía' : 'Corregir'}</button>
+                    <button className="btn sm" onClick={() => (noSabe ? setCorrigiendo(true) : setMotivando(true))}><Icon.pencil aria-hidden="true" /> {noSabe ? 'Sí sabía' : 'No me sirve'}</button>
                     <button className="btn sm ghost ai-re" onClick={() => cargar(true)}><Icon.refresh aria-hidden="true" /> Otra sugerencia</button>
                   </div>
                 )}

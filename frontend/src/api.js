@@ -482,8 +482,8 @@ export const api = {
     } finally { clearTimeout(timer) }
   },
   aiStatus: () => req('ai_suggestions.php?action=status'),
-  aiRate: (id, rating, correction) => req('ai_suggestions.php?action=rate', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, rating, correction }),
+  aiRate: (id, rating, correction, reason) => req('ai_suggestions.php?action=rate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, rating, correction, reason }),
   }),
   aiUsed: (id) => req('ai_suggestions.php?action=used', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),

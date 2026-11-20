@@ -138,6 +138,26 @@ class AiSuggestionsTest extends TestCase
         $this->assertSame(1, app(\App\Services\Ai\AiSuggestionService::class)->historial('down')['total']);
     }
 
+    public function test_un_pulgar_abajo_rapido_con_motivo_se_apunta_pero_no_ensena_a_la_ia(): void
+    {
+        $this->activar();
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $tok = $this->agente();
+        $id = $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->json('suggestion.id');
+        $r = $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $id, 'rating' => 'down', 'reason' => 'derivar'])->assertOk();
+        $this->assertSame('derivar', $r->json('suggestion.reason'));
+        $fila = DB::table('ai_suggestions')->where('id', $id)->first();
+        $this->assertNull($fila->correction);
+        $this->assertSame(0, app(\App\Services\Ai\AiSuggestionService::class)->revisionPendiente()['pending'], 'sin texto no hay nada que revisar');
+        $h = app(\App\Services\Ai\AiSuggestionService::class)->historial('down');
+        $this->assertSame('Debía pasarlo a una persona', $h['items'][0]['reason']);
+        // Un motivo inventado y sin texto no vale.
+        $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $id, 'rating' => 'down', 'reason' => 'xx'])->assertStatus(422);
+        // Con corrección escrita además del motivo, la corrección sí pasa a la memoria.
+        $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=rate', ['id' => $id, 'rating' => 'down', 'reason' => 'dato', 'correction' => 'Debía derivarlo a garantías.'])->assertOk();
+        $fila = DB::table('ai_suggestions')->where('id', $id)->first();
+        $this->assertSame('validated', $fila->correction_status);
+    }
     public function test_la_medicion_cuenta_cuanto_se_aprovecha_el_borrador_y_compara_tiempos(): void
     {
         $this->activar();

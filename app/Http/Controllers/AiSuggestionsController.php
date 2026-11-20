@@ -188,7 +188,7 @@ class AiSuggestionsController extends Controller
             return response()->json(['ok' => false, 'error' => 'Sugerencia no encontrada'], 404);
         }
         try {
-            $r = $this->ai->rate($s->id, (string) $request->input('rating'), $request->input('correction'), $request->user()->id);
+            $r = $this->ai->rate($s->id, (string) $request->input('rating'), $request->input('correction'), $request->user()->id, $request->input('reason'));
         } catch (InvalidArgumentException $e) {
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
@@ -218,7 +218,7 @@ class AiSuggestionsController extends Controller
         return [
             'id' => (int) $s->id, 'ticket_id' => (int) $s->ticket_id, 'status' => $s->status, 'body' => $s->body,
             'sources' => json_decode((string) $s->sources, true) ?: ['faqs' => [], 'examples' => []],
-            'rating' => $s->rating, 'correction' => $s->correction, 'used' => $s->used_at !== null,
+            'rating' => $s->rating, 'correction' => $s->correction, 'reason' => $s->reason ?? null, 'used' => $s->used_at !== null,
             'model' => $s->model, 'created_at' => $s->created_at,
             // Solo este motivo se enseña al agente; el resto de errores técnicos no salen del servidor.
             'limit_reached' => str_starts_with((string) ($s->error ?? ''), 'Se alcanzó el tope mensual'),

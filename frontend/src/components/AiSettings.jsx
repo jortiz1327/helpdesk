@@ -242,6 +242,7 @@ function AiHistorial() {
                     <summary>{x.subject || 'Ver detalle'}</summary>
                     <dl>
                       <div><dt>La IA sugirió</dt><dd>{x.ai || '—'}</dd></div>
+                      {x.reason ? <div><dt>Motivo</dt><dd>{x.reason}</dd></div> : null}
                       {x.correction ? <div><dt>La persona indicó{x.status ? ` (${ESTADO[x.status] || x.status})` : ''}</dt><dd>{x.correction}</dd></div> : null}
                       <div><dt>Se envió al cliente</dt><dd>{x.sent ? <>{x.sent.text}<small className="muted"> — {x.sent.by || 'sistema'}, {fmtDate(x.sent.at)}</small></> : 'Todavía nada tras esta sugerencia'}</dd></div>
                     </dl>
