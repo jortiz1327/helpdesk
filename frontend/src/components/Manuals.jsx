@@ -18,6 +18,19 @@ export default function Manuals() {
   const load = () => { setErr(false); api.listManuals().then((d) => d.ok ? setList(d.manuals || []) : setErr(true)).catch(() => setErr(true)) }
   useEffect(() => { load() }, [])
 
+  /* Flujo de la IA: página aparte (otra pestaña) con el recorrido completo. Se abre la pestaña al pulsar (para que no la bloquee el navegador) y luego se le da el enlace firmado. */
+  const [flujoOn, setFlujoOn] = useState(false)
+  const [abriendo, setAbriendo] = useState(false)
+  useEffect(() => { api.aiStatus().then((r) => setFlujoOn(!!r?.enabled)).catch(() => {}) }, [])
+  const abrirFlujo = async () => {
+    setAbriendo(true)
+    const w = window.open('', '_blank')
+    const r = await api.aiFlowLink().catch(() => null)
+    setAbriendo(false)
+    if (r?.ok && r.url) { if (w) w.location.href = r.url; else window.location.href = r.url }
+    else { w?.close(); toast('No se pudo abrir el flujo de la IA', 'err') }
+  }
+
   const descargar = async (m) => {
     setBusy(m.key)
     const r = await api.downloadManual(m.key)
@@ -47,6 +60,20 @@ export default function Manuals() {
             Aquí tienes los manuales que corresponden a tu puesto. Descárgalos en PDF para consultarlos
             cuando quieras.
           </p>
+
+          {flujoOn && (
+            <div className="man-card man-flujo">
+              <span className="man-ic"><Icon.bolt /></span>
+              <div className="man-meta">
+                <b>Flujo de la IA</b>
+                <span className="man-desc">Cómo piensa la sugerencia de la IA, paso a paso, de que el cliente escribe a que tú decides. Se abre en otra pestaña.</span>
+                <span className="man-sub">Página interactiva · solo para agentes</span>
+              </div>
+              <button className="btn primary" disabled={abriendo} onClick={abrirFlujo}>
+                <Icon.bolt /> {abriendo ? 'Abriendo…' : 'Abrir flujo'}
+              </button>
+            </div>
+          )}
 
           {list === null ? <div className="center-load"><div className="spinner" /></div> :
             err ? <LoadError onRetry={load} msg="No se pudieron cargar los manuales" /> :

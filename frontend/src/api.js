@@ -508,6 +508,8 @@ export const api = {
   uploadInlineImage: (file) => { const fd = new FormData(); fd.append('file', file); return req('inline_media.php', { method: 'POST', body: fd }) },
   // Manuales (apartado «Ayuda»): lista filtrada por rol.
   listManuals: () => req('manuals.php'),
+  // Enlace firmado (1 h) a la página del flujo de la IA, solo para agentes.
+  aiFlowLink: () => req('ai_flow.php'),
   // Descarga un manual: binaria (PDF), con el token en cabecera. Devuelve { ok, blob, filename }.
   downloadManual: async (key) => {
     try {

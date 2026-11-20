@@ -27,6 +27,9 @@ Route::prefix('ia/casos')->controller(\App\Http\Controllers\AiCasosController::c
     Route::post('/api/{id}', 'guardar')->whereNumber('id');
 });
 
+// Flujo de la IA para los agentes (también en producción): solo con el enlace firmado que da la app (Ayuda › Manuales).
+Route::get('/flujo-ia', [\App\Http\Controllers\AiFlowController::class, 'page'])->middleware('signed:relative')->name('ia.flujo.agentes');
+
 // Chats de prueba de la IA: SOLO local (el controlador da 404 si config('ai.lab') está apagado).
 Route::prefix('ia')->controller(\App\Http\Controllers\AiLabController::class)->group(function () {
     Route::get('/', 'page');

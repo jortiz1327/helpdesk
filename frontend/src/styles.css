@@ -3899,6 +3899,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .man-grid { display: grid; gap: 12px; }
 .man-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px;
   background: var(--card, #fff); border: 1px solid var(--border, #e2e6ea); border-radius: 12px; }
+.man-flujo { margin-bottom: 14px; border-color: color-mix(in srgb, var(--accent, #3047d4) 35%, var(--border, #e2e6ea)); }
 .man-ic { width: 42px; height: 42px; border-radius: 10px; background: var(--primary-soft);
   display: grid; place-items: center; flex: 0 0 auto; }
 .man-ic svg { width: 22px; height: 22px; fill: var(--primary); }

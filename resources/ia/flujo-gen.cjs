@@ -41,7 +41,7 @@ function box(id, cx, y, w, kind, title, ls, o = {}) {
   anchors(id, cx, y, w, h);
   let ic = '', dx = 0;
   if (o.icon) { dx = 12; ic = icono(o.icon, cx - (title.length * 7.6) / 2 - 12, y + 10); }
-  out.push(`<g style="--k:var(--k-${kind})" class="n${o.cls ? ' ' + o.cls : ''}"><rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="11"/>${ic}${texto(cx, y + 26, title, ls, dx)}${o.badge ? insignia(cx - w / 2, y, o.badge) : ''}</g>`);
+  out.push(`<g data-n="${id}" tabindex="0" style="--k:var(--k-${kind})" class="n${o.cls ? ' ' + o.cls : ''}"><rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="11"/>${ic}${texto(cx, y + 26, title, ls, dx)}${o.badge ? insignia(cx - w / 2, y, o.badge) : ''}</g>`);
   return N[id];
 }
 // Pregunta (decisión): cápsula con un «?» a la izquierda
@@ -50,14 +50,14 @@ function dia(id, cx, y, w, kind, ls, o = {}) {
   anchors(id, cx, y, w, h);
   const y0 = y + h / 2 - (ls.length - 1) * TS / 2 + 4.2;
   const qx = cx - w / 2 + 24;
-  out.push(`<g style="--k:var(--k-${kind})" class="n q"><rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="${h / 2}"/><circle class="qm" cx="${qx}" cy="${y + h / 2}" r="11"/><text x="${qx}" y="${y + h / 2 + 4.6}" class="qt">?</text>${ls.map((l, i) => `<text x="${cx + 14}" y="${y0 + i * TS}" class="s q">${esc(l)}</text>`).join('')}${o.badge ? insignia(cx - w / 2 + 6, y + 4, o.badge) : ''}</g>`);
+  out.push(`<g data-n="${id}" tabindex="0" style="--k:var(--k-${kind})" class="n q"><rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="${h / 2}"/><circle class="qm" cx="${qx}" cy="${y + h / 2}" r="11"/><text x="${qx}" y="${y + h / 2 + 4.6}" class="qt">?</text>${ls.map((l, i) => `<text x="${cx + 14}" y="${y0 + i * TS}" class="s q">${esc(l)}</text>`).join('')}${o.badge ? insignia(cx - w / 2 + 6, y + 4, o.badge) : ''}</g>`);
   return N[id];
 }
 // Conector: «viene de / vuelve a»
 function chip(id, cx, y, w, kind, texto_, sinIcono) {
   const h = 32;
   anchors(id, cx, y, w, h);
-  out.push(`<g style="--k:var(--k-${kind})" class="chip"><rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="16"/>${sinIcono ? '' : icono('loop', cx - w / 2 + 12, y + 8, 0.66)}<text x="${cx + (sinIcono ? 0 : 10)}" y="${y + 20}" >${esc(texto_)}</text></g>`);
+  out.push(`<g data-n="${id}" tabindex="0" style="--k:var(--k-${kind})" class="chip"><rect x="${cx - w / 2}" y="${y}" width="${w}" height="${h}" rx="16"/>${sinIcono ? '' : icono('loop', cx - w / 2 + 12, y + 8, 0.66)}<text x="${cx + (sinIcono ? 0 : 10)}" y="${y + 20}" >${esc(texto_)}</text></g>`);
   return N[id];
 }
 const P = (pts) => 'M' + pts.map((p) => p.join(',')).join(' L');
@@ -287,9 +287,17 @@ ${labels.join('\n')}
 const anclas = secciones.map((s) => `<span class="ancla" id="cap-${s.letra.toLowerCase()}" style="top:${(s.y / H * 100).toFixed(3)}%"></span>`).join('');
 const html = `<!--LIENZO-->${svg}${anclas}<!--/LIENZO-->`;
 
-const vista = path.join(__dirname, '..', 'views', 'ia-flujo.blade.php');
-const src = fs.readFileSync(vista, 'utf8');
-const a = src.indexOf('<!--LIENZO-->'), b = src.indexOf('<!--/LIENZO-->') + '<!--/LIENZO-->'.length;
-if (a < 0 || b < a) { console.error('Faltan los marcadores <!--LIENZO--> en la vista'); process.exit(1); }
-fs.writeFileSync(vista, src.slice(0, a) + html + src.slice(b));
-console.log('ia-flujo.blade.php actualizado (' + html.length + ' bytes, alto ' + H + ')');
+const INFO = require('./flujo-info.cjs');
+const infoJson = JSON.stringify(INFO).replace(/</g, '\\u003c');
+for (const nombre of ['ia-flujo.blade.php', 'ia-flujo-agentes.blade.php']) {
+  const vista = path.join(__dirname, '..', 'views', nombre);
+  if (!fs.existsSync(vista)) continue;
+  const src = fs.readFileSync(vista, 'utf8');
+  const a = src.indexOf('<!--LIENZO-->'), b = src.indexOf('<!--/LIENZO-->') + '<!--/LIENZO-->'.length;
+  if (a < 0 || b < a) { console.error('Faltan los marcadores <!--LIENZO--> en ' + nombre); process.exit(1); }
+  let nuevo = src.slice(0, a) + html + src.slice(b);
+  nuevo = nuevo.replace(/<!--INFO-->[\s\S]*?<!--\/INFO-->/, () => '<!--INFO--><script type="application/json" id="flujo-info">' + infoJson + '</script><!--/INFO-->');
+  fs.writeFileSync(vista, nuevo);
+  console.log(nombre + ' actualizado (' + html.length + ' bytes, alto ' + H + ')');
+}
+if (process.env.IDS) { for (const k of Object.keys(N)) console.log(k); }
