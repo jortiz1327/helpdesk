@@ -397,13 +397,26 @@ class AiSuggestionService
             return $derivar('garantias', 'garantía');
         }
         // Problema de uso, primera vez que escribe y no se sabe quién es: se piden hotel y correo (y nada más).
-        $uso = preg_match('/no (se )?(cambian|cambia|actualizan|actualiza|refrescan)|no (me )?(deja|dejan) (entrar|acceder)|no (puedo|podemos) (entrar|acceder)|unauthorized|error al (emparejar|vincular)/', $t);
+        $uso = preg_match('/(no|tampoco) (se )?(cambian|cambia|actualizan|actualiza|refrescan)|no (me )?(deja|dejan) (entrar|acceder)|no (puedo|podemos) (entrar|acceder)|unauthorized|error al (emparejar|vincular)/', $t);
         if ($uso && ! $yaRespondio && ! $hotelNombrado && $estadoCorreo !== 'verificado') {
             return ['decision' => 'pedir_datos', 'resumen' => 'pedir hotel y correo',
                 'instruccion' => 'PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas), sin dar pasos, diagnóstico ni derivar.'];
         }
         // Lo que parece garantía pero lo hace el hotel: sustituir una etiqueta rota por otra que ya tienen (dan su código) y darla de alta
         // en la posición, o poner pilas nuevas y forzar. Sin pedir envío ni garantía. No se deriva: primero se identifica y luego se explica.
+        // Piden etiquetas de reposición pero alguna solo está bloqueada o no cambia (aunque la fuercen) y no han probado el reinicio: primero
+        // el reinicio de esa (la dañada, por humedad o pantalla rota, no se menciona). No es solo garantía.
+        $pideReposicion = preg_match('/reposicion|envi\w*.{0,40}etiquetas?|etiquetas?.{0,20}nuev/s', $t);
+        $bloqueada = preg_match('/bloquead|(no|tampoco) (se )?(cambia|cambian)/', $t);
+        $yaProbo = preg_match('/pilas (nuevas|cambiad)|cambiad\w* (las )?pilas|cambiamos las pilas|quitad\w* (las )?pilas|reinicio|reiniciad/', $t);
+        if ($pideReposicion && $bloqueada && ! $yaProbo && ! $yaRespondio && ! preg_match('/garantia/', $t)) {
+            if (! $hotelNombrado && $estadoCorreo !== 'verificado') {
+                return ['decision' => 'pedir_datos', 'resumen' => 'pedir hotel y correo (una está solo bloqueada)',
+                    'instruccion' => 'PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas), sin dar pasos ni derivar.'];
+            }
+            return ['decision' => 'responder', 'resumen' => 'reinicio de la etiqueta bloqueada antes de derivar',
+                'instruccion' => 'Alguna de las etiquetas solo está BLOQUEADA o no cambia (sin daño visible): NO derives todavía. Explica el protocolo de reinicio de la etiqueta de la guía (quitar las pilas 15 minutos, con las antenas en línea) para esa. NO menciones la etiqueta dañada (humedad, pantalla rota) ni prometas sustituir o enviar nada. Si el correo no está verificado, pídelo primero (VERIFICACIÓN DEL CLIENTE).'];
+        }
         $sinEnvio = ! preg_match('/envi|garantia|repuesto|pedido|presupuesto|nuevas etiquetas|comprar/', $t);
         $reasignar = $sinEnvio && preg_match('/(sustitu|reempla|cambiar).{0,120}(rot[ao]s?|pantalla)|(rot[ao]s?|pantalla).{0,120}(sustitu|reempla)/s', $t) && preg_match('/\balta\b/', $t);
         $pilasForzar = $sinEnvio && preg_match('/pilas?.{0,60}(forz|actualiz)|(forz|actualiz).{0,60}pilas?/s', $t);

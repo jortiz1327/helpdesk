@@ -39,6 +39,16 @@ class AiDecidirTest extends TestCase
         $this->assertNull(AiSuggestionService::decidir('Hay que sustituir una etiqueta con la pantalla rota, envíennos una nueva y denla de alta', $this->conv('x'), null, false));
     }
 
+    public function test_reposicion_con_una_etiqueta_solo_bloqueada_va_primero_al_reinicio(): void
+    {
+        $t = 'Dos etiquetas no cambian aunque forcemos. Una tiene humedad. La otra se ha quedado bloqueada. Necesitamos que nos envien dos etiquetas nuevas de reposicion';
+        $this->assertSame('pedir_datos', AiSuggestionService::decidir($t, $this->conv('x'), null, false)['decision']);
+        $d = AiSuggestionService::decidir($t, $this->conv('x'), null, true);
+        $this->assertSame('responder', $d['decision']);
+        $this->assertStringNotContainsString('DERIVAR', $d['instruccion']);
+        $this->assertNull(AiSuggestionService::decidir($t . ' Ya cambiamos las pilas', $this->conv('x'), null, true), 'si ya probó el reinicio, decide el modelo');
+    }
+
     public function test_garantia_deriva_pero_la_de_farmacia_la_decide_el_modelo(): void
     {
         $this->assertSame('garantias', explode('|', explode('DERIVAR:', AiSuggestionService::decidir('Queremos la garantía', $this->conv('x'), null, false)['instruccion'])[1])[0]);
@@ -54,6 +64,7 @@ class AiDecidirTest extends TestCase
     {
         $d = AiSuggestionService::decidir('Las etiquetas no se actualizan', $this->conv('x'), null, false);
         $this->assertSame('pedir_datos', $d['decision']);
+        $this->assertSame('pedir_datos', AiSuggestionService::decidir('La de CL02-05 debería poner otro plato y tampoco cambia', $this->conv('x'), null, false)['decision']);
         $this->assertNull(AiSuggestionService::decidir('Las etiquetas no se actualizan', $this->conv('x', true), null, false), 'en un seguimiento decide el modelo');
         $this->assertNull(AiSuggestionService::decidir('Las etiquetas no se actualizan', $this->conv('x'), null, true), 'con hotel identificado decide el modelo');
         $this->assertNull(AiSuggestionService::decidir('Las etiquetas no se actualizan', $this->conv('x'), 'verificado', false), 'con correo verificado decide el modelo');
