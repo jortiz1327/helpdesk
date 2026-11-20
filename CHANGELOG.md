@@ -11,11 +11,16 @@ cambios de comportamiento) y **Arreglos** (bugs corregidos).
   conocimiento (`ai:indexar --solo=plantillas`; también en la pasada nocturna y en «Actualizar conocimiento»). La IA
   ve las 2 más parecidas y, si una encaja, la usa casi literal. Se excluyen las de cierre/estado automático, saludos,
   pruebas, con huecos sin rellenar y las de garantía. No cambian el orden de decisión (si manda derivar, deriva).
-- Prompt reescrito: reglas en `resources/ai/prompt-reglas.md`, una sola prioridad, de 43.000 a 29.500 caracteres,
-  con test de auditoría de contradicciones. Medido sobre 19 casos nuevos (4 repeticiones): 67 % frente a 66 % del
-  prompt anterior (sin mejora medible, sí más corto y coherente).
-- Reglas ajustadas: presupuestos (pedir el correo vs. pedir que lo preparemos), sustituir una etiqueta estropeada por
-  una sobrante y errores de permisos con hotel nombrado (lo hace el hotel; se pide el correo).
+- Mapa de la aplicación de hoteles (índice de la documentación) siempre presente en el prompt, y búsqueda de guías por
+  título y por sinónimos (snack, horario, apertura… → Servicios) para que llegue la guía que toca.
+- Prompt reescrito: reglas en `resources/ai/prompt-reglas.md`, una sola prioridad y sin repeticiones (de 43.000 a
+  ~14.500 caracteres fijos), con test de auditoría. Garantías vuelven al primer punto del orden (derivar sin preguntar).
+- Reglas ajustadas: presupuestos (pedir el correo vs. pedir que lo preparemos), sustituir/codificar/parametrizar una
+  etiqueta (lo hace el hotel), activar o crear servicios e idiomas (lo hace el hotel), errores de permisos con hotel
+  nombrado, y usuario/contraseña que no funciona (derivar sin preguntar).
+- Documentación nueva: stock en farmacias tras la nueva versión (`resources/ai-docs/soporte/farmacias-stock-en-etiquetas.md`).
+- Los criterios de las propuestas de `ai:prerrellenar` se alinean con las reglas actuales.
+- Medido en un lote nuevo de 20 casos revisados (4 repeticiones): 75 % (60/80) frente a 65 % (52/80) del prompt de 1.6.0.
 - Sin migraciones.
 
 ### Arreglos

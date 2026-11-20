@@ -127,12 +127,14 @@ const VERSIONS = [
     {
         version: "1.7.0",
         date: "19 nov 2026",
-        resumen: "El asistente de IA responde con más criterio y aprovecha las plantillas de respuesta del equipo.",
+        resumen: "El asistente de IA acierta más: conoce mejor la aplicación de hoteles y aprovecha las plantillas de respuesta del equipo.",
         mejoras: [
+            "La IA tiene siempre a mano el mapa de la aplicación de hoteles, así que ya no dice que el equipo hace lo que el propio hotel puede hacer (servicios, idiomas, posiciones, usuarios…).",
             "Si una plantilla de respuesta del equipo encaja con lo que pide el cliente, la IA la usa como base en su sugerencia, adaptada al caso.",
-            "Las instrucciones de la IA se han ordenado y acortado: sigue una sola prioridad y se contradice menos.",
+            "Encuentra mejor la guía que toca (por ejemplo, la de Servicios o la de Idiomas) aunque el cliente no use esa palabra.",
             "Distingue mejor entre pedir un correo para un presupuesto (se le da el de postventa) y pedir que se lo preparemos (pasa a Pedidos y facturas).",
-            "Aclara qué hace el propio hotel (usuarios, permisos, cambiar etiquetas por otras que ya tiene) y qué hace el equipo.",
+            "Los problemas de usuario o contraseña y las garantías se derivan a una persona sin hacer preguntas.",
+            "Sabe explicar qué hacer cuando una farmacia deja de ver el stock en las etiquetas.",
         ],
     },
     {
