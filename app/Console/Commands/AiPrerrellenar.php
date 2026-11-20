@@ -19,6 +19,7 @@ class AiPrerrellenar extends Command
 
     private const CRITERIOS = <<<'TXT'
 Criterios del revisor (aplícalos):
+- NORMA DE LA DIRECCIÓN (la primera): en un hotel SIEMPRE se verifica antes de contestar, pedir otros datos o derivar. Si en el mensaje no constan hotel y correo (o solo el correo si el hotel ya consta), la decisión es pedir_info, también en temas que luego se derivan (garantías, contraseñas, alérgenos). Se exceptúan pedidos de material, presupuestos, farmacias y tiendas.
 - Hotel Don Pancho (aparece en el asunto, el mensaje o el correo): SIEMPRE derivar; su aplicación no la gestionamos nosotros.
 - Alérgenos: lo que afecta a un PLATO concreto (qué lleva, falta o está mal) se deriva sin preguntar. Qué alérgenos y distintivos se muestran (Configuración > Alérgenos: activar o desactivar, «solo salen 17») lo hace el propio hotel: responder explicando los pasos.
 - Como mucho DOS preguntas por mensaje; si no se sabe quién escribe, solo hotel y correo.

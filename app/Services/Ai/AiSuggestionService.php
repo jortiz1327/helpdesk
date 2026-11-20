@@ -387,6 +387,19 @@ class AiSuggestionService
         }
         // Temas que SIEMPRE lleva una persona (la farmacia es otra regla: la lleva Expofarm).
         $farmacia = str_contains($t, 'farmacia');
+        // REGLA DE LA DIRECCIÓN (20-nov): en un hotel, SIEMPRE se verifica antes de contestar, pedir otros datos o derivar. Si aún no hay
+        // correo verificado (ni se intentó comprobar), lo primero es pedir hotel y correo. Salvo: pedidos de material y presupuestos (no
+        // dependen del hotel), farmacias, tiendas y supermercados (otras áreas, otra verificación).
+        $material = preg_match('/presupuesto|(comprar|compra|pedir|pedido|reponer|necesit[a-z]+)\b.{0,40}(pilas|soportes?|recambios?|pinzas|etiquetas)/s', $t);
+        $otraArea = $farmacia || preg_match('/tienda|supermercado/', $t);
+        $acuse = mb_strlen($t) < 200 && preg_match('/gracias|ya funciona|solucionado|resuelto/', $t) && ! str_contains($t, '?');
+        if (! $acuse && ! in_array($estadoCorreo, ['verificado', 'incompleto', 'no_encontrado'], true) && ! $material && ! $otraArea) {
+            return ['decision' => 'pedir_datos', 'resumen' => $hotelNombrado ? 'verificar primero: pedir el correo' : 'verificar primero: pedir hotel y correo',
+                'instruccion' => ($hotelNombrado
+                    ? 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. El hotel ya consta: PIDE SOLO el correo con el que accede a la aplicación.'
+                    : 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas).')
+                    . ' No des pasos, diagnóstico ni derives todavía; di que en cuanto lo confirme se lo atiende.'];
+        }
         // Alérgenos: lo sensible (qué lleva un plato, datos mal o ausentes) lo lleva una persona; qué alérgenos se muestran lo configura el hotel.
         $configuraAlergenos = preg_match('/alergen/', $t)
             && preg_match('/\b(activar|activa|activado|desactivar|apagar|encender|ocultar|aparec\w*|salen|lista|cuantos)\b|configuracion/', $t)
@@ -1035,7 +1048,7 @@ class AiSuggestionService
                     return $cab . $antenas;
                 }
                 return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "». Falta comprobar su correo.\n"
-                    . "- VERIFICAR PRIMERO, EXPLICAR DESPUÉS: si lo que pide implica CONFIGURAR algo de su buffet en la aplicación (crear o editar posiciones, isletas, etiquetas, servicios, ruedas…), NO expliques todavía los pasos: pídele el correo con el que accede a la aplicación (el hotel ya lo tienes) y dile que, en cuanto lo confirme, le indicas cómo hacerlo; una petición simple de explicación de cómo se usa o se accede a la aplicación (entrar desde el móvil, qué hace una pantalla) sí se explica directamente. Pide el correo siempre que necesites datos concretos de ese hotel (usuarios, permisos, etiquetas concretas).\n" . $comun;
+                    . "- VERIFICAR PRIMERO, EXPLICAR DESPUÉS: si lo que pide implica CONFIGURAR algo de su buffet en la aplicación (crear o editar posiciones, isletas, etiquetas, servicios, ruedas…), NO expliques todavía los pasos: pídele el correo con el que accede a la aplicación (el hotel ya lo tienes) y dile que, en cuanto lo confirme, le indicas cómo hacerlo. REGLA DE LA DIRECCIÓN: en un hotel SIEMPRE se verifica antes de explicar, pedir otros datos o derivar, también para una duda simple de uso. Pide el correo siempre que necesites datos concretos de ese hotel (usuarios, permisos, etiquetas concretas).\n" . $comun;
             }
             return $cab . "- El hotel que nombra no se localiza en nuestro sistema" . ($dirFalla ? ' (no se pudo consultar ahora)' : '') . ". Pídele el nombre exacto del hotel y el correo con el que accede a la aplicación.\n" . $comun . $derivar;
         }

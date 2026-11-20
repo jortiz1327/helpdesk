@@ -308,7 +308,7 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringContainsString('el correo con el que accede', $p);
         $this->assertStringContainsString('nunca digas que hay varios con ese nombre', $p);
         $this->assertStringContainsString('No preguntes lo obvio ni lo inventado', $p);
-        $this->assertStringContainsString('DERIVA sin preguntar nada', $p);
+        $this->assertStringContainsString('DERIVA sin preguntar más', $p);
     }
 
     public function test_un_correo_que_no_esta_en_la_app_no_recibe_datos_de_hoteles(): void
