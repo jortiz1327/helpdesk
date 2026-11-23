@@ -92,6 +92,30 @@ class ContactoHotel
         return $igual ? null : $nombre;
     }
 
+    /**
+     * Un contacto sin correo (típico de WhatsApp) da el suyo y AdminHoteles lo confirma: se guarda en su ficha para no volver a pedirlo.
+     * El correo es único: si ya es de otra ficha no se toca nada y se devuelve su id para que una persona las una (Contactos › Unir fichas).
+     *
+     * @return array{estado:string, otro?:int}|null  null si no había nada que hacer (el contacto ya tiene correo o el correo no es válido)
+     */
+    public static function guardarCorreo(?int $contactId, string $email): ?array
+    {
+        $email = mb_strtolower(trim($email));
+        if (! $contactId || $email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+        $c = DB::table('contacts')->where('id', $contactId)->first(['email']);
+        if (! $c || trim((string) $c->email) !== '') {
+            return null;
+        }
+        $otro = DB::table('contacts')->whereRaw('LOWER(email) = ?', [$email])->where('id', '<>', $contactId)->value('id');
+        if ($otro) {
+            return ['estado' => 'duplicado', 'otro' => (int) $otro];
+        }
+        DB::table('contacts')->where('id', $contactId)->update(['email' => $email]);
+        return ['estado' => 'guardado'];
+    }
+
     /** La sede de ese hotel (por id de AdminHoteles o por nombre); si no existe se crea bajo su grupo, en la marca «Sin marca». */
     private static function sede(string $nombre, string $hotelId, string $grupo): int
     {

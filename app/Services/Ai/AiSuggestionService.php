@@ -1229,6 +1229,15 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             if ($nuevo) {
                 $this->paso('hotel', true, 'Hotel guardado para los próximos tickets de este contacto: ' . $nuevo);
             }
+            // Contacto sin correo (WhatsApp) que lo ha dado y AdminHoteles lo confirma: se guarda en su ficha.
+            if (mb_strtolower($e) !== mb_strtolower(trim((string) $contactEmail))) {
+                $g = ContactoHotel::guardarCorreo($contactId, $e);
+                if (($g['estado'] ?? '') === 'guardado') {
+                    $this->paso('correo', true, "Correo $e guardado en la ficha del contacto (lo dio el cliente y está verificado)");
+                } elseif (($g['estado'] ?? '') === 'duplicado') {
+                    $this->paso('correo', null, "El correo $e ya es de otra ficha (#{$g['otro']}): conviene unirlas en Contactos");
+                }
+            }
         }
         // Traza para el agente: hotel y correo (lo que ve el panel de la sugerencia).
         if ($v['estado'] === 'sin_correo') {

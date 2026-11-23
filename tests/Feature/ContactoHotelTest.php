@@ -56,6 +56,27 @@ class ContactoHotelTest extends TestCase
         $this->assertSame($madrid, (int) DB::table('contacts')->where('id', $keep3)->value('sede_id'));
     }
 
+    public function test_el_correo_que_da_un_contacto_de_whatsapp_se_guarda_en_su_ficha(): void
+    {
+        $wa = DB::table('contacts')->insertGetId(['name' => 'Manolo Hyatt', 'wa_id' => '34600111222']);
+        $this->assertSame(['estado' => 'guardado'], \App\Services\Ai\ContactoHotel::guardarCorreo($wa, ' Manolo@Hotel.COM '));
+        $this->assertSame('manolo@hotel.com', DB::table('contacts')->where('id', $wa)->value('email'));
+
+        // Ya tiene correo: no se pisa.
+        $this->assertNull(\App\Services\Ai\ContactoHotel::guardarCorreo($wa, 'otro@hotel.com'));
+        $this->assertSame('manolo@hotel.com', DB::table('contacts')->where('id', $wa)->value('email'));
+
+        // Correo que ya es de otra ficha: no se toca y se avisa de cuál.
+        $wa2 = DB::table('contacts')->insertGetId(['name' => 'Manolo', 'wa_id' => '34600333444']);
+        $r = \App\Services\Ai\ContactoHotel::guardarCorreo($wa2, 'manolo@hotel.com');
+        $this->assertSame('duplicado', $r['estado']);
+        $this->assertSame($wa, $r['otro']);
+        $this->assertNull(DB::table('contacts')->where('id', $wa2)->value('email'));
+
+        // Texto que no es un correo.
+        $this->assertNull(\App\Services\Ai\ContactoHotel::guardarCorreo($wa2, 'no-es-correo'));
+    }
+
     public function test_la_ficha_del_ticket_dice_que_hotel_se_recuerda_y_si_caduco(): void
     {
         $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
