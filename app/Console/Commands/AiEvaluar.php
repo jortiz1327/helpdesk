@@ -133,10 +133,7 @@ class AiEvaluar extends Command
             $porMarca += $deMarca ? 1 : 0;
             // Derivó con palabras pero SIN dejar la marca: la IA se ha saltado la regla de añadir `[[DERIVAR:…]]` (a vigilar).
             $sinMarca += (! $deMarca && $obtenido === 'derivar') ? 1 : 0;
-            // [VERIF] en el comentario: «responder, pero solo tras verificar hotel y correo». Sin correo conocido, que la IA lo pida es acierto.
-            if ($esperado === 'responder' && $obtenido === 'pedir_info' && preg_match('/\[\s*VERIF\s*\]/i', (string) ($marcas[$c['id']]['comentario'] ?? ''))) {
-                $esperado = 'pedir_info';
-            }
+            $esperado = self::esperadoConVerificacion($esperado, $obtenido, $marcas[$c['id']]['comentario'] ?? null);
             $in += (int) ($r['input_tokens'] ?? 0) + $jin;
             $out += (int) ($r['output_tokens'] ?? 0) + $jout;
             $api = self::necesitaApi($marcas[$c['id']]['comentario'] ?? null);
@@ -175,6 +172,23 @@ class AiEvaluar extends Command
         fclose($h);
         $this->line('Detalle caso a caso: ' . $f);
         return self::SUCCESS;
+    }
+
+    /**
+     * La norma de la dirección (23-nov): en un hotel SIEMPRE se pide hotel y correo ANTES de contestar o derivar. La medición no ve el correo,
+     * así que una marca «responder» o «derivar» con [VERIF] (o un «pedir_info» cuyo comentario empieza por «PRIMERO se verifica…») vale
+     * por las dos órdenes: preguntar primero o ir directamente al destino. Devuelve la decisión esperada ya ajustada.
+     */
+    public static function esperadoConVerificacion(string $esperado, string $obtenido, ?string $comentario): string
+    {
+        $c = (string) $comentario;
+        if (in_array($esperado, ['responder', 'derivar'], true) && $obtenido === 'pedir_info' && preg_match('/\[\s*VERIF\s*\]/i', $c)) {
+            return 'pedir_info';
+        }
+        if ($esperado === 'pedir_info' && $obtenido === 'derivar' && preg_match('/^\s*PRIMERO se verifica.*despu[eé]s se deriva/isu', $c)) {
+            return 'derivar';
+        }
+        return $esperado;
     }
 
     /** ¿El comentario del revisor marca el caso como dependiente de AdminHoteles? (etiqueta [API] en cualquier sitio) */

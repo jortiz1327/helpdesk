@@ -51,7 +51,7 @@ class AiEstabilidad extends Command
                 $vistas[] = $obt;
             }
             $esperado = $m['decision'];
-            $aciertos = count(array_filter($vistas, fn ($v) => $v === $esperado || ($esperado === 'responder' && $v === 'pedir_info' && preg_match('/\[\s*VERIF\s*\]/i', (string) ($m['comentario'] ?? '')))));
+            $aciertos = count(array_filter($vistas, fn ($v) => $v === $esperado || AiEvaluar::esperadoConVerificacion($esperado, $v, $m['comentario'] ?? null) === $v));
             $distintas = count(array_unique($vistas));
             $inestables += $distintas > 1 ? 1 : 0;
             $aciertoTotal += $aciertos;

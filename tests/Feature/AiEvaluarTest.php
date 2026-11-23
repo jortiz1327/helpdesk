@@ -28,6 +28,22 @@ class AiEvaluarTest extends TestCase
         $this->assertFalse(AiEvaluar::necesitaApi(null));
     }
 
+    public function test_la_verificacion_primero_vale_por_las_dos_ordenes(): void
+    {
+        $f = [\App\Console\Commands\AiEvaluar::class, 'esperadoConVerificacion'];
+        // «responder» o «derivar» con [VERIF]: pedir hotel y correo primero es acierto.
+        $this->assertSame('pedir_info', $f('derivar', 'pedir_info', 'Es de garantías [VERIF]'));
+        $this->assertSame('pedir_info', $f('responder', 'pedir_info', '[verif] explicar los pasos'));
+        $this->assertSame('derivar', $f('derivar', 'derivar', '[VERIF]'));
+        // Sin la etiqueta no se perdona: pedir datos donde debía derivar sigue siendo fallo.
+        $this->assertSame('derivar', $f('derivar', 'pedir_info', 'garantías'));
+        // «pedir_info» por «PRIMERO se verifica… después se deriva»: ir directo a derivar también vale.
+        $c = 'PRIMERO se verifica (pedir el correo); después se deriva como dice el resto del comentario.';
+        $this->assertSame('derivar', $f('pedir_info', 'derivar', $c));
+        $this->assertSame('pedir_info', $f('pedir_info', 'responder', $c), 'contestar sola nunca vale');
+        $this->assertSame('pedir_info', $f('pedir_info', 'derivar', 'faltan datos'));
+    }
+
     public function test_el_juez_clasifica_con_el_modelo_y_cae_a_la_regla_si_falla(): void
     {
         $juez = fn (string $dice) => new class($dice) implements AiProvider {
