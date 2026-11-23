@@ -4551,3 +4551,9 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tk-relacionados li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .tk-relacionados small { color: var(--ink-2); }
 .tk-relacionados .link { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+
+.tk-urgente { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 10%, var(--panel-2)); }
+.tk-urgente.alta { border-color: color-mix(in srgb, var(--danger) 55%, var(--line)); background: color-mix(in srgb, var(--danger) 9%, var(--panel-2)); }
+.tk-urgente > svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: var(--warn); }
+.tk-urgente.alta > svg { fill: var(--danger); }
+.tk-urgente small { display: block; color: var(--ink-2); margin-top: 2px; }

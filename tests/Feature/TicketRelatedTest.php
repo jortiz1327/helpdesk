@@ -91,6 +91,17 @@ class TicketRelatedTest extends TestCase
         $this->assertSame([], $this->relacionados($nuevo)->assertOk()->json('related'));
     }
 
+    public function test_avisa_de_urgencia_segun_lo_ultimo_que_escribe_el_cliente_y_no_en_tickets_cerrados(): void
+    {
+        $a = $this->contacto('Marta', 'Hotel Sol');
+        $tk = $this->ticket($a, 'Buffet', 'Ninguna etiqueta del buffet funciona y el desayuno es en una hora');
+        $r = $this->relacionados($tk)->assertOk();
+        $this->assertSame('alta', $r->json('urgency.level'));
+        $normal = $this->ticket($a, 'Usuario', 'Hola, ¿cómo añado un usuario nuevo?');
+        $this->assertNull($this->relacionados($normal)->json('urgency'));
+        DB::table('tickets')->where('id', $tk)->update(['status' => 'cerrado']);
+        $this->assertNull($this->relacionados($tk)->json('urgency'));
+    }
     public function test_un_ticket_que_no_ves_da_404(): void
     {
         $a = $this->contacto('Marta');

@@ -1620,6 +1620,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   const roto = (id) => setRotos((r) => (r[id] ? r : { ...r, [id]: true }))
   const [loadErr, setLoadErr] = useState(false)       // no se pudo cargar el ticket (red/servidor)
   const [masOpen, setMasOpen] = useState(false)       // menú «Más ⋯» de acciones secundarias
+  const [urgencia, setUrgencia] = useState(null)       // aviso de urgencia según lo último que escribió el cliente
   const [relacionados, setRelacionados] = useState([]) // tickets duplicados o relacionados (mismo cliente / mismo hotel con problema parecido)
   const masRef = useRef(null)
 
@@ -1660,8 +1661,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   useEffect(() => { load() }, [load])
   useEffect(() => {
     let vivo = true
-    setRelacionados([])
-    api.ticketRelated(id).then((r) => { if (vivo && r?.ok) setRelacionados(r.related || []) }).catch(() => {})
+    setRelacionados([]); setUrgencia(null)
+    api.ticketRelated(id).then((r) => { if (vivo && r?.ok) { setRelacionados(r.related || []); setUrgencia(r.urgency || null) } }).catch(() => {})
     return () => { vivo = false }
   }, [id])
 
@@ -2503,6 +2504,17 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   <button className="btn sm" onClick={() => onOpenTicket?.(Number(t.merged_into_id))}>
                     Ir a {t.merged_into_code}
                   </button>
+                </div>
+              )}
+
+              {/* Urgencia: solo avisa (no cambia la prioridad); la decisión es del agente. */}
+              {view === 'chat' && !t.merged_into_id && !tkCerrado && urgencia && (
+                <div className={`tk-urgente ${urgencia.level}`} role="note">
+                  <Icon.warn />
+                  <div>
+                    <b>{urgencia.level === 'alta' ? 'Posible urgencia: atiéndelo cuanto antes' : 'Puede tener prisa'}</b>
+                    <small>{urgencia.reasons.join(' · ')}. Detectado por el texto del cliente; compruébalo y ajusta la prioridad si hace falta.</small>
+                  </div>
                 </div>
               )}
 

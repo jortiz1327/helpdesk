@@ -29,7 +29,19 @@ class TicketRelatedController extends Controller
         if (! TicketVisibility::puedeVer($me, $id)) {
             return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
         }
-        return response()->json(['ok' => true, 'related' => $this->buscar($id, $me)]);
+        return response()->json(['ok' => true, 'related' => $this->buscar($id, $me), 'urgency' => $this->urgencia($id)]);
+    }
+
+    /** Aviso de urgencia según lo último que escribió el cliente (sin IA). No cambia nada del ticket. */
+    public function urgencia(int $id): ?array
+    {
+        $t = DB::table('tickets')->where('id', $id)->first(['status', 'channel', 'merged_into_id']);
+        if (! $t || $t->merged_into_id || $t->channel === 'cron' || in_array($t->status, ['resuelto', 'cerrado'], true)) {
+            return null;
+        }
+        $ult = DB::table('messages')->where('ticket_id', $id)->where('direction', 'in')->where('is_internal_note', 0)->whereNotNull('body')
+            ->orderByDesc('id')->limit(2)->pluck('body')->all();
+        return $ult ? \App\Support\Urgency::detectar(implode("\n", array_map(fn ($b) => mb_substr(trim(strip_tags((string) $b)), 0, 1500), $ult))) : null;
     }
 
     public function buscar(int $id, $me): array
