@@ -692,12 +692,12 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
      * Evaluación (comando ai:evaluar): contesta a un caso ya anonimizado como si fuera un ticket nuevo, sin guardar nada
      * y sin consultar datos de ningún hotel. $excluirTicket es el ticket local del propio caso, para que no se «copie».
      */
-    public function evaluarCaso(string $asunto, string $pregunta, ?int $excluirTicket, AiProvider $ai, bool $conApi = false, ?array $conversacion = null): array
+    public function evaluarCaso(string $asunto, string $pregunta, ?int $excluirTicket, AiProvider $ai, bool $conApi = false, ?array $conversacion = null, ?string $canal = null): array
     {
         $this->excluirTicket = $excluirTicket;
         $this->evalApi = $conApi;   // casos [API]: la IA también ve lo que AdminHoteles diga del hotel que nombra el mensaje (solo lectura)
         try {
-            $t = (object) ['id' => null, 'subject' => $asunto, 'category_id' => null, 'channel' => 'chat', 'category_name' => null,
+            $t = (object) ['id' => null, 'subject' => $asunto, 'category_id' => null, 'channel' => $canal ?: 'chat', 'category_name' => null,
                 'contact_name' => null, 'contact_email' => null, 'yaRespondio' => (bool) array_filter($conversacion ?? [], fn ($m) => $m['role'] === 'assistant')];
             return $this->componer($t, $conversacion ?: [['role' => 'user', 'text' => $pregunta]], null, $ai, true);
         } finally {

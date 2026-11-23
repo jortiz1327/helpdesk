@@ -75,6 +75,7 @@ class AiEvaluar extends Command
             . "responder = da una respuesta, solución o confirmación al problema del cliente.\n"
             . "pedir_info = su objetivo principal es pedir al cliente datos que faltan (hotel, código, foto, detalle) antes de poder ayudar.\n"
             . "derivar = dice que lo atenderá, revisará o gestionará una persona del equipo, sin resolver ni preguntar nada esencial.\n"
+            . "Si el borrador le da al cliente el correo al que escribir (p. ej. postventa@aemegroup.com) con lo que debe indicar, eso es responder, aunque diga que por este canal no se hace.\n"
             . "Contesta solo con la palabra, sin nada más.";
         try {
             $r = $ai->complete($sistema, [['role' => 'user', 'content' => "MENSAJE DEL CLIENTE:\n" . mb_substr($cliente, 0, 1500) . "\n\nBORRADOR DEL ASISTENTE:\n" . mb_substr((string) $body, 0, 2500)]]);
@@ -128,7 +129,7 @@ class AiEvaluar extends Command
             $esperado = $marcas[$c['id']]['decision'];
             // Los casos [API] se miden CON la consulta real (solo lectura) a AdminHoteles del hotel que nombra el mensaje.
             $conApi = ! $this->option('sin-consulta') && self::necesitaApi($marcas[$c['id']]['comentario'] ?? null);
-            $r = $svc->evaluarCaso((string) $c['asunto'], (string) $c['pregunta'], isset($locales[$c['code']]) ? (int) $locales[$c['code']] : null, $ai, $conApi, $c['conversacion'] ?? null);
+            $r = $svc->evaluarCaso((string) $c['asunto'], (string) $c['pregunta'], isset($locales[$c['code']]) ? (int) $locales[$c['code']] : null, $ai, $conApi, $c['conversacion'] ?? null, $c['canal'] ?? null);
             [$obtenido, $jin, $jout, $deMarca] = self::juzgar($ai, (string) $c['pregunta'], (string) $r['status'], $r['body'] ?? null, $r['sources'] ?? null);
             $porMarca += $deMarca ? 1 : 0;
             // Derivó con palabras pero SIN dejar la marca: la IA se ha saltado la regla de añadir `[[DERIVAR:…]]` (a vigilar).
