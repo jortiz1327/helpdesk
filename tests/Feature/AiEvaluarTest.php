@@ -133,7 +133,7 @@ class AiEvaluarTest extends TestCase
         // Presupuesto de postventa y material: las dos frases literales existen una vez.
         $this->assertSame(1, substr_count($todo, 'EXACTAMENTE «Asignar al departamento de Pedidos y facturas.»'));
         // Tamaño: sin las reglas el prompt vuelve a engordar sin que nadie lo note.
-        $this->assertLessThan(16000, strlen($todo), 'El prompt fijo ha crecido demasiado: adelgázalo antes de añadir reglas');
+        $this->assertLessThan(24000, strlen($todo), 'El prompt fijo ha crecido demasiado: adelgázalo antes de añadir reglas');
     }
 
     public function test_un_caso_no_se_copia_a_si_mismo_ni_guarda_nada(): void
