@@ -4538,3 +4538,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-kbd { margin-left: 8px; padding: 1px 5px; border-radius: 5px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); font: 600 10.5px/1.4 inherit; opacity: .75; }
 @media (pointer: coarse) { .ai-kbd { display: none; } .ai-chip { min-height: 44px; } }
 @media (max-width: 520px) { .ai-resp-h .ai-act { width: 100%; } .ai-resp-h .ai-act .btn { flex: 1; justify-content: center; } .ai-chips { gap: 10px; } }
+
+.ai-estilo { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 6px; }
+.ai-estilo .ai-chip { padding: 4px 11px; font-size: 12.5px; }
+.ai-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--primary) 14%, transparent); border-color: var(--primary); }

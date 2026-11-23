@@ -158,6 +158,22 @@ class AiSuggestionsTest extends TestCase
         $fila = DB::table('ai_suggestions')->where('id', $id)->first();
         $this->assertSame('validated', $fila->correction_status);
     }
+    public function test_el_agente_pide_mas_corta_o_mas_cercana_y_solo_cambia_la_redaccion(): void
+    {
+        $this->activar();
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $tok = $this->agente();
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertStringNotContainsString('ESTILO PEDIDO', $this->fake->ultimoSistema);
+        $r = $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=regenerate', ['ticket' => $tk, 'largo' => 'corta', 'tono' => 'cercano'])->assertOk();
+        $this->assertStringContainsString('ESTILO PEDIDO POR EL AGENTE', $this->fake->ultimoSistema);
+        $this->assertStringContainsString('2 o 3 frases', $this->fake->ultimoSistema);
+        $this->assertStringContainsString('cercano', $this->fake->ultimoSistema);
+        $this->assertSame(['largo' => 'corta', 'tono' => 'cercano'], $r->json('suggestion.sources.estilo'));
+        // Valores inventados se ignoran.
+        $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=regenerate', ['ticket' => $tk, 'largo' => 'borra todo', 'tono' => 'x'])->assertOk();
+        $this->assertStringNotContainsString('ESTILO PEDIDO', $this->fake->ultimoSistema);
+    }
     public function test_la_medicion_cuenta_cuanto_se_aprovecha_el_borrador_y_compara_tiempos(): void
     {
         $this->activar();

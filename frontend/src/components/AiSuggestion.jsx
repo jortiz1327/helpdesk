@@ -79,6 +79,7 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
   const [cargando, setCargando] = useState(true)
   const [fallo, setFallo] = useState(null)
   const [corrigiendo, setCorrigiendo] = useState(false)
+  const [estilo, setEstilo] = useState({})        // longitud y tono elegidos para esta sugerencia
   const [motivando, setMotivando] = useState(false)   // eligiendo el motivo de un 👎 rápido
   const [texto, setTexto] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -86,19 +87,22 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
   const seq = useRef(0)
   const cierre = useRef(null)
 
-  const cargar = async (regenerar = false) => {
+  const cargar = async (regenerar = false, est = estilo) => {
     const mia = ++seq.current
     setCargando(true); setFallo(null); setVivo([]); setHace('Empezando…'); setCorrigiendo(false); setMotivando(false); setTexto(''); setCopiado(false)
     const r = await api.aiSuggestStream(ticketId, regenerar, (e) => {
       if (mia !== seq.current) return
       if (e.paso) setVivo((v) => [...v, e.paso])
       if (e.hace) setHace(e.hace)
-    })
+    }, est)
     if (mia !== seq.current) return
     setCargando(false); setHace('')
     if (r?.ok === false) { setFallo(r.error || 'No se pudo pedir la sugerencia.'); return }
     setS(r?.suggestion || null)
+    setEstilo(r?.suggestion?.sources?.estilo || {})
   }
+  // Longitud y tono: un botón pulsado de nuevo se quita; cada cambio redacta otra versión (solo cambia la redacción).
+  const elegir = (clave, valor) => cargar(true, { ...estilo, [clave]: estilo[clave] === valor ? undefined : valor })
 
   useEffect(() => { cargar(); return () => { seq.current++ } }, [ticketId])   // eslint-disable-line react-hooks/exhaustive-deps
   // onClose llega como función nueva en cada pintado del padre: si fuera dependencia del efecto, el foco volvería al botón de cerrar
@@ -216,6 +220,13 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
                     </div>
                   )}
                 </div>
+                {!noSabe && (
+                  <div className="ai-estilo" role="group" aria-label="Ajustar la redacción">
+                    {[['largo', 'corta', 'Más corta'], ['largo', 'detallada', 'Más detallada'], ['tono', 'cercano', 'Más cercano'], ['tono', 'formal', 'Más formal']].map(([k, v, t]) => (
+                      <button key={v} className="ai-chip" aria-pressed={estilo[k] === v} onClick={() => elegir(k, v)}>{t}</button>
+                    ))}
+                  </div>
+                )}
                 {noSabe
                   ? <p className="ai-body">No tiene claro cómo responder y prefiere no inventar: respóndelo tú. Si sí sabías qué contestar, díselo con «Sí sabía» y aprenderá.</p>
                   : <p className="ai-body ai-borrador">{s.body}</p>}

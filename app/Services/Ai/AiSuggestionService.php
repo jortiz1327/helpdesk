@@ -58,6 +58,9 @@ class AiSuggestionService
     private array $traza = [];
     /** A qué categoría de la app (soporte, garantías, pedidos) debe llevarlo una persona, si la IA derivó. Nota interna para el agente. */
     private ?array $derivarA = null;
+    /** Estilo pedido por el agente para esta sugerencia: ['largo' => corta|detallada, 'tono' => cercano|formal]. Solo cambia la redacción. */
+    private array $estilo = [];
+    public const ESTILOS = ['largo' => ['corta', 'detallada'], 'tono' => ['cercano', 'formal']];
     private const CATEGORIAS_DERIVAR = ['soporte' => 'Soporte', 'garantias' => 'Garantías', 'pedidos' => 'Pedidos y facturas'];
 
     /** Apunta un paso en la traza. $ok: true = bien, false = problema, null = informativo. */
@@ -240,7 +243,7 @@ class AiSuggestionService
      * La sugerencia vigente para el último mensaje del cliente; si no hay, se genera.
      * Si el cliente aún no ha escrito nada que contestar, devuelve null.
      */
-    public function forTicket(int $ticketId, ?int $userId = null, bool $regenerate = false): ?object
+    public function forTicket(int $ticketId, ?int $userId = null, bool $regenerate = false, array $estilo = []): ?object
     {
         $ult = DB::table('messages')->where('ticket_id', $ticketId)->where('direction', 'in')
             ->where('is_internal_note', 0)->orderByDesc('id')->first(['id', 'body']);
@@ -248,6 +251,10 @@ class AiSuggestionService
             return null;
         }
 
+        $estilo = self::estiloValido($estilo);
+        if ($estilo) {
+            $regenerate = true;   // pedir otro estilo siempre redacta de nuevo
+        }
         if (! $regenerate) {
             $ya = DB::table('ai_suggestions')->where('ticket_id', $ticketId)->where('trigger_message_id', $ult->id)
                 ->where('status', '!=', 'failed')->orderByDesc('id')->first();
@@ -256,7 +263,40 @@ class AiSuggestionService
             }
         }
 
-        return $this->generate($ticketId, (int) $ult->id, $userId);
+        $this->estilo = $estilo;
+        try {
+            return $this->generate($ticketId, (int) $ult->id, $userId);
+        } finally {
+            $this->estilo = [];
+        }
+    }
+
+    /** Deja solo los valores permitidos (lo que llega de la pantalla no se fía). */
+    public static function estiloValido(array $e): array
+    {
+        $ok = [];
+        foreach (self::ESTILOS as $k => $valores) {
+            if (isset($e[$k]) && in_array($e[$k], $valores, true)) {
+                $ok[$k] = $e[$k];
+            }
+        }
+        return $ok;
+    }
+
+    /** Indicación de redacción para la IA según el estilo elegido; vacía si no hay. */
+    private function notaEstilo(): string
+    {
+        if (! $this->estilo) {
+            return '';
+        }
+        $t = [
+            'corta' => 'lo más breve posible: 2 o 3 frases, solo lo imprescindible',
+            'detallada' => 'más detallada: explica con pasos numerados y algo más de contexto, sin alargarte con relleno',
+            'cercano' => 'tono más cercano y cálido (sin perder el trato de usted)',
+            'formal' => 'tono más formal e institucional',
+        ];
+        $pide = array_map(fn ($v) => $t[$v], array_values($this->estilo));
+        return "\n\nESTILO PEDIDO POR EL AGENTE PARA ESTE BORRADOR: " . implode('; ', $pide) . ". Cambia solo la redacción: la decisión (responder, pedir datos o derivar), los datos que pides y las reglas siguen igual.";
     }
 
     private function generate(int $ticketId, int $messageId, ?int $userId, string $modo = 'suggest', ?int $hasta = null): object
@@ -343,11 +383,11 @@ class AiSuggestionService
         $this->paso('memoria', null, 'Memoria consultada: ' . count($faqs) . ' preguntas frecuentes · ' . count($ejemplos) . ' respuestas de ejemplo · ' . count($casos) . ' casos/manuales parecidos'
             . ($casos ? ' (' . implode('; ', array_map(fn ($d) => mb_substr((string) ($d->title ?? ''), 0, 60), array_slice($casos, 0, 4))) . ')' : ''),
             ['faqs' => count($faqs), 'ejemplos' => count($ejemplos), 'casos' => array_map(fn ($d) => ['tipo' => (string) ($d->source_type ?? ''), 'titulo' => mb_substr((string) ($d->title ?? ''), 0, 90)], array_slice($casos, 0, 6))]);
-        $fuentes = fn () => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos), 'traza' => $this->traza, 'derivar' => $this->derivarA]);
+        $fuentes = fn () => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos), 'traza' => $this->traza, 'derivar' => $this->derivarA, 'estilo' => $this->estilo ?: null]);
         $fila = ['sources' => $fuentes()];
         $this->avisar('Redactando la respuesta…');
         try {
-            $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos), $this->comoTurnos($conversacion));
+            $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos) . $this->notaEstilo(), $this->comoTurnos($conversacion));
             if (! empty($r['truncated'])) {
                 // Un texto cortado a medias no se puede enseñar como si estuviera completo.
                 $fila += ['model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens']];   // se pagó aunque no sirva

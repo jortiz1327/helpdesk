@@ -143,7 +143,7 @@ class AiSuggestionsController extends Controller
         if (! TicketVisibility::puedeVer($request->user(), $ticket)) {
             return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
         }
-        $s = $this->ai->forTicket($ticket, $request->user()->id, $regenerate);
+        $s = $this->ai->forTicket($ticket, $request->user()->id, $regenerate, $this->estilo($request));
         return response()->json(['ok' => true, 'enabled' => true, 'suggestion' => $s ? $this->salida($s) : null]);
     }
 
@@ -159,8 +159,9 @@ class AiSuggestionsController extends Controller
             return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
         }
         $regen = $request->boolean('regen');
+        $estilo = $this->estilo($request);
         $uid = $request->user()->id;
-        return response()->stream(function () use ($ticket, $regen, $uid) {
+        return response()->stream(function () use ($ticket, $regen, $uid, $estilo) {
             while (ob_get_level() > 0) {
                 @ob_end_flush();
             }
@@ -170,7 +171,7 @@ class AiSuggestionsController extends Controller
             };
             $this->ai->alPaso($emitir);
             try {
-                $s = $this->ai->forTicket($ticket, $uid, $regen);
+                $s = $this->ai->forTicket($ticket, $uid, $regen, $estilo);
                 $emitir(['fin' => ['suggestion' => $s ? $this->salida($s) : null]]);
             } catch (\Throwable $e) {
                 report($e);
@@ -179,6 +180,11 @@ class AiSuggestionsController extends Controller
                 $this->ai->alPaso(null);
             }
         }, 200, ['Content-Type' => 'application/x-ndjson; charset=utf-8', 'Cache-Control' => 'no-cache, no-store', 'X-Accel-Buffering' => 'no']);
+    }
+
+    private function estilo(Request $request): array
+    {
+        return AiSuggestionService::estiloValido(['largo' => $request->input('largo', $request->query('largo')), 'tono' => $request->input('tono', $request->query('tono'))]);
     }
 
     private function rate(Request $request)

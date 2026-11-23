@@ -455,11 +455,11 @@ export const api = {
     ? req('ai_suggestions.php?action=regenerate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }) })
     : req(`ai_suggestions.php?action=suggest&ticket=${ticket}`),
   // Sugerencia con cada paso al momento: el servidor devuelve una línea JSON por paso ({paso}, {hace}, {fin}, {error}).
-  aiSuggestStream: async (ticket, regen, onEvent) => {
+  aiSuggestStream: async (ticket, regen, onEvent, estilo = {}) => {
     const ctl = new AbortController()
     const timer = setTimeout(() => ctl.abort(), 90000)
     try {
-      const r = await fetch(`${BASE}/ai_suggestions.php?action=stream&ticket=${ticket}${regen ? '&regen=1' : ''}`, { headers: { 'X-App-Token': getToken() }, signal: ctl.signal })
+      const r = await fetch(`${BASE}/ai_suggestions.php?action=stream&ticket=${ticket}${regen ? '&regen=1' : ''}${estilo.largo ? `&largo=${estilo.largo}` : ''}${estilo.tono ? `&tono=${estilo.tono}` : ''}`, { headers: { 'X-App-Token': getToken() }, signal: ctl.signal })
       if (!r.ok || !r.body) return { ok: false, error: 'No se pudo pedir la sugerencia.' }
       const lector = r.body.getReader()
       const dec = new TextDecoder()
