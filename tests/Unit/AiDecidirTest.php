@@ -110,7 +110,7 @@ class AiDecidirTest extends TestCase
         $this->assertStringContainsString('tienda o comercio', $d['resumen']);
         $this->assertSame('derivar', AiSuggestionService::decidir('Tengo una carnicería y las etiquetas no cambian', $this->conv('x'), 'sin_correo', false)['decision']);
         // Vocabulario y nombres de clientes reales que no son hoteles (de los proyectos y la BD de integraciones), también en plural.
-        foreach (['Somos de la pescadería Alondra, las etiquetas no cambian', 'Soy de Superplus Retamar y no actualiza', 'En nuestras tiendas no cambian los precios', 'Ferretería: la etiqueta no conecta', 'Vilato, las etiquetas no se actualizan'] as $texto) {
+        foreach (['Somos de la pescadería Alondra, las etiquetas no cambian', 'Soy de Superplus Retamar y no actualiza', 'En nuestras tiendas no cambian los precios', 'Ferretería: la etiqueta no conecta', 'Vilato, las etiquetas no se actualizan', 'Carnicería Bernal, no cambia', 'Soy de Calvet y la etiqueta no conecta'] as $texto) {
             $this->assertSame('derivar', AiSuggestionService::decidir($texto, $this->conv('x'), 'sin_correo', false)['decision'], $texto);
         }
         $this->assertNull(AiSuggestionService::decidir('Mi etiqueta no cambia', $this->conv('x'), 'verificado', true), 'sin palabras de tienda no se desvía');
