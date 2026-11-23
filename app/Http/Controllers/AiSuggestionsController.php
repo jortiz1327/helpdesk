@@ -211,7 +211,9 @@ class AiSuggestionsController extends Controller
             return response()->json(['ok' => false, 'error' => 'Sugerencia no encontrada'], 404);
         }
         try {
-            $r = $this->ai->rate($s->id, (string) $request->input('rating'), $request->input('correction'), $request->user()->id, $request->input('reason'));
+            // Solo texto: un array (o cualquier otra cosa) en estos campos se trata como vacío en vez de reventar con un 500.
+            $texto = fn (string $k): ?string => is_string($v = $request->input($k)) ? $v : null;
+            $r = $this->ai->rate($s->id, (string) $texto('rating'), $texto('correction'), $request->user()->id, $texto('reason'));
         } catch (InvalidArgumentException $e) {
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }

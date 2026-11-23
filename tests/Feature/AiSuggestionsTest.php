@@ -205,6 +205,19 @@ class AiSuggestionsTest extends TestCase
         $this->fake->falla = true;
         $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=summary&ticket=$tk&regen=1")->assertStatus(503)->assertJsonPath('ok', false);
     }
+    public function test_una_valoracion_con_campos_que_no_son_texto_no_revienta(): void
+    {
+        $this->activar();
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $tok = $this->agente();
+        $id = $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->json('suggestion.id');
+        $url = '/api/ai_suggestions.php?action=rate';
+        $this->withHeader('X-App-Token', $tok)->postJson($url, ['id' => $id, 'rating' => 'down', 'reason' => ['a']])->assertStatus(422);
+        $this->withHeader('X-App-Token', $tok)->postJson($url, ['id' => $id, 'rating' => 'down', 'correction' => ['a']])->assertStatus(422);
+        $this->withHeader('X-App-Token', $tok)->postJson($url, ['id' => $id, 'rating' => ['up']])->assertStatus(422);
+        // Un motivo válido junto a una corrección que no es texto sigue valiendo como motivo.
+        $this->withHeader('X-App-Token', $tok)->postJson($url, ['id' => $id, 'rating' => 'down', 'reason' => 'tono', 'correction' => ['a']])->assertOk();
+    }
     public function test_la_medicion_cuenta_cuanto_se_aprovecha_el_borrador_y_compara_tiempos(): void
     {
         $this->activar();
