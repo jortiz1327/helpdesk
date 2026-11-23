@@ -22,67 +22,23 @@ const necesitaApi = (c) => /\[\s*API\s*\]/i.test(c.comentario || '')
 const verif = (c) => /\[\s*VERIF\s*\]/i.test(c.comentario || '')
 const difiere = (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido !== c.decision && !(verif(c) && c.decision === 'responder' && c.ia.obtenido === 'pedir_info')
 
-// Filtros: cuatro grupos que SE COMBINAN (un caso tiene que cumplir uno de cada grupo). Cada botón enseña cuántos casos
-// quedarían si lo eliges, teniendo en cuenta lo que ya has elegido en los otros grupos.
+// Un solo filtro, a propósito: lo que hay que mirar es lo que aún no se ha revisado (y poder repasar lo ya revisado).
 const FILTROS = [
-  { k: 'conj', t: 'Conjunto de casos', ops: [
-    ['todos', 'Todos', () => true, ''],
-    ['fase2l', 'Fase 2l (para medir)', (c) => c.lote === 'fase2l', '10 casos reales nuevos (5 correo, 5 WhatsApp) tras arreglar menú/plato viejo con Cambios programados. Revísalos sin ajustar reglas después.'],
-    ['fase2k', 'Fase 2k (medido)', (c) => c.lote === 'fase2k', '8 casos medidos: 69 % la 1.6.2 frente a 53 % la original.'],
-    ['fase2j', 'Fase 2j (ya usado)', (c) => c.lote === 'fase2j', '8 casos medidos (47 % la 1.6.2, 53 % la original) y usados después para ajustar reglas.'],
-    ['fase2i', 'Fase 2i (medido)', (c) => c.lote === 'fase2i', '7 casos medidos: 82 % la versión 1.6.2 frente a 57 % la original.'],
-    ['fase2h', 'Fase 2h (ya usado)', (c) => c.lote === 'fase2h', '10 casos medidos (60 % la versión actual, 63 % la original) y usados después para ajustar reglas.'],
-    ['fase2g', 'Fase 2g (ya usado)', (c) => c.lote === 'fase2g', '9 casos medidos (53 % la versión actual, 58 % la original) y usados después para ajustar reglas.'],
-    ['fase2f', 'Fase 2f (medido)', (c) => c.lote === 'fase2f', '10 casos del cierre del bloque A, ya medidos (48 % con la versión actual, 28 % con la original).'],
-    ['fase2e', 'Fase 2e (ya usado)', (c) => c.lote === 'fase2e', '20 casos usados para medir la 1.6.1 (75 %).'],
-    ['fase2d', 'Fase 2d', (c) => c.lote === 'fase2d', 'Medido el 20-nov (final 65 %, original 66 %). Ya NO vale para medir: se miraron sus fallos para documentar stock de farmacias, guías por título, contraseñas y servicios.'],
-    ['fase2c', 'Fase 2c', (c) => c.lote === 'fase2c', 'Medido el 20-nov. Ya NO vale para medir: se miraron sus fallos para arreglar el orden de decisión (garantías).'],
-    ['fase2b', 'Fase 2b', (c) => c.lote === 'fase2b', 'Medido el 19-nov (prompt nuevo 51/76 = 67 %, original 50/76 = 66 %). Ya NO vale para medir si se ajustan reglas mirándolo.'],
-    ['fase2', 'Fase 2', (c) => c.lote === 'fase2', 'Medido el 19-nov (59 % → 67 %). Ya NO vale para medir: se ajustaron 2 reglas mirando sus casos.'],
-    ['seg4', 'Seguimientos 4', (c) => c.lote === 'seg4-20261118', '20 casos nuevos del 18-nov (2.º o 3.º mensaje del cliente). Para MEDIR: revísalos sin ajustar reglas después.'],
-    ['seg3', 'Seguimientos 3', (c) => c.lote === 'seg3-20261118', 'Medido el 18-nov (77 %). Ya NO vale para medir: de él salieron las reglas del orden de decisión.'],
-    ['seg2', 'Seguimientos 2', (c) => c.lote === 'seg2-20261118', 'Medido el 18-nov (50 %). Ya NO vale para medir: después se cambiaron reglas de material y presupuestos.'],
-    ['seg', 'Seguimientos 1', (c) => c.lote === 'seg-20261117', 'Ya NO vale para medir: se ajustaron reglas mirando sus casos.'],
-    ['lote5', 'Lote 5', (c) => c.lote === 'lote5-20261117', 'Ya NO vale para medir: se arreglaron a mano varios de sus casos.'],
-    ['lote4', 'Lote 4', (c) => c.lote === 'lote4-20261117', 'Ya usado para ajustar las reglas: no vale para medir.'],
-    ['lote3', 'Lote 3', (c) => c.lote === 'lote3-20261117', '20 casos del 17-nov, ya medidos.'],
-    ['nuevos', 'Lote 2', (c) => c.lote === 'lote2-20261116', '30 casos del 16-nov.'],
-  ] },
   { k: 'rev', t: 'Revisión', ops: [
-    ['todos', 'Todos', () => true, ''],
-    ['pend', 'Sin revisar', (c) => !c.revisado, ''],
-    ['dud', '🚩 Dudosos', (c) => c.dudoso, 'Los que marcaste con «Dudoso: lo miro luego».'],
-  ] },
-  { k: 'dec', t: 'Tu decisión', ops: [
-    ['todos', 'Todas', () => true, ''],
-    ['responder', 'Responder', (c) => c.decision === 'responder' && c.revisado, ''],
-    ['pedir_info', 'Pedir dato', (c) => c.decision === 'pedir_info' && c.revisado, ''],
-    ['derivar', 'Derivar', (c) => c.decision === 'derivar' && c.revisado, ''],
-    ['descartar', 'Descartados', (c) => c.decision === 'descartar', ''],
-  ] },
-  { k: 'ia', t: 'Qué hizo la IA', ops: [
-    ['todos', 'Todo', () => true, ''],
-    ['ind', '⚠ Contestó y no debía', (c) => c.ia && c.ia.obtenido === 'responder' && (c.decision === 'pedir_info' || c.decision === 'derivar'), 'Respuestas indebidas: lo más grave.'],
-    ['dif', 'No coincide', (c) => difiere(c), ''],
-    ['ok', 'Coincide', (c) => c.ia && c.decision !== 'descartar' && c.ia.obtenido === c.decision, ''],
-    ['sinprobar', 'Sin probar', (c) => !c.ia, 'La IA aún no los ha probado.'],
-  ] },
-  { k: 'ext', t: 'Otros', ops: [
-    ['todos', 'Todos', () => true, ''],
-    ['api', 'Necesitan [API]', (c) => necesitaApi(c), ''],
-    ['claude', 'Revalidados por Claude', (c) => !!c.nota, ''],
+    ['pend', 'No revisados', (c) => !c.revisado, ''],
+    ['rev', 'Revisados', (c) => !!c.revisado, ''],
   ] },
 ]
-const estadoFiltro = { conj: 'todos', rev: 'todos', dec: 'todos', ia: 'todos', ext: 'todos' }
+const estadoFiltro = { rev: 'pend' }
 const predicado = (g, v) => (g.ops.find((o) => o[0] === v) || g.ops[0])[2]
 const cumple = (c, estado) => FILTROS.every((g) => predicado(g, estado[g.k])(c))
-const hayFiltros = () => FILTROS.some((g) => estadoFiltro[g.k] !== 'todos')
+const hayFiltros = () => false
 
 function pintarFiltro() {
   const box = $('filtros'); if (!box) return
   const n = casos.filter((c) => cumple(c, estadoFiltro)).length
   const activos = FILTROS.filter((g) => estadoFiltro[g.k] !== 'todos').map((g) => g.ops.find((o) => o[0] === estadoFiltro[g.k])[1].replace(/^⚠ |^🚩 /, ''))
-  $('fsum').textContent = (activos.length ? activos.join(' · ') : 'Todos los casos') + ' — ' + n + (n === 1 ? ' caso' : ' casos')
+  $('fsum').textContent = (activos.length ? activos.join(' · ') : 'Casos') + ' — ' + n + (n === 1 ? ' caso' : ' casos')
   const panel = $('fpanel'); panel.replaceChildren()
   FILTROS.forEach((g) => {
     const fila = el('div', 'frow'), grupo = el('div', 'fgrp'); grupo.setAttribute('role', 'group'); grupo.setAttribute('aria-label', g.t)
