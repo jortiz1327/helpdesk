@@ -213,11 +213,15 @@ class HotelsApi
                 $hotel = is_array($b) && self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']) !== null
                     ? self::nombre(self::pick($b, ['hotel', 'hotel_nombre', 'hotel_name']))
                     : ($nombrePorId[(string) (is_array($b) ? ($b['hotel_id'] ?? '') : '')] ?? (count($hoteles) === 1 ? self::nombre($hoteles[0]) : ''));
-                $out[$id] = ['buffet_id' => $id, 'buffet' => self::nombre($b), 'hotel' => $hotel, 'rol' => $rol, 'activo' => $activo];
+                $hid = is_array($b) ? (string) ($b['hotel_id'] ?? '') : '';
+                if ($hid === '' && count($hoteles) === 1 && is_array($hoteles[0])) {
+                    $hid = (string) ($hoteles[0]['id'] ?? '');
+                }
+                $out[$id] = ['buffet_id' => $id, 'buffet' => self::nombre($b), 'hotel' => $hotel, 'hotel_id' => $hid, 'rol' => $rol, 'activo' => $activo];
             }
             if (! $conBuffet) {   // sin buffets utilizables: al menos el nombre de los hoteles
                 foreach ($hoteles as $h) {
-                    $out['h:' . self::norm(self::nombre($h))] = ['buffet_id' => '', 'buffet' => '', 'hotel' => self::nombre($h), 'rol' => $rol, 'activo' => $activo];
+                    $out['h:' . self::norm(self::nombre($h))] = ['buffet_id' => '', 'buffet' => '', 'hotel' => self::nombre($h), 'hotel_id' => is_array($h) ? (string) ($h['id'] ?? '') : '', 'rol' => $rol, 'activo' => $activo];
                 }
             }
         }

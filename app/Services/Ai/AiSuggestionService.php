@@ -408,7 +408,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             $t = DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')
                 ->leftJoin('ticket_categories as cat', 'cat.id', '=', 't.category_id')
                 ->where('t.id', $ticketId)
-                ->first(['t.id', 't.subject', 't.category_id', 't.channel', 'c.name as contact_name', 'c.email as contact_email', 'cat.name as category_name']);
+                ->first(['t.id', 't.subject', 't.category_id', 't.channel', 't.contact_id', 'c.name as contact_name', 'c.email as contact_email', 'cat.name as category_name']);
             $this->nombreCliente = $anonimizar ? trim((string) ($t->contact_name ?? '')) : '';
             if ($anonimizar) {
                 $t->subject = $this->plano((string) $t->subject);
@@ -445,7 +445,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
 
         $t->codigos = $ticketId ? $this->leerCodigosDeFotos($ticketId) : [[], 0];
         $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
-        $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente, $t->contact_name ?? null);
+        $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente, $t->contact_name ?? null, $anonimizar ? null : ($t->contact_id ?? null));
 
         $hotelNombrado = $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente);
         // Evaluaciones: los casos van anonimizados y sin correo, así que la norma de verificar primero NO se aplica (se mide la decisión de fondo; la norma la cubren los tests).
@@ -543,7 +543,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             . '|\b(alondra|bernal|calvet|areapadel|carviresa|calviresa|cashsur|dispival|goshop|la ?joyosa|lomillos|nova ?garden|penalver|recambios gil|sancrispin|soyoptima|superplus|openplus|ubemar|dialprix|euronics|brico moreno|mischuches|futbol ?factory|vilato|lovepets|divelsa|dps ?market)\b/', $t);
         $otraArea = $farmacia || $comercio;
         $acuse = mb_strlen($t) < 200 && preg_match('/gracias|ya funciona|solucionado|resuelto/', $t) && ! str_contains($t, '?');
-        if (! $acuse && ! $noEsHotel && ! in_array($estadoCorreo, ['verificado', 'incompleto', 'no_encontrado'], true) && ! $material && ! $otraArea) {
+        if (! $acuse && ! $noEsHotel && ! in_array($estadoCorreo, ['verificado', 'incompleto', 'no_encontrado', 'desactivado'], true) && ! $material && ! $otraArea) {
             return ['decision' => 'pedir_datos', 'resumen' => $hotelNombrado ? 'verificar primero: pedir el correo' : 'verificar primero: pedir hotel y correo',
                 'instruccion' => ($hotelNombrado
                     ? 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. El hotel ya consta: PIDE SOLO el correo con el que accede a la aplicación.'
@@ -1064,13 +1064,13 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
      * 3) si coincide, hotel/buffet y estado de antenas y etiquetas (solo lectura, ver HotelsApi); si no coincide o no
      * consta, se le explica con tacto y se deriva a una persona. Sin configurar: nada.
      */
-    private function contextoHotel(?string $contactEmail, array $codigos = [], string $textoCliente = '', ?string $nombreContacto = null): string
+    private function contextoHotel(?string $contactEmail, array $codigos = [], string $textoCliente = '', ?string $nombreContacto = null, ?int $contactId = null): string
     {
         $this->hotelAmbiguo = null;
         $this->estadoCorreo = null;
         $this->hotelLocalizado = false;
         $this->hotelNoEncontrado = false;
-        $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente, $nombreContacto);
+        $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente, $nombreContacto, $contactId);
         if ($s !== '' && $this->hotelAmbiguo !== null) {
             // El nombre encaja con varios hoteles (p. ej. «Hotel Poseidón» hay más de uno): nunca se asume cuál es.
             // No se enumeran los hoteles al cliente: solo se le pide el nombre completo.
@@ -1138,7 +1138,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         return count($r) === 1 ? $r[0]['nombre'] : null;
     }
 
-    private function contextoHotelBase(?string $contactEmail, array $codigos = [], string $textoCliente = '', ?string $nombreContacto = null): string
+    private function contextoHotelBase(?string $contactEmail, array $codigos = [], string $textoCliente = '', ?string $nombreContacto = null, ?int $contactId = null): string
     {
         $api = app(HotelsApi::class);
         if (! $api->configured()) {
@@ -1153,6 +1153,12 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         // Hotel: el que el cliente nombra, buscado en el inventario del panel.
         $this->avisar('Buscando el hotel en AdminHoteles…');
         $nombres = $this->nombresDeHotel($textoCliente);
+        // El mensaje no nombra hotel pero este contacto ya fue verificado antes (vínculo vigente, 12 meses): se parte de ese hotel. Solo evita volver a
+        // preguntarlo: el correo se comprueba igual en AdminHoteles cada vez, y si ya no figura o está desactivado no se le atiende.
+        $memoria = $nombres ? null : ContactoHotel::vigente($contactId);
+        if ($memoria) {
+            $nombres = [$memoria->name];
+        }
         // Sin «Hotel X» explícito (p. ej. solo la firma «Barceló Benidorm Beach»): se prueban nombres propios del mensaje y solo
         // valen los hoteles cuyo nombre contiene el buscado (o al revés), para no arrastrar resultados sueltos del buscador.
         $porMayusculas = ! $nombres;
@@ -1184,7 +1190,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             }
         }
         // Frases con mayúsculas que no son ningún hotel (el asunto «Revisión Platos», una firma…): no son un hotel «que no consta», solo ruido.
-        if ($porMayusculas && ! $dir && ! $dirFalla) {
+        if (($porMayusculas || $memoria) && ! $dir && ! $dirFalla) {
             $nombres = [];
             $ambiguos = [];
         }
@@ -1199,7 +1205,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if ($this->hotelAmbiguo !== null) {
             $this->paso('hotel', false, 'Hotel ambiguo: «' . $this->hotelAmbiguo . '» corresponde a varios hoteles');
         } elseif ($dir) {
-            $this->paso('hotel', true, 'Hotel localizado: ' . $dir[0]['nombre'] . (! empty($dir[0]['grupo']) ? ' (' . $dir[0]['grupo'] . ')' : '') . (count($dir) > 1 ? ' · +' . (count($dir) - 1) . ' coincidencias' : ''), ['nombre' => $dir[0]['nombre'], 'grupo' => $dir[0]['grupo'] ?? null, 'otras' => count($dir) - 1]);
+            $this->paso('hotel', true, ($memoria ? 'Hotel recordado (ticket anterior, confirmado el ' . date('d/m/Y', strtotime($memoria->verificada)) . '): ' : 'Hotel localizado: ') . $dir[0]['nombre'] . (! empty($dir[0]['grupo']) ? ' (' . $dir[0]['grupo'] . ')' : '') . (count($dir) > 1 ? ' · +' . (count($dir) - 1) . ' coincidencias' : ''), ['nombre' => $dir[0]['nombre'], 'grupo' => $dir[0]['grupo'] ?? null, 'otras' => count($dir) - 1]);
         } elseif ($nombres) {
             $this->paso('hotel', false, 'Hotel no localizado: «' . $nombres[0] . '»' . ($dirFalla ? ' (el panel no respondió)' : ''));
         } else {
@@ -1207,15 +1213,30 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         }
         $this->avisar('Comprobando el correo en AdminHoteles…');
         $v = $api->verificar($e);
+        // Un usuario DESACTIVADO no cuenta como verificado: solo valen los sitios donde está activo (y si en ninguno, es «desactivado»).
+        $todos = $v['sitios'];
+        $v['sitios'] = array_values(array_filter($todos, fn ($x) => ($x['activo'] ?? true) !== false));
+        if ($v['estado'] === 'encontrado' && $todos && ! $v['sitios']) {
+            $v['estado'] = 'desactivado';
+        }
         $sitios = array_slice($v['sitios'], 0, 4);
         $this->hotelLocalizado = (bool) $dir;
         $this->hotelNoEncontrado = ! $dir && $nombres && ! $dirFalla;
         $this->estadoCorreo = ($v['estado'] === 'encontrado' && (! $dir || $this->coincideHotel($dir, $sitios))) ? 'verificado' : (string) $v['estado'];
+        // Verificado y de UN solo hotel: se recuerda para no volver a preguntarlo en el próximo ticket.
+        if ($this->estadoCorreo === 'verificado' && $contactId && $v['sitios']) {
+            $nuevo = ContactoHotel::recordar($contactId, $v['sitios'], (string) ($dir[0]['grupo'] ?? ''));
+            if ($nuevo) {
+                $this->paso('hotel', true, 'Hotel guardado para los próximos tickets de este contacto: ' . $nuevo);
+            }
+        }
         // Traza para el agente: hotel y correo (lo que ve el panel de la sugerencia).
         if ($v['estado'] === 'sin_correo') {
             $this->paso('correo', null, 'Sin correo que comprobar');
         } elseif ($v['estado'] === 'incompleto') {
             $this->paso('correo', null, "No se pudo comprobar el correo $e ahora (el panel no respondió)");
+        } elseif ($v['estado'] === 'desactivado') {
+            $this->paso('correo', false, "El correo $e figura, pero su usuario está DESACTIVADO: no se le atiende como usuario");
         } elseif ($v['estado'] === 'no_encontrado') {
             $this->paso('correo', false, "El correo $e no figura como usuario de la aplicación");
         } elseif ($dir && ! $this->coincideHotel($dir, $sitios)) {
@@ -1248,7 +1269,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
                 if (! $pedido && ($antenas = $this->antenasSinVerificar($api, $dir, $nombres, $unicos))) {
                     return $cab . $antenas;
                 }
-                return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "». Falta comprobar su correo.\n"
+                return $cab . "- El cliente " . ($memoria ? 'ya nos escribió antes y figura como de «' : 'dice ser de «') . $dir[0]['nombre'] . "». Falta comprobar su correo.\n"
                     . "- VERIFICAR PRIMERO, EXPLICAR DESPUÉS: si lo que pide implica CONFIGURAR algo de su buffet en la aplicación (crear o editar posiciones, isletas, etiquetas, servicios, ruedas…), NO expliques todavía los pasos: pídele el correo con el que accede a la aplicación (el hotel ya lo tienes) y dile que, en cuanto lo confirme, le indicas cómo hacerlo. REGLA DE LA DIRECCIÓN: en un hotel SIEMPRE se verifica antes de explicar, pedir otros datos o derivar, también para una duda simple de uso. Pide el correo siempre que necesites datos concretos de ese hotel (usuarios, permisos, etiquetas concretas).\n" . $comun;
             }
             return $cab . "- El hotel que nombra no se localiza en nuestro sistema" . ($dirFalla ? ' (no se pudo consultar ahora)' : '') . ". Pídele el nombre exacto del hotel y el correo con el que accede a la aplicación.\n" . $comun . $derivar;
@@ -1260,6 +1281,10 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             }
             return $cab . "- No se ha podido comprobar el correo ($e) ahora mismo. NO afirmes que el correo no pertenece al hotel ni que no figura.\n"
                 . "- Di que un compañero comprobará sus datos y le atenderá. Si aún no sabemos el hotel, pregúntalo.\n" . $comun;
+        }
+        if ($v['estado'] === 'desactivado') {
+            return $cab . "- El correo del cliente ($e) figura, pero su usuario está DESACTIVADO en la aplicación: de momento NO es un usuario con acceso. NO consultes ni des datos de ningún hotel, antena ni etiqueta, y NO expliques pasos.\n"
+                . "- Dile con tacto que un compañero del equipo revisará su caso y le atenderá personalmente (reactivar un usuario lo hace una persona).\n" . $comun . $derivar;
         }
         if ($v['estado'] === 'no_encontrado') {
             // Correo que no figura: el dominio (si es de empresa) puede orientar sobre el hotel. Es solo una pista, nunca una verificación.

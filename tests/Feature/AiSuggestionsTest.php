@@ -277,6 +277,58 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringNotContainsString('PISTA SIN CONFIRMAR', $this->fake->ultimoSistema);
     }
 
+    public function test_un_contacto_verificado_en_un_hotel_se_recuerda_12_meses_y_el_correo_se_sigue_comprobando(): void
+    {
+        $this->activar();
+        $this->flota('m@x.com');
+        $tok = $this->agente();
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $c = DB::table('contacts')->where('id', $this->cid)->first();
+        $this->assertNotNull($c->sede_id, 'al verificar el correo en UN hotel, el contacto queda enlazado a su sede');
+        $this->assertSame('correo', $c->sede_verificada_por);
+        $sede = DB::table('sedes')->where('id', $c->sede_id)->first();
+        $this->assertSame('Hotel Sol', $sede->name);
+        $this->assertSame('adminhoteles', $sede->origen);
+
+        // Diez días después escribe otra vez sin decir el hotel (y su correo ya no consta en la ficha): la IA parte del hotel recordado.
+        DB::table('contacts')->where('id', $this->cid)->update(['email' => null, 'sede_verificada_at' => now()->subDays(10)]);
+        $tk2 = $this->ticket('Las etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk2")->assertOk();
+        $this->assertStringContainsString('ya nos escribió antes y figura como de «Hotel Sol»', $this->fake->ultimoSistema);
+        $this->assertStringContainsString('Falta comprobar su correo', $this->fake->ultimoSistema, 'recordar el hotel no verifica a nadie');
+
+        // Pasados los 12 meses el vínculo caduca y se vuelve a preguntar.
+        DB::table('contacts')->where('id', $this->cid)->update(['sede_verificada_at' => now()->subMonths(13)]);
+        $tk3 = $this->ticket('Las etiquetas no se actualizan');
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk3")->assertOk();
+        $this->assertStringNotContainsString('ya nos escribió antes', $this->fake->ultimoSistema);
+    }
+
+    public function test_un_usuario_desactivado_no_cuenta_como_verificado_ni_se_enlaza_ni_se_le_dan_datos(): void
+    {
+        $this->activar();
+        config(['ai.support.url' => 'https://panel.example.com', 'ai.support.key' => 'K-secreta']);
+        Cache::flush();
+        Http::fake([
+            'panel.example.com/api/support/v1/users/lookup*' => Http::response(['success' => true, 'data' => ['encontrado' => true, 'coincidencias' => [[
+                'app' => 'sol', 'hoteles' => ['Hotel Sol'], 'usuario' => ['rol' => 'Chef', 'activo' => false],
+                'buffets' => [['id' => 'b3b3b3b3-0000-4000-8000-000000000003', 'nombre' => 'Buffet Principal']],
+            ]]]]),
+            'panel.example.com/api/support/v1/hotels*' => Http::response(['success' => true, 'data' => ['total' => 0, 'hoteles' => []]]),
+            'panel.example.com/api/support/v1/buffets/*' => Http::response(['success' => true, 'data' => []]),
+        ]);
+        $tk = $this->ticket('Mi etiqueta no cambia');
+        $this->withHeader('X-App-Token', $this->agente())->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $p = $this->fake->ultimoSistema;
+        $this->assertStringContainsString('su usuario está DESACTIVADO', $p);
+        $this->assertStringContainsString('NO consultes ni des datos', $p);
+        $this->assertStringNotContainsString('VERIFICADO: el correo', $p);
+        $this->assertStringNotContainsString('Antenas de', $p);
+        $this->assertNull(DB::table('contacts')->where('id', $this->cid)->value('sede_id'), 'un usuario desactivado no se enlaza a ningún hotel');
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), '/antennas') || str_contains($r->url(), '/tags'));
+    }
+
     public function test_una_valoracion_con_campos_que_no_son_texto_no_revienta(): void
     {
         $this->activar();
