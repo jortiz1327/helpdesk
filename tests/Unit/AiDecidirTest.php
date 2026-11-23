@@ -67,6 +67,16 @@ class AiDecidirTest extends TestCase
         $this->assertSame(['Hotel A', 'Hotel B'], AiSuggestionService::limpiarAjenas("Hotel A\n hotel a \nHotel B, xx\n"));
     }
 
+    public function test_mencionar_la_garantia_de_pasada_para_pedir_presupuesto_de_compra_no_deriva_a_garantias(): void
+    {
+        $compra = 'Estoy revisando su protocolo de garantía. Me gustaría saber el precio de una nueva para valorar comprar otra. Envíenme presupuesto de 2 bolsas de pinzas y una etiqueta.';
+        $this->assertNull(AiSuggestionService::decidir($compra, $this->conv('x'), 'verificado', false));
+        // Con un fallo de por medio sigue siendo una garantía, aunque también pidan presupuesto.
+        $this->assertSame('derivar', AiSuggestionService::decidir('La etiqueta no funciona y queremos la garantía. Pasadnos también presupuesto para comprar pinzas.', $this->conv('x'), 'verificado', false)['decision']);
+        // Y sin pedir precio ni presupuesto, deriva como siempre.
+        $this->assertSame('derivar', AiSuggestionService::decidir('Queremos comprar la garantía extendida', $this->conv('x'), 'verificado', false)['decision']);
+    }
+
     public function test_garantia_deriva_pero_la_de_farmacia_la_decide_el_modelo(): void
     {
         $this->assertSame('garantias', explode('|', explode('DERIVAR:', AiSuggestionService::decidir('Queremos la garantía', $this->conv('x'), 'verificado', false)['instruccion'])[1])[0]);

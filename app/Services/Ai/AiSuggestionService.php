@@ -563,7 +563,12 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if (preg_match('/\btotems?\b/', $t)) {
             return $derivar('soporte', 'tótem');
         }
-        if (preg_match('/\bgarantia/', $t) && ! $farmacia) {
+        // «Garantía» deriva siempre, salvo que solo la mencione de pasada: pide precio o presupuesto para COMPRAR material (otra etiqueta,
+        // pinzas…) y no cuenta ningún fallo. Eso es un presupuesto de material, no una garantía (ej.: «estoy revisando su protocolo de garantía… me
+        // conviene comprar otra etiqueta; envíenme presupuesto»).
+        $soloCompra = preg_match('/\b(precio|presupuesto)/', $t) && preg_match('/\b(comprar\w*|compra|pinzas|portaetiquetas)\b/', $t)
+            && ! preg_match('/\b(no funcion\w*|fallo\w*|fallan|averi\w*|rotas?|rotos?|defectuos\w*|sustitu\w*|reemplaz\w*|no cambia\w*|se apag\w*|en blanco|bloquead\w*|estropead\w*|no enciende|humedad|no carga\w*)\b/', $t);
+        if (preg_match('/\bgarantia/', $t) && ! $farmacia && ! $soloCompra) {
             return $derivar('garantias', 'garantía');
         }
         // Problema de uso, primera vez que escribe y no se sabe quién es: se piden hotel y correo (y nada más).
