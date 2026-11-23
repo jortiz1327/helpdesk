@@ -185,6 +185,10 @@ class AiEvaluar extends Command
         if (in_array($esperado, ['responder', 'derivar'], true) && $obtenido === 'pedir_info' && preg_match('/\[\s*VERIF\s*\]/i', $c)) {
             return 'pedir_info';
         }
+        // Presupuesto de material por correo o web: valen las dos respuestas del equipo (el correo de postventa o asignar a Pedidos y facturas).
+        if (in_array($esperado, ['responder', 'derivar'], true) && in_array($obtenido, ['responder', 'derivar'], true) && preg_match('/\[\s*PPTO\s*\]/i', $c)) {
+            return $obtenido;
+        }
         if ($esperado === 'pedir_info' && $obtenido === 'derivar' && preg_match('/^\s*PRIMERO se verifica.*despu[eé]s se deriva/isu', $c)) {
             return 'derivar';
         }
