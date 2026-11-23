@@ -13,5 +13,20 @@
         "clave": "pilas-varta-no-compatibles",
         "titulo": "Pilas VARTA no compatibles",
         "contenido": "Pregunta del cliente:\nTenemos etiquetas que no funcionan. Pensábamos que era por las pilas, hemos comprado pilas nuevas para todas, pero al cambiarlas no pasa nada. ¿Hay algún protocolo para que se actualicen al poner las pilas nuevas? (adjuntan foto o vídeo de las etiquetas)\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nCuando una etiqueta no funciona aunque se hayan puesto pilas nuevas, hay que mirar de qué MARCA son las pilas. Las pilas VARTA NO funcionan bien con nuestras etiquetas: son más gruesas y no hacen buen contacto con los pines. Las recomendadas son Beidongli, HenliMax o NSN, que son más finas. Si el cliente puede ver la marca (en la foto o porque la dice), explícaselo con tacto y recomienda cambiar a una de esas tres. Si necesita pilas, puede pedirlas por correo a postventa indicando el material y las cantidades (la IA no tramita el pedido ni da precios). Si no se ve ni se sabe la marca, pregunta qué marca de pilas usa antes de derivar a garantías. Como siempre en un hotel, primero se verifica hotel y correo; después se da esta recomendación."
+    },
+    {
+        "clave": "traduccion-de-platos-no-funciona",
+        "titulo": "Traducción de platos no funciona",
+        "contenido": "Pregunta del cliente:\nSi pongo el plato en español y le doy a traducir, el sistema no deja que se hagan las traducciones al inglés.\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nPrimero, como siempre en un hotel, se verifica hotel y correo. Después: si la aplicación NO deja traducir un plato, no es algo que el hotel pueda arreglar: la traducción la hace la aplicación con un servicio de IA (los tokens de ChatGPT) que traduce el nombre en español a los demás idiomas del hotel, y cuando falla lo lleva una persona del equipo. Por tanto se DERIVA a Soporte (nota «Para el equipo»), sin explicar pasos. Los idiomas que muestra el hotel sí los configura el propio hotel; el fallo de traducir, no."
+    },
+    {
+        "clave": "etiqueta-no-cambia-pasos-antes-de-garantias",
+        "titulo": "Etiqueta que no cambia: pasos antes de garantías",
+        "contenido": "Pregunta del cliente:\nLa etiqueta no cambia, ni con pilas nuevas, incluso con éxito en Cloud.\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nPrimero se verifica hotel y correo. Después, antes de pasarlo a Garantías, el equipo sigue estos pasos con una etiqueta que no funciona: 1) quitarle las pilas unos 15 minutos y volver a ponerlas; 2) si sigue igual, probar con pilas nuevas o con las de una etiqueta que sí funcione; 3) si tampoco, pedir fotos de la etiqueta: la parte frontal donde se vea el código de barras y la parte trasera con la tapa abierta y sin pilas. Solo cuando estos pasos no resuelven (o el cliente ya dice que los hizo, como aquí con pilas nuevas) se deriva a Garantías. Si no está claro qué ha probado, pregunta solo por eso; no pidas envío ni des plazos."
+    },
+    {
+        "clave": "estado-de-etiquetas-enviadas-a-garantias",
+        "titulo": "Estado de etiquetas ya en garantías",
+        "contenido": "Pregunta del cliente:\nHace días o semanas que recibieron las etiquetas del hotel y quería saber cuándo las tendremos de vuelta para hacer el mapeo del buffet antes de la apertura.\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nEs un ticket de Garantías: preguntar cuándo vuelven unas etiquetas que ya enviaron lo gestiona ese departamento, porque nosotros no sabemos sus tiempos ni cuándo estarán disponibles. Primero se verifica hotel y correo; después se DERIVA a Garantías (nota «Para el equipo») sin dar fechas, plazos ni promesas."
     }
 ]

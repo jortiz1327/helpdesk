@@ -93,6 +93,14 @@ class AiDecidirTest extends TestCase
         // Material y presupuestos, farmacias y tiendas no dependen de la verificación del hotel.
         $this->assertNull(AiSuggestionService::decidir("Necesito 30 pilas", $this->conv('x'), 'sin_correo', false));
         $this->assertNull(AiSuggestionService::decidir("Etiquetas de la farmacia sin stock", $this->conv('x'), 'sin_correo', false));
+        // Una tienda (balanza, carnicería, caja…) no es un hotel: de momento la lleva una persona, sin pedirle hotel ni correo.
+        $d = AiSuggestionService::decidir('Desde la balanza no cambia los precios automáticamente a las etiquetas electrónicas', $this->conv('x'), 'sin_correo', false);
+        $this->assertSame('derivar', $d['decision']);
+        $this->assertStringContainsString('tienda o comercio', $d['resumen']);
+        $this->assertSame('derivar', AiSuggestionService::decidir('Tengo una carnicería y las etiquetas no cambian', $this->conv('x'), 'sin_correo', false)['decision']);
+        // Si ya es un usuario verificado de la aplicación, o es un pedido de material, no se desvía.
+        $this->assertNotSame('derivar', AiSuggestionService::decidir('La balanza de la tienda del hotel no marca bien', $this->conv('x'), 'verificado', true)['decision'] ?? null);
+        $this->assertNull(AiSuggestionService::decidir('Necesito 30 pilas para la tienda', $this->conv('x'), 'sin_correo', false));
         // El sitio que nombra no está en el listado de hoteles: quizá no sea un hotel, no se fuerza la norma (manda la verificación normal).
         $this->assertNull(AiSuggestionService::decidir('Somos la universidad, las etiquetas no cambian', $this->conv('x'), 'sin_correo', true, true));
         // Ya comprobado (aunque no figure o el panel no responda) deciden las reglas normales.

@@ -504,7 +504,10 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         // dependen del hotel), farmacias, tiendas y supermercados (otras áreas, otra verificación) y quien nombra un sitio que el listado de
         // hoteles no conoce (quizá no sea un hotel; ahí manda VERIFICACIÓN DEL CLIENTE: pedir el nombre exacto y, si sigue sin constar, derivar).
         $material = preg_match('/presupuesto|(comprar|compra|pedir|pedido|reponer|necesit[a-z]+)\b.{0,40}(pilas|soportes?|recambios?|pinzas|etiquetas)/s', $t);
-        $otraArea = $farmacia || preg_match('/tienda|supermercado/', $t);
+        // Tienda o comercio (no un hotel): balanza, báscula, caja, carnicería, frutería… De momento los lleva una persona del equipo: ni se
+        // les pide «hotel» ni se les explica nada. Solo si aún no hay un correo verificado (si ya es un usuario de la app, manda lo demás).
+        $comercio = preg_match('/\b(tienda|supermercado|balanza|basculas?|caja registradora|tpv|carniceria|charcuteria|fruteria|pescaderia|panaderia|ultramarinos|autoservicio)\b/', $t);
+        $otraArea = $farmacia || $comercio;
         $acuse = mb_strlen($t) < 200 && preg_match('/gracias|ya funciona|solucionado|resuelto/', $t) && ! str_contains($t, '?');
         if (! $acuse && ! $noEsHotel && ! in_array($estadoCorreo, ['verificado', 'incompleto', 'no_encontrado'], true) && ! $material && ! $otraArea) {
             return ['decision' => 'pedir_datos', 'resumen' => $hotelNombrado ? 'verificar primero: pedir el correo' : 'verificar primero: pedir hotel y correo',
@@ -512,6 +515,9 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
                     ? 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. El hotel ya consta: PIDE SOLO el correo con el que accede a la aplicación.'
                     : 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. PIDE SOLO el nombre de su establecimiento y el correo con el que accede a nuestra aplicación (como máximo esas dos preguntas). No des por hecho que es un hotel (puede ser tienda o farmacia): no digas «hotel» ni «aplicación de hoteles».')
                     . ' No des pasos, diagnóstico ni derives todavía; di que en cuanto lo confirme se lo atiende.'];
+        }
+        if ($comercio && ! $farmacia && ! $material && ! $acuse && $estadoCorreo !== 'verificado') {
+            return $derivar('soporte', 'tienda o comercio, no un hotel');
         }
         // Alérgenos: lo sensible (qué lleva un plato, datos mal o ausentes) lo lleva una persona; qué alérgenos se muestran lo configura el hotel.
         $configuraAlergenos = preg_match('/alergen/', $t)
