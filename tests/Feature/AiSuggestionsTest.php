@@ -224,6 +224,22 @@ class AiSuggestionsTest extends TestCase
         $this->assertStringContainsString('Marta Gómez dice que no conecta', $r->json('summary.body'));
         $this->assertStringNotContainsString('@', $r->json('summary.body'));
     }
+    public function test_la_lista_de_apps_que_no_gestionamos_se_edita_en_ajustes_y_solo_con_permiso(): void
+    {
+        $this->activar();
+        $tok = $this->agente();
+        $this->assertSame(['Don Pancho'], \App\Services\Ai\AiSuggestionService::ajenas());
+        $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=admin_apps', ['apps' => 'Hotel Sol'])->assertStatus(403);
+        $u = User::create(['name' => 'Jefe', 'email' => 'jefe@x.com', 'password' => bcrypt('x')]);
+        $u->assignRole('superadmin');
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        $t = TokenService::make($u);
+        $r = $this->withHeader('X-App-Token', $t)->postJson('/api/ai_suggestions.php?action=admin_apps', ['apps' => "Hotel Sol\nHotel Luna"])->assertOk();
+        $this->assertSame(['Hotel Sol', 'Hotel Luna'], $r->json('apps_ajenas'));
+        $this->assertSame(['Hotel Sol', 'Hotel Luna'], \App\Services\Ai\AiSuggestionService::ajenas());
+        $this->withHeader('X-App-Token', $t)->postJson('/api/ai_suggestions.php?action=admin_apps', ['apps' => ['x']])->assertOk()->assertJsonPath('apps_ajenas', []);
+    }
+
     public function test_una_valoracion_con_campos_que_no_son_texto_no_revienta(): void
     {
         $this->activar();

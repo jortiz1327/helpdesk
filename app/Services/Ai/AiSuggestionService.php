@@ -137,6 +137,7 @@ class AiSuggestionService
             ],
             'usage'      => $this->consumo(),
             'budget'     => $this->presupuesto(),
+            'apps_ajenas' => self::ajenas(),
             'hotels_api' => app(HotelsApi::class)->configured() ? HotelsApi::estadoPanel() : null,
             'knowledge'  => [
                 'tickets' => DB::table('ai_documents')->where('source_type', 'ticket')->count(),
@@ -448,7 +449,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
 
         $hotelNombrado = $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente);
         // Evaluaciones: los casos van anonimizados y sin correo, así que la norma de verificar primero NO se aplica (se mide la decisión de fondo; la norma la cubren los tests).
-        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? '') . ' ' . (string) ($t->contact_email ?? ''), $conversacion, $this->estadoCorreo, $hotelNombrado, $this->hotelNoEncontrado || $anonimizar);
+        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? '') . ' ' . (string) ($t->contact_email ?? ''), $conversacion, $this->estadoCorreo, $hotelNombrado, $this->hotelNoEncontrado || $anonimizar, self::ajenas());
         $t->decision = $dec ? "\nDECISIÓN YA TOMADA POR EL SISTEMA (obligatoria; no la discutas ni la cambies): " . $dec['instruccion'] . "\n" : '';
         if ($dec) {
             $this->paso('decision', null, 'Decisión fijada en código: ' . $dec['resumen']);
@@ -484,6 +485,27 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         }
     }
 
+    public const AJENAS_POR_DEFECTO = ['Don Pancho'];
+
+    /** Hoteles/aplicaciones que no gestionamos nosotros (Ajustes › Asistente IA). Sin configurar: la lista de siempre. */
+    public static function ajenas(): array
+    {
+        $v = Setting::get('ai_apps_ajenas', null);
+        return $v === null ? self::AJENAS_POR_DEFECTO : self::limpiarAjenas((string) $v);
+    }
+
+    /** Una por línea o separadas por comas; sin vacías ni repetidas, de 3 a 60 caracteres, máximo 50. */
+    public static function limpiarAjenas(string $texto): array
+    {
+        $l = array_map(fn ($x) => trim(strip_tags($x)), preg_split('/[\r\n,;]+/u', $texto) ?: []);
+        $l = array_filter($l, fn ($x) => mb_strlen($x) >= 3 && mb_strlen($x) <= 60);
+        $vistos = [];
+        foreach ($l as $x) {
+            $vistos[mb_strtolower($x)] ??= $x;
+        }
+        return array_slice(array_values($vistos), 0, 50);
+    }
+
     /**
      * Decide EN CÓDIGO los casos claros que el modelo resolvía a veces de una forma y a veces de otra (derivar o pedir datos).
      * Función pura: solo mira el último mensaje del cliente, la conversación y lo que se supo del correo y el hotel.
@@ -492,16 +514,20 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
      * @param  array<int, array{role:string, text:string}>  $conversacion
      * @return array{decision:string, instruccion:string, resumen:string}|null
      */
-    public static function decidir(string $texto, array $conversacion, ?string $estadoCorreo, bool $hotelNombrado, bool $noEsHotel = false): ?array
+    public static function decidir(string $texto, array $conversacion, ?string $estadoCorreo, bool $hotelNombrado, bool $noEsHotel = false, ?array $ajenas = null): ?array
     {
         $t = mb_strtolower((string) preg_replace('/\p{Mn}/u', '', \Normalizer::normalize($texto, \Normalizer::FORM_D) ?: $texto));
         $derivar = fn (string $cat, string $motivo) => ['decision' => 'derivar', 'resumen' => "derivar ($motivo)",
             'instruccion' => "DERIVA. Responde con la frase corta «Gracias por su mensaje. Hemos registrado la incidencia y el equipo la revisará.» sin preguntar nada ni dar pasos, y añade al final «[[DERIVAR:$cat|$motivo]]»."];
         $yaRespondio = (bool) array_filter($conversacion, fn ($m) => ($m['role'] ?? '') === 'assistant');
 
-        // Hotel Don Pancho: la aplicación de ese hotel no la gestionamos nosotros; cualquier incidencia la lleva una persona.
-        if (preg_match('/don ?pancho/', $t)) {
-            return $derivar('soporte', 'Don Pancho (su app no la gestionamos nosotros)');
+        // Hoteles o aplicaciones que no gestionamos nosotros (lista editable en Ajustes › Asistente IA): cualquier incidencia la lleva una persona.
+        foreach ($ajenas ?? self::AJENAS_POR_DEFECTO as $nombre) {
+            $n = mb_strtolower((string) preg_replace('/\p{Mn}/u', '', \Normalizer::normalize($nombre, \Normalizer::FORM_D) ?: $nombre));
+            $partes = array_filter(preg_split('/\s+/u', trim($n)) ?: [], fn ($p) => $p !== '');
+            if (mb_strlen(trim($n)) >= 3 && preg_match('/(?<![\p{L}\p{N}])' . implode(' ?', array_map(fn ($p) => preg_quote($p, '/'), $partes)) . '(?![\p{L}\p{N}])/u', $t)) {
+                return $derivar('soporte', $nombre . ' (su app no la gestionamos nosotros)');
+            }
         }
         // Temas que SIEMPRE lleva una persona (la farmacia es otra regla: la lleva Expofarm).
         $farmacia = str_contains($t, 'farmacia');

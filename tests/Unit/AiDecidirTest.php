@@ -56,6 +56,17 @@ class AiDecidirTest extends TestCase
         $this->assertSame('derivar', AiSuggestionService::decidir('Duda sobre el menu info@donpancho.com', $this->conv('x'), 'verificado', true)['decision']);
     }
 
+    public function test_las_apps_que_no_gestionamos_son_una_lista_y_derivan_aunque_cambie(): void
+    {
+        $d = AiSuggestionService::decidir('Problema con la app del Hotel Playa Sol', $this->conv('x'), 'verificado', true, false, ['Playa  Sol']);
+        $this->assertSame('derivar', $d['decision']);
+        $this->assertStringContainsString('Playa  Sol', $d['resumen']);
+        $this->assertNull(AiSuggestionService::decidir('Las etiquetas no se actualizan en el Hotel Luna', $this->conv('x'), 'verificado', true, false, ['Playa Sol']));
+        $this->assertNull(AiSuggestionService::decidir('Las etiquetas no se actualizan en don pancho', $this->conv('x'), 'verificado', true, false, []), 'con la lista vacía no se deriva por nombre');
+        $this->assertSame('derivar', AiSuggestionService::decidir('Duda de DON PANCHO', $this->conv('x'), 'verificado', true, false, ['Don Pancho'])['decision']);
+        $this->assertSame(['Hotel A', 'Hotel B'], AiSuggestionService::limpiarAjenas("Hotel A\n hotel a \nHotel B, xx\n"));
+    }
+
     public function test_garantia_deriva_pero_la_de_farmacia_la_decide_el_modelo(): void
     {
         $this->assertSame('garantias', explode('|', explode('DERIVAR:', AiSuggestionService::decidir('Queremos la garantía', $this->conv('x'), 'verificado', false)['instruccion'])[1])[0]);

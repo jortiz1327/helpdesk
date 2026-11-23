@@ -39,6 +39,13 @@ export default function AiSettings() {
     if (r?.ok) { setD(r); toast('Tope mensual guardado') }
     else toast(r?.error || 'No se pudo guardar', 'err')
   }
+  const guardarApps = async (apps) => {
+    setBusy(true)
+    const r = await api.aiAdminApps(apps)
+    setBusy(false)
+    if (r?.ok) { setD(r); toast('Lista guardada') }
+    else toast(r?.error || 'No se pudo guardar', 'err')
+  }
   const indexar = async () => {
     setBusy(true)
     const r = await api.aiAdminIndex()
@@ -121,6 +128,8 @@ export default function AiSettings() {
 
 
       {d.budget && <AiBudget b={d.budget} busy={busy} onSave={guardarTope} />}
+
+      <AiAppsAjenas lista={d.apps_ajenas || []} busy={busy} onSave={guardarApps} />
 
       {d.hotels_api && <AiPanelHoteles p={d.hotels_api} />}
 
@@ -310,6 +319,22 @@ function AiBudget({ b, busy, onSave }) {
       <p className="em-desc" style={{ marginTop: 8 }}>
         Cuenta solo las sugerencias de los agentes (mes natural; se reinicia el día 1). Los chats de prueba ({euros(b.lab)} este mes) y las evaluaciones desde la consola no cortan a los agentes. El crédito de Anthropic es compartido por toda la organización: este tope protege la parte del helpdesk.
       </p>
+    </div>
+  )
+}
+
+/* Hoteles o aplicaciones que no gestionamos nosotros: la IA no contesta y los pasa a una persona. Uno por línea. */
+function AiAppsAjenas({ lista, busy, onSave }) {
+  const [v, setV] = useState(lista.join('\n'))
+  useEffect(() => { setV(lista.join('\n')) }, [lista])
+  return (
+    <div className="card em-card" style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Hoteles o aplicaciones que no gestionamos</h3>
+      <p className="em-desc">Si el cliente (en el asunto, el mensaje o el correo) nombra uno de estos, la IA no contesta: lo pasa a una persona. Escribe uno por línea.</p>
+      <form onSubmit={(e) => { e.preventDefault(); onSave(v) }}>
+        <textarea className="input" rows={4} value={v} onChange={(e) => setV(e.target.value)} aria-label="Hoteles o aplicaciones que no gestionamos" placeholder="Hotel Ejemplo" />
+        <button className="btn" disabled={busy} style={{ marginTop: 8 }}>Guardar lista</button>
+      </form>
     </div>
   )
 }

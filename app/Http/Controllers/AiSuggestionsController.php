@@ -42,6 +42,7 @@ class AiSuggestionsController extends Controller
             'admin'      => $this->admin($request),
             'admin_save' => $this->post($request) ?? $this->adminSave($request),
             'admin_budget' => $this->post($request) ?? $this->adminBudget($request),
+            'admin_apps' => $this->post($request) ?? $this->adminApps($request),
             'admin_index' => $this->post($request) ?? $this->adminIndex($request),
             'admin_review' => $this->post($request) ?? $this->adminReview($request),
             'admin_history' => $this->adminHistory($request),
@@ -76,6 +77,16 @@ class AiSuggestionsController extends Controller
             return response()->json(['ok' => false, 'error' => 'Escribe un importe en dólares entre 0 y 100000'], 422);
         }
         \App\Models\Setting::put('ai_budget_month_usd', (string) round((float) $v, 2));
+        return response()->json(['ok' => true] + $this->ai->panel());
+    }
+
+    /** Hoteles/aplicaciones que no gestionamos nosotros: la IA los deriva a una persona. */
+    private function adminApps(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        $v = $request->input('apps');
+        $lista = AiSuggestionService::limpiarAjenas(is_array($v) ? implode("\n", array_filter($v, 'is_string')) : (is_string($v) ? $v : ''));
+        \App\Models\Setting::put('ai_apps_ajenas', implode("\n", $lista));
         return response()->json(['ok' => true] + $this->ai->panel());
     }
 

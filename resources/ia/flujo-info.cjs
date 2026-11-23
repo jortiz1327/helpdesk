@@ -26,7 +26,7 @@ module.exports = {
   h4x: ['No es el mismo', 'El correo existe pero en otro sitio.', ['No se revela a qué hotel pertenece', 'Se pide confirmar hotel y correo']],
   h5: ['Datos del hotel para la IA', 'Solo lectura y solo de su hotel.', ['Rol de su usuario y si está activo', 'Antenas en línea o caídas', 'Estado de la etiqueta concreta', 'Nunca contraseñas ni datos de otros hoteles']],
   d5: ['¿Caso evidente?', 'Lo claro se decide sin la IA.', ['Así no oscila de un intento a otro']],
-  c1: ['Pasa a una persona', 'Con el cliente ya verificado.', ['Alérgenos de un plato, tótems y garantías (salvo farmacias)', 'Hotel Don Pancho: su aplicación no la gestionamos nosotros']],
+  c1: ['Pasa a una persona', 'Con el cliente ya verificado.', ['Alérgenos de un plato, tótems y garantías (salvo farmacias)', 'Hoteles o aplicaciones que no gestionamos (lista editable en Ajustes; hoy Don Pancho)']],
   c2: ['Verificar primero', 'Norma de la dirección.', ['En un hotel sin correo verificado solo se piden hotel y correo (o solo el correo si el hotel consta)', 'Excepto: material, presupuestos, farmacias, tiendas y quien no es un hotel', 'Antes no se explica, ni se pide otra cosa, ni se deriva']],
   pr: ['Prepara las instrucciones', 'Todo lo que la IA necesita saber.', ['Reglas del equipo y orden de decisión', 'Lo que sabemos del cliente y de su hotel', '«Decisión ya tomada» si el caso era evidente']],
   ia: ['La IA (Claude Haiku 5.5)', 'Redacta un borrador para que lo revises.', ['Nunca da precios ni inventa procedimientos', 'Responde en el idioma del cliente', 'Si duda, no se atreve: lo dice']],
