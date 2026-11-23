@@ -54,6 +54,7 @@ class AiSuggestionService
     /** El cliente nombra un sitio y el listado de hoteles del panel (consultado, no caído) no lo conoce: quizá no sea un hotel. */
     private bool $hotelNoEncontrado = false;
     private bool $hotelLocalizado = false;
+    private bool $hotelSinApi = false;
     /** Lo que hizo la IA en esta sugerencia, paso a paso (se guarda en `sources.traza` y se enseña al agente en el panel). */
     private array $traza = [];
     /** A qué categoría de la app (soporte, garantías, pedidos) debe llevarlo una persona, si la IA derivó. Nota interna para el agente. */
@@ -449,7 +450,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
 
         $hotelNombrado = $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente);
         // Evaluaciones: los casos van anonimizados y sin correo, así que la norma de verificar primero NO se aplica (se mide la decisión de fondo; la norma la cubren los tests).
-        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? '') . ' ' . (string) ($t->contact_email ?? ''), $conversacion, $this->estadoCorreo, $hotelNombrado, $this->hotelNoEncontrado || $anonimizar, self::ajenas());
+        $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? '') . ' ' . (string) ($t->contact_email ?? ''), $conversacion, $this->estadoCorreo, $hotelNombrado, $this->hotelNoEncontrado || $anonimizar, self::ajenas(), $this->hotelSinApi);
         $t->decision = $dec ? "\nDECISIÓN YA TOMADA POR EL SISTEMA (obligatoria; no la discutas ni la cambies): " . $dec['instruccion'] . "\n" : '';
         if ($dec) {
             $this->paso('decision', null, 'Decisión fijada en código: ' . $dec['resumen']);
@@ -514,7 +515,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
      * @param  array<int, array{role:string, text:string}>  $conversacion
      * @return array{decision:string, instruccion:string, resumen:string}|null
      */
-    public static function decidir(string $texto, array $conversacion, ?string $estadoCorreo, bool $hotelNombrado, bool $noEsHotel = false, ?array $ajenas = null): ?array
+    public static function decidir(string $texto, array $conversacion, ?string $estadoCorreo, bool $hotelNombrado, bool $noEsHotel = false, ?array $ajenas = null, bool $appSinApi = false): ?array
     {
         $t = mb_strtolower((string) preg_replace('/\p{Mn}/u', '', \Normalizer::normalize($texto, \Normalizer::FORM_D) ?: $texto));
         $derivar = fn (string $cat, string $motivo) => ['decision' => 'derivar', 'resumen' => "derivar ($motivo)",
@@ -528,6 +529,10 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             if (mb_strlen(trim($n)) >= 3 && preg_match('/(?<![\p{L}\p{N}])' . implode(' ?', array_map(fn ($p) => preg_quote($p, '/'), $partes)) . '(?![\p{L}\p{N}])/u', $t)) {
                 return $derivar('soporte', $nombre . ' (su app no la gestionamos nosotros)');
             }
+        }
+        // Hotel de una app que no está en la API de soporte (Poseidón, Hoteles03, Fira Barcelona, Lavaka): no se puede verificar, lo lleva una persona.
+        if ($appSinApi) {
+            return $derivar('soporte', 'hotel cuya app aún no está en la API de soporte');
         }
         // Temas que SIEMPRE lleva una persona (la farmacia es otra regla: la lleva Expofarm).
         $farmacia = str_contains($t, 'farmacia');
@@ -1074,6 +1079,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $this->hotelAmbiguo = null;
         $this->estadoCorreo = null;
         $this->hotelLocalizado = false;
+        $this->hotelSinApi = false;
         $this->hotelNoEncontrado = false;
         $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente, $nombreContacto, $contactId);
         if ($s !== '' && $this->hotelAmbiguo !== null) {
@@ -1240,6 +1246,10 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         }
         $sitios = array_slice($v['sitios'], 0, 4);
         $this->hotelLocalizado = (bool) $dir;
+        $this->hotelSinApi = $dir && $this->hotelAmbiguo === null && HotelsApi::sinApi($dir);
+        if ($this->hotelSinApi) {
+            $this->paso('hotel', null, 'Hotel de una app que aún no está en la API de soporte: no se puede verificar, lo lleva una persona');
+        }
         $this->hotelNoEncontrado = ! $dir && $nombres && ! $dirFalla;
         $this->estadoCorreo = ($v['estado'] === 'encontrado' && (! $dir || $this->coincideHotel($dir, $sitios))) ? 'verificado' : (string) $v['estado'];
         // Verificado y de UN solo hotel: se recuerda para no volver a preguntarlo en el próximo ticket.

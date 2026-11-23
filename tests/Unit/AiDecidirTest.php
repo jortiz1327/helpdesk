@@ -17,6 +17,15 @@ class AiDecidirTest extends TestCase
         return $c;
     }
 
+    public function test_hotel_de_una_app_sin_api_se_deriva_a_soporte(): void
+    {
+        $d = AiSuggestionService::decidir('Las etiquetas no cambian', $this->conv('x'), 'no_encontrado', true, false, null, true);
+        $this->assertSame('derivar', $d['decision']);
+        $this->assertStringContainsString('soporte', $d['instruccion']);
+        $this->assertTrue(\App\Services\Ai\HotelsApi::sinApi([['nombre' => 'Hotel Poseidón Playa', 'app' => 'contenedor-poseidon']]));
+        $this->assertFalse(\App\Services\Ai\HotelsApi::sinApi([['nombre' => 'Hotel Sol', 'app' => 'contenedor-sol']]));
+    }
+
     public function test_alergenos_y_totems_siempre_derivan(): void
     {
         $d = AiSuggestionService::decidir('Las etiquetas no muestran los alérgenos', $this->conv('x'), 'verificado', true);

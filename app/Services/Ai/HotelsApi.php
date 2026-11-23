@@ -276,7 +276,7 @@ class HotelsApi
         }
         // La lista de hoteles casi no cambia: lo que ya se encontró se recuerda un día. Lo que NO se encuentra no se guarda
         // (puede ser un hotel recién dado de alta) y se vuelve a preguntar al panel.
-        $clave = 'ai_support_hoteles_' . sha1(self::norm($nombre));
+        $clave = 'ai_support_hoteles2_' . sha1(self::norm($nombre));
         $guardado = Cache::get($clave);
         if (is_array($guardado) && $guardado) {
             return $guardado;
@@ -292,7 +292,7 @@ class HotelsApi
                 $d = $this->get('/api/support/v1/hotels', ['q' => $sin, 'per_page' => 5]) ?? $d;
             }
         }
-        $res = array_map(fn ($h) => ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
+        $res = array_map(fn ($h) => ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? ''), 'app' => (string) ($h['app'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
         // El buscador del panel exige la frase seguida («Bahía Príncipe Turquesa» no encuentra «Bahia Principe Grand Turquesa»):
         // si no hay nada, se busca palabra a palabra y solo valen los hoteles que contienen varias de ellas.
         if (! $res && $d !== null) {
@@ -302,6 +302,20 @@ class HotelsApi
             Cache::put($clave, $res, self::CACHE_HOTELES);
         }
         return $res;
+    }
+
+    /** Apps de AdminHoteles que no están en la API de soporte (tienen cosas distintas): sus usuarios no se pueden verificar y se derivan. */
+    public const APPS_SIN_API = ['contenedor-firabarcelona', 'contenedor-hoteles03', 'contenedor-poseidon', 'lavaka'];
+
+    /** ¿Alguno de estos hoteles (resultado de buscarHoteles) es de una app sin API de soporte? */
+    public static function sinApi(array $hoteles): bool
+    {
+        foreach ($hoteles as $h) {
+            if (in_array(mb_strtolower((string) ($h['app'] ?? '')), self::APPS_SIN_API, true)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Palabras de un nombre que sirven para identificar un hotel (sin tildes, sin palabras genéricas). */
@@ -322,7 +336,7 @@ class HotelsApi
         foreach ($pal as $w) {
             $d = $this->get('/api/support/v1/hotels', ['q' => $w, 'per_page' => 10]);
             foreach ((array) ($d['hoteles'] ?? []) as $h) {
-                $vistos[(string) ($h['id'] ?? $h['nombre'] ?? '')] = ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')];
+                $vistos[(string) ($h['id'] ?? $h['nombre'] ?? '')] = ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? ''), 'app' => (string) ($h['app'] ?? '')];
             }
         }
         $max = 0;
