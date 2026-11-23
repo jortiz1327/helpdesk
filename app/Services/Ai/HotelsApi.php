@@ -177,13 +177,41 @@ class HotelsApi
             return ['estado' => 'incompleto', 'sitios' => []];
         }
         if (! empty($d['encontrado'])) {
-            $r = ['estado' => 'encontrado', 'sitios' => $this->sitiosDe($d)];
+            $r = ['estado' => 'encontrado', 'sitios' => $this->completarBuffets($this->sitiosDe($d))];
             if ($r['sitios']) {
                 Cache::put($clave, $r, self::CACHE_CORREO);
             }
             return $r;
         }
         return ['estado' => ((array) ($d['apps_sin_respuesta'] ?? [])) ? 'incompleto' : 'no_encontrado', 'sitios' => []];
+    }
+
+    /**
+     * Con el índice central el lookup NO trae buffets (solo el hotel, el rol y si está activo): sin su id no se pueden consultar las antenas ni
+     * las etiquetas. Se completan desde el propio hotel (hotels/{id}/buffets, en caché). Solo si son pocos hoteles: un usuario de cadena con
+     * decenas de hoteles se queda con los nombres, que es lo que hace falta para verificar.
+     *
+     * @param  array<int, array<string, mixed>>  $sitios
+     * @return array<int, array<string, mixed>>
+     */
+    private function completarBuffets(array $sitios): array
+    {
+        $faltan = array_filter($sitios, fn ($x) => ($x['buffet_id'] ?? '') === '' && self::idValido((string) ($x['hotel_id'] ?? '')));
+        if (! $faltan || count($faltan) > 4) {
+            return $sitios;
+        }
+        $out = [];
+        foreach ($sitios as $x) {
+            $bs = isset($faltan[array_search($x, $sitios, true)]) ? $this->buffetsDeHotel((string) $x['hotel_id']) : null;
+            if (! $bs) {
+                $out['x' . count($out)] = $x;
+                continue;
+            }
+            foreach ($bs as $b) {
+                $out['b' . $b['buffet_id']] = array_merge($x, ['buffet_id' => $b['buffet_id'], 'buffet' => $b['buffet'], 'hotel' => $x['hotel'] !== '' ? $x['hotel'] : $b['hotel']]);
+            }
+        }
+        return array_values($out);
     }
 
     /** Hoteles/buffets de las coincidencias de /users/lookup (tolera variantes de nombres de campo). */

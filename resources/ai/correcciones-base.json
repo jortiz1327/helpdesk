@@ -38,5 +38,10 @@
         "clave": "etiquetas-de-otro-hotel",
         "titulo": "Etiquetas traídas de otro hotel: sí funcionan, hay que desvincularlas",
         "contenido": "Pregunta del cliente:\n¿Las etiquetas funcionan solo con su antena? Me han traído unas etiquetas del otro hotel para comprobar si funcionan, o tengo que probarlas en su hotel.\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nLas etiquetas SÍ pueden funcionar aunque vengan de otro hotel: no hace falta probarlas en el de origen. Primero se verifica hotel y correo. Después se le explica el procedimiento: 1) el hotel de origen (A) debe eliminar las posiciones que tienen esas etiquetas vinculadas, para que queden desvinculadas; 2) una vez desvinculadas, se vinculan en las posiciones que necesite en su hotel (B). Esto pasa entre hoteles de una misma cadena, y quien lo pide suele ser un usuario con acceso a ambos hoteles, así que puede hacerlo él mismo en cada uno (si no tiene acceso al hotel de origen, que lo haga alguien de ese hotel). Pídele de qué hotel provienen las etiquetas. No digas que ya están desvinculadas ni que ya están listas."
+    },
+    {
+        "clave": "etiquetas-desactivadas-sin-posicion",
+        "titulo": "Etiquetas que salen desactivadas y sin posición: ya no se usan",
+        "contenido": "Pregunta del cliente:\n¿Cómo podemos activar las etiquetas que nos salen desactivadas?\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nPrimero se verifica hotel y correo. Las etiquetas que salen desactivadas y con la posición «__» (vacía) son etiquetas que en su momento tuvieron una posición y se sustituyeron por otra: ya no se utilizan o el hotel ya no las tiene, y de hecho no deberían salir en la aplicación (aparecen por la migración). No se «activan». Si todavía las tienen guardadas en alguna caja, deben ponerles pilas nuevas (reinicio); si no las tienen, se deriva el ticket. No expliques cómo asignarles una posición ni prometas que se reactivarán."
     }
 ]

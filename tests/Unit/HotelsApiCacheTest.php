@@ -43,6 +43,37 @@ class HotelsApiCacheTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_con_el_indice_central_los_buffets_se_completan_desde_el_hotel(): void
+    {
+        // Respuesta del índice: sin nombre ni buffets, solo hotel, rol y estado.
+        Http::fake([
+            'panel.test/api/support/v1/users/lookup*' => Http::response(['data' => ['encontrado' => true, 'origen' => 'indice', 'coincidencias' => [[
+                'alcance' => 'hotel', 'hoteles' => [['id' => '7', 'nombre' => 'Hotel Sol']], 'buffets' => [], 'usuario' => ['nombre' => null, 'rol' => 'Admin', 'activo' => true],
+            ]]]]),
+            'panel.test/api/support/v1/hotels/7/buffets*' => Http::response(['data' => ['hotel' => 'Hotel Sol', 'buffets' => [['id' => '31', 'nombre' => 'Buffet principal'], ['id' => '32', 'nombre' => 'Terraza']]]]),
+        ]);
+        $s = (new HotelsApi())->verificar('d@sol.es');
+        $this->assertSame('encontrado', $s['estado']);
+        $this->assertSame(['31', '32'], array_column($s['sitios'], 'buffet_id'));
+        $this->assertSame('Hotel Sol', $s['sitios'][0]['hotel']);
+        $this->assertSame('7', $s['sitios'][0]['hotel_id']);
+        $this->assertSame('Admin', $s['sitios'][1]['rol']);
+    }
+
+    public function test_un_usuario_de_cadena_con_muchos_hoteles_no_dispara_una_consulta_por_hotel(): void
+    {
+        $hoteles = array_map(fn ($i) => ['id' => (string) (100 + $i), 'nombre' => "Hotel $i"], range(1, 9));
+        Http::fake([
+            'panel.test/api/support/v1/users/lookup*' => Http::response(['data' => ['encontrado' => true, 'origen' => 'indice', 'coincidencias' => [[
+                'alcance' => 'cadena', 'hoteles' => $hoteles, 'buffets' => [], 'usuario' => ['rol' => 'Director', 'activo' => true],
+            ]]]]),
+        ]);
+        $s = (new HotelsApi())->verificar('dir@cadena.es');
+        $this->assertCount(9, $s['sitios']);
+        $this->assertSame('', $s['sitios'][0]['buffet_id']);
+        Http::assertSentCount(1);   // solo el lookup
+    }
+
     public function test_un_fallo_no_se_recuerda(): void
     {
         Http::fake(['panel.test/*' => Http::response('', 500)]);
