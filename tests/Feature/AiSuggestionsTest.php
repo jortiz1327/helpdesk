@@ -240,6 +240,43 @@ class AiSuggestionsTest extends TestCase
         $this->withHeader('X-App-Token', $t)->postJson('/api/ai_suggestions.php?action=admin_apps', ['apps' => ['x']])->assertOk()->assertJsonPath('apps_ajenas', []);
     }
 
+    public function test_una_frase_con_mayusculas_que_no_es_un_hotel_no_cuenta_como_hotel_no_localizado_y_el_nombre_del_contacto_da_una_pista(): void
+    {
+        $this->activar();
+        config(['ai.support.url' => 'https://panel.example.com', 'ai.support.key' => 'K-secreta']);
+        Cache::flush();
+        Http::fake([
+            'panel.example.com/api/support/v1/hotels*' => function ($r) {
+                $q = mb_strtolower((string) ($r->data()['q'] ?? ''));
+                $h = [];
+                foreach (['hyatt', 'calas', 'mallorca'] as $p) {
+                    if (str_contains($q, $p)) { $h[] = ['id' => 'h9', 'nombre' => 'Hyatt Regency Calas Mallorca', 'grupo' => 'G', 'app' => 'x']; }
+                }
+                return Http::response(['success' => true, 'data' => ['total' => count($h), 'hoteles' => $h]]);
+            },
+        ]);
+        $tok = $this->agente();
+        // «Revisión Platos» (el asunto) no es un hotel: nada de «el hotel que nombra no se localiza».
+        DB::table('contacts')->where('id', $this->cid)->update(['email' => null, 'name' => 'Javier']);
+        $tk = $this->ticket('Revisión Platos. Buenos días, nuestro chef quiere eliminar platos duplicados.');
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertStringContainsString('Aún no sabemos de qué hotel es', $this->fake->ultimoSistema);
+        $this->assertStringNotContainsString('no se localiza en nuestro sistema', $this->fake->ultimoSistema);
+        $this->assertStringNotContainsString('PISTA SIN CONFIRMAR', $this->fake->ultimoSistema);
+        // En WhatsApp el contacto se guarda como «Manolo Hyatt Calas Mallorca»: pista, sin afirmarlo.
+        DB::table('contacts')->where('id', $this->cid)->update(['name' => 'Manolo Hyatt Calas Mallorca']);
+        $tk2 = $this->ticket('Las etiquetas no cambian');
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk2")->assertOk();
+        $this->assertStringContainsString('PISTA SIN CONFIRMAR', $this->fake->ultimoSistema);
+        $this->assertStringContainsString('Hyatt Regency Calas Mallorca', $this->fake->ultimoSistema);
+        $this->assertStringContainsString('NO lo afirmes', $this->fake->ultimoSistema);
+        // Con solo nombre de pila + una palabra no hay base para suponer nada.
+        DB::table('contacts')->where('id', $this->cid)->update(['name' => 'Manolo Hyatt']);
+        $tk3 = $this->ticket('Las etiquetas no cambian');
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk3")->assertOk();
+        $this->assertStringNotContainsString('PISTA SIN CONFIRMAR', $this->fake->ultimoSistema);
+    }
+
     public function test_una_valoracion_con_campos_que_no_son_texto_no_revienta(): void
     {
         $this->activar();

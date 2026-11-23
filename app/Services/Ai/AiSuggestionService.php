@@ -445,7 +445,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
 
         $t->codigos = $ticketId ? $this->leerCodigosDeFotos($ticketId) : [[], 0];
         $textoCliente = ($t->subject ?? '') . "\n" . implode("\n", array_column(array_filter($conversacion, fn ($m) => $m['role'] === 'user'), 'text'));
-        $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente);
+        $t->hotel = ($anonimizar && ! $this->evalApi) ? '' : $this->contextoHotel($t->contact_email ?? null, array_values(array_unique(array_merge($t->codigos[0] ?? [], $this->codigosEnTexto($pregunta)))), $textoCliente, $t->contact_name ?? null);
 
         $hotelNombrado = $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente);
         // Evaluaciones: los casos van anonimizados y sin correo, así que la norma de verificar primero NO se aplica (se mide la decisión de fondo; la norma la cubren los tests).
@@ -1064,13 +1064,13 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
      * 3) si coincide, hotel/buffet y estado de antenas y etiquetas (solo lectura, ver HotelsApi); si no coincide o no
      * consta, se le explica con tacto y se deriva a una persona. Sin configurar: nada.
      */
-    private function contextoHotel(?string $contactEmail, array $codigos = [], string $textoCliente = ''): string
+    private function contextoHotel(?string $contactEmail, array $codigos = [], string $textoCliente = '', ?string $nombreContacto = null): string
     {
         $this->hotelAmbiguo = null;
         $this->estadoCorreo = null;
         $this->hotelLocalizado = false;
         $this->hotelNoEncontrado = false;
-        $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente);
+        $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente, $nombreContacto);
         if ($s !== '' && $this->hotelAmbiguo !== null) {
             // El nombre encaja con varios hoteles (p. ej. «Hotel Poseidón» hay más de uno): nunca se asume cuál es.
             // No se enumeran los hoteles al cliente: solo se le pide el nombre completo.
@@ -1097,6 +1097,35 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         return strlen((string) $n) >= 5 ? $n : null;
     }
 
+    /**
+     * En WhatsApp muchos contactos se guardan como «Manolo Hyatt Calas Mallorca» (nombre de pila + hotel). Busca en el panel con las palabras
+     * del nombre (salvo la primera, que suele ser el nombre de pila) y devuelve el hotel solo si UNO encaja con al menos dos de ellas.
+     * Es una pista sin confirmar: nunca sustituye a la verificación del correo.
+     */
+    private function hotelPorNombreDeContacto(HotelsApi $api, string $nombre): ?string
+    {
+        $pal = array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', HotelsApi::norm($nombre)) ?: [], fn ($w) => mb_strlen($w) >= 4 && ! in_array($w, ['hotel', 'hoteles', 'resort', 'grupo', 'recepcion', 'direccion', 'cocina', 'chef'], true)));
+        if (count($pal) < 3) {
+            return null;   // con el nombre de pila y una sola palabra más no hay base para suponer nada
+        }
+        $pal = array_slice($pal, 1, 4);
+        $vistos = [];
+        foreach ($pal as $w) {
+            foreach ($api->buscarHoteles($w) ?? [] as $h) {
+                $vistos[$h['id'] ?: $h['nombre']] = $h;
+            }
+        }
+        $mejores = [];
+        $max = 0;
+        foreach ($vistos as $h) {
+            $n = ' ' . HotelsApi::norm($h['nombre']) . ' ';
+            $puntos = count(array_filter($pal, fn ($w) => str_contains($n, $w)));
+            if ($puntos > $max) { $max = $puntos; $mejores = []; }
+            if ($puntos === $max) { $mejores[] = $h['nombre']; }
+        }
+        return ($max >= 2 && count($mejores) === 1) ? $mejores[0] : null;
+    }
+
     /** ¿Hay UN solo hotel en el panel cuyo nombre (sin espacios) contiene el nombre del dominio? Devuelve su nombre o null. */
     private function hotelPorDominio(HotelsApi $api, string $email): ?string
     {
@@ -1109,7 +1138,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         return count($r) === 1 ? $r[0]['nombre'] : null;
     }
 
-    private function contextoHotelBase(?string $contactEmail, array $codigos = [], string $textoCliente = ''): string
+    private function contextoHotelBase(?string $contactEmail, array $codigos = [], string $textoCliente = '', ?string $nombreContacto = null): string
     {
         $api = app(HotelsApi::class);
         if (! $api->configured()) {
@@ -1153,6 +1182,11 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             if (count($r) >= 2 && ! $exacto) {
                 $ambiguos[] = $n;
             }
+        }
+        // Frases con mayúsculas que no son ningún hotel (el asunto «Revisión Platos», una firma…): no son un hotel «que no consta», solo ruido.
+        if ($porMayusculas && ! $dir && ! $dirFalla) {
+            $nombres = [];
+            $ambiguos = [];
         }
         // Un nombre suelto («Playas») que está dentro de otro nombre ya resuelto a UN solo hotel («Playas de Guardamar») no es ambiguo.
         foreach ($ambiguos as $n) {
@@ -1202,7 +1236,13 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         }
         if ($v['estado'] === 'sin_correo') {
             if (! $nombres) {
-                return $cab . "- Aún no sabemos de qué hotel es ni con qué correo accede. Pregunta PRIMERO el nombre del hotel y, a continuación, el correo con el que accede a la aplicación.\n" . $comun;
+                $pista = $this->hotelPorNombreDeContacto($api, (string) $nombreContacto);
+                if ($pista) {
+                    $this->paso('hotel', null, 'Pista por el nombre del contacto: «' . $pista . '» (sin confirmar)');
+                }
+                return $cab . "- Aún no sabemos de qué hotel es ni con qué correo accede. Pregunta PRIMERO el nombre del hotel y, a continuación, el correo con el que accede a la aplicación.\n"
+                    . ($pista ? "- PISTA SIN CONFIRMAR: el nombre con el que figura este contacto se parece al hotel «{$pista}». NO lo afirmes ni des datos de él: úsalo solo para preguntar «¿Se refiere a {$pista}?» al pedirle el nombre del hotel.\n" : '')
+                    . $comun;
             }
             if ($dir) {
                 if (! $pedido && ($antenas = $this->antenasSinVerificar($api, $dir, $nombres, $unicos))) {
@@ -1223,7 +1263,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         }
         if ($v['estado'] === 'no_encontrado') {
             // Correo que no figura: el dominio (si es de empresa) puede orientar sobre el hotel. Es solo una pista, nunca una verificación.
-            $pista = (! $dir && ! $nombres) ? $this->hotelPorDominio($api, $e) : null;
+            $pista = (! $dir && ! $nombres) ? ($this->hotelPorDominio($api, $e) ?? $this->hotelPorNombreDeContacto($api, (string) $nombreContacto)) : null;
             if ($pista) {
                 $this->paso('hotel', null, 'Pista por el dominio del correo: «' . $pista . '» (sin confirmar)');
             }
