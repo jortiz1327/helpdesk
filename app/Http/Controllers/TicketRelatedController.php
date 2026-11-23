@@ -67,11 +67,13 @@ class TicketRelatedController extends Controller
             return [];
         }
 
-        $mio = self::palabras($t->subject . ' ' . $this->primerMensaje($id));
+        // Primer mensaje del cliente de todos los candidatos y del propio ticket, en dos consultas (no una por ticket).
+        $primeros = $this->primerosMensajes(array_merge([$id], $filas->pluck('id')->map(fn ($v) => (int) $v)->all()));
+        $mio = self::palabras($t->subject . ' ' . ($primeros[$id] ?? ''));
         $salida = [];
         foreach ($filas as $f) {
             $mismo = $t->contact_id && (int) $f->contact_id === (int) $t->contact_id;
-            $parecido = $this->parecido($mio, self::palabras($f->subject . ' ' . $this->primerMensaje((int) $f->id)));
+            $parecido = $this->parecido($mio, self::palabras($f->subject . ' ' . ($primeros[(int) $f->id] ?? '')));
             $similar = $parecido >= self::SIMILITUD;
             // Mismo cliente: siempre cuenta. Otra persona del mismo hotel: solo si el problema se parece (si no, es ruido).
             if (! $mismo && ! $similar) {
@@ -87,10 +89,19 @@ class TicketRelatedController extends Controller
         return array_map(function ($r) { unset($r['_p']); return $r; }, array_slice($salida, 0, self::MAX));
     }
 
-    private function primerMensaje(int $ticketId): string
+    /** @param int[] $ids  @return array<int,string> ticket_id => primer mensaje del cliente (recortado) */
+    private function primerosMensajes(array $ids): array
     {
-        $b = DB::table('messages')->where('ticket_id', $ticketId)->where('direction', 'in')->where('is_internal_note', 0)->whereNotNull('body')->orderBy('id')->value('body');
-        return mb_substr(trim(strip_tags((string) $b)), 0, 600);
+        $base = fn () => DB::table('messages')->whereIn('ticket_id', $ids)->where('direction', 'in')->where('is_internal_note', 0)->whereNotNull('body');
+        $primeros = $base()->groupBy('ticket_id')->selectRaw('MIN(id) as id')->pluck('id');
+        if ($primeros->isEmpty()) {
+            return [];
+        }
+        $salida = [];
+        foreach (DB::table('messages')->whereIn('id', $primeros)->get(['ticket_id', 'body']) as $m) {
+            $salida[(int) $m->ticket_id] = mb_substr(trim(strip_tags((string) $m->body)), 0, 600);
+        }
+        return $salida;
     }
 
     /** Palabras con contenido (sin tildes, de 4 letras o más, sin las vacías de siempre). */

@@ -109,4 +109,21 @@ class TicketRelatedTest extends TestCase
         $ajeno = $this->ticket($a, 'Algo', 'Algo', 0, $otraCat);
         $this->relacionados($ajeno)->assertNotFound();
     }
+    public function test_no_hace_una_consulta_por_candidato_y_frena_el_abuso(): void
+    {
+        $c = $this->contacto('Marta', 'Hotel Sol');
+        $id = $this->ticket($c, 'Etiqueta no cambia', 'La etiqueta del plato no cambia');
+        foreach (range(1, 12) as $i) {
+            $this->ticket($c, "Otro $i", "Otro problema $i");
+        }
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->relacionados($id)->assertOk();
+        $mensajes = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'from "messages"') || str_contains($q['query'], 'from `messages`'))->count();
+        $this->assertLessThanOrEqual(4, $mensajes, 'los primeros mensajes se piden en bloque, no uno por ticket');
+        foreach (range(1, 70) as $i) {
+            $r = $this->relacionados($id);
+        }
+        $r->assertStatus(429);
+    }
 }
