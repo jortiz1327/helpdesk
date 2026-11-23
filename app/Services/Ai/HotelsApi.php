@@ -293,10 +293,47 @@ class HotelsApi
             }
         }
         $res = array_map(fn ($h) => ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')], array_slice(array_values((array) ($d['hoteles'] ?? [])), 0, 5));
+        // El buscador del panel exige la frase seguida («Bahía Príncipe Turquesa» no encuentra «Bahia Principe Grand Turquesa»):
+        // si no hay nada, se busca palabra a palabra y solo valen los hoteles que contienen varias de ellas.
+        if (! $res && $d !== null) {
+            $res = $this->buscarPorPalabras($nombre);
+        }
         if ($res) {
             Cache::put($clave, $res, self::CACHE_HOTELES);
         }
         return $res;
+    }
+
+    /** Palabras de un nombre que sirven para identificar un hotel (sin tildes, sin palabras genéricas). */
+    public static function palabrasClave(string $nombre): array
+    {
+        $gen = ['hotel', 'hoteles', 'resort', 'grupo', 'spa', 'beach', 'club', 'apartamentos', 'aparthotel', 'del', 'los', 'las'];
+        return array_values(array_unique(array_filter(explode(' ', self::norm($nombre)), fn ($w) => mb_strlen($w) >= 4 && ! in_array($w, $gen, true))));
+    }
+
+    /** Hoteles que comparten al menos 2 palabras clave con el nombre (los de más coincidencias, hasta 5). [] si ninguno. */
+    private function buscarPorPalabras(string $nombre): array
+    {
+        $pal = array_slice(self::palabrasClave($nombre), 0, 4);
+        if (count($pal) < 2) {
+            return [];
+        }
+        $vistos = [];
+        foreach ($pal as $w) {
+            $d = $this->get('/api/support/v1/hotels', ['q' => $w, 'per_page' => 10]);
+            foreach ((array) ($d['hoteles'] ?? []) as $h) {
+                $vistos[(string) ($h['id'] ?? $h['nombre'] ?? '')] = ['id' => (string) ($h['id'] ?? ''), 'nombre' => (string) ($h['nombre'] ?? ''), 'grupo' => (string) ($h['grupo'] ?? '')];
+            }
+        }
+        $max = 0;
+        $mejores = [];
+        foreach ($vistos as $h) {
+            $n = ' ' . self::norm($h['nombre']) . ' ';
+            $p = count(array_filter($pal, fn ($w) => str_contains($n, " $w ")));
+            if ($p > $max) { $max = $p; $mejores = []; }
+            if ($p === $max && $p > 0) { $mejores[] = $h; }
+        }
+        return $max >= 2 ? array_slice($mejores, 0, 5) : [];
     }
 
     /**

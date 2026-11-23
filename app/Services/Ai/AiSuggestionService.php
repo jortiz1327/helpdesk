@@ -1187,7 +1187,16 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             }
             if ($porMayusculas) {
                 $nn = HotelsApi::norm($n);
-                $r = array_values(array_filter($r, fn ($h) => $nn !== '' && (str_contains(HotelsApi::norm($h['nombre']), $nn) || str_contains($nn, HotelsApi::norm($h['nombre'])))));
+                $kw = HotelsApi::palabrasClave($n);
+                $r = array_values(array_filter($r, function ($h) use ($nn, $kw) {
+                    $hn = HotelsApi::norm($h['nombre']);
+                    if ($nn !== '' && (str_contains($hn, $nn) || str_contains($nn, $hn))) {
+                        return true;
+                    }
+                    // «Bahía Príncipe Explore Turquesa» ~ «Bahia Principe Grand Turquesa»: la mayoría de las palabras clave coinciden.
+                    $c = count(array_filter($kw, fn ($w) => str_contains(' ' . $hn . ' ', " $w ")));
+                    return count($kw) >= 2 && $c >= 2 && $c >= count($kw) - 1;
+                }));
             }
             $dir = array_merge($dir, $r);
             // Varios resultados y ninguno se llama exactamente así: el cliente no ha dicho cuál de ellos es.
@@ -1458,6 +1467,14 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
                 $n = implode(' ', $pal);
                 if (count($pal) >= 2 && mb_strlen($n) >= 6) {
                     $out[$n] = true;
+                }
+            }
+        }
+        // Un solo nombre propio tras «en/de/del» («forzar el menú en Islantilla»): sirve como pista; la búsqueda decide si es un hotel.
+        if (preg_match_all('/(?<![\wáéíóúñ])(?:en|de|del|desde)[ \t]+(' . $cap . ')(?![\wáéíóúñ]*[ \t]+' . $cap . ')/u', $texto, $m)) {
+            foreach ($m[1] as $w) {
+                if (mb_strlen($w) >= 6 && ! isset($paradas[mb_strtolower($w)])) {
+                    $out[$w] = true;
                 }
             }
         }

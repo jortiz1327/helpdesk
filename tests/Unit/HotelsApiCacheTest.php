@@ -34,6 +34,18 @@ class HotelsApiCacheTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_nombre_con_palabras_de_mas_se_busca_palabra_a_palabra(): void
+    {
+        Http::fake(function ($req) {
+            $q = $req['q'] ?? '';
+            $h = $q === 'turquesa' ? [['id' => '3', 'nombre' => 'Bahia Principe Grand Turquesa', 'grupo' => 'BP']] : ($q === 'principe' || $q === 'bahia' ? [['id' => '3', 'nombre' => 'Bahia Principe Grand Turquesa', 'grupo' => 'BP'], ['id' => '4', 'nombre' => 'Bahia Principe Grand Tequila', 'grupo' => 'BP']] : []);
+            return Http::response(['data' => ['hoteles' => $h]]);
+        });
+        $r = (new HotelsApi())->buscarHoteles('Bahía Príncipe Explore Turquesa');
+        $this->assertSame(['Bahia Principe Grand Turquesa'], array_column($r, 'nombre'));
+        $this->assertSame([], (new HotelsApi())->buscarHoteles('Hotel Inventado Zzzz'));
+    }
+
     public function test_correo_encontrado_se_recuerda(): void
     {
         Http::fake(['panel.test/*' => Http::response(['data' => ['encontrado' => true, 'coincidencias' => [['hoteles' => [['id' => '1', 'nombre' => 'H']], 'buffets' => [['id' => '5', 'nombre' => 'B', 'hotel_id' => '1']], 'usuario' => ['rol' => 'Admin', 'activo' => true]]]]])]);
