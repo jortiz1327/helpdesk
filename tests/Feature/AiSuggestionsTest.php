@@ -205,6 +205,25 @@ class AiSuggestionsTest extends TestCase
         $this->fake->falla = true;
         $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=summary&ticket=$tk&regen=1")->assertStatus(503)->assertJsonPath('ok', false);
     }
+    public function test_el_resumen_no_manda_al_proveedor_el_nombre_ni_el_correo_del_cliente(): void
+    {
+        $this->activar();
+        $tok = $this->agente();
+        DB::table('contacts')->where('id', $this->cid)->update(['name' => 'Marta Gómez']);
+        $tk = $this->ticket('Hola, soy Marta Gómez (marta.gomez@hotel-sol.com, 612 345 678). La etiqueta no conecta.');
+        DB::table('messages')->insert(['contact_id' => $this->cid, 'wa_id' => '', 'ticket_id' => $tk, 'direction' => 'out', 'body' => 'Hola Marta, reinicie la etiqueta.', 'created_at' => now()->addMinute()]);
+        $this->fake->respuesta = "Qué pasó:\n- [cliente] dice que no conecta (escribe desde [email])\nQué se ha probado:\n- Reiniciar\nQué falta:\n- El equipo";
+        $r = $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=summary&ticket=$tk")->assertOk();
+        $enviado = json_encode($this->fake->ultimosMensajes, JSON_UNESCAPED_UNICODE);
+        foreach (['Marta', 'Gómez', 'marta.gomez', 'hotel-sol', '612 345'] as $dato) {
+            $this->assertStringNotContainsString($dato, $enviado, "no debe salir {$dato}");
+        }
+        $this->assertStringContainsString('[cliente]', $enviado);
+        $this->assertStringContainsString('[email]', $enviado);
+        // Dentro de casa el agente lee el nombre real; el correo sigue tapado.
+        $this->assertStringContainsString('Marta Gómez dice que no conecta', $r->json('summary.body'));
+        $this->assertStringNotContainsString('@', $r->json('summary.body'));
+    }
     public function test_una_valoracion_con_campos_que_no_son_texto_no_revienta(): void
     {
         $this->activar();
@@ -698,6 +717,7 @@ class FakeAi implements AiProvider
 {
     public int $llamadas = 0;
     public string $ultimoSistema = '';
+    public array $ultimosMensajes = [];
     public string $respuesta = 'Hola Marta, prueba a reiniciarla.';
     public bool $falla = false;
     public bool $configurada = true;
@@ -711,6 +731,7 @@ class FakeAi implements AiProvider
     {
         $this->llamadas++;
         $this->ultimoSistema = $system;
+        $this->ultimosMensajes = $messages;
         if ($this->falla) {
             throw new AiException('caído');
         }

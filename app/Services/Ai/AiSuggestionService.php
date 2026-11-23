@@ -277,7 +277,7 @@ class AiSuggestionService
 Qué pasó:
 Qué se ha probado:
 Qué falta:
-Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos al cliente; el cliente es «user» y el equipo «assistant». Si no se ha probado nada o no falta nada, escribe «- Nada por ahora». En «Qué falta» di qué espera cada parte (el cliente o el equipo). Máximo 120 palabras. Nunca repitas contraseñas, tarjetas ni datos personales.';
+Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos al cliente; el cliente es «user» y el equipo «assistant». Si no se ha probado nada o no falta nada, escribe «- Nada por ahora». En «Qué falta» di qué espera cada parte (el cliente o el equipo). Máximo 120 palabras. Nunca repitas contraseñas, tarjetas ni datos personales. Verás [cliente], [email] o [tel]: son datos tapados a propósito; escríbelos tal cual si hace falta, no los adivines.';
 
     /**
      * Resumen del ticket para quien lo coge (qué pasó, qué se probó, qué falta). Se guarda por último mensaje: mientras no haya
@@ -299,7 +299,9 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             return ['ok' => false, 'error' => 'La IA ha llegado al tope de gasto de este mes. Lee el hilo; volverá el día 1 (o cuando un responsable suba el tope).'];
         }
         // Un mensaje larguísimo (un correo con todo el historial) no debe llenar la petición.
-        $conv = array_map(fn ($m) => ['role' => $m['role'], 'text' => mb_substr($m['text'], 0, 1500)], $this->conversacion($ticketId, self::MAX_RESUMEN));
+        // Al proveedor no salen el nombre ni el correo del cliente (ni teléfonos, enlaces con parámetros o contraseñas): se tapan aquí.
+        $nombre = trim((string) DB::table('tickets as t')->leftJoin('contacts as c', 'c.id', '=', 't.contact_id')->where('t.id', $ticketId)->value('c.name'));
+        $conv = array_map(fn ($m) => ['role' => $m['role'], 'text' => Scrub::tapar(mb_substr($m['text'], 0, 1500), $nombre)], $this->conversacion($ticketId, self::MAX_RESUMEN));
         // La API pide empezar por el cliente y alternar roles: se unen los mensajes seguidos del mismo rol.
         $turnos = [];
         foreach ($conv as $m) {
@@ -330,7 +332,11 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if ($texto === '' || ! empty($r['truncated'])) {
             return ['ok' => false, 'error' => 'La IA no pudo preparar el resumen. Inténtalo de nuevo en un momento.'];
         }
+        // Dentro de casa el agente sí ve el nombre (ya está en el ticket); el correo y el teléfono se quedan tapados.
         $texto = Scrub::sensibles(mb_substr($texto, 0, 2000));
+        if ($nombre !== '') {
+            $texto = str_replace('[cliente]', $nombre, $texto);
+        }
         DB::table('ai_summaries')->insert([
             'ticket_id' => $ticketId, 'last_message_id' => $ult, 'body' => $texto, 'model' => $r['model'] ?? null,
             'input_tokens' => $r['input_tokens'] ?? null, 'output_tokens' => $r['output_tokens'] ?? null,
