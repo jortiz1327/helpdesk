@@ -218,6 +218,17 @@ class AiSuggestionsTest extends TestCase
         // Un motivo válido junto a una corrección que no es texto sigue valiendo como motivo.
         $this->withHeader('X-App-Token', $tok)->postJson($url, ['id' => $id, 'rating' => 'down', 'reason' => 'tono', 'correction' => ['a']])->assertOk();
     }
+    public function test_los_resumenes_antiguos_se_purgan(): void
+    {
+        $fila = fn ($d) => ['ticket_id' => 1, 'last_message_id' => 1, 'body' => 'x', 'created_at' => now()->subDays($d), 'updated_at' => now()->subDays($d)];
+        DB::table('ai_summaries')->insert([$fila(120), $fila(91), $fila(10)]);
+        $this->artisan('ai:purgar-resumenes', ['--simular' => true])->assertSuccessful();
+        $this->assertSame(3, DB::table('ai_summaries')->count());
+        $this->artisan('ai:purgar-resumenes')->assertSuccessful();
+        $this->assertSame(1, DB::table('ai_summaries')->count());
+        $this->artisan('ai:purgar-resumenes', ['--dias' => 1])->assertSuccessful();   // el mínimo protege el mes en curso
+        $this->assertSame(1, DB::table('ai_summaries')->count());
+    }
     public function test_la_medicion_cuenta_cuanto_se_aprovecha_el_borrador_y_compara_tiempos(): void
     {
         $this->activar();

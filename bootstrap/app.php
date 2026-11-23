@@ -51,6 +51,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // ningún proveedor) y solo corre con el asistente encendido.
         $schedule->command('ai:indexar')->dailyAt('04:30')->withoutOverlapping()
             ->when(fn () => \App\Models\Setting::get('ai_suggestions_enabled', '0') === '1');
+        // Los resúmenes de tickets llevan texto de clientes: se borran a los 90 días (se regeneran si se piden).
+        $schedule->command('ai:purgar-resumenes')->dailyAt('04:40')->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         /*
