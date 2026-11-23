@@ -510,7 +510,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             return ['decision' => 'pedir_datos', 'resumen' => $hotelNombrado ? 'verificar primero: pedir el correo' : 'verificar primero: pedir hotel y correo',
                 'instruccion' => ($hotelNombrado
                     ? 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. El hotel ya consta: PIDE SOLO el correo con el que accede a la aplicación.'
-                    : 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas).')
+                    : 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. PIDE SOLO el nombre de su establecimiento y el correo con el que accede a nuestra aplicación (como máximo esas dos preguntas). No des por hecho que es un hotel (puede ser tienda o farmacia): no digas «hotel» ni «aplicación de hoteles».')
                     . ' No des pasos, diagnóstico ni derives todavía; di que en cuanto lo confirme se lo atiende.'];
         }
         // Alérgenos: lo sensible (qué lleva un plato, datos mal o ausentes) lo lleva una persona; qué alérgenos se muestran lo configura el hotel.
@@ -530,7 +530,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $uso = preg_match('/(no|tampoco) (se )?(cambian|cambia|actualizan|actualiza|refrescan)|no (me )?(deja|dejan) (entrar|acceder)|no (puedo|podemos) (entrar|acceder)|unauthorized|error al (emparejar|vincular)/', $t);
         if ($uso && ! $yaRespondio && ! $hotelNombrado && $estadoCorreo !== 'verificado') {
             return ['decision' => 'pedir_datos', 'resumen' => 'pedir hotel y correo',
-                'instruccion' => 'PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas), sin dar pasos, diagnóstico ni derivar.'];
+                'instruccion' => 'PIDE SOLO el nombre de su establecimiento y el correo con el que accede a nuestra aplicación (como máximo esas dos preguntas). No des por hecho que es un hotel (puede ser tienda o farmacia): no digas «hotel» ni «aplicación de hoteles», sin dar pasos, diagnóstico ni derivar.'];
         }
         // Lo que parece garantía pero lo hace el hotel: sustituir una etiqueta rota por otra que ya tienen (dan su código) y darla de alta
         // en la posición, o poner pilas nuevas y forzar. Sin pedir envío ni garantía. No se deriva: primero se identifica y luego se explica.
@@ -542,7 +542,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if ($pideReposicion && $bloqueada && ! $yaProbo && ! $yaRespondio && ! preg_match('/garantia/', $t)) {
             if (! $hotelNombrado && $estadoCorreo !== 'verificado') {
                 return ['decision' => 'pedir_datos', 'resumen' => 'pedir hotel y correo (una está solo bloqueada)',
-                    'instruccion' => 'PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas), sin dar pasos ni derivar.'];
+                    'instruccion' => 'PIDE SOLO el nombre de su establecimiento y el correo con el que accede a nuestra aplicación (como máximo esas dos preguntas). No des por hecho que es un hotel (puede ser tienda o farmacia): no digas «hotel» ni «aplicación de hoteles», sin dar pasos ni derivar.'];
             }
             return ['decision' => 'responder', 'resumen' => 'reinicio de la etiqueta bloqueada antes de derivar',
                 'instruccion' => 'Alguna de las etiquetas solo está BLOQUEADA o no cambia (sin daño visible): NO derives todavía. Explica el protocolo de reinicio de la etiqueta de la guía (quitar las pilas 15 minutos, con las antenas en línea) para esa. NO menciones la etiqueta dañada (humedad, pantalla rota) ni prometas sustituir o enviar nada. Si el correo no está verificado, pídelo primero (VERIFICACIÓN DEL CLIENTE).'];
@@ -553,7 +553,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if ($reasignar || $pilasForzar) {
             if (! $yaRespondio && ! $hotelNombrado && $estadoCorreo !== 'verificado') {
                 return ['decision' => 'pedir_datos', 'resumen' => 'pedir hotel y correo (no es garantía)',
-                    'instruccion' => 'PIDE SOLO el nombre completo del hotel y el correo con el que accede a la aplicación (como máximo esas dos preguntas), sin dar pasos, diagnóstico ni derivar. NO lo trates como garantía.'];
+                    'instruccion' => 'PIDE SOLO el nombre de su establecimiento y el correo con el que accede a nuestra aplicación (como máximo esas dos preguntas). No des por hecho que es un hotel (puede ser tienda o farmacia): no digas «hotel» ni «aplicación de hoteles», sin dar pasos, diagnóstico ni derivar. NO lo trates como garantía.'];
             }
             return ['decision' => 'responder', 'resumen' => 'no es garantía: lo hace el hotel',
                 'instruccion' => $reasignar
@@ -1378,13 +1378,13 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             ->when($this->hasta, fn ($q) => $q->where('id', '<', $this->hasta))->exists();
         if ($yaRespondio) {
             return "SALUDO Y PRESENTACIÓN (anula lo que digan las instrucciones anteriores)\n"
-                . "- El equipo ya contestó antes en esta conversación: NO saludes, NO te presentes ni repitas «le hablo de AEME Group». Entra directamente en la respuesta.\n"
+                . "- El equipo ya contestó antes en esta conversación: NO saludes ni te presentes. Entra directamente en la respuesta.\n"
                 . "- Tampoco repitas la firma ni la despedida larga; basta una frase breve de cierre si procede.";
         }
         $h = (int) now()->format('G');
         $f = $h >= 6 && $h < 14 ? 'Buenos días' : ($h < 21 && $h >= 14 ? 'Buenas tardes' : 'Buenas noches');
         return "SALUDO Y PRESENTACIÓN (anula lo que digan las instrucciones anteriores)\n"
-            . "- Es el primer mensaje del equipo en esta conversación. Ahora mismo toca «{$f}»: empieza con «{$f}, le hablo de AEME Group.» (en el idioma del cliente, manteniendo el saludo adecuado a la hora).";
+            . "- Es el primer mensaje del equipo en esta conversación. Ahora mismo toca «{$f}»: empieza con «{$f}.» (en el idioma del cliente, manteniendo el saludo adecuado a la hora). NO te presentes ni digas «le hablo de AEME Group»: la firma ya dice quién eres.";
     }
 
     /** Reglas de decisión del asistente (resources/ai/prompt-reglas.md), con las marcas del código resueltas. */

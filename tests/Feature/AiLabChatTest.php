@@ -48,7 +48,7 @@ class AiLabChatTest extends TestCase
         $this->assertCount(0, $this->fake->sistemas);   // enviar solo guarda: contesta cuando la página pide /reply
         $r = $this->postJson("/ia/api/chats/$id/reply")->assertOk();
         $this->assertSame('Respuesta 1', collect($r->json('messages'))->last()['body']);
-        $this->assertStringContainsString('le hablo de AEME Group', $this->fake->sistemas[0]);   // primer mensaje: se presenta
+        $this->assertStringContainsString('NO te presentes ni digas «le hablo de AEME Group»', $this->fake->sistemas[0]);   // primer mensaje: solo saludo, sin presentación
 
         $this->postJson("/ia/api/chats/$id/send", ['text' => 'Gracias'])->assertOk();
         $this->postJson("/ia/api/chats/$id/send", ['text' => '¿y la antena?'])->assertOk();   // varios mensajes seguidos
