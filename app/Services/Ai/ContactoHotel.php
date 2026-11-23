@@ -80,24 +80,38 @@ class ContactoHotel
         if (! $contactId || ! $sitios) {
             return null;
         }
+        // Un hotel = un id de AdminHoteles (si lo trae) o, sin él, su nombre. Un sitio sin id cuyo nombre es el de otro que sí lo trae es el mismo hotel.
         $claves = [];
+        $nombresConId = [];
+        foreach ($sitios as $x) {
+            if (trim((string) ($x['hotel_id'] ?? '')) !== '') {
+                $nombresConId[HotelsApi::norm((string) ($x['hotel'] ?? ''))] = true;
+            }
+        }
         foreach ($sitios as $x) {
             $n = HotelsApi::norm((string) ($x['hotel'] ?? ''));
-            if ($n === '') {
-                return null;   // sin nombre de hotel no hay a qué enlazar
+            $id = trim((string) ($x['hotel_id'] ?? ''));
+            if ($n === '' && $id === '') {
+                return null;   // sin id ni nombre de hotel no hay a qué enlazar
             }
-            $claves[$n] = $x;
+            if ($id === '' && isset($nombresConId[$n])) {
+                continue;
+            }
+            $claves[$id !== '' ? 'id:' . $id : 'n:' . $n] = $x;
         }
         if (count($claves) !== 1) {
             return self::recordarMarca($contactId, array_values($claves));
         }
         $x = reset($claves);
-        $nombre = trim((string) $x['hotel']);
+        $nombre = trim((string) ($x['hotel'] ?? ''));
         $hotelId = trim((string) ($x['hotel_id'] ?? ''));
 
         $actual = DB::table('contacts')->where('id', $contactId)->first(['sede_id', 'sede_verificada_at', 'sede_verificada_por']);
         if (! $actual) {
             return null;
+        }
+        if ($nombre === '' && ! self::buscarSede('', $hotelId)) {
+            return null;   // solo el id y esa sede aún no existe: sin nombre no se puede crear
         }
         $sede = self::sede($nombre, $hotelId, $grupo);
         // Un vínculo puesto a mano por un agente (y aún vigente) no lo pisa el correo: manda quien lo corrigió.
@@ -164,8 +178,14 @@ class ContactoHotel
             return (int) $id;
         }
         $n = HotelsApi::norm($nombre);
-        foreach (DB::table('sedes')->get(['id', 'name']) as $s) {
+        foreach (DB::table('sedes')->get(['id', 'name', 'admin_hotel_id']) as $s) {
             if ($n !== '' && HotelsApi::norm((string) $s->name) === $n) {
+                if ($hotelId !== '' && $s->admin_hotel_id && (string) $s->admin_hotel_id !== $hotelId) {
+                    continue;
+                }
+                if ($hotelId !== '' && ! $s->admin_hotel_id) {
+                    DB::table('sedes')->where('id', $s->id)->update(['admin_hotel_id' => $hotelId]);
+                }
                 return (int) $s->id;
             }
         }
@@ -206,6 +226,9 @@ class ContactoHotel
         $n = HotelsApi::norm($nombre);
         foreach (DB::table('sedes')->get(['id', 'name', 'admin_hotel_id']) as $s) {
             if (HotelsApi::norm((string) $s->name) === $n) {
+                if ($hotelId !== '' && $s->admin_hotel_id && (string) $s->admin_hotel_id !== $hotelId) {
+                    continue;   // mismo nombre pero es OTRO hotel de AdminHoteles
+                }
                 if ($hotelId !== '' && ! $s->admin_hotel_id) {
                     DB::table('sedes')->where('id', $s->id)->update(['admin_hotel_id' => $hotelId]);
                 }

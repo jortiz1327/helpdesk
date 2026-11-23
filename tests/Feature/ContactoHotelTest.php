@@ -94,6 +94,54 @@ class ContactoHotelTest extends TestCase
         $this->assertNull(\App\Services\Ai\ContactoHotel::recordar($this->contacto('dir3@x.com'), $cH('Hotel A', 'Hotel B')));
     }
 
+    public function test_el_enlace_manda_el_id_del_hotel_y_no_el_nombre(): void
+    {
+        $madrid = $this->sede('Allegro Madrid');
+        $h = fn (string $nombre, string $id) => [['hotel' => $nombre, 'hotel_id' => $id, 'activo' => true]];
+
+        // Una sede puesta a mano (sin id) recibe el id de AdminHoteles al coincidir por nombre.
+        $a = $this->contacto('a@x.com');
+        \App\Services\Ai\ContactoHotel::recordar($a, $h('Allegro Madrid', '501'));
+        $this->assertSame($madrid, (int) DB::table('contacts')->where('id', $a)->value('sede_id'));
+        $this->assertSame('501', DB::table('sedes')->where('id', $madrid)->value('admin_hotel_id'));
+
+        // Otro hotel de AdminHoteles con el MISMO nombre pero distinto id no se confunde con esa sede: se crea la suya.
+        $b = $this->contacto('b@x.com');
+        \App\Services\Ai\ContactoHotel::recordar($b, $h('Allegro Madrid', '777'));
+        $sedeB = (int) DB::table('contacts')->where('id', $b)->value('sede_id');
+        $this->assertNotSame($madrid, $sedeB);
+        $this->assertSame('777', DB::table('sedes')->where('id', $sedeB)->value('admin_hotel_id'));
+
+        // El hotel se encuentra por id aunque AdminHoteles lo haya renombrado.
+        $c = $this->contacto('c@x.com');
+        \App\Services\Ai\ContactoHotel::recordar($c, $h('Allegro Madrid Centro', '501'));
+        $this->assertSame($madrid, (int) DB::table('contacts')->where('id', $c)->value('sede_id'));
+
+        // Dos sitios del mismo hotel (uno con id y otro solo con el nombre) son UN hotel, no varios.
+        $d = $this->contacto('d@x.com');
+        \App\Services\Ai\ContactoHotel::recordar($d, [['hotel' => 'Allegro Madrid', 'hotel_id' => '501'], ['hotel' => 'Allegro Madrid', 'hotel_id' => '']]);
+        $this->assertSame($madrid, (int) DB::table('contacts')->where('id', $d)->value('sede_id'));
+
+        // Solo el id y esa sede no existe: no se inventa una sin nombre.
+        $e = $this->contacto('e@x.com');
+        $this->assertNull(\App\Services\Ai\ContactoHotel::recordar($e, [['hotel' => '', 'hotel_id' => '999']]));
+        $this->assertNull(DB::table('contacts')->where('id', $e)->value('sede_id'));
+    }
+
+    public function test_el_hotel_que_dice_el_cliente_se_compara_con_el_correo_por_id(): void
+    {
+        $m = new \ReflectionMethod(\App\Services\Ai\AiSuggestionService::class, 'coincideHotel');
+        $m->setAccessible(true);
+        $svc = app(\App\Services\Ai\AiSuggestionService::class);
+        $dir = [['id' => '12', 'nombre' => 'Sol Palma']];
+        // Mismo id aunque el nombre no se parezca: coincide. Distinto id aunque el nombre se parezca: no.
+        $this->assertTrue($m->invoke($svc, $dir, [['hotel' => 'Meliá Sol Palma Resort', 'buffet' => '', 'hotel_id' => '12']]));
+        $this->assertTrue($m->invoke($svc, $dir, [['hotel' => 'Otro nombre', 'buffet' => '', 'hotel_id' => '12']]));
+        $this->assertFalse($m->invoke($svc, $dir, [['hotel' => 'Sol Palma', 'buffet' => '', 'hotel_id' => '99']]));
+        // Sin id en alguno de los lados: se compara por nombre como antes.
+        $this->assertTrue($m->invoke($svc, [['id' => '', 'nombre' => 'Sol Palma']], [['hotel' => 'Sol Palma Beach', 'buffet' => '', 'hotel_id' => '']]));
+    }
+
     public function test_el_informe_por_organizacion_cuenta_los_contactos_enlazados_a_la_marca(): void
     {
         $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);

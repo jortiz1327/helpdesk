@@ -1470,6 +1470,15 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         foreach ($dir as $d) {
             $a = HotelsApi::norm($d['nombre']);
             foreach ($sitios as $x) {
+                // Con el id de AdminHoteles a los dos lados manda el id (los nombres se parecen y se repiten); sin él, el nombre.
+                $idD = trim((string) ($d['id'] ?? ''));
+                $idX = trim((string) ($x['hotel_id'] ?? ''));
+                if ($idD !== '' && $idX !== '') {
+                    if ($idD === $idX) {
+                        return true;
+                    }
+                    continue;
+                }
                 foreach ([$x['hotel'], $x['buffet']] as $nombre) {
                     $b = HotelsApi::norm((string) $nombre);
                     if ($a !== '' && $b !== '' && (str_contains($a, $b) || str_contains($b, $a))) {
