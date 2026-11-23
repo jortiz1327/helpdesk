@@ -1159,6 +1159,11 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if ($memoria) {
             $nombres = [$memoria->name];
         }
+        // Usuario de varios hoteles de una misma marca (enlace por marca): no hay un hotel que dar por sabido, solo la marca.
+        $marcaMem = (! $nombres && ! $memoria) ? ContactoHotel::vigenteMarca($contactId) : null;
+        if ($marcaMem) {
+            $this->paso('hotel', null, 'Contacto de varios hoteles de la marca «' . $marcaMem->name . '» (hotel concreto sin confirmar)');
+        }
         // Sin «Hotel X» explícito (p. ej. solo la firma «Barceló Benidorm Beach»): se prueban nombres propios del mensaje y solo
         // valen los hoteles cuyo nombre contiene el buscado (o al revés), para no arrastrar resultados sueltos del buscador.
         $porMayusculas = ! $nombres;
@@ -1227,7 +1232,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if ($this->estadoCorreo === 'verificado' && $contactId && $v['sitios']) {
             $nuevo = ContactoHotel::recordar($contactId, $v['sitios'], (string) ($dir[0]['grupo'] ?? ''));
             if ($nuevo) {
-                $this->paso('hotel', true, 'Hotel guardado para los próximos tickets de este contacto: ' . $nuevo);
+                $this->paso('hotel', true, 'Hotel (o marca, si tiene varios) guardado para los próximos tickets de este contacto: ' . $nuevo);
             }
             // Contacto sin correo (WhatsApp) que lo ha dado y AdminHoteles lo confirma: se guarda en su ficha.
             if (mb_strtolower($e) !== mb_strtolower(trim((string) $contactEmail))) {
@@ -1272,6 +1277,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
                 }
                 return $cab . "- Aún no sabemos de qué hotel es ni con qué correo accede. Pregunta PRIMERO el nombre del hotel y, a continuación, el correo con el que accede a la aplicación.\n"
                     . ($pista ? "- PISTA SIN CONFIRMAR: el nombre con el que figura este contacto se parece al hotel «{$pista}». NO lo afirmes ni des datos de él: úsalo solo para preguntar «¿Se refiere a {$pista}?» al pedirle el nombre del hotel.\n" : '')
+                    . ($marcaMem ? "- Este contacto ya nos escribió antes y figura con acceso a varios hoteles de la marca «{$marcaMem->name}»: NO supongas cuál. Pregunta de cuál de sus hoteles habla.\n" : '')
                     . $comun;
             }
             if ($dir) {

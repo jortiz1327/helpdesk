@@ -988,6 +988,7 @@ class TicketsController extends Controller
                 'c.email as contact_email',
                 'c.wa_id as contact_wa',
                 'c.sede_id as contact_sede_id',
+                'c.marca_id as contact_marca_id',
                 'c.sede_verificada_at as contact_sede_at',
                 'c.sede_verificada_por as contact_sede_por',
                 'sede.name as contact_sede_name',
@@ -1004,8 +1005,8 @@ class TicketsController extends Controller
         if (!$t) return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
 
         // «Hotel recordado»: la sede de este contacto, con quién y cuándo la confirmó y hasta cuándo vale (12 meses). Solo informa.
-        $t->hotel_recordado = \App\Services\Ai\ContactoHotel::resumen($t->contact_sede_id ? (int) $t->contact_sede_id : null, $t->contact_sede_at, $t->contact_sede_por);
-        unset($t->contact_sede_at, $t->contact_sede_por);
+        $t->hotel_recordado = \App\Services\Ai\ContactoHotel::resumen($t->contact_sede_id ? (int) $t->contact_sede_id : null, $t->contact_sede_at, $t->contact_sede_por, $t->contact_marca_id ? (int) $t->contact_marca_id : null);
+        unset($t->contact_sede_at, $t->contact_sede_por, $t->contact_marca_id);
 
         /*
          * ¿Está fusionado en otro? Se manda el CÓDIGO además del id: la pantalla

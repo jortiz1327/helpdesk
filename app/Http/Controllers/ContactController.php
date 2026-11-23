@@ -44,6 +44,7 @@ class ContactController extends Controller
             if (array_key_exists('sede_id', $data)) {
                 $sedeId = (int) $data['sede_id'];
                 $upd['sede_id'] = ($sedeId && DB::table('sedes')->where('id', $sedeId)->exists()) ? $sedeId : null;
+                $upd['marca_id'] = null;   // una sede elegida a mano sustituye al enlace por marca
                 $upd['sede_verificada_at'] = $upd['sede_id'] ? now() : null;
                 $upd['sede_verificada_por'] = $upd['sede_id'] ? 'agente' : null;
             }

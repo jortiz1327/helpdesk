@@ -56,6 +56,66 @@ class ContactoHotelTest extends TestCase
         $this->assertSame($madrid, (int) DB::table('contacts')->where('id', $keep3)->value('sede_id'));
     }
 
+    public function test_un_usuario_de_varios_hoteles_de_una_marca_se_enlaza_a_la_marca(): void
+    {
+        $madrid = $this->sede('Allegro Madrid');
+        $this->sede('Allegro Sevilla');
+        $otra = $this->sede('Sol Palma', 'Sol', 'Grupo Meliá');
+        $c = $this->contacto('dir@x.com');
+        $cH = fn (string ...$n) => array_map(fn ($h) => ['hotel' => $h, 'activo' => true], $n);
+
+        // Dos hoteles de la misma marca: queda la marca, sin sede.
+        $this->assertSame('Allegro', \App\Services\Ai\ContactoHotel::recordar($c, $cH('Allegro Madrid', 'Allegro Sevilla')));
+        $f = DB::table('contacts')->where('id', $c)->first();
+        $this->assertNull($f->sede_id);
+        $this->assertSame((int) DB::table('marcas')->where('name', 'Allegro')->value('id'), (int) $f->marca_id);
+        $this->assertSame('Allegro', \App\Services\Ai\ContactoHotel::vigenteMarca($c)->name);
+        $this->assertNull(\App\Services\Ai\ContactoHotel::vigente($c));
+        $r = \App\Services\Ai\ContactoHotel::resumen(null, $f->sede_verificada_at, $f->sede_verificada_por, (int) $f->marca_id);
+        $this->assertNull($r['sede']);
+        $this->assertSame('Allegro', $r['marca']);
+        $this->assertTrue($r['vigente']);
+
+        // Hoteles de marcas distintas, o uno que el panel no conoce: no se adivina nada.
+        $c2 = $this->contacto('dir2@x.com');
+        $this->assertNull(\App\Services\Ai\ContactoHotel::recordar($c2, $cH('Allegro Madrid', 'Sol Palma')));
+        $this->assertNull(\App\Services\Ai\ContactoHotel::recordar($c2, $cH('Allegro Madrid', 'Hotel Inventado')));
+        $this->assertNull(DB::table('contacts')->where('id', $c2)->value('marca_id'));
+
+        // Si luego se confirma UN solo hotel, la sede sustituye a la marca.
+        \App\Services\Ai\ContactoHotel::recordar($c, $cH('Allegro Madrid'));
+        $f = DB::table('contacts')->where('id', $c)->first();
+        $this->assertSame($madrid, (int) $f->sede_id);
+        $this->assertNull($f->marca_id);
+
+        // «Sin marca» no es una marca real.
+        $s = DB::table('sedes')->insertGetId(['marca_id' => DB::table('marcas')->insertGetId(['grupo_id' => DB::table('grupos')->value('id'), 'name' => 'Sin marca', 'active' => 1, 'created_at' => now(), 'updated_at' => now()]), 'name' => 'Hotel A', 'active' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('sedes')->insert(['marca_id' => DB::table('sedes')->where('id', $s)->value('marca_id'), 'name' => 'Hotel B', 'active' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        $this->assertNull(\App\Services\Ai\ContactoHotel::recordar($this->contacto('dir3@x.com'), $cH('Hotel A', 'Hotel B')));
+    }
+
+    public function test_al_fusionar_el_enlace_por_marca_solo_vale_si_no_hay_sede(): void
+    {
+        $madrid = $this->sede('Allegro Madrid');
+        $marca = (int) DB::table('marcas')->where('name', 'Allegro')->value('id');
+        $svc = app(ContactMergeService::class);
+
+        $keep = $this->contacto('k@x.com');
+        $otro = $this->contacto('o@x.com', null, now()->subDays(3), 'correo');
+        DB::table('contacts')->where('id', $otro)->update(['marca_id' => $marca]);
+        $svc->fusionar($keep, $otro);
+        $this->assertSame($marca, (int) DB::table('contacts')->where('id', $keep)->value('marca_id'));
+
+        // El principal tiene una sede concreta: la marca del otro no la desplaza.
+        $keep2 = $this->contacto('k2@x.com', $madrid, now()->subDays(30), 'correo');
+        $otro2 = $this->contacto('o2@x.com', null, now()->subDays(1), 'correo');
+        DB::table('contacts')->where('id', $otro2)->update(['marca_id' => $marca]);
+        $svc->fusionar($keep2, $otro2);
+        $f = DB::table('contacts')->where('id', $keep2)->first();
+        $this->assertSame($madrid, (int) $f->sede_id);
+        $this->assertNull($f->marca_id);
+    }
+
     public function test_el_correo_que_da_un_contacto_de_whatsapp_se_guarda_en_su_ficha(): void
     {
         $wa = DB::table('contacts')->insertGetId(['name' => 'Manolo Hyatt', 'wa_id' => '34600111222']);

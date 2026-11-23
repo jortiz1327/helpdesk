@@ -50,9 +50,16 @@ class ContactMergeService
                         && (empty($keep->sede_verificada_at) || $merge->sede_verificada_at > $keep->sede_verificada_at));
                 if ($tomar) {
                     $upd['sede_id'] = $merge->sede_id;
+                    $upd['marca_id'] = null;
                     $upd['sede_verificada_at'] = $merge->sede_verificada_at;
                     $upd['sede_verificada_por'] = $merge->sede_verificada_por;
                 }
+            } elseif (! empty($merge->marca_id) && empty($keep->sede_id)
+                && (empty($keep->marca_id) || (! empty($merge->sede_verificada_at) && (empty($keep->sede_verificada_at) || $merge->sede_verificada_at > $keep->sede_verificada_at)))) {
+                // Enlace por marca (usuario de varios hoteles): mismas reglas, solo si el principal no tiene una sede concreta.
+                $upd['marca_id'] = $merge->marca_id;
+                $upd['sede_verificada_at'] = $merge->sede_verificada_at;
+                $upd['sede_verificada_por'] = $merge->sede_verificada_por;
             }
             // Se conserva la actividad más reciente de los dos.
             if (!empty($merge->last_time) && (empty($keep->last_time) || $merge->last_time > $keep->last_time)) {

@@ -28,14 +28,36 @@ class ContactoHotel
         return $s ? (object) ['id' => (int) $s->id, 'name' => (string) $s->name, 'verificada' => (string) $c->sede_verificada_at, 'por' => (string) $c->sede_verificada_por] : null;
     }
 
-    /** Lo que enseña la ficha del ticket: sede › marca › grupo, quién y cuándo la confirmó, y si el vínculo sigue vigente. Null si no hay sede. */
-    public static function resumen(?int $sedeId, ?string $verificadaAt, ?string $por): ?array
+    /** La marca recordada del contacto (usuario de varios hoteles de una misma marca) si el vínculo sigue vigente; null si no hay o caducó. */
+    public static function vigenteMarca(?int $contactId): ?object
     {
-        if (! $sedeId) {
+        if (! $contactId) {
             return null;
         }
-        $s = DB::table('sedes as s')->leftJoin('marcas as m', 'm.id', '=', 's.marca_id')->leftJoin('grupos as g', 'g.id', '=', 'm.grupo_id')
-            ->where('s.id', $sedeId)->first(['s.name as sede', 'm.name as marca', 'g.name as grupo']);
+        $c = DB::table('contacts')->where('id', $contactId)->whereNull('sede_id')->first(['marca_id', 'sede_verificada_at']);
+        if (! $c || ! $c->marca_id || ! $c->sede_verificada_at || strtotime((string) $c->sede_verificada_at) < strtotime('-' . self::MESES . ' months')) {
+            return null;
+        }
+        $m = DB::table('marcas')->where('id', $c->marca_id)->where('active', 1)->first(['id', 'name']);
+        return $m ? (object) ['id' => (int) $m->id, 'name' => (string) $m->name] : null;
+    }
+
+    /** Lo que enseña la ficha del ticket: sede › marca › grupo (solo marca › grupo si está enlazado a la marca), quién y cuándo la confirmó, y si sigue vigente. Null si no hay nada. */
+    public static function resumen(?int $sedeId, ?string $verificadaAt, ?string $por, ?int $marcaId = null): ?array
+    {
+        if (! $sedeId && ! $marcaId) {
+            return null;
+        }
+        if ($sedeId) {
+            $s = DB::table('sedes as s')->leftJoin('marcas as m', 'm.id', '=', 's.marca_id')->leftJoin('grupos as g', 'g.id', '=', 'm.grupo_id')
+                ->where('s.id', $sedeId)->first(['s.name as sede', 'm.name as marca', 'g.name as grupo']);
+        } else {
+            $s = DB::table('marcas as m')->leftJoin('grupos as g', 'g.id', '=', 'm.grupo_id')
+                ->where('m.id', $marcaId)->first(['m.name as marca', 'g.name as grupo']);
+            if ($s) {
+                $s->sede = null;
+            }
+        }
         if (! $s) {
             return null;
         }
@@ -67,7 +89,7 @@ class ContactoHotel
             $claves[$n] = $x;
         }
         if (count($claves) !== 1) {
-            return null;
+            return self::recordarMarca($contactId, array_values($claves));
         }
         $x = reset($claves);
         $nombre = trim((string) $x['hotel']);
@@ -88,8 +110,66 @@ class ContactoHotel
         if ($igual && $reciente) {
             return null;
         }
-        DB::table('contacts')->where('id', $contactId)->update(['sede_id' => $sede, 'sede_verificada_at' => now(), 'sede_verificada_por' => 'correo']);
+        DB::table('contacts')->where('id', $contactId)->update(['sede_id' => $sede, 'marca_id' => null, 'sede_verificada_at' => now(), 'sede_verificada_por' => 'correo']);
         return $igual ? null : $nombre;
+    }
+
+    /**
+     * Varios hoteles activos (director de marca, grupo de hoteles): no se adivina cuál, pero si TODOS son de la misma marca (ya configurada en el
+     * panel: no vale «Sin marca») el contacto se enlaza a esa marca. Los hoteles que aún no existen en el panel no se crean aquí: sin ellos no hay marca segura.
+     *
+     * @param  array<int, array{hotel:string, hotel_id?:string}>  $sitios  uno por hotel distinto
+     */
+    private static function recordarMarca(int $contactId, array $sitios): ?string
+    {
+        $marcas = [];
+        foreach ($sitios as $x) {
+            $s = self::buscarSede(trim((string) $x['hotel']), trim((string) ($x['hotel_id'] ?? '')));
+            $m = $s ? DB::table('sedes')->where('id', $s)->value('marca_id') : null;
+            if (! $m) {
+                return null;
+            }
+            $marcas[(int) $m] = true;
+        }
+        if (count($marcas) !== 1) {
+            return null;
+        }
+        $marcaId = (int) array_key_first($marcas);
+        $marca = DB::table('marcas')->where('id', $marcaId)->first(['name']);
+        if (! $marca || mb_strtolower(trim((string) $marca->name)) === 'sin marca') {
+            return null;
+        }
+        $actual = DB::table('contacts')->where('id', $contactId)->first(['sede_id', 'marca_id', 'sede_verificada_at', 'sede_verificada_por']);
+        if (! $actual) {
+            return null;
+        }
+        // Lo que un agente fijó a mano (y sigue vigente) no lo pisa el correo.
+        if (($actual->sede_id || $actual->marca_id) && $actual->sede_verificada_por === 'agente'
+            && $actual->sede_verificada_at && strtotime((string) $actual->sede_verificada_at) >= strtotime('-' . self::MESES . ' months')) {
+            return null;
+        }
+        $igual = ! $actual->sede_id && (int) $actual->marca_id === $marcaId;
+        $reciente = $actual->sede_verificada_at && strtotime((string) $actual->sede_verificada_at) >= strtotime('-1 day');
+        if ($igual && $reciente) {
+            return null;
+        }
+        DB::table('contacts')->where('id', $contactId)->update(['sede_id' => null, 'marca_id' => $marcaId, 'sede_verificada_at' => now(), 'sede_verificada_por' => 'correo']);
+        return $igual ? null : (string) $marca->name;
+    }
+
+    /** La sede de ese hotel si ya existe en el panel (por id de AdminHoteles o por nombre); no crea nada. */
+    private static function buscarSede(string $nombre, string $hotelId): ?int
+    {
+        if ($hotelId !== '' && ($id = DB::table('sedes')->where('admin_hotel_id', $hotelId)->value('id'))) {
+            return (int) $id;
+        }
+        $n = HotelsApi::norm($nombre);
+        foreach (DB::table('sedes')->get(['id', 'name']) as $s) {
+            if ($n !== '' && HotelsApi::norm((string) $s->name) === $n) {
+                return (int) $s->id;
+            }
+        }
+        return null;
     }
 
     /**
