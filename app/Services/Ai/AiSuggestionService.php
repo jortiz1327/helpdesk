@@ -538,7 +538,9 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $material = preg_match('/presupuesto|(comprar|compra|pedir|pedido|reponer|necesit[a-z]+)\b.{0,40}(pilas|soportes?|recambios?|pinzas|etiquetas)/s', $t);
         // Tienda o comercio (no un hotel): balanza, báscula, caja, carnicería, frutería… De momento los lleva una persona del equipo: ni se
         // les pide «hotel» ni se les explica nada. Solo si aún no hay un correo verificado (si ya es un usuario de la app, manda lo demás).
-        $comercio = preg_match('/\b(tienda|supermercado|balanza|basculas?|caja registradora|tpv|carniceria|charcuteria|fruteria|pescaderia|panaderia|ultramarinos|autoservicio)\b/', $t);
+        // Vocabulario y nombres sacados de los clientes reales que no son hoteles (carnicerías, pescaderías, supermercados, garden, bricolaje, vinos, mascotas, pádel…).
+        $comercio = preg_match('/\b(tiendas?|supermercados?|balanzas?|basculas?|caja registradora|tpv|carnicerias?|charcuterias?|fruterias?|pescaderias?|panaderias?|pastelerias?|polleria|ultramarinos|autoservicio|ferreteria|bricolaje|garden|jardineria|bodega|licoreria|peluqueria|optica|libreria|mascotas|cash ?& ?carry|mercadillo)\b'
+            . '|\b(alondra|areapadel|carviresa|calviresa|cashsur|dispival|goshop|la ?joyosa|lomillos|nova ?garden|penalver|recambios gil|sancrispin|soyoptima|superplus|openplus|ubemar|dialprix|euronics|brico moreno|mischuches|futbol ?factory|vilato|lovepets|divelsa|dps ?market)\b/', $t);
         $otraArea = $farmacia || $comercio;
         $acuse = mb_strlen($t) < 200 && preg_match('/gracias|ya funciona|solucionado|resuelto/', $t) && ! str_contains($t, '?');
         if (! $acuse && ! $noEsHotel && ! in_array($estadoCorreo, ['verificado', 'incompleto', 'no_encontrado'], true) && ! $material && ! $otraArea) {

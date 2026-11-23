@@ -109,6 +109,11 @@ class AiDecidirTest extends TestCase
         $this->assertSame('derivar', $d['decision']);
         $this->assertStringContainsString('tienda o comercio', $d['resumen']);
         $this->assertSame('derivar', AiSuggestionService::decidir('Tengo una carnicería y las etiquetas no cambian', $this->conv('x'), 'sin_correo', false)['decision']);
+        // Vocabulario y nombres de clientes reales que no son hoteles (de los proyectos y la BD de integraciones), también en plural.
+        foreach (['Somos de la pescadería Alondra, las etiquetas no cambian', 'Soy de Superplus Retamar y no actualiza', 'En nuestras tiendas no cambian los precios', 'Ferretería: la etiqueta no conecta', 'Vilato, las etiquetas no se actualizan'] as $texto) {
+            $this->assertSame('derivar', AiSuggestionService::decidir($texto, $this->conv('x'), 'sin_correo', false)['decision'], $texto);
+        }
+        $this->assertNull(AiSuggestionService::decidir('Mi etiqueta no cambia', $this->conv('x'), 'verificado', true), 'sin palabras de tienda no se desvía');
         // Si ya es un usuario verificado de la aplicación, o es un pedido de material, no se desvía.
         $this->assertNotSame('derivar', AiSuggestionService::decidir('La balanza de la tienda del hotel no marca bien', $this->conv('x'), 'verificado', true)['decision'] ?? null);
         $this->assertNull(AiSuggestionService::decidir('Necesito 30 pilas para la tienda', $this->conv('x'), 'sin_correo', false));
