@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { Icon } from '../icons.jsx'
 import RichInput from './RichInput.jsx'
 import AiSuggestion from './AiSuggestion.jsx'
+import AiResumen from './AiResumen.jsx'
 
 const esCorreo = (d) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.trim())
 
@@ -21,6 +22,7 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
   /* Pestaña «Sugerencia de IA»: solo aparece si el asistente está activo. La IA no gasta
      nada hasta que se abre la pestaña (se genera bajo demanda, una vez por mensaje). */
   const [aiOn, setAiOn] = useState(false)
+  const [resumenOpen, setResumenOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)   // panel lateral de solo lectura
   useEffect(() => {
     if (!ticketId || disabled) return
@@ -162,7 +164,13 @@ export default function Composer({ onSend, disabled = false, disabledHint, to, c
             <Icon.bolt /> Sugerencia de IA
           </button>
         )}
+        {aiOn && ticketId && (
+          <button type="button" className={`cmp-mode-btn ai ${resumenOpen ? 'on' : ''}`} onClick={() => setResumenOpen((v) => !v)} aria-expanded={resumenOpen}>
+            <Icon.note /> Resumen del ticket
+          </button>
+        )}
       </div>
+      {resumenOpen && ticketId && <AiResumen ticketId={ticketId} onClose={() => setResumenOpen(false)} />}
       {aiOpen && ticketId && <AiSuggestion ticketId={ticketId} onClose={() => setAiOpen(false)} onInsert={insertarSugerencia} />}
       {/* Destinatarios: solo al responder (una nota interna no se envía a nadie). */}
       {!note && to && (

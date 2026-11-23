@@ -35,6 +35,7 @@ class AiSuggestionsController extends Controller
         return match ($request->query('action', 'status')) {
             'suggest'    => $this->suggest($request, false),
             'stream'     => $this->stream($request),
+            'summary'    => $this->summary($request),
             'regenerate' => $this->post($request) ?? $this->suggest($request, true),
             'rate'       => $this->post($request) ?? $this->rate($request),
             'used'       => $this->post($request) ?? $this->used($request),
@@ -180,6 +181,22 @@ class AiSuggestionsController extends Controller
                 $this->ai->alPaso(null);
             }
         }, 200, ['Content-Type' => 'application/x-ndjson; charset=utf-8', 'Cache-Control' => 'no-cache, no-store', 'X-Accel-Buffering' => 'no']);
+    }
+
+    /** Resumen del ticket para quien lo coge. Sin regen reutiliza el guardado; ?regen=1 lo rehace. */
+    private function summary(Request $request)
+    {
+        if (! $this->ai->enabled()) {
+            return response()->json(['ok' => true, 'enabled' => false, 'summary' => null]);
+        }
+        $ticket = (int) $request->query('ticket');
+        if (! TicketVisibility::puedeVer($request->user(), $ticket)) {
+            return response()->json(['ok' => false, 'error' => 'Ticket no encontrado'], 404);
+        }
+        $rehacer = $request->boolean('regen');
+        if ($limite = $this->demasiadas($request)) return $limite;
+        $r = $this->ai->resumen($ticket, $request->user()->id, $rehacer);
+        return response()->json($r + ['enabled' => true], $r['ok'] ? 200 : 503);
     }
 
     private function estilo(Request $request): array

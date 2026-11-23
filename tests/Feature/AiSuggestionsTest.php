@@ -174,6 +174,37 @@ class AiSuggestionsTest extends TestCase
         $this->withHeader('X-App-Token', $tok)->postJson('/api/ai_suggestions.php?action=regenerate', ['ticket' => $tk, 'largo' => 'borra todo', 'tono' => 'x'])->assertOk();
         $this->assertStringNotContainsString('ESTILO PEDIDO', $this->fake->ultimoSistema);
     }
+    public function test_resumen_del_ticket_se_guarda_se_reutiliza_y_se_rehace_con_mensajes_nuevos(): void
+    {
+        $this->activar();
+        $tok = $this->agente();
+        $tk = $this->ticket('Mi etiqueta no conecta');
+        // Un solo mensaje: no hay nada que resumir, y no se gasta.
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=summary&ticket=$tk")->assertOk()->assertJsonPath('summary', null);
+        $this->assertSame(0, $this->fake->llamadas);
+
+        DB::table('messages')->insert(['contact_id' => $this->cid, 'wa_id' => '', 'ticket_id' => $tk, 'direction' => 'out', 'body' => 'Pruebe a reiniciarla.', 'created_at' => now()->addMinute()]);
+        DB::table('messages')->insert(['contact_id' => $this->cid, 'wa_id' => '', 'ticket_id' => $tk, 'direction' => 'in', 'body' => 'Sigue igual.', 'created_at' => now()->addMinutes(2)]);
+        $this->fake->respuesta = "Qué pasó:\n- No conecta\nQué se ha probado:\n- Reiniciar\nQué falta:\n- El equipo";
+        $r = $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=summary&ticket=$tk")->assertOk();
+        $this->assertStringContainsString('Qué falta', $r->json('summary.body'));
+        $this->assertSame(3, $r->json('summary.messages'));
+        $this->assertSame(1, $this->fake->llamadas);
+        $this->assertStringContainsString('Resume la conversación', $this->fake->ultimoSistema);
+
+        // Sin mensajes nuevos se reutiliza: no cuesta nada.
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=summary&ticket=$tk")->assertOk();
+        $this->assertSame(1, $this->fake->llamadas);
+        // Con un mensaje nuevo se rehace.
+        DB::table('messages')->insert(['contact_id' => $this->cid, 'wa_id' => '', 'ticket_id' => $tk, 'direction' => 'out', 'body' => 'Lo revisamos.', 'created_at' => now()->addMinutes(3)]);
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=summary&ticket=$tk")->assertOk();
+        $this->assertSame(2, $this->fake->llamadas);
+        // El gasto del resumen cuenta para el tope mensual.
+        $this->assertSame(2, DB::table('ai_summaries')->count());
+        // Si el proveedor falla, se avisa sin romper.
+        $this->fake->falla = true;
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=summary&ticket=$tk&regen=1")->assertStatus(503)->assertJsonPath('ok', false);
+    }
     public function test_la_medicion_cuenta_cuanto_se_aprovecha_el_borrador_y_compara_tiempos(): void
     {
         $this->activar();

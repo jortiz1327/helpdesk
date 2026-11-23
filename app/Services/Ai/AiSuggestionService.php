@@ -211,7 +211,7 @@ class AiSuggestionService
     public function topeAlcanzado(): bool
     {
         $tope = $this->topeMensual();
-        return $tope > 0 && $this->gastoTabla('ai_suggestions', now()->startOfMonth()) >= $tope;
+        return $tope > 0 && ($this->gastoTabla('ai_suggestions', now()->startOfMonth()) + $this->gastoTabla('ai_summaries', now()->startOfMonth())) >= $tope;
     }
 
     /** Tokens y coste ESTIMADO (config ai.prices) de hoy, los últimos 30 días y el total. */
@@ -223,7 +223,7 @@ class AiSuggestionService
             $coste = 0.0;
             $n = 0;
             // Sugerencias de tickets y respuestas de los chats de prueba (/ia).
-            foreach (['ai_suggestions', 'ai_lab_messages'] as $tabla) {
+            foreach (['ai_suggestions', 'ai_lab_messages', 'ai_summaries'] as $tabla) {
                 $q = DB::table($tabla)->whereNotNull('input_tokens');
                 if ($desde) {
                     $q->where('created_at', '>=', $desde);
@@ -269,6 +269,74 @@ class AiSuggestionService
         } finally {
             $this->estilo = [];
         }
+    }
+
+    public const MAX_RESUMEN = 40;
+
+    private const PROMPT_RESUMEN = 'Eres un compañero del equipo de soporte de AEME. Resume la conversación de este ticket para alguien que lo coge ahora y no ha leído nada. Responde en español, sin saludos ni adornos, con EXACTAMENTE estas tres secciones, cada una con 1 a 4 viñetas cortas que empiecen por «- »:
+Qué pasó:
+Qué se ha probado:
+Qué falta:
+Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos al cliente; el cliente es «user» y el equipo «assistant». Si no se ha probado nada o no falta nada, escribe «- Nada por ahora». En «Qué falta» di qué espera cada parte (el cliente o el equipo). Máximo 120 palabras. Nunca repitas contraseñas, tarjetas ni datos personales.';
+
+    /**
+     * Resumen del ticket para quien lo coge (qué pasó, qué se probó, qué falta). Se guarda por último mensaje: mientras no haya
+     * mensajes nuevos se reutiliza sin gastar. Nunca lanza: devuelve ['ok' => false, 'error' => …] si no se pudo.
+     */
+    public function resumen(int $ticketId, ?int $userId, bool $rehacer = false): array
+    {
+        $base = fn () => DB::table('messages')->where('ticket_id', $ticketId)->where('is_internal_note', 0)->whereNotNull('body');
+        $ult = $base()->max('id');
+        $n = $base()->count();
+        if (! $ult || $n < 2) {
+            return ['ok' => true, 'summary' => null];
+        }
+        $ya = DB::table('ai_summaries')->where('ticket_id', $ticketId)->where('last_message_id', $ult)->orderByDesc('id')->first();
+        if ($ya && ! $rehacer) {
+            return ['ok' => true, 'summary' => ['body' => $ya->body, 'messages' => $n, 'at' => $ya->created_at]];
+        }
+        if ($this->topeAlcanzado()) {
+            return ['ok' => false, 'error' => 'La IA ha llegado al tope de gasto de este mes. Lee el hilo; volverá el día 1 (o cuando un responsable suba el tope).'];
+        }
+        // Un mensaje larguísimo (un correo con todo el historial) no debe llenar la petición.
+        $conv = array_map(fn ($m) => ['role' => $m['role'], 'text' => mb_substr($m['text'], 0, 1500)], $this->conversacion($ticketId, self::MAX_RESUMEN));
+        // La API pide empezar por el cliente y alternar roles: se unen los mensajes seguidos del mismo rol.
+        $turnos = [];
+        foreach ($conv as $m) {
+            if ($turnos && $turnos[count($turnos) - 1]['role'] === $m['role']) {
+                $turnos[count($turnos) - 1]['text'] .= "\n" . $m['text'];
+            } else {
+                $turnos[] = $m;
+            }
+        }
+        if (! $turnos) {
+            return ['ok' => true, 'summary' => null];
+        }
+        if ($turnos[0]['role'] !== 'user') {
+            array_unshift($turnos, ['role' => 'user', 'text' => '(el hilo empieza con una respuesta del equipo)']);
+        }
+        if ($turnos[count($turnos) - 1]['role'] !== 'user') {
+            $turnos[] = ['role' => 'user', 'text' => 'Resume el ticket con las tres secciones indicadas.'];
+        } else {
+            $turnos[count($turnos) - 1]['text'] .= "\n\n(Resume el ticket con las tres secciones indicadas.)";
+        }
+        try {
+            $r = $this->ai->complete(self::PROMPT_RESUMEN, $this->comoTurnos($turnos));
+        } catch (\Throwable $e) {
+            report($e);
+            return ['ok' => false, 'error' => 'La IA no pudo preparar el resumen. Inténtalo de nuevo en un momento.'];
+        }
+        $texto = trim((string) ($r['text'] ?? ''));
+        if ($texto === '' || ! empty($r['truncated'])) {
+            return ['ok' => false, 'error' => 'La IA no pudo preparar el resumen. Inténtalo de nuevo en un momento.'];
+        }
+        $texto = Scrub::sensibles(mb_substr($texto, 0, 2000));
+        DB::table('ai_summaries')->insert([
+            'ticket_id' => $ticketId, 'last_message_id' => $ult, 'body' => $texto, 'model' => $r['model'] ?? null,
+            'input_tokens' => $r['input_tokens'] ?? null, 'output_tokens' => $r['output_tokens'] ?? null,
+            'created_by' => $userId, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        return ['ok' => true, 'summary' => ['body' => $texto, 'messages' => $n, 'at' => now()->toDateTimeString()]];
     }
 
     /** Deja solo los valores permitidos (lo que llega de la pantalla no se fía). */
@@ -815,11 +883,11 @@ class AiSuggestionService
     // -- Conocimiento -------------------------------------------------------------
 
     /** Las últimas mensajes visibles al cliente (sin notas internas), de antiguo a nuevo. */
-    private function conversacion(int $ticketId): array
+    private function conversacion(int $ticketId, int $limite = self::MAX_MENSAJES): array
     {
         $rows = DB::table('messages')->where('ticket_id', $ticketId)->where('is_internal_note', 0)
             ->when($this->hasta, fn ($q) => $q->where('id', '<=', $this->hasta))
-            ->whereNotNull('body')->orderByDesc('id')->limit(self::MAX_MENSAJES)->get(['direction', 'body', 'type', 'media_mime']);
+            ->whereNotNull('body')->orderByDesc('id')->limit($limite)->get(['direction', 'body', 'type', 'media_mime']);
 
         return $rows->reverse()->map(function ($m) {
             $texto = $this->plano((string) $m->body);

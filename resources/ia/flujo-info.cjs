@@ -53,7 +53,7 @@ module.exports = {
   e3x: ['Pasa a una persona', 'Bloque «Para el equipo».', ['Categoría: Soporte, Garantías o Pedidos y facturas', 'Más un mensaje corto para el cliente, solo para que tú lo veas']],
   e4: ['Propuesta de respuesta', 'El borrador queda listo.', ['«Insertar en la respuesta» con un clic, o «Copiar»', '«En qué se basa»: manuales, tickets parecidos y plantillas', '«Más corta», «Más detallada», «Más cercano» o «Más formal»: otra redacción, misma decisión']],
   s1: ['Se guarda', 'La sugerencia queda registrada.', ['Con su coste estimado', 'Si pulsas «Sugerir» otra vez no se vuelve a pagar']],
-  g1: ['El agente la ve', 'Y lo que hizo la IA para llegar.', ['Hotel, correo, antenas y memoria consultados', 'Tú decides: nada se envía solo']],
+  g1: ['El agente la ve', 'Y lo que hizo la IA para llegar.', ['Aparte, «Resumen del ticket»: qué pasó, qué se probó y qué falta (un hilo largo, de un vistazo)', 'Hotel, correo, antenas y memoria consultados', 'Tú decides: nada se envía solo']],
   f1: ['Útil', 'Un clic: «Útil».', ['Se anota en el historial de valoraciones']],
   f2: ['Inserta o copia y envía', 'Revisa y envía él.', ['Se marca como usada']],
   f3: ['Contesta sin la IA', 'Totalmente válido.', []],
