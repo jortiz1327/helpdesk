@@ -40,8 +40,19 @@ class ContactMergeService
 
             // 2) Rellenar SOLO los huecos del principal (lo suyo manda).
             $upd = [];
-            foreach (['name', 'email', 'wa_id', 'country_code', 'note', 'empresa', 'tienda', 'cargo', 'provincia', 'comentarios', 'sede_id'] as $col) {
+            foreach (['name', 'email', 'wa_id', 'country_code', 'note', 'empresa', 'tienda', 'cargo', 'provincia', 'comentarios'] as $col) {
                 if (property_exists($keep, $col) && empty($keep->$col) && !empty($merge->$col)) $upd[$col] = $merge->$col;
+            }
+            // Sede (grupo › marca › sede): si el principal no tiene, hereda la del absorbido CON su confirmación; si las dos difieren, vale la confirmada más recientemente.
+            if (! empty($merge->sede_id)) {
+                $tomar = empty($keep->sede_id)
+                    || ((int) $merge->sede_id !== (int) $keep->sede_id && ! empty($merge->sede_verificada_at)
+                        && (empty($keep->sede_verificada_at) || $merge->sede_verificada_at > $keep->sede_verificada_at));
+                if ($tomar) {
+                    $upd['sede_id'] = $merge->sede_id;
+                    $upd['sede_verificada_at'] = $merge->sede_verificada_at;
+                    $upd['sede_verificada_por'] = $merge->sede_verificada_por;
+                }
             }
             // Se conserva la actividad más reciente de los dos.
             if (!empty($merge->last_time) && (empty($keep->last_time) || $merge->last_time > $keep->last_time)) {

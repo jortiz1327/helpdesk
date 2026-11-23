@@ -28,6 +28,25 @@ class ContactoHotel
         return $s ? (object) ['id' => (int) $s->id, 'name' => (string) $s->name, 'verificada' => (string) $c->sede_verificada_at, 'por' => (string) $c->sede_verificada_por] : null;
     }
 
+    /** Lo que enseña la ficha del ticket: sede › marca › grupo, quién y cuándo la confirmó, y si el vínculo sigue vigente. Null si no hay sede. */
+    public static function resumen(?int $sedeId, ?string $verificadaAt, ?string $por): ?array
+    {
+        if (! $sedeId) {
+            return null;
+        }
+        $s = DB::table('sedes as s')->leftJoin('marcas as m', 'm.id', '=', 's.marca_id')->leftJoin('grupos as g', 'g.id', '=', 'm.grupo_id')
+            ->where('s.id', $sedeId)->first(['s.name as sede', 'm.name as marca', 'g.name as grupo']);
+        if (! $s) {
+            return null;
+        }
+        $hasta = $verificadaAt ? date('Y-m-d', strtotime($verificadaAt . ' +' . self::MESES . ' months')) : null;
+        return [
+            'sede' => $s->sede, 'marca' => $s->marca, 'grupo' => $s->grupo,
+            'por' => $por ?: null, 'desde' => $verificadaAt ? substr($verificadaAt, 0, 10) : null, 'hasta' => $hasta,
+            'vigente' => (bool) ($verificadaAt && $hasta >= date('Y-m-d')),
+        ];
+    }
+
     /**
      * Enlaza el contacto al hotel donde AdminHoteles ha confirmado su correo. Solo si todos los sitios activos son del mismo hotel
      * (con varios hoteles no se adivina cuál). Devuelve el nombre de la sede si se ha creado o cambiado el vínculo; null si no hizo falta.

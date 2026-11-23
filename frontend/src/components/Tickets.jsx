@@ -1974,6 +1974,7 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                   </button>
                 )}
               </div>
+              <HotelRecordado h={t.hotel_recordado} />
               {/* Teléfono del cliente: dato de contacto, bien visible y clicable. */}
               {t.contact_wa && (
                 <a className="tkm-tel" href={`tel:+${t.contact_wa}`} title="Llamar al cliente">
@@ -2796,6 +2797,24 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/* «Hotel recordado»: el hotel (sede › marca › grupo) que se confirmó de este contacto. Es solo informativo: el correo se comprueba igual en cada ticket. */
+function HotelRecordado({ h }) {
+  if (!h) return null
+  const fmt = (iso) => (iso ? new Date(iso + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
+  const ruta = [h.sede, h.marca, h.grupo].filter(Boolean)
+  const origen = h.por === 'agente' ? 'un agente' : h.por === 'correo' ? 'su correo' : null
+  return (
+    <div className={`tkm-hotel ${h.vigente ? '' : 'old'}`} title={h.vigente ? 'Este contacto ya se verificó en este hotel: la IA no vuelve a preguntarlo. El correo se comprueba igual en cada ticket.' : 'El vínculo caducó: la IA volverá a preguntar el hotel.'}>
+      <Icon.building />
+      <div>
+        <b>{h.vigente ? 'Hotel recordado' : 'Hotel anterior (caducado)'}</b>
+        <span>{ruta.join(' · ')}</span>
+        <small>{h.desde ? `Confirmado el ${fmt(h.desde)}${origen ? ` por ${origen}` : ''}` : 'Sin fecha de confirmación'}{h.vigente && h.hasta ? ` · vale hasta ${fmt(h.hasta)}` : ''}</small>
+      </div>
     </div>
   )
 }
