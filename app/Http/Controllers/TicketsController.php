@@ -225,9 +225,12 @@ class TicketsController extends Controller
         if (!$oid) return;
         match ($nivel) {
             'sede'  => $q->where('c.sede_id', $oid),
-            'marca' => $q->whereIn('c.sede_id', fn($sub) => $sub->select('id')->from('sedes')->where('marca_id', $oid)),
-            'grupo' => $q->whereIn('c.sede_id', fn($sub) => $sub->select('s.id')->from('sedes as s')
-                ->join('marcas as m', 'm.id', '=', 's.marca_id')->where('m.grupo_id', $oid)),
+            // Incluye a los contactos enlazados solo a la marca (varios hoteles de una misma marca).
+            'marca' => $q->where(fn($w) => $w->whereIn('c.sede_id', fn($sub) => $sub->select('id')->from('sedes')->where('marca_id', $oid))
+                ->orWhere('c.marca_id', $oid)),
+            'grupo' => $q->where(fn($w) => $w->whereIn('c.sede_id', fn($sub) => $sub->select('s.id')->from('sedes as s')
+                    ->join('marcas as m', 'm.id', '=', 's.marca_id')->where('m.grupo_id', $oid))
+                ->orWhereIn('c.marca_id', fn($sub) => $sub->select('id')->from('marcas')->where('grupo_id', $oid))),
             default => null,
         };
     }

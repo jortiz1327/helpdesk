@@ -94,6 +94,53 @@ class ContactoHotelTest extends TestCase
         $this->assertNull(\App\Services\Ai\ContactoHotel::recordar($this->contacto('dir3@x.com'), $cH('Hotel A', 'Hotel B')));
     }
 
+    public function test_el_informe_por_organizacion_cuenta_los_contactos_enlazados_a_la_marca(): void
+    {
+        $this->seed(\Database\Seeders\RolesPermissionsSeeder::class);
+        $cat = DB::table('ticket_categories')->insertGetId(['key' => 'a', 'name' => 'Etiquetas', 'color' => '#888', 'position' => 1, 'active' => 1]);
+        $u = User::create(['name' => 'Ana', 'email' => 'ana@x.com', 'password' => bcrypt('x')]);
+        $u->assignRole('agente');
+        $u->givePermissionTo('organizations.view');
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        DB::table('user_ticket_categories')->insert(['user_id' => $u->id, 'category_id' => $cat]);
+        $tok = TokenService::make($u);
+
+        $madrid = $this->sede('Allegro Madrid');
+        $marca = (int) DB::table('marcas')->where('name', 'Allegro')->value('id');
+        $grupo = (int) DB::table('grupos')->where('name', 'Grupo Barceló')->value('id');
+        $conSede = $this->contacto('s@x.com', $madrid, now(), 'correo');
+        $conMarca = $this->contacto('m@x.com', null, now(), 'correo');
+        DB::table('contacts')->where('id', $conMarca)->update(['marca_id' => $marca]);
+        foreach ([$conSede, $conMarca, $conMarca] as $i => $c) {
+            DB::table('tickets')->insert([
+                'code' => 'TK-' . uniqid() . $i, 'subject' => 'x', 'status' => 'abierto', 'priority' => 'media', 'channel' => 'email',
+                'contact_id' => $c, 'category_id' => $cat, 'opened_at' => now(), 'last_message_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $get = fn (string $q) => $this->withHeader('X-App-Token', $tok)->getJson('/api/organizations.php?' . $q)->assertOk();
+
+        // Marca y grupo cuentan los 3 tickets; la sede, solo el suyo.
+        $this->assertSame(3, $get('action=report&level=marca')->json('rows.0.total'));
+        $this->assertSame(3, $get('action=report&level=grupo')->json('rows.0.total'));
+        $sede = $get('action=report&level=sede');
+        $this->assertCount(1, $sede->json('rows'));
+        $this->assertSame(1, $sede->json('rows.0.total'));
+
+        // El árbol enseña lo enlazado solo a la marca.
+        $m = $get('action=tree')->json('grupos.0.marcas.0');
+        $this->assertSame(1, $m['contactos_marca']);
+        $this->assertSame(2, $m['tickets_marca']);
+        $this->assertSame(1, $m['sedes'][0]['tickets']);
+
+        // El filtro «Ver sus tickets» de marca y de grupo también los incluye.
+        foreach (["marca:$marca", "grupo:$grupo"] as $org) {
+            $r = $this->withHeader('X-App-Token', $tok)->getJson('/api/tickets.php?action=list&org=' . $org)->assertOk();
+            $this->assertCount(3, $r->json('tickets'), $org);
+        }
+        $r = $this->withHeader('X-App-Token', $tok)->getJson("/api/tickets.php?action=list&org=sede:$madrid")->assertOk();
+        $this->assertCount(1, $r->json('tickets'));
+    }
+
     public function test_al_fusionar_el_enlace_por_marca_solo_vale_si_no_hay_sede(): void
     {
         $madrid = $this->sede('Allegro Madrid');

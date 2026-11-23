@@ -31,7 +31,7 @@ function OrgModal({ title, onClose, onSave, saveLabel, children }) {
 }
 
 /* Suma de tickets: marca = sus sedes; grupo = todas sus marcas. */
-const sumMarca = (m) => m.sedes.reduce((a, s) => a + (s.tickets || 0), 0)
+const sumMarca = (m) => m.sedes.reduce((a, s) => a + (s.tickets || 0), 0) + (m.tickets_marca || 0)   // + contactos enlazados solo a la marca
 const sumGrupo = (g) => g.marcas.reduce((a, m) => a + sumMarca(m), 0)
 
 /* Horas → texto legible: «—» si no hay dato, minutos si <1 h. */
@@ -166,6 +166,7 @@ export default function Organizations({ onVerTickets }) {
                   <b>{m.name}</b>
                   {!m.active && <span className="chip cerrado sm">Inactiva</span>}
                   <span className="org-count">{m.sedes.length} sede{m.sedes.length === 1 ? '' : 's'}</span>
+                  {m.contactos_marca > 0 && <span className="org-count" title="Contactos con acceso a varios hoteles de esta marca (sin una sede concreta)">{m.contactos_marca} de varios hoteles</span>}
                   <span style={{ flex: 1 }} />
                   {onVerTickets && sumMarca(m) > 0 && (
                     <button className="btn ghost sm org-vt" title="Ver sus tickets" onClick={() => onVerTickets(`marca:${m.id}`)}><Icon.ticket /> {sumMarca(m)}</button>

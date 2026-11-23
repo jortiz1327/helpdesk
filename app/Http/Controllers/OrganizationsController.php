@@ -37,6 +37,13 @@ class OrganizationsController extends Controller
             ->whereNotNull('c.sede_id')->where('t.channel', '!=', 'cron')->whereNull('t.merged_into_id')
             ->select('c.sede_id', DB::raw('COUNT(*) n'))->groupBy('c.sede_id')->pluck('n', 'c.sede_id');
 
+        // Contactos y tickets enlazados solo a la marca (sin sede concreta).
+        $contactosPorMarca = DB::table('contacts')->whereNull('sede_id')->whereNotNull('marca_id')
+            ->select('marca_id', DB::raw('COUNT(*) n'))->groupBy('marca_id')->pluck('n', 'marca_id');
+        $ticketsPorMarca = DB::table('tickets as t')->join('contacts as c', 'c.id', '=', 't.contact_id')
+            ->whereNull('c.sede_id')->whereNotNull('c.marca_id')->where('t.channel', '!=', 'cron')->whereNull('t.merged_into_id')
+            ->select('c.marca_id', DB::raw('COUNT(*) n'))->groupBy('c.marca_id')->pluck('n', 'c.marca_id');
+
         $grupos = Grupo::with(['marcas' => fn ($q) => $q->orderBy('name'), 'marcas.sedes' => fn ($q) => $q->orderBy('name')])
             ->orderBy('name')->get();
 
@@ -50,6 +57,8 @@ class OrganizationsController extends Controller
                 'id'     => $m->id,
                 'name'   => $m->name,
                 'active' => $m->active,
+                'contactos_marca' => (int) ($contactosPorMarca[$m->id] ?? 0),
+                'tickets_marca'   => (int) ($ticketsPorMarca[$m->id] ?? 0),
                 'sedes'  => $m->sedes->map(fn ($s) => [
                     'id'        => $s->id,
                     'name'      => $s->name,
@@ -89,9 +98,11 @@ class OrganizationsController extends Controller
 
         $rows = DB::table('tickets as t')
             ->join('contacts as c', 'c.id', '=', 't.contact_id')
-            ->join('sedes as s', 's.id', '=', 'c.sede_id')
-            ->join('marcas as m', 'm.id', '=', 's.marca_id')
+            ->leftJoin('sedes as s', 's.id', '=', 'c.sede_id')
+            // Un contacto enlazado solo a la MARCA (usuario de varios hoteles) cuenta en marca y grupo, pero no en ninguna sede.
+            ->join('marcas as m', 'm.id', '=', DB::raw('COALESCE(s.marca_id, c.marca_id)'))
             ->join('grupos as g', 'g.id', '=', 'm.grupo_id')
+            ->when($level === 'sede', fn ($q) => $q->whereNotNull('s.id'))
             ->where('t.channel', '!=', 'cron')->whereNull('t.merged_into_id')
             ->selectRaw("$idCol AS id, $label AS label,
                 COUNT(*) AS total,
