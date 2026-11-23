@@ -481,6 +481,7 @@ export const api = {
       return { ok: false, error: e?.name === 'AbortError' ? 'La operación tardó demasiado. Inténtalo de nuevo.' : 'No se pudo conectar. Revisa la red.' }
     } finally { clearTimeout(timer) }
   },
+  ticketRelated: (ticket) => req(`ticket_related.php?ticket=${ticket}`),
   aiSummary: (ticket, regen = false) => req(`ai_suggestions.php?action=summary&ticket=${ticket}${regen ? '&regen=1' : ''}`),
   aiStatus: () => req('ai_suggestions.php?action=status'),
   aiRate: (id, rating, correction, reason) => req('ai_suggestions.php?action=rate', {

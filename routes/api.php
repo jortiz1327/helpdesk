@@ -120,6 +120,9 @@ Route::middleware('token')->group(function () {
     // --- Helpdesk: TICKETS (núcleo del sistema) ---
     Route::match(['get', 'post'], 'tickets.php', [TicketsController::class, 'handle'])
         ->middleware('can:helpdesk.access');
+    // Tickets duplicados o relacionados con el abierto (sin IA: solo compara datos del helpdesk).
+    Route::get('ticket_related.php', \App\Http\Controllers\TicketRelatedController::class)
+        ->middleware('can:helpdesk.access');
     // Sugerencias de la IA en la ficha del ticket (solo propone; la persona responde).
     Route::match(['get', 'post'], 'ai_suggestions.php', [\App\Http\Controllers\AiSuggestionsController::class, 'handle'])
         ->middleware('can:helpdesk.access');

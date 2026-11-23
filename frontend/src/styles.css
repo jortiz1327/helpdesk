@@ -4544,3 +4544,10 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .ai-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--primary) 14%, transparent); border-color: var(--primary); }
 
 .ai-resumen { margin: 0; padding-left: 18px; display: grid; gap: 5px; font-size: 14px; line-height: 1.5; max-width: 66ch; }
+
+.tk-relacionados { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--primary) 6%, var(--panel-2)); font-size: 13px; }
+.tk-relacionados > svg { width: 16px; height: 16px; fill: var(--primary); flex: none; margin-top: 2px; }
+.tk-relacionados ul { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.tk-relacionados li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.tk-relacionados small { color: var(--ink-2); }
+.tk-relacionados .link { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
