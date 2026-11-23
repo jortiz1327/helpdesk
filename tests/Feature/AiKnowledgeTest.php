@@ -237,10 +237,10 @@ class AiKnowledgeTest extends TestCase
     public function test_las_correcciones_base_del_repositorio_se_importan_sin_duplicar_y_sin_datos_personales(): void
     {
         $k = new AiKnowledge();
-        $this->assertSame(6, $k->importarCorreccionesBase());
-        $this->assertSame(6, $k->importarCorreccionesBase());   // idempotente
+        $this->assertSame(8, $k->importarCorreccionesBase());
+        $this->assertSame(8, $k->importarCorreccionesBase());   // idempotente
         $docs = DB::table('ai_documents')->where('source_type', 'correccion')->where('source_id', 'like', 'base:%')->get();
-        $this->assertCount(6, $docs);
+        $this->assertCount(8, $docs);
         foreach ($docs as $d) {
             $this->assertDoesNotMatchRegularExpression('/@|\+?\d{9}|Calle|Avinguda/u', $d->content, 'sin datos personales');
         }

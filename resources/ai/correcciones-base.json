@@ -28,5 +28,15 @@
         "clave": "estado-de-etiquetas-enviadas-a-garantias",
         "titulo": "Estado de etiquetas ya en garantías",
         "contenido": "Pregunta del cliente:\nHace días o semanas que recibieron las etiquetas del hotel y quería saber cuándo las tendremos de vuelta para hacer el mapeo del buffet antes de la apertura.\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nEs un ticket de Garantías: preguntar cuándo vuelven unas etiquetas que ya enviaron lo gestiona ese departamento, porque nosotros no sabemos sus tiempos ni cuándo estarán disponibles. Primero se verifica hotel y correo; después se DERIVA a Garantías (nota «Para el equipo») sin dar fechas, plazos ni promesas."
+    },
+    {
+        "clave": "posicion-con-x-en-vez-de-etiqueta",
+        "titulo": "Posición con una X en vez de etiqueta: la modifica el equipo",
+        "contenido": "Pregunta del cliente:\nEstamos intentando poner nuevas etiquetas a las posiciones, pero en algunas posiciones, dentro del programa, aparece una X y no podemos asignarle una etiqueta nueva. ¿Cómo lo hacemos?\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nEs una excepción a «asignar etiquetas lo hace el hotel». Una posición que en vez de una etiqueta (código MAC de 9 dígitos) muestra una X es un resto de la aplicación antigua, donde la X marcaba que esa posición no estaba en uso; al migrar se arrastró y el hotel NO puede cambiarla desde Posiciones, solo el equipo. Hoy es muy raro, porque los hoteles que lo tenían ya lo resolvieron. Primero se verifica hotel y correo. Después se DERIVA a Soporte («[[DERIVAR:soporte|posición con X]]») y el borrador pide las posiciones que quieren modificar y los códigos de barras de las etiquetas nuevas. No expliques pasos en Posiciones ni digas que lo pueden hacer ellos."
+    },
+    {
+        "clave": "etiquetas-de-otro-hotel",
+        "titulo": "Etiquetas traídas de otro hotel: sí funcionan, hay que desvincularlas",
+        "contenido": "Pregunta del cliente:\n¿Las etiquetas funcionan solo con su antena? Me han traído unas etiquetas del otro hotel para comprobar si funcionan, o tengo que probarlas en su hotel.\n\nIndicación del equipo (criterio a aplicar, no un texto para copiar):\nLas etiquetas SÍ pueden funcionar aunque vengan de otro hotel: no hace falta probarlas en el de origen. Primero se verifica hotel y correo. Después se le explica el procedimiento: 1) hay que eliminar, en el hotel de origen (A), las posiciones que tienen esas etiquetas vinculadas, para que queden desvinculadas; 2) una vez desvinculadas, se vinculan en las posiciones que necesite en su hotel (B). Pídele de qué hotel provienen las etiquetas para localizarlas. No digas que ya están desvinculadas ni que ya están listas."
     }
 ]
