@@ -667,7 +667,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             . '|\b(alondra|bernal|calvet|areapadel|carviresa|calviresa|cashsur|dispival|goshop|la ?joyosa|lomillos|nova ?garden|penalver|recambios gil|sancrispin|soyoptima|superplus|openplus|ubemar|dialprix|euronics|brico moreno|mischuches|futbol ?factory|vilato|lovepets|divelsa|dps ?market)\b/', $t);
         $otraArea = $farmacia || $comercio;
         $acuse = mb_strlen($t) < 200 && preg_match('/gracias|ya funciona|solucionado|resuelto/', $t) && ! str_contains($t, '?');
-        if (! $acuse && ! $noEsHotel && ! in_array($estadoCorreo, ['verificado', 'incompleto', 'no_encontrado', 'desactivado'], true) && ! $material && ! $otraArea) {
+        if (! $acuse && ! $noEsHotel && ! in_array($estadoCorreo, ['verificado', 'declarado', 'incompleto', 'no_encontrado', 'desactivado'], true) && ! $material && ! $otraArea) {
             return ['decision' => 'pedir_datos', 'resumen' => $hotelNombrado ? 'verificar primero: pedir el correo' : 'verificar primero: pedir hotel y correo',
                 'instruccion' => ($hotelNombrado
                     ? 'ANTES de contestar, pedir datos o derivar hay que VERIFICAR al cliente. El hotel ya consta: PIDE SOLO el correo con el que accede a la aplicación.'
@@ -1348,17 +1348,28 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             $this->paso('hotel', null, 'AdminHoteles no está configurado: no se consulta el hotel');
             return '';
         }
-        // Correo de QUIEN ESCRIBE: el del contacto del ticket. Un correo escrito en el texto suele ser de un tercero («dad de alta a
-        // fulano@hotel.com») y verificarlo como si fuera el remitente le atribuía el rol y los hoteles de otro. Solo cuando el cliente dice
-        // que ese correo es SUYO («mi usuario es…», «accedo con…»), o si el contacto no tiene correo (WhatsApp), se usa el del texto.
-        // Los demás correos que mencione se comprueban aparte (ver correosMencionados) para poder hablar de ellos con datos.
+        // Correo de QUIEN ESCRIBE: el del contacto del ticket. Un correo escrito en el texto es solo una AFIRMACIÓN del cliente (nadie ha
+        // probado que sea suyo), y suele ser de un tercero («dad de alta a fulano@hotel.com»). Reglas:
+        //  1) Si el remitente ya consta como usuario activo, es él: los correos del texto son solo datos mencionados (correosMencionados).
+        //  2) Si no consta, un correo que el cliente dice que es SUYO («mi correo es…») se comprueba, pero queda como DECLARADO: se sabe si
+        //     existe, no que sea él, y no se dan datos del hotel (antenas, rol…) hasta que una persona lo confirme.
+        //  3) Sin correo de contacto (WhatsApp) pasa igual con el que el cliente escriba.
         $e = trim((string) $contactEmail);
-        $propio = self::correoPropioEnTexto($textoCliente);
-        if ($propio !== null && mb_strtolower($propio) !== mb_strtolower($e)) {
-            $e = $propio;
+        $declarado = false;
+        $remitenteOk = false;
+        if ($e !== '') {
+            $vr = $api->verificar($e);
+            $remitenteOk = $vr['estado'] === 'encontrado' && (bool) array_filter($vr['sitios'] ?? [], fn ($x) => ($x['activo'] ?? true) !== false);
         }
-        if ($e === '') {
-            $e = self::correosEnTexto($textoCliente)[0] ?? '';
+        if (! $remitenteOk) {
+            $propio = self::correoPropioEnTexto($textoCliente);
+            if ($propio !== null && mb_strtolower($propio) !== mb_strtolower($e)) {
+                $e = $propio;
+                $declarado = true;
+            } elseif ($e === '' && ($primero = self::correosEnTexto($textoCliente)[0] ?? null)) {
+                $e = $primero;
+                $declarado = true;
+            }
         }
         $this->correoVerificado = $e;
         // Un pedido de material no necesita saber si las antenas están en línea ni qué rol tiene el usuario: no se consulta ni se cuenta.
@@ -1467,6 +1478,10 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         }
         $this->hotelNoEncontrado = ! $dir && $nombres && ! $dirFalla;
         $this->estadoCorreo = ($v['estado'] === 'encontrado' && (! $dir || $this->coincideHotel($dir, $sitiosTodos))) ? 'verificado' : (string) $v['estado'];
+        // Correo que el cliente dice que es suyo pero que nadie ha comprobado que lo sea: existe, pero no cuenta como verificado.
+        if ($declarado && $this->estadoCorreo === 'verificado') {
+            $this->estadoCorreo = 'declarado';
+        }
         // Verificado y de UN solo hotel: se recuerda para no volver a preguntarlo en el próximo ticket.
         if ($this->estadoCorreo === 'verificado' && $contactId && $v['sitios']) {
             $nuevo = ContactoHotel::recordar($contactId, $v['sitios'], (string) ($dir[0]['grupo'] ?? ''));
@@ -1494,6 +1509,8 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             $this->paso('correo', false, "El correo $e no figura como usuario de la aplicación");
         } elseif ($dir && ! $this->coincideHotel($dir, $sitiosTodos)) {
             $this->paso('correo', false, "El correo $e figura, pero no asociado al hotel que dice");
+        } elseif ($this->estadoCorreo === 'declarado') {
+            $this->paso('correo', null, "El cliente dice que $e es su correo y consta como usuario, pero NO está confirmado que sea él: no se dan datos del hotel hasta que lo confirme una persona");
         } else {
             $this->paso('correo', true, "Correo $e verificado en: " . implode('; ', array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /'), $sitios)), ['correo' => $e, 'sitios' => array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /'), $sitios)]);
         }
@@ -1554,6 +1571,14 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if ($dir && ! $this->coincideHotel($dir, $sitiosTodos)) {
             return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "», pero su correo ($e) no figura asociado a ese hotel en la aplicación.\n"
                 . "- Explícaselo con tacto: con el correo que nos indica no podemos asociarle a ese hotel en nuestro sistema.\n" . $pedir . $tacto . $comun . $derivar;
+        }
+        if ($this->estadoCorreo === 'declarado') {
+            return $cab . "- El cliente DICE que su correo es ($e) y ese correo consta como usuario de la aplicación, pero NADIE HA CONFIRMADO que quien escribe sea esa persona (cualquiera puede escribir un correo ajeno).
+"
+                . "- NO des datos de ningún hotel, antena, etiqueta, rol ni usuario, NO digas en qué hoteles figura ese correo y NO expliques pasos que dependan de su hotel. Puedes responder lo general que no revele datos.
+"
+                . "- Dile con tacto que un compañero del equipo confirmará sus datos y le atenderá personalmente.
+" . $comun . $derivar;
         }
         $s = $cab
             . "- VERIFICADO: el correo del cliente ($e) figura como usuario activo de la aplicación de hoteles en: "
