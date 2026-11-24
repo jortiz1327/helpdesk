@@ -3,6 +3,15 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.8] — 2026-11-24
+
+### Mejoras
+
+- La sugerencia verifica siempre el correo del remitente del ticket (`contextoHotelBase`); si el texto trae otro correo, se comprueba aparte (`correosMencionados`) y se cuenta a la IA como dato de ese correo, no del remitente. Si el cliente dice que el correo es suyo (`correoPropioEnTexto`) o el contacto no tiene correo, se usa el del texto. Fila «Otro correo» en el panel.
+- Búsqueda de la memoria: reglas de sinónimos por tema (conectividad, posiciones, ruedas, isletas) y comando `ai:evaluar-busqueda` (sin IA): el manual correcto sale en 89 % de los casos de prueba frente a 68 %.
+- Manual de hoteles 23: la sección «Cambiar de rueda para unas fechas» pasa antes de «Revertir cambios».
+- Sin migraciones. Al desplegar: `php artisan ai:indexar`.
+
 ## [1.6.7] — 2026-11-24
 
 ### Arreglos

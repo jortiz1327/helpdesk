@@ -51,6 +51,8 @@ class AiSuggestionService
     private ?string $hotelAmbiguo = null;
     /** Lo que se supo del correo y del hotel en la última consulta a AdminHoteles (para decidir en código). */
     private ?string $estadoCorreo = null;
+    /** Correo con el que se ha verificado a quien escribe (el remitente, o el que dice ser suyo); los demás correos del texto se comprueban aparte. */
+    private string $correoVerificado = '';
     /** El cliente nombra un sitio y el listado de hoteles del panel (consultado, no caído) no lo conoce: quizá no sea un hotel. */
     private bool $hotelNoEncontrado = false;
     private bool $hotelLocalizado = false;
@@ -1200,13 +1202,72 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $this->hotelLocalizado = false;
         $this->hotelSinApi = false;
         $this->hotelNoEncontrado = false;
+        $this->correoVerificado = '';
         $s = $this->contextoHotelBase($contactEmail, $codigos, $textoCliente, $nombreContacto, $contactId);
+        if ($s !== '') {
+            $s .= $this->correosMencionados($textoCliente, (string) $contactEmail);
+        }
         if ($s !== '' && $this->hotelAmbiguo !== null) {
             // El nombre encaja con varios hoteles (p. ej. «Hotel Poseidón» hay más de uno): nunca se asume cuál es.
             // No se enumeran los hoteles al cliente: solo se le pide el nombre completo.
             $s .= "- AMBIGUO: el nombre «" . $this->hotelAmbiguo . "» corresponde a VARIOS hoteles. NO asumas cuál es y NO des datos de ninguno: "
                 . "pregúntale simplemente el nombre completo del hotel antes de seguir. NO le digas que hay varios hoteles con ese nombre ni nombres otros: "
                 . "quien escribe podría no ser del hotel y no debe saber qué hoteles existen.\n";
+        }
+        return $s;
+    }
+
+    /** Correos escritos en el texto, sin repetir (mayúsculas aparte). */
+    public static function correosEnTexto(string $texto): array
+    {
+        preg_match_all('/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/', $texto, $m);
+        $vistos = [];
+        foreach ($m[0] as $c) {
+            $c = rtrim($c, '.');
+            $vistos[mb_strtolower($c)] ??= $c;
+        }
+        return array_values($vistos);
+    }
+
+    /** El correo que el cliente dice que es SUYO («mi usuario es x@…», «accedo con x@…»), o null. */
+    public static function correoPropioEnTexto(string $texto): ?string
+    {
+        $re = '/\b(mi\s+(?:correo|e-?mail|usuario|cuenta)|(?:accedo|entro|accedemos|entramos|me\s+conecto|inicio\s+sesi[oó]n)\s+(?:con|usando)|(?:uso|usamos|utilizo)\s+el\s+(?:correo|usuario))\b[^@\n]{0,40}?([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})/iu';
+        return preg_match($re, $texto, $m) ? rtrim($m[2], '.') : null;
+    }
+
+    /**
+     * Otros correos del mensaje (no el verificado como remitente): se comprueban en AdminHoteles y se cuentan como DATO sobre un correo
+     * mencionado, para que la IA sepa, por ejemplo, que el usuario que se pide crear ya existe y en qué hoteles. Máximo 2.
+     */
+    private function correosMencionados(string $texto, string $contactEmail): string
+    {
+        $api = app(HotelsApi::class);
+        if (! $api->configured()) {
+            return '';
+        }
+        $propios = array_filter([mb_strtolower($this->correoVerificado), mb_strtolower(trim($contactEmail))]);
+        $otros = array_slice(array_values(array_filter(self::correosEnTexto($texto), fn ($c) => ! in_array(mb_strtolower($c), $propios, true))), 0, 2);
+        $s = '';
+        foreach ($otros as $c) {
+            $v = $api->verificar($c);
+            $activos = array_values(array_filter($v['sitios'] ?? [], fn ($x) => ($x['activo'] ?? true) !== false));
+            if ($v['estado'] === 'encontrado' && $activos) {
+                $lista = implode('; ', array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /') . (! empty($x['rol']) ? ' (rol «' . $x['rol'] . '»)' : ''), array_slice($activos, 0, 4)));
+                $dato = "YA es usuario ACTIVO de la aplicación en: $lista";
+                $this->paso('correo_mencionado', true, "Correo mencionado en el mensaje, $c: ya es usuario activo en " . $lista, ['correo' => $c]);
+            } elseif ($v['estado'] === 'encontrado') {
+                $dato = 'figura como usuario pero DESACTIVADO';
+                $this->paso('correo_mencionado', false, "Correo mencionado en el mensaje, $c: figura DESACTIVADO", ['correo' => $c]);
+            } elseif ($v['estado'] === 'no_encontrado') {
+                $dato = 'NO figura como usuario de la aplicación (se puede dar de alta)';
+                $this->paso('correo_mencionado', null, "Correo mencionado en el mensaje, $c: no figura como usuario", ['correo' => $c]);
+            } else {
+                continue;
+            }
+            $s .= "- CORREO QUE EL CLIENTE MENCIONA ($c): $dato. Es un DATO de ese correo, NO de quien escribe: no le atribuyas su rol ni sus hoteles. "
+                . "Deduce por el texto si es otra persona (pide dar de alta o dar acceso a alguien, firma de otro) o el propio cliente, y contesta en consecuencia: "
+                . "si ya existe, díselo y no le expliques cómo crearlo; pregunta solo lo que falte (a qué hotel necesita acceso, qué le falla).\n";
         }
         return $s;
     }
@@ -1275,9 +1336,19 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             $this->paso('hotel', null, 'AdminHoteles no está configurado: no se consulta el hotel');
             return '';
         }
-        // Correo: el que el cliente dice usar (si lo escribe) o, si no, el del contacto del ticket.
-        preg_match_all('/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/', $textoCliente, $m);
-        $e = trim((string) ($m[0][0] ?? $contactEmail));
+        // Correo de QUIEN ESCRIBE: el del contacto del ticket. Un correo escrito en el texto suele ser de un tercero («dad de alta a
+        // fulano@hotel.com») y verificarlo como si fuera el remitente le atribuía el rol y los hoteles de otro. Solo cuando el cliente dice
+        // que ese correo es SUYO («mi usuario es…», «accedo con…»), o si el contacto no tiene correo (WhatsApp), se usa el del texto.
+        // Los demás correos que mencione se comprueban aparte (ver correosMencionados) para poder hablar de ellos con datos.
+        $e = trim((string) $contactEmail);
+        $propio = self::correoPropioEnTexto($textoCliente);
+        if ($propio !== null && mb_strtolower($propio) !== mb_strtolower($e)) {
+            $e = $propio;
+        }
+        if ($e === '') {
+            $e = self::correosEnTexto($textoCliente)[0] ?? '';
+        }
+        $this->correoVerificado = $e;
         // Un pedido de material no necesita saber si las antenas están en línea ni qué rol tiene el usuario: no se consulta ni se cuenta.
         $pedido = self::esPedido($textoCliente);
         // Hotel: el que el cliente nombra, buscado en el inventario del panel.

@@ -2,8 +2,19 @@
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión. Formato de cada una:
 //   { version: "1.6.4", date: "24 nov 2026", resumen: "…", mejoras: ["…"], arreglos: ["…"] }
 // Las series (1.6, 1.5…) y las subversiones (1.6.4, 1.6.3…) las agrupa solas la ventana de Novedades.
-export const APP_VERSION = "1.6.7";
+export const APP_VERSION = "1.6.8";
 export const VERSIONS = [
+    {
+        version: "1.6.8",
+        date: "24 nov 2026",
+        resumen: "La IA distingue el correo de quien escribe del de otra persona que se menciona, y la búsqueda de manuales entiende mejor cómo habla el cliente.",
+        mejoras: [
+            "La sugerencia comprueba SIEMPRE el correo de quien envía el ticket. Si en el mensaje aparece otro correo (por ejemplo, alguien a quien dar de alta), también se comprueba y se cuenta aparte: si ya es usuario, la IA lo sabe y no explica cómo crearlo.",
+            "Si el cliente dice que el correo es suyo («mi usuario es…», «accedo con…»), se usa ese. En el panel aparece la fila «Otro correo».",
+            "La búsqueda de manuales reconoce más formas de decir lo mismo (antenas y conectividad, posiciones, ruedas y buffet, isletas): el manual correcto sale en más casos.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.6.7",
         date: "24 nov 2026",

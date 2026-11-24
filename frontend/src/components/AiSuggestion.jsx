@@ -12,7 +12,7 @@ import { useToast } from '../App.jsx'
  * sobre todo, valorarlo: «Útil», o «Corregir» con lo que debía decir. Esa
  * valoración se guarda y alimenta las siguientes sugerencias.
  * ---------------------------------------------------------------------- */
-const ROTULO = { filtro: 'Filtro', hotel: 'Hotel', correo: 'Correo', rol: 'Usuario', antenas: 'Antenas', etiqueta: 'Etiqueta', memoria: 'Memoria', busqueda: 'Búsqueda' }
+const ROTULO = { filtro: 'Filtro', hotel: 'Hotel', correo: 'Correo', correo_mencionado: 'Otro correo', historial: 'Historial', rol: 'Usuario', antenas: 'Antenas', etiqueta: 'Etiqueta', memoria: 'Memoria', busqueda: 'Búsqueda' }
 const TIPO = { manual: 'Manual', ticket: 'Ticket parecido', correccion: 'Corrección', plantilla: 'Plantilla' }
 // Motivos de un 👎 rápido (un clic): deben coincidir con AiSuggestionService::MOTIVOS.
 const MOTIVOS = { tema: 'Se equivocó de tema', dato: 'Faltó un dato o preguntó de más', derivar: 'Debía pasarlo a una persona', responder: 'Podía responder y no lo hizo', inventa: 'Inventó o dio algo incorrecto', tono: 'Tono o redacción' }
