@@ -23,11 +23,11 @@ No hay un manual general: cada área se genera o se escribe de una forma distint
 
 | Área | Cómo se hace el manual | Quién lo actualiza | Cuándo |
 |---|---|---|---|
-| Hoteles | Lo genera Claude leyendo el proyecto web de hoteles (un prompt lanzado en la raíz de ese proyecto) | Juan, volviendo a lanzar ese prompt | Cuando cambia la aplicación de hoteles |
+| Hoteles | Lo genera Claude leyendo el proyecto web de hoteles (un prompt lanzado en la raíz de ese proyecto) | Robert, volviendo a lanzar ese prompt | Cuando cambia la aplicación de hoteles |
 | Soporte: protocolos | Lo escribe Juan a partir de los chats reales del equipo | Juan | Cuando el equipo cambia un protocolo o decide algo nuevo |
 | Portal del cliente (PDF) | Lo generó Claude hace meses; sigue sin revisarse | Pendiente de decidir: comprobar si sigue siendo cierto y regenerarlo | La tarjeta lo marca «Toca revisar» cada 90 días |
-| Farmacias | Se hará igual que hoteles: un prompt en la raíz del proyecto de farmacias que documente toda la aplicación | Juan | Cuando haya API y cambie AdminFarm |
-| Tiendas y Cloud | Sin definir cómo se documentará | Sin asignar | Pendiente |
+| Farmacias | Se hará igual que hoteles: un prompt en la raíz del proyecto de farmacias que documente toda la aplicación | Diego | Cuando haya API y cambie AdminFarm |
+| Tiendas y Cloud | Sin definir cómo se documentará | Juan, cuando se haga | Pendiente |
 
 Fuera de los manuales, hay dos cosas que se editan en la aplicación, sin tocar código: las **plantillas de respuesta** (Respuestas rápidas) y las **correcciones** de los agentes, que valida quien configura el asistente desde Ajustes.
 
