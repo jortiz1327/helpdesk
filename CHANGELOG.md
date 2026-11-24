@@ -3,6 +3,14 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.9] — 2026-11-24
+
+### Mejoras
+
+- Ajustes › Chat de pruebas IA (`AiPruebasController`, `ai_pruebas.php`, permiso `support.config`): conversaciones de prueba con la IA dentro de la aplicación, sin enviar nada a clientes. Validación obligatoria de cada respuesta, autor en conversaciones y correcciones, retirar/restaurar correcciones de la memoria y tope propio de 20 €/mes (`ai.lab_budget_month_eur`).
+- Migración `add_authors_to_ai_lab` (columnas de autor y de retirada). Las páginas antiguas `/ia` siguen solo en local.
+- Sin importar datos de local: las tablas del chat de pruebas empiezan vacías en producción.
+
 ## [1.6.8] — 2026-11-24
 
 ### Mejoras

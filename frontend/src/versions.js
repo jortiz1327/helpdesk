@@ -2,8 +2,20 @@
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión. Formato de cada una:
 //   { version: "1.6.4", date: "24 nov 2026", resumen: "…", mejoras: ["…"], arreglos: ["…"] }
 // Las series (1.6, 1.5…) y las subversiones (1.6.4, 1.6.3…) las agrupa solas la ventana de Novedades.
-export const APP_VERSION = "1.6.8";
+export const APP_VERSION = "1.6.9";
 export const VERSIONS = [
+    {
+        version: "1.6.9",
+        date: "24 nov 2026",
+        resumen: "Nuevo Chat de pruebas de la IA en Ajustes: los agentes de soporte pueden probar la IA y enseñarle con sus correcciones, sin enviar nada a ningún cliente.",
+        mejoras: [
+            "Ajustes › Chat de pruebas IA: escribes como si fueras el cliente y la IA contesta como en un ticket. Nada se envía a nadie.",
+            "Cada respuesta hay que validarla («está bien» o «hay que corregirla») antes de seguir; lo corregido enseña a la IA y queda con el nombre de quien lo escribió.",
+            "«Correcciones guardadas»: se ve quién escribió cada una y se puede retirar de la memoria de la IA (y restaurar).",
+            "Tiene su propio tope de gasto: 20 € al mes.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.6.8",
         date: "24 nov 2026",
