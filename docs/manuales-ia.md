@@ -42,3 +42,15 @@ No se envían correos ni avisos: se ve al entrar en Ajustes.
 - Si algo lo hace el equipo y no el cliente, dilo explícito (p. ej. «el alta de etiquetas en Conectividad la hace solo el administrador»).
 - No contradecir `resources/ai/prompt-reglas.md` (las reglas de decisión mandan; los manuales explican el cómo).
 - Si el manual cambia una regla (qué se deriva, qué se explica), cambiar también las reglas y `/ia/flujo`.
+
+## Revisión periódica: contradicciones y documentos desfasados
+
+Cada lunes a las 05:00 (y cuando se pulsa **Revisar ahora** en Ajustes › Asistente IA › «Revisión del conocimiento») corre `php artisan ai:revisar-conocimiento`. No usa ningún proveedor de IA, así que no gasta nada. Hace tres cosas:
+
+1. **Contradicciones**: compara los manuales (`resources/ai-docs/`), las reglas (`resources/ai/`), los criterios base, las correcciones validadas y las plantillas con los **hechos vigentes** que están en `App\Services\Ai\CoherenciaConocimiento::hechos()` (el único correo que se da es el de postventa, para garantías no se da correo, VARTA no vale, la pila es la CR2450, el reinicio es de 15 minutos, «Añadir etiqueta» de Conectividad es solo de la plataforma, las garantías de farmacia son de Expofarm). También comprueba que cada regla importante esté escrita donde toca (`omisiones()`: por ejemplo, las tres fotos en el protocolo, en las reglas de derivación y en el prompt).
+2. **Respuestas antiguas que engañan**: los tickets antiguos indexados cuya respuesta del equipo contradice un hecho se marcan como **desfasados** (solo sirven para entender el problema, no para copiar la respuesta). Además se repite `ai:limpiar-conocimiento` (contraseñas tapadas y lo que hoy hace el propio hotel).
+3. **Aviso**: la tarjeta de Ajustes enseña la fecha de la última revisión, las contradicciones encontradas (dónde están y la frase) y cuántos casos están desfasados.
+
+**Qué hacer cuando hay contradicciones:** corregir el manual, la regla o la plantilla afectada (las plantillas se editan en la aplicación; los manuales y reglas, en el repositorio), pulsar «Actualizar conocimiento» y volver a pulsar «Revisar ahora».
+
+**Cuando la dirección cambia una decisión** (por ejemplo, otro correo de postventa o otra marca de pila): se cambia el hecho en `CoherenciaConocimiento` y en su prueba (`tests/Feature/CoherenciaConocimientoTest.php`) a la vez que los manuales. Esa prueba también falla si alguien deja un manual o regla del repositorio que contradiga un hecho, así que una contradicción nueva en `resources/` no llega a desplegarse.

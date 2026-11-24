@@ -204,6 +204,7 @@ class AiSuggestionService
             'medicion' => \Illuminate\Support\Facades\Cache::remember('ai_medicion', 600, fn () => $this->medicion()),
             'docs_pending' => $this->knowledge->documentacionPendiente(),
             'manuales'   => ManualesCatalogo::resumen(),
+            'revision'   => CoherenciaConocimiento::resumen(),
         ];
     }
 

@@ -45,6 +45,7 @@ class AiSuggestionsController extends Controller
             'admin_apps' => $this->post($request) ?? $this->adminApps($request),
             'admin_index' => $this->post($request) ?? $this->adminIndex($request),
             'admin_manual' => $this->post($request) ?? $this->adminManual($request),
+            'admin_revisar' => $this->post($request) ?? $this->adminRevisar($request),
             'admin_review' => $this->post($request) ?? $this->adminReview($request),
             'admin_history' => $this->adminHistory($request),
             default     => response()->json(['ok' => true, 'enabled' => $this->ai->enabled()]),
@@ -110,6 +111,15 @@ class AiSuggestionsController extends Controller
             return response()->json(['ok' => false, 'error' => 'Área no encontrada'], 404);
         }
         return response()->json(['ok' => true] + $this->ai->panel());
+    }
+
+    /** Revisar ahora la coherencia del conocimiento: contradicciones y respuestas antiguas desfasadas (support.config; sin gasto de IA). */
+    private function adminRevisar(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        \Illuminate\Support\Facades\Artisan::call('ai:limpiar-conocimiento');
+        $r = \App\Services\Ai\CoherenciaConocimiento::ejecutar(true);
+        return response()->json(['ok' => true, 'total' => $r['total'], 'tickets_marcados' => $r['tickets_marcados']] + $this->ai->panel());
     }
 
     /** Validar / rechazar / dejar pendiente una corrección de un agente (support.config). */

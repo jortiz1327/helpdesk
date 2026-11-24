@@ -50,6 +50,9 @@ return [
         'cloud'     => ['nombre' => 'Cloud (etiquetas y ESLAdmin)', 'carpeta' => 'cloud', 'revision_dias' => 60, 'estado' => 'sin_manuales', 'descripcion' => 'Sin manuales todavía (bloque L: conexión con el Cloud)'],
     ],
 
+    // Correos que la IA puede dar al cliente (la revisión de coherencia avisa si un manual o regla da otro). Ver CoherenciaConocimiento.
+    'correos_permitidos' => ['postventa@aemegroup.com'],
+
     // Puntuación mínima absoluta FULLTEXT (0 = solo cuenta la relativa al mejor resultado; subirla con datos reales si se cuelan casos poco relacionados).
     'knowledge_min_score' => (float) env('AI_KNOWLEDGE_MIN_SCORE', 0.0),
     // Al derivar se le dice al cliente «será derivada al departamento X». Pasar a true cuando el ticket se asigne solo (fase 3): «ha sido derivada».

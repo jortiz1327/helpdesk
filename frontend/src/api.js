@@ -503,6 +503,7 @@ export const api = {
   aiAdminManual: (area) => req('ai_suggestions.php?action=admin_manual', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ area }),
   }),
+  aiAdminRevisar: () => req('ai_suggestions.php?action=admin_revisar', { method: 'POST' }),
   aiAdminHistory: (filter = '', q = '', offset = 0) => req('ai_suggestions.php?action=admin_history&filter=' + encodeURIComponent(filter) + '&q=' + encodeURIComponent(q) + '&offset=' + offset),
   aiAdminIndex: () => req('ai_suggestions.php?action=admin_index', { method: 'POST' }),
   aiAdminReview: (id, status) => req('ai_suggestions.php?action=admin_review', {

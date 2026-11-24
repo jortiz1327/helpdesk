@@ -53,6 +53,13 @@ export default function AiSettings() {
     if (r?.ok) { setD(r); toast('Área marcada como revisada hoy') }
     else toast(r?.error || 'No se pudo marcar', 'err')
   }
+  const revisarConocimiento = async () => {
+    setBusy(true)
+    const r = await api.aiAdminRevisar()
+    setBusy(false)
+    if (r?.ok) { setD(r); toast(r.total ? `Revisión hecha: ${r.total} contradicción${r.total > 1 ? 'es' : ''} por corregir` : 'Revisión hecha: sin contradicciones') }
+    else toast(r?.error || 'No se pudo revisar', 'err')
+  }
   const indexar = async () => {
     setBusy(true)
     const r = await api.aiAdminIndex()
@@ -178,6 +185,7 @@ export default function AiSettings() {
       </div>
 
       {d.manuales && <AiManuales areas={d.manuales} busy={busy} onRevisado={marcarManual} />}
+      {d.revision && <AiRevision r={d.revision} busy={busy} onRevisar={revisarConocimiento} />}
 
       <div className="card em-card" style={{ marginTop: 12 }}>
         <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Lo que la IA no ha sabido hacer</h3>
@@ -312,6 +320,40 @@ function AiManuales({ areas, busy, onRevisado }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/* Revisión periódica de la memoria: contradicciones entre manuales, reglas y casos, y respuestas antiguas desfasadas. */
+const NIVEL_REV = { ok: 'Sin contradicciones', contradicciones: 'Hay contradicciones', retrasada: 'Revisión retrasada', sin_revisar: 'Sin revisar todavía' }
+function AiRevision({ r, busy, onRevisar }) {
+  const u = r.ultima
+  const hallazgos = u ? [...(u.ficheros || []), ...(u.base || [])] : []
+  const nivel = r.nivel === 'ok' ? 'ok' : r.nivel === 'sin_revisar' ? 'sin_uso' : r.nivel === 'contradicciones' ? 'mal' : 'aviso'
+  return (
+    <div className="card em-card" style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Revisión del conocimiento</h3>
+      <p className="em-desc">Cada lunes se comprueba, sin gastar IA, que los manuales, las reglas, las correcciones y las plantillas no se contradigan con lo decidido (correo de postventa, pilas, fotos antes de Garantías…) y se marcan como desfasadas las respuestas antiguas del equipo que lo contradicen: solo sirven para entender el caso, no para copiarlas.</p>
+      <section className="ai-api" data-level={nivel} aria-label="Revisión del conocimiento">
+        <header>
+          <b>{u ? 'Última revisión: ' + fecha(u.fecha.slice(0, 10)) : 'Aún no se ha revisado'}</b>
+          <span className="ai-api-n" data-level={nivel}>{NIVEL_REV[r.nivel]}</span>
+        </header>
+        <dl className="ai-api-k">
+          <div><dt>Contradicciones</dt><dd className={u && u.total ? 'mal' : ''}>{u ? u.total : '—'}</dd></div>
+          <div><dt>Casos desfasados</dt><dd>{r.tickets_desfasados} de {r.tickets_total}</dd></div>
+          <div><dt>Casos excluidos</dt><dd>{r.tickets_excluidos}</dd></div>
+          <div><dt>Se repite cada</dt><dd>{r.cada_dias} d</dd></div>
+        </dl>
+        {hallazgos.length > 0 && (
+          <ul className="ai-api-err" style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+            {hallazgos.map((h, i) => (
+              <li key={i}><b>{h.titulo}</b> · {h.donde}<br /><small className="muted">{h.texto}</small></li>
+            ))}
+          </ul>
+        )}
+        <button className="btn sm ghost" disabled={busy} onClick={onRevisar}><Icon.refresh /> Revisar ahora</button>
+      </section>
     </div>
   )
 }
