@@ -3,6 +3,23 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.6] — 2026-11-24
+
+### Mejoras
+
+- Manual propio de pilas y baterías (`resources/ai-docs/soporte/pilas-y-baterias.md`): referencia CR2450 (AM-BZ2450), marcas compatibles (Beidongli, HenliMax, NSN; VARTA no), pedidos de material por correo de postventa, señales de pila baja y vida útil por ciclos.
+- Garantía según contexto (`AiSuggestionService::decidir`): la palabra «garantía» sola no deriva; seguimiento, lote grande, daño (LED rojo, rota, humedad) o «ya enviamos» sí; los síntomas del protocolo siguen el protocolo. Antes de derivar a Garantías se piden tres fotos por etiqueta. Pedidos con «encargar» y «tapas» cuentan como material.
+- Reinicio de la etiqueta: 30 minutos en todos los sitios (manuales, reglas, criterio base, plantillas).
+- Departamentos de derivación (Garantías, Postventa, Soporte, Proyectos) con la frase «será derivada al departamento de X».
+- Vocabulario del cliente en el prompt (tarjetitas, carteles = etiquetas; LCD, TV y tótems = pantallas grandes) y `buscar_memoria` como herramienta interna de la IA.
+- Ajustes › Asistente IA: «Manuales por área» (`ManualesCatalogo`, `config('ai.areas')`, fechas de revisión en `ai_manuales_revisado`), «Revisión del conocimiento» (`CoherenciaConocimiento`, `php artisan ai:revisar-conocimiento`, cada lunes 05:00) y estado de cada API (`ApiMonitor`).
+- Guía del portal del cliente v1.1 con generador reproducible (`resources/manuals-src/04-cliente.php`).
+- Proceso de mantenimiento de los manuales y responsables por área en `docs/manuales-ia.md`.
+- Sin migraciones. Al desplegar: `php artisan ai:indexar` (manual de pilas, criterio base y guía del cliente).
+
+### Arreglos
+
+- Pedir pilas o tapas («encargar 10 pilas») ya no se trata como una incidencia.
 ## [1.6.5] — 2026-11-24
 
 ### Mejoras

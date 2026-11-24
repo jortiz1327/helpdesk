@@ -2,8 +2,28 @@
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión. Formato de cada una:
 //   { version: "1.6.4", date: "24 nov 2026", resumen: "…", mejoras: ["…"], arreglos: ["…"] }
 // Las series (1.6, 1.5…) y las subversiones (1.6.4, 1.6.3…) las agrupa solas la ventana de Novedades.
-export const APP_VERSION = "1.6.5";
+export const APP_VERSION = "1.6.6";
 export const VERSIONS = [
+    {
+        version: "1.6.6",
+        date: "24 nov 2026",
+        resumen: "La IA conoce mejor las pilas y las garantías, sabe a qué departamento pasa cada caso y los manuales tienen un proceso claro para mantenerse al día.",
+        mejoras: [
+            "Pilas y baterías: manual propio con la pila que usan las etiquetas (CR2450), qué marcas valen (Beidongli, HenliMax o NSN; VARTA no), cuándo es un pedido de material y cómo saber que la pila está baja.",
+            "Garantías según el contexto: pedir pilas o reponer material no es una garantía; un seguimiento, un lote grande o una etiqueta dañada sí pasa a Garantías. Antes de pasar el caso, la IA pide tres fotos por etiqueta (de frente, y la parte trasera con y sin pilas).",
+            "El reinicio de la etiqueta es de 30 minutos con las pilas fuera, en todas las respuestas, plantillas y manuales.",
+            "Vida útil de la pila medida en ciclos (orientativa, nunca en meses), con lo que significa cada color de la batería.",
+            "Al pasar un caso a una persona, la IA dice a qué departamento va (Garantías, Postventa, Soporte o Proyectos).",
+            "La IA entiende que «tarjetitas» o «carteles» son etiquetas, y distingue las pantallas grandes (LCD, televisores, tótems) de las etiquetas.",
+            "La IA consulta por su cuenta los manuales y los casos anteriores al redactar la respuesta.",
+            "Ajustes › Asistente IA: tarjeta «Manuales por área» (qué manuales tiene la IA, si están al día y cuándo se revisaron) y tarjeta «Revisión del conocimiento», que cada lunes busca manuales, reglas o plantillas que se contradigan y marca como antiguas las respuestas que ya no valen.",
+            "Ajustes › Asistente IA: estado de cada servicio que usa la IA (llamadas, fallos y tiempos).",
+            "Guía del portal del cliente actualizada (v1.1): código de 6 dígitos, consulta del estado sin entrar, teléfono opcional, salir, horario, idiomas y fases de la incidencia.",
+        ],
+        arreglos: [
+            "Pedir pilas, tapas o soportes («quería encargar 10 pilas») ya no se confunde con una incidencia.",
+        ],
+    },
     {
         version: "1.6.5",
         date: "24 nov 2026",
