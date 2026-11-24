@@ -19,13 +19,15 @@ un `.md` en su carpeta (empieza con `# Título`).
 
 ## Quién mantiene cada manual
 
-No hay un manual general: cada área se genera o se escribe de una forma distinta, y por eso cambia quién lo actualiza y cómo.
+No hay un manual general: cada área se genera o se escribe de una forma distinta, y por eso cambia quién conoce el cambio y quién aporta el material.
 
-| Área | Cómo se hace el manual | Quién lo actualiza | Cuándo |
+**Quien lleva el proceso en este proyecto es Claude, en esta conversación.** Cuando cambia algo, la persona responsable del área (columna «Responsable») avisa a Juan, Juan avisa a Claude, y Claude actualiza el manual, las reglas y las pruebas, y deja lista la subida. La persona responsable aporta el material (el manual regenerado con su prompt, o el cambio de protocolo); Claude lo integra, lo revisa y lo mantiene coherente. Desplegar sigue haciéndose solo cuando Juan lo ordena.
+
+| Área | Cómo se hace el manual | Responsable (aporta el material) | Cuándo |
 |---|---|---|---|
 | Hoteles | Lo genera Claude leyendo el proyecto web de hoteles (un prompt lanzado en la raíz de ese proyecto) | Robert, volviendo a lanzar ese prompt | Cuando cambia la aplicación de hoteles |
 | Soporte: protocolos | Lo escribe Juan a partir de los chats reales del equipo | Juan | Cuando el equipo cambia un protocolo o decide algo nuevo |
-| Portal del cliente (PDF) | Lo generó Claude hace meses; sigue sin revisarse | Pendiente de decidir: comprobar si sigue siendo cierto y regenerarlo | La tarjeta lo marca «Toca revisar» cada 90 días |
+| Portal del cliente (PDF) | Lo generó Claude hace meses; sigue sin revisarse | Claude, con la ayuda de Juan: comprobar si sigue siendo cierto y regenerarlo | La tarjeta lo marca «Toca revisar» cada 90 días |
 | Farmacias | Se hará igual que hoteles: un prompt en la raíz del proyecto de farmacias que documente toda la aplicación | Diego | Cuando haya API y cambie AdminFarm |
 | Tiendas y Cloud | Sin definir cómo se documentará | Juan, cuando se haga | Pendiente |
 
@@ -33,8 +35,8 @@ Fuera de los manuales, hay dos cosas que se editan en la aplicación, sin tocar 
 
 ## Proceso cuando cambia la aplicación
 
-1. **Detectar el cambio**: lo avisa quien conoce el cambio (desarrollo o el equipo de soporte). Si nadie avisa, la tarjeta **Manuales por área** marca «Toca revisar» al pasar el plazo de cada área.
-2. **Actualizar el manual** del área afectada según la tabla de arriba (volver a generarlo con Claude o editar el `.md`), con los nombres de pantallas y botones tal como aparecen en la app.
+1. **Avisar del cambio**: el responsable del área avisa a Juan y Juan se lo dice a Claude aquí. Si nadie avisa, la tarjeta **Manuales por área** marca «Toca revisar» al pasar el plazo de cada área.
+2. **Actualizar el manual** (lo hace Claude con el material del responsable): editar el `.md` o integrar el manual regenerado, con los nombres de pantallas y botones tal como aparecen en la app.
 3. **Desplegar** (commit y despliegue normal).
 4. En **Ajustes › Asistente IA**, pulsar **Actualizar conocimiento**: la IA carga los manuales nuevos o cambiados y olvida los borrados. Aunque no se pulse, `ai:indexar` corre cada noche a las 04:30.
 5. Pulsar **Revisado hoy** en la tarjeta de esa área (**Manuales por área**). La fecha se guarda en la base de datos, no en el repositorio.
