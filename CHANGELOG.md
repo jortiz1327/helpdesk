@@ -3,6 +3,13 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.7] — 2026-11-24
+
+### Arreglos
+
+- Ajustes › Asistente IA no se abría («Algo ha fallado»): `AiBudget` (tope mensual) y `AiAppsAjenas` se habían borrado por error al añadir el estado de las APIs. Restaurados, con una prueba que comprueba que cada componente usado está definido.
+- «Sugerir» daba HTTP 400 cuando el hilo de WhatsApp no tenía ningún mensaje del cliente con texto (solo fotos y una respuesta del equipo): ya no se manda una petición sin mensajes.
+
 ## [1.6.6] — 2026-11-24
 
 ### Mejoras

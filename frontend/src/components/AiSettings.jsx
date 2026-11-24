@@ -405,3 +405,53 @@ function AiPanelApis({ apis, hoteles }) {
 }
 
 
+
+/* Tope mensual: barra de gasto del mes natural, aviso al 80 % y al 100 %, gasto por día y tope editable. */
+function AiBudget({ b, busy, onSave }) {
+  const [v, setV] = useState(String(b.limit))
+  useEffect(() => { setV(String(b.limit)) }, [b.limit])
+  const pct = Math.min(100, b.pct ?? 0)
+  const max = Math.max(0.0001, ...b.days.map((x) => x.cost))
+  const fecha = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+  const aviso = b.level === 'over'
+    ? `Tope alcanzado: la IA no sugiere a los agentes hasta el ${fecha(b.resets)}. Sube el tope aquí si hay que seguir.`
+    : b.level === 'warn' ? `Llevas el ${Math.round(b.pct)} % del tope mensual. Al llegar al 100 % la IA dejará de sugerir hasta el ${fecha(b.resets)}.` : null
+  return (
+    <div className="card em-card ai-budget" data-level={b.level} style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Tope mensual de gasto</h3>
+      {aviso ? <p className="ai-budget-aviso" role="alert">{aviso}</p> : null}
+      <div className="ai-budget-top">
+        <b>{euros(b.spent)}</b><span className="muted"> de {b.limit > 0 ? euros(b.limit) : 'sin tope'} · {fecha(b.from)} a fin de mes{b.pct != null ? ` · ${b.pct.toString().replace('.', ',')} %` : ''}</span>
+      </div>
+      {b.limit > 0 ? <div className="ai-budget-bar" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}><i style={{ width: pct + '%' }} /></div> : null}
+      {b.days.length > 0 && (
+        <div className="ai-budget-days" aria-label="Gasto por día">
+          {b.days.map((x) => <span key={x.dia} title={`${fecha(x.dia)}: ${euros(x.cost)} · ${x.calls} llamadas`}><i style={{ height: Math.max(4, x.cost / max * 100) + '%' }} /></span>)}
+        </div>
+      )}
+      <form className="ai-budget-form" onSubmit={(e) => { e.preventDefault(); onSave(Number(v.replace(',', '.'))) }}>
+        <label>Tope al mes (USD, 0 = sin tope) <input className="input" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} /></label>
+        <button className="btn" disabled={busy}>Guardar</button>
+      </form>
+      <p className="em-desc" style={{ marginTop: 8 }}>
+        Cuenta solo las sugerencias de los agentes (mes natural; se reinicia el día 1). Los chats de prueba ({euros(b.lab)} este mes) y las evaluaciones desde la consola no cortan a los agentes. El crédito de Anthropic es compartido por toda la organización: este tope protege la parte del helpdesk.
+      </p>
+    </div>
+  )
+}
+
+/* Hoteles o aplicaciones que no gestionamos nosotros: la IA no contesta y los pasa a una persona. Uno por línea. */
+function AiAppsAjenas({ lista, busy, onSave }) {
+  const [v, setV] = useState(lista.join('\n'))
+  useEffect(() => { setV(lista.join('\n')) }, [lista])
+  return (
+    <div className="card em-card" style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Hoteles o aplicaciones que no gestionamos</h3>
+      <p className="em-desc">Si el cliente (en el asunto, el mensaje o el correo) nombra uno de estos, la IA no contesta: lo pasa a una persona. Escribe uno por línea.</p>
+      <form onSubmit={(e) => { e.preventDefault(); onSave(v) }}>
+        <textarea className="input" rows={4} value={v} onChange={(e) => setV(e.target.value)} aria-label="Hoteles o aplicaciones que no gestionamos" placeholder="Hotel Ejemplo" />
+        <button className="btn" disabled={busy} style={{ marginTop: 8 }}>Guardar lista</button>
+      </form>
+    </div>
+  )
+}

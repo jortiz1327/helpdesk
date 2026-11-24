@@ -2,8 +2,18 @@
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión. Formato de cada una:
 //   { version: "1.6.4", date: "24 nov 2026", resumen: "…", mejoras: ["…"], arreglos: ["…"] }
 // Las series (1.6, 1.5…) y las subversiones (1.6.4, 1.6.3…) las agrupa solas la ventana de Novedades.
-export const APP_VERSION = "1.6.6";
+export const APP_VERSION = "1.6.7";
 export const VERSIONS = [
+    {
+        version: "1.6.7",
+        date: "24 nov 2026",
+        resumen: "Arreglo urgente: Ajustes › Asistente IA vuelve a abrirse y «Sugerir» ya no falla en conversaciones de WhatsApp con solo fotos.",
+        mejoras: [],
+        arreglos: [
+            "Ajustes › Asistente IA fallaba al entrar («Algo ha fallado»): vuelven el tope mensual de gasto y la lista de hoteles o aplicaciones que no gestionamos.",
+            "«Sugerir» daba error en conversaciones de WhatsApp donde el cliente solo había mandado fotos o archivos sin texto.",
+        ],
+    },
     {
         version: "1.6.6",
         date: "24 nov 2026",

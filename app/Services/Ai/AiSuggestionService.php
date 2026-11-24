@@ -1111,6 +1111,11 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         while ($out && $out[count($out) - 1]['role'] !== 'user') {
             array_pop($out);
         }
+        // Si no queda ningún mensaje del cliente con texto (p. ej. solo fotos o archivos sin texto y una respuesta del equipo),
+        // la API rechaza la petición vacía (HTTP 400): se le dice qué ha pasado en vez de mandarla sin mensajes.
+        if (! $out) {
+            $out[] = ['role' => 'user', 'content' => '(el cliente ha enviado archivos o imágenes sin texto)'];
+        }
         return $out;
     }
 
