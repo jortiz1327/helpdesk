@@ -51,9 +51,11 @@ Es la prueba previa del protocolo de garantías. Se le va pidiendo al cliente lo
 
 ## Vida útil de la pila
 
-- No damos una duración en meses o años: depende de cuántas veces cambia la etiqueta de contenido. Lo que más gasta es **cambiar de contenido**; comprobar la señal cada minuto gasta poco.
+- No hay una duración oficial en meses o años: depende de cuántas veces cambia la etiqueta de contenido. Lo que más gasta es **cambiar de contenido**; comprobar la señal cada minuto gasta poco.
+- La vida útil se mide en **ciclos**, una estimación propia del equipo (no una medida del fabricante) que es más fiable que la que da el proveedor de la etiqueta o su cloud. Cada refresco de la etiqueta suma 1 ciclo y, si pasó tiempo desde el anterior, suma 1 por cada semana transcurrida (el gasto en reposo).
+- Orden de magnitud: la pila aguanta del orden de **4000 a 5000 ciclos**. En las tiendas el nivel de batería sube cada 1000 ciclos (media, baja, muy baja y agotada pasados los 4000); en los hoteles la aplicación marca naranja pasados 1250, roja «baja» pasados 3750 y roja «vacía» pasados 5000. Es orientativo: cada etiqueta aguanta distinto.
+- Si el cliente pregunta cuánto dura, la IA puede decir que es orientativo y que depende de cuánto cambie el contenido (no promete fechas ni meses); en un hotel le indica dónde ver la batería. Si insiste en una cifra exacta, se deriva a una persona.
 - En un hotel con el buffet pausado (cierre de temporada) las etiquetas apenas gastan pila.
-- Si el cliente pregunta cuánto dura, la IA explica esto y no promete cifras. Si insiste, se deriva a una persona.
 - Las etiquetas antiguas pueden estar fuera del periodo de garantía: eso lo valora una persona (según la fecha de instalación); la IA nunca dice si está cubierta ni propone sustituciones o presupuestos por su cuenta.
 
 ## Línea roja

@@ -677,7 +677,15 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         // conviene comprar otra etiqueta; envíenme presupuesto»).
         $soloCompra = preg_match('/\b(precio|presupuesto)/', $t) && preg_match('/\b(comprar\w*|compra|pinzas|portaetiquetas)\b/', $t)
             && ! preg_match('/\b(no funcion\w*|fallo\w*|fallan|averi\w*|rotas?|rotos?|defectuos\w*|sustitu\w*|reemplaz\w*|no cambia\w*|se apag\w*|en blanco|bloquead\w*|estropead\w*|no enciende|humedad|no carga\w*)\b/', $t);
-        if (preg_match('/\bgarantia/', $t) && ! $farmacia && ! $soloCompra) {
+        // Según el CONTEXTO (decisión de Juan, 24-nov): la palabra «garantía» deriva directo en código salvo cuando el cliente cuenta, con
+        // naturalidad, una etiqueta (o unas pocas) que no responde y habla de pilas, reinicio o forzar sin daño visible: ahí el modelo lee
+        // la conversación y aplica el protocolo (reinicio → pilas de otra etiqueta → tres fotos → Garantías). Siguen derivando en código el
+        // seguimiento de una garantía ya abierta («¿cómo está esto?», «no me han dicho nada», ya enviadas), un lote grande y el daño evidente.
+        $seguimiento = preg_match('/como (esta|va|andan?)\b|no (me|nos) (han|ha) (dicho|contestado|respondido|llamado)|sin (noticias|respuesta)|(estado|seguimiento|situacion) de (la|las|mi|nuestra|esta)|cuando (nos|me|las|los|va)\b|ya (os |les |se )?(envi|mand|entreg)|enviad[oa]s?\b|recibisteis|han recibido|hace (unos |varios )?(dias|semanas|un mes|meses)|numero de (rma|garantia)|\brma\b|retras|reclam/', $t);
+        $sintomaDelProtocolo = preg_match('/\b(no (funcion\w*|cambia\w*|responde\w*|actualiza\w*|enciende)|en blanco|bloquead\w*|se apag\w*|se queda\w* (en )?(negro|blanco)|pilas?|reinici\w*|forz\w*)\b/', $t)
+            && ! preg_match('/\b(rotas?|rotos?|roturas?|humedad|golpe\w*|averi\w*|defectuos\w*|led (rojo|fijo|encendido)|luces?)\b/', $t);
+        $loteGrande = preg_match('/\b(\d{2,} (etiquetas|carteles|pantallas|unidades|equipos|aparatos)|todas|todos|lote|decenas|cientos)\b/', $t);
+        if (preg_match('/\bgarantia/', $t) && ! $farmacia && ! $soloCompra && ! ($sintomaDelProtocolo && ! $seguimiento && ! $loteGrande)) {
             return $derivar('garantias', 'garantía');
         }
         // Problema de uso, primera vez que escribe y no se sabe quién es: se piden hotel y correo (y nada más).

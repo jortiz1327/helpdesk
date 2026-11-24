@@ -80,8 +80,8 @@ class AiDecidirTest extends TestCase
     {
         $compra = 'Estoy revisando su protocolo de garantía. Me gustaría saber el precio de una nueva para valorar comprar otra. Envíenme presupuesto de 2 bolsas de pinzas y una etiqueta.';
         $this->assertNull(AiSuggestionService::decidir($compra, $this->conv('x'), 'verificado', false));
-        // Con un fallo de por medio sigue siendo una garantía, aunque también pidan presupuesto.
-        $this->assertSame('derivar', AiSuggestionService::decidir('La etiqueta no funciona y queremos la garantía. Pasadnos también presupuesto para comprar pinzas.', $this->conv('x'), 'verificado', false)['decision']);
+        // Con un daño evidente de por medio sigue siendo una garantía, aunque también pidan presupuesto.
+        $this->assertSame('derivar', AiSuggestionService::decidir('La etiqueta tiene la pantalla rota y queremos la garantía. Pasadnos también presupuesto para comprar pinzas.', $this->conv('x'), 'verificado', false)['decision']);
         // Y sin pedir precio ni presupuesto, deriva como siempre.
         $this->assertSame('derivar', AiSuggestionService::decidir('Queremos comprar la garantía extendida', $this->conv('x'), 'verificado', false)['decision']);
     }
