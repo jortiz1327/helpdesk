@@ -4670,8 +4670,7 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .pr-l-m em { font-style: normal; font-weight: 700; padding: 1px 7px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
 .pr-vacio-l { font-size: 12.5px; color: var(--ink-3); padding: 8px 4px; }
 .pr-nuevo { display: grid; gap: 10px; padding: 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
-.pr-nuevo label { display: grid; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
-.pr-nuevo label small { font-weight: 400; color: var(--ink-3); }
+.pr-nuevo .field { margin: 0; }
 .pr-nuevo .muted { margin: 0; }
 .pr-chat { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
 .pr-chat-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -4708,8 +4707,9 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .pr-no:hover { background: color-mix(in srgb, var(--danger) 85%, #000); }
 .pr-fix { display: grid; gap: 8px; }
 .pr-fix label { font-size: 13px; font-weight: 600; }
-.pr-fix textarea, .pr-comp-f textarea { width: 100%; resize: vertical; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.5; }
-.pr-fix textarea:focus, .pr-comp-f textarea:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+.pr-fix textarea, .pr-comp-f textarea { width: 100%; resize: vertical; padding: 11px 13px; border: 1.5px solid var(--line-2); border-radius: 10px; background: var(--panel-2); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.5; }
+.pr-fix textarea:focus, .pr-comp-f textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.pr-fix textarea::placeholder, .pr-comp-f textarea::placeholder { color: var(--ink-3); }
 .pr-fix .muted { margin: 0; }
 .pr-espera { justify-self: center; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; border-radius: 10px; font-size: 12.5px; color: var(--ink-2); background: var(--panel); border: 1px solid var(--line); }
 .pr-typing { display: inline-flex; gap: 4px; padding: 3px 0; }

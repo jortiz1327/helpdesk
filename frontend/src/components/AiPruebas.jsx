@@ -144,11 +144,11 @@ export default function AiPruebas() {
             <button className="btn" onClick={() => setNuevo((v) => !v)}><Icon.plus /> Nueva conversación</button>
             {nuevo && (
               <form className="pr-nuevo" onSubmit={crear}>
-                <label>Nombre del «cliente» <small>(opcional)</small>
-                  <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej.: Javier" />
+                <label className="field"><span className="lbl">Nombre del «cliente» <span className="hint">(opcional)</span></span>
+                  <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej.: Javier" />
                 </label>
-                <label>Correo del «cliente» <small>(opcional)</small>
-                  <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nombre@hotel.com" />
+                <label className="field"><span className="lbl">Correo del «cliente» <span className="hint">(opcional)</span></span>
+                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nombre@hotel.com" />
                 </label>
                 <p className="muted">Si pones un correo, la IA lo comprueba de verdad en los hoteles (solo lectura), igual que en un ticket.</p>
                 <button className="btn primary" type="submit" disabled={ocupado}>Empezar</button>
