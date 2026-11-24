@@ -451,6 +451,18 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $hotelNombrado = $this->hotelLocalizado || (bool) $this->nombresDeHotel($textoCliente);
         // Evaluaciones: los casos van anonimizados y sin correo, así que la norma de verificar primero NO se aplica (se mide la decisión de fondo; la norma la cubren los tests).
         $dec = self::decidir($pregunta . ' ' . (string) ($t->subject ?? '') . ' ' . (string) ($t->contact_email ?? ''), $conversacion, $this->estadoCorreo, $hotelNombrado, $this->hotelNoEncontrado || $anonimizar, self::ajenas(), $this->hotelSinApi);
+        // Historial (tickets anteriores del cliente o de su hotel): solo en tickets reales y con el correo ya VERIFICADO.
+        $t->historial = '';
+        if (! $anonimizar && $ticketId && ! empty($t->contact_id) && $this->estadoCorreo === 'verificado') {
+            try {
+                $t->historial = HistorialCliente::para((int) $t->contact_id, $ticketId);
+            } catch (\Throwable $e) {
+                $t->historial = '';
+            }
+            if ($t->historial !== '') {
+                $this->paso('historial', null, 'Historial del cliente añadido como contexto (tickets anteriores suyos o de su hotel)');
+            }
+        }
         $t->decision = $dec ? "\nDECISIÓN YA TOMADA POR EL SISTEMA (obligatoria; no la discutas ni la cambies): " . $dec['instruccion'] . "\n" : '';
         if ($dec) {
             $this->paso('decision', null, 'Decisión fijada en código: ' . $dec['resumen']);
@@ -1605,7 +1617,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $leido = $codigos
             ? "\nCÓDIGO(S) DE BARRAS LEÍDO(S) DE LAS FOTOS DEL CLIENTE (lectura automática fiable): " . implode(', ', $codigos) . ". Úsalo(s) para identificar la etiqueta y menciónalo(s) cuando ayude; no pidas de nuevo el código.\n"
             : ($nFotos ? "\nEL CLIENTE HA ADJUNTADO " . $nFotos . " FOTO(S) pero NO se ha podido leer ningún código de barras en ellas. Si el código hace falta, pide una foto más cercana y frontal, con el código completo y enfocado, sin reflejos, o que lo escriba; no te inventes ningún código.\n" : '');
-        $s .= $leido . ($t->hotel ?? '') . ($t->decision ?? '');
+        $s .= $leido . ($t->hotel ?? '') . ($t->historial ?? '') . ($t->decision ?? '');
         $s .= 'TICKET: ' . ($t->subject ?? '') . ($t->category_name ? ' (categoría: ' . $t->category_name . ')' : '') . ' · canal ' . ($t->channel ?? '') . "\n";
         if (! empty($t->contact_name)) {
             $s .= 'CLIENTE: ' . $t->contact_name . "\n";
