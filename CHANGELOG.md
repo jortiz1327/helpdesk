@@ -3,6 +3,12 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.5] — 2026-11-24
+
+### Mejoras
+
+- Se retira el botón «Resumen del ticket» del editor y el aviso de tickets relacionados (con su atajo de fusionar). Fusionar sigue en el ticket y en la lista. El backend (resumen, relacionados) queda sin uso en la interfaz.
+
 ## [1.6.4] — 2026-11-24
 
 ### Mejoras

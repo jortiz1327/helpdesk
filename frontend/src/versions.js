@@ -2,8 +2,18 @@
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión. Formato de cada una:
 //   { version: "1.6.4", date: "24 nov 2026", resumen: "…", mejoras: ["…"], arreglos: ["…"] }
 // Las series (1.6, 1.5…) y las subversiones (1.6.4, 1.6.3…) las agrupa solas la ventana de Novedades.
-export const APP_VERSION = "1.6.4";
+export const APP_VERSION = "1.6.5";
 export const VERSIONS = [
+    {
+        version: "1.6.5",
+        date: "24 nov 2026",
+        resumen: "Ajuste de limpieza: se retiran dos ayudas del ticket que no se van a usar.",
+        mejoras: [
+            "Se quita el botón «Resumen del ticket» del editor de respuestas.",
+            "Se quita el aviso de tickets parecidos o del mismo cliente con su botón para fusionar. Fusionar sigue disponible desde el propio ticket y desde la lista.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.6.4",
         date: "24 nov 2026",

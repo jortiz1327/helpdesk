@@ -1621,7 +1621,6 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   const [loadErr, setLoadErr] = useState(false)       // no se pudo cargar el ticket (red/servidor)
   const [masOpen, setMasOpen] = useState(false)       // menú «Más ⋯» de acciones secundarias
   const [urgencia, setUrgencia] = useState(null)       // aviso de urgencia según lo último que escribió el cliente
-  const [relacionados, setRelacionados] = useState([]) // tickets duplicados o relacionados (mismo cliente / mismo hotel con problema parecido)
   const masRef = useRef(null)
 
   const can = (p) => (user?.permissions || []).includes(p)
@@ -1661,8 +1660,8 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
   useEffect(() => { load() }, [load])
   useEffect(() => {
     let vivo = true
-    setRelacionados([]); setUrgencia(null)
-    api.ticketRelated(id).then((r) => { if (vivo && r?.ok) { setRelacionados(r.related || []); setUrgencia(r.urgency || null) } }).catch(() => {})
+    setUrgencia(null)
+    api.ticketRelated(id).then((r) => { if (vivo && r?.ok) { setUrgencia(r.urgency || null) } }).catch(() => {})
     return () => { vivo = false }
   }, [id])
 
@@ -2519,24 +2518,6 @@ function TicketModal({ id, meta, user, onClose, onChange, onOpenTicket, onCode }
                 </div>
               )}
 
-              {/* Duplicados o relacionados: avisa para no contestar dos veces lo mismo; fusionar es decisión del agente. */}
-              {view === 'chat' && !t.merged_into_id && !tkCerrado && relacionados.length > 0 && (
-                <div className="tk-relacionados" role="note">
-                  <Icon.merge />
-                  <div>
-                    <b>{relacionados.some((x) => x.similar) ? 'Puede ser el mismo problema que otro ticket' : 'Este cliente tiene otros tickets recientes'}</b>
-                    <ul>
-                      {relacionados.map((x) => (
-                        <li key={x.id}>
-                          <button type="button" className="link" onClick={() => onOpenTicket?.(x.id)}>{x.code}</button> {x.subject || '(sin asunto)'}
-                          <small> · {x.relation === 'cliente' ? 'mismo cliente' : 'mismo hotel'} · {x.days === 0 ? 'hoy' : `hace ${x.days} d`}{x.similar ? ' · parece el mismo problema' : ''}</small>
-                          {x.relation === 'cliente' && <button type="button" className="btn sm ghost" onClick={() => setFusion({ preselect: x.id })}>Fusionar</button>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
               {/* Triaje primero: hasta que no tenga prioridad no se contesta, ni se
                   anota, ni se asigna (lo pidió el responsable de soporte). */}
               {view === 'chat' && !t.merged_into_id && t.priority === 'sin_asignar' && (
