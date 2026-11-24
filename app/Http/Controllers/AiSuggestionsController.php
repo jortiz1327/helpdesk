@@ -16,6 +16,7 @@ use InvalidArgumentException;
  *   GET  ?action=status                  → ¿está activa?
  *   GET  ?action=suggest&ticket=ID       → la sugerencia vigente (la genera si no existe)
  *   GET  ?action=stream&ticket=ID[&regen=1] → igual, pero devuelve cada paso al momento (una línea JSON por paso, NDJSON)
+ *   GET  ?action=search&q=…              → buscador de la memoria (manuales, casos, correcciones, plantillas); sin IA ni gasto
  *   POST ?action=regenerate  ticket      → pide otra
  *   POST ?action=rate  id, rating, correction → 👍 / 👎 (con corrección obligatoria)
  *   POST ?action=used  id                → el agente la usó de base
@@ -36,6 +37,7 @@ class AiSuggestionsController extends Controller
             'suggest'    => $this->suggest($request, false),
             'stream'     => $this->stream($request),
             'summary'    => $this->summary($request),
+            'search'     => $this->search($request),
             'regenerate' => $this->post($request) ?? $this->suggest($request, true),
             'rate'       => $this->post($request) ?? $this->rate($request),
             'used'       => $this->post($request) ?? $this->used($request),
@@ -208,6 +210,30 @@ class AiSuggestionsController extends Controller
         if ($limite = $this->demasiadas($request)) return $limite;
         $r = $this->ai->resumen($ticket, $request->user()->id, $rehacer);
         return response()->json($r + ['enabled' => true], $r['ok'] ? 200 : 503);
+    }
+
+    /**
+     * Buscador de la memoria para el agente («busca en manuales y casos»): solo búsqueda de texto sobre lo ya indexado
+     * (documentos sin datos personales); no llama a la IA ni gasta. No enlaza tickets: los casos salen resumidos.
+     */
+    private function search(Request $request)
+    {
+        if (! $this->ai->enabled()) {
+            return response()->json(['ok' => true, 'enabled' => false, 'results' => []]);
+        }
+        if ($limite = $this->demasiadas($request)) return $limite;
+        $q = $request->query('q');
+        $q = is_string($q) ? trim($q) : '';
+        if (mb_strlen($q) < 3) {
+            return response()->json(['ok' => true, 'enabled' => true, 'results' => [], 'short' => true]);
+        }
+        $docs = app(\App\Services\Ai\AiKnowledge::class)->consultar($q);
+        $res = array_map(fn ($d) => [
+            'tipo' => (string) $d->source_type,
+            'titulo' => mb_substr((string) $d->title, 0, 140),
+            'texto' => mb_strlen((string) $d->content) > 420 ? rtrim(mb_substr((string) $d->content, 0, 420)) . '…' : (string) $d->content,
+        ], $docs);
+        return response()->json(['ok' => true, 'enabled' => true, 'results' => $res]);
     }
 
     private function estilo(Request $request): array

@@ -218,6 +218,18 @@ class AiKnowledgeTest extends TestCase
         $this->assertSame([], $k->buscar('Etiqueta electrónica sin conexión con la antena', $a));   // sin copiarse a sí mismo
     }
 
+    public function test_consultar_del_buscador_devuelve_manuales_y_casos(): void
+    {
+        $this->ticket('resuelto', 'Cambiar idioma de la etiqueta', 'Quiero cambiar el idioma de la etiqueta del buffet.', 'Entre en Idiomas y elija la plantilla de etiqueta del buffet.');
+        $k = new AiKnowledge();
+        $k->indexarTickets();
+        DB::table('ai_documents')->insert(['source_type' => 'manual', 'source_id' => 'idiomas#1', 'title' => 'Cambiar el idioma de la etiqueta',
+            'content' => 'Para cambiar el idioma de las etiquetas entra en Idiomas y elige la plantilla de etiqueta del buffet.']);
+        $tipos = array_map(fn ($d) => $d->source_type, $k->consultar('cambiar idioma etiqueta'));
+        $this->assertContains('manual', $tipos);
+        $this->assertContains('ticket', $tipos);
+    }
+
     public function test_el_prompt_lleva_el_caso_parecido_y_lo_cita_en_las_fuentes(): void
     {
         $viejo = $this->ticket('resuelto', 'Etiqueta electrónica sin conexión', 'Mi etiqueta electrónica no conecta con la antena de la tienda.', 'Reinicie la etiqueta electrónica acercándola a la antena de la tienda.');

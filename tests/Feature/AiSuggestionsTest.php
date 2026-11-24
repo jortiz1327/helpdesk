@@ -816,6 +816,14 @@ class AiSuggestionsTest extends TestCase
         $this->withHeader('X-App-Token', $this->encargado())->postJson('/api/ai_suggestions.php?action=admin_save', ['enabled' => true])->assertStatus(422);
         $this->assertNotSame('1', Setting::get('ai_suggestions_enabled'));
     }
+    public function test_buscador_de_memoria_pide_al_menos_tres_letras_y_no_usa_la_ia(): void
+    {
+        $this->activar();
+        $tok = $this->agente();
+        $this->withHeader('X-App-Token', $tok)->getJson('/api/ai_suggestions.php?action=search&q=ab')->assertOk()->assertJsonPath('short', true);
+        $this->withHeader('X-App-Token', $tok)->getJson('/api/ai_suggestions.php?action=search&q=' . urlencode('nada que exista'))->assertOk()->assertJsonPath('results', []);
+        $this->assertSame(0, $this->fake->llamadas, 'buscar no usa la IA');
+    }
 }
 
 class FakeAi implements AiProvider
@@ -842,4 +850,5 @@ class FakeAi implements AiProvider
         }
         return ['text' => $this->respuesta, 'model' => 'fake', 'input_tokens' => 10, 'output_tokens' => 5];
     }
+
 }

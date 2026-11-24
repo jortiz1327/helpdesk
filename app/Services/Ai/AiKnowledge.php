@@ -443,6 +443,12 @@ class AiKnowledge
         return $out;
     }
 
+    /** Búsqueda manual del agente: lo mismo que la sugerencia pero con más resultados por tipo y sin excluir ningún ticket. */
+    public function consultar(string $texto): array
+    {
+        return $this->buscar($texto, null, 5, 6, 3, $texto, 3);
+    }
+
     /**
      * Lo más parecido a $texto: hasta $nTickets casos resueltos y $nManuales trozos de manual.
      * Se excluye $ticketId (si se está contestando un ticket ya resuelto, que no se copie a sí mismo).
