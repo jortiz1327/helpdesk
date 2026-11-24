@@ -46,6 +46,13 @@ export default function AiSettings() {
     if (r?.ok) { setD(r); toast('Lista guardada') }
     else toast(r?.error || 'No se pudo guardar', 'err')
   }
+  const marcarManual = async (area) => {
+    setBusy(true)
+    const r = await api.aiAdminManual(area)
+    setBusy(false)
+    if (r?.ok) { setD(r); toast('Área marcada como revisada hoy') }
+    else toast(r?.error || 'No se pudo marcar', 'err')
+  }
   const indexar = async () => {
     setBusy(true)
     const r = await api.aiAdminIndex()
@@ -170,6 +177,8 @@ export default function AiSettings() {
         <button className="btn" disabled={busy} onClick={indexar}><Icon.refresh /> {busy ? 'Actualizando…' : 'Actualizar conocimiento'}</button>
       </div>
 
+      {d.manuales && <AiManuales areas={d.manuales} busy={busy} onRevisado={marcarManual} />}
+
       <div className="card em-card" style={{ marginTop: 12 }}>
         <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Lo que la IA no ha sabido hacer</h3>
         <p className="muted" style={{ margin: '0 0 8px', fontSize: 13 }}>Consultas en las que se ha rendido por falta de base, o que han fallado. Son las pistas de qué documentar o corregir: añade la respuesta como FAQ o en la documentación y se reducirán.</p>
@@ -263,6 +272,46 @@ function AiHistorial() {
           {h.items.length < h.total ? <button className="btn" disabled={cargando} onClick={() => cargar(filtro, q, h.items.length)}>{cargando ? 'Cargando…' : `Ver más (${h.total - h.items.length})`}</button> : null}
         </>
       )}
+    </div>
+  )
+}
+
+/* Manuales por área: qué documentación tiene la IA de cada una, cuándo cambió, cuándo se revisó y si ya está en su memoria. */
+const NIVEL_MAN = { ok: 'Al día', revisar: 'Toca revisar', pendiente: 'Sin cargar en la memoria', vacia: 'Sin manuales' }
+const fecha = (s) => (s ? new Date(s + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
+function AiManuales({ areas, busy, onRevisado }) {
+  return (
+    <div className="card em-card" style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Manuales por área</h3>
+      <p className="em-desc">Lo que la IA sabe de cada área sale de estos manuales. Cuando cambie la aplicación: edita el manual de su área, despliega, pulsa «Actualizar conocimiento» y marca el área como revisada. Se avisa aquí cuando toca volver a revisarla.</p>
+      <div className="ai-apis">
+        {areas.map((a) => {
+          const pend = a.pendientes.nuevos + a.pendientes.cambiados + a.pendientes.borrados
+          return (
+            <section key={a.clave} className="ai-api" data-level={a.nivel === 'ok' ? 'ok' : a.nivel === 'vacia' ? 'sin_uso' : 'aviso'} aria-label={a.nombre}>
+              <header>
+                <b>{a.nombre}</b>
+                <span className="ai-api-n" data-level={a.nivel === 'ok' ? 'ok' : a.nivel === 'vacia' ? 'sin_uso' : 'aviso'}>{a.estado === 'en_espera' && a.nivel !== 'vacia' ? 'En espera · ' : ''}{NIVEL_MAN[a.nivel]}</span>
+              </header>
+              <small className="muted">{a.descripcion}</small>
+              {a.archivos > 0 ? (
+                <>
+                  <dl className="ai-api-k">
+                    <div><dt>Manuales</dt><dd>{a.archivos}</dd></div>
+                    <div><dt>Trozos en memoria</dt><dd>{a.trozos}</dd></div>
+                    <div><dt>Cambiado</dt><dd>{fecha(a.cambiado)}</dd></div>
+                    <div><dt>Cargado en la IA</dt><dd>{fecha(a.indexado)}</dd></div>
+                    <div><dt>Revisado</dt><dd>{a.revisado ? fecha(a.revisado) : 'nunca'}</dd></div>
+                    <div><dt>Revisar cada</dt><dd>{a.revision_dias} d</dd></div>
+                  </dl>
+                  {pend > 0 && <small className="ai-api-err">Sin cargar en la IA: {[a.pendientes.nuevos && a.pendientes.nuevos + ' nuevo' + (a.pendientes.nuevos > 1 ? 's' : ''), a.pendientes.cambiados && a.pendientes.cambiados + ' cambiado' + (a.pendientes.cambiados > 1 ? 's' : ''), a.pendientes.borrados && a.pendientes.borrados + ' borrado' + (a.pendientes.borrados > 1 ? 's' : '')].filter(Boolean).join(', ')}. Pulsa «Actualizar conocimiento».</small>}
+                  <button className="btn sm ghost" disabled={busy} onClick={() => onRevisado(a.clave)}><Icon.check /> Revisado hoy</button>
+                </>
+              ) : <p className="em-desc" style={{ margin: '6px 0 0' }}>Aún no hay manuales de esta área.</p>}
+            </section>
+          )
+        })}
+      </div>
     </div>
   )
 }

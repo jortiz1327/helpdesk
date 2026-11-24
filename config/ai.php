@@ -39,13 +39,24 @@ return [
 
     // Manuales (claves de config/manuals.php) que la IA puede consultar. Solo los pensados para clientes.
     'manuals'    => ['cliente'],
+    // Catálogo de manuales por ÁREA (ver App\Services\Ai\ManualesCatalogo y docs/manuales-ia.md). 'carpeta' = resources/ai-docs/<carpeta>/ (archivos .md);
+    // 'manual' = clave de un PDF de config/manuals.php. 'revision_dias' = cada cuántos días hay que volver a revisarla.
+    'areas' => [
+        'hoteles'   => ['nombre' => 'Hoteles (buffets)', 'carpeta' => 'hoteles', 'revision_dias' => 45, 'descripcion' => 'Una guía por cada apartado de la aplicación de hoteles (usuarios, platos, etiquetas, servicios…)'],
+        'soporte'   => ['nombre' => 'Soporte: reglas y protocolos', 'carpeta' => 'soporte', 'revision_dias' => 30, 'descripcion' => 'Derivación, verificación del cliente, protocolo de garantías y base de conocimiento'],
+        'cliente'   => ['nombre' => 'Portal del cliente (PDF)', 'manual' => 'cliente', 'revision_dias' => 90, 'descripcion' => 'La guía que ve el cliente en el portal'],
+        'farmacias' => ['nombre' => 'Farmacias (AdminFarm)', 'carpeta' => 'farmacias', 'revision_dias' => 90, 'estado' => 'en_espera', 'descripcion' => 'En espera de la API de AdminFarm; hoy solo el stock en etiquetas'],
+        'tiendas'   => ['nombre' => 'Tiendas y supermercados', 'carpeta' => 'tiendas', 'revision_dias' => 90, 'estado' => 'sin_manuales', 'descripcion' => 'Sin manuales todavía (tareas de tiendas en pausa)'],
+        'cloud'     => ['nombre' => 'Cloud (etiquetas y ESLAdmin)', 'carpeta' => 'cloud', 'revision_dias' => 60, 'estado' => 'sin_manuales', 'descripcion' => 'Sin manuales todavía (bloque L: conexión con el Cloud)'],
+    ],
+
     // Puntuación mínima absoluta FULLTEXT (0 = solo cuenta la relativa al mejor resultado; subirla con datos reales si se cuelan casos poco relacionados).
-    // La IA puede buscar ella misma en la memoria mientras redacta (herramienta interna; solo proveedores que lo admiten).
+    'knowledge_min_score' => (float) env('AI_KNOWLEDGE_MIN_SCORE', 0.0),
     // Al derivar se le dice al cliente «será derivada al departamento X». Pasar a true cuando el ticket se asigne solo (fase 3): «ha sido derivada».
     'derivacion_asignada' => (bool) env('AI_DERIVACION_ASIGNADA', false),
+    // La IA puede buscar ella misma en la memoria mientras redacta (herramienta interna; solo proveedores que lo admiten).
     'memoria_herramienta' => (bool) env('AI_MEMORIA_HERRAMIENTA', true),
     'memoria_max_busquedas' => (int) env('AI_MEMORIA_MAX_BUSQUEDAS', 2),
-    'knowledge_min_score' => (float) env('AI_KNOWLEDGE_MIN_SCORE', 0.0),
 
     // Precio en USD por millón de tokens [entrada, salida], solo para ESTIMAR el gasto en Ajustes (la factura real es la del proveedor).
     // Comprobar en la web del proveedor; se puede ajustar sin tocar código con AI_PRICE_IN / AI_PRICE_OUT.

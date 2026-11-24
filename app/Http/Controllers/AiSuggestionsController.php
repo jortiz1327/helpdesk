@@ -44,6 +44,7 @@ class AiSuggestionsController extends Controller
             'admin_budget' => $this->post($request) ?? $this->adminBudget($request),
             'admin_apps' => $this->post($request) ?? $this->adminApps($request),
             'admin_index' => $this->post($request) ?? $this->adminIndex($request),
+            'admin_manual' => $this->post($request) ?? $this->adminManual($request),
             'admin_review' => $this->post($request) ?? $this->adminReview($request),
             'admin_history' => $this->adminHistory($request),
             default     => response()->json(['ok' => true, 'enabled' => $this->ai->enabled()]),
@@ -98,6 +99,17 @@ class AiSuggestionsController extends Controller
         $trozos = $k->indexarManuales();
         $k->indexarPlantillas();
         return response()->json(['ok' => true, 'nuevos' => $nuevos, 'trozos' => $trozos] + $this->ai->panel());
+    }
+
+    /** Marcar un área de manuales como revisada hoy (support.config). */
+    private function adminManual(Request $request)
+    {
+        if ($denegado = $this->soloConfig($request)) return $denegado;
+        $area = $request->input('area');
+        if (! is_string($area) || ! \App\Services\Ai\ManualesCatalogo::marcarRevisado($area)) {
+            return response()->json(['ok' => false, 'error' => 'Área no encontrada'], 404);
+        }
+        return response()->json(['ok' => true] + $this->ai->panel());
     }
 
     /** Validar / rechazar / dejar pendiente una corrección de un agente (support.config). */

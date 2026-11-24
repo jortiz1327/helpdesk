@@ -500,6 +500,9 @@ export const api = {
   aiAdminApps: (apps) => req('ai_suggestions.php?action=admin_apps', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apps }),
   }),
+  aiAdminManual: (area) => req('ai_suggestions.php?action=admin_manual', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ area }),
+  }),
   aiAdminHistory: (filter = '', q = '', offset = 0) => req('ai_suggestions.php?action=admin_history&filter=' + encodeURIComponent(filter) + '&q=' + encodeURIComponent(q) + '&offset=' + offset),
   aiAdminIndex: () => req('ai_suggestions.php?action=admin_index', { method: 'POST' }),
   aiAdminReview: (id, status) => req('ai_suggestions.php?action=admin_review', {
