@@ -45,25 +45,42 @@ class HotelsApi
             return null;
         }
         $t0 = microtime(true);
+        $op = preg_replace('#/[0-9a-fA-F-]{8,40}(?=/|$)|/[0-9]+(?=/|$)#', '/{id}', $ruta);
         try {
             $r = Http::timeout($timeout ?? (float) config('ai.support.timeout', 12))->acceptJson()
                 ->withHeaders(['X-Api-Key' => (string) config('ai.support.key'), 'X-Actor' => 'IA-Soporte'])
                 ->get($this->base() . $ruta, $query);
             if (! $r->successful()) {
                 $this->anotar($ruta, microtime(true) - $t0, 'HTTP ' . $r->status());
+                ApiMonitor::registrar('adminhoteles', $op, microtime(true) - $t0, false, 'HTTP ' . $r->status());
                 return null;
             }
             $d = $r->json('data');
             $seg = microtime(true) - $t0;
             $sinApp = is_array($d) && ! empty($d['apps_sin_respuesta']);
+            ApiMonitor::registrar('adminhoteles', $op, $seg, true, $sinApp ? 'una app del panel no respondió' : null);
             if ($sinApp || $seg > self::LENTA) {
                 $this->anotar($ruta, $seg, $sinApp ? 'una app del panel no respondió' : 'lenta');
             }
             return is_array($d) ? $d : null;
         } catch (Throwable $e) {
             $this->anotar($ruta, microtime(true) - $t0, 'sin respuesta');
+            ApiMonitor::registrar('adminhoteles', $op, microtime(true) - $t0, false, 'sin respuesta');
             return null;
         }
+    }
+
+    /** Como Cache::remember, pero anota si salió de la caché (para la estadística de Ajustes). */
+    private function recordada(string $clave, int $segundos, callable $f)
+    {
+        if (Cache::has($clave)) {
+            ApiMonitor::cache('adminhoteles', true);
+            return Cache::get($clave);
+        }
+        ApiMonitor::cache('adminhoteles', false);
+        $v = $f();
+        Cache::put($clave, $v, $segundos);
+        return $v;
     }
 
     /** Apunta que el panel ha ido lento o ha fallado (solo la ruta, nunca correos ni nombres). Se ve en Ajustes › Asistente IA. */
@@ -158,8 +175,10 @@ class HotelsApi
         $clave = 'ai_support_lookup_' . sha1($email);
         $guardado = Cache::get($clave);
         if (is_array($guardado) && ! empty($guardado['sitios'])) {
+            ApiMonitor::cache('adminhoteles', true);
             return $guardado;
         }
+        ApiMonitor::cache('adminhoteles', false);
         $inicio = microtime(true);
         $d = $this->get('/api/support/v1/users/lookup', ['email' => $email], self::ESPERA_CORREO);
         // El panel contesta pero a veces una de sus apps no: una segunda consulta suele salir bien, y evita decir «no hemos podido
@@ -311,8 +330,10 @@ class HotelsApi
         $clave = 'ai_support_hoteles2_' . sha1(self::norm($nombre));
         $guardado = Cache::get($clave);
         if (is_array($guardado) && $guardado) {
+            ApiMonitor::cache('adminhoteles', true);
             return $guardado;
         }
+        ApiMonitor::cache('adminhoteles', false);
         $d = $this->get('/api/support/v1/hotels', ['q' => $nombre, 'per_page' => 5]);
         if ($d === null) {
             return null;
@@ -391,7 +412,7 @@ class HotelsApi
         if (! self::idValido($hotelId)) {
             return null;
         }
-        $d = Cache::remember("ai_support_hotel_buffets_$hotelId", 300, fn () => $this->get("/api/support/v1/hotels/$hotelId/buffets") ?? []);
+        $d = $this->recordada("ai_support_hotel_buffets_$hotelId", 300, fn () => $this->get("/api/support/v1/hotels/$hotelId/buffets") ?? []);
         if (! $d) {
             return null;
         }
@@ -415,7 +436,7 @@ class HotelsApi
         if (! self::idValido($id)) {
             return null;
         }
-        $d = Cache::remember("ai_support_antenas_$id", 120, fn () => $this->get("/api/support/v1/buffets/$id/antennas") ?? []);
+        $d = $this->recordada("ai_support_antenas_$id", 120, fn () => $this->get("/api/support/v1/buffets/$id/antennas") ?? []);
         if (! $d) {
             return null;
         }

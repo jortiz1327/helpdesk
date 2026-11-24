@@ -4615,3 +4615,25 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tkm-hotel small { color: var(--ink-2); }
 .tkm-hotel.old { border-style: dashed; opacity: .8; }
 .tkm-hotel.old svg { fill: var(--ink-2); }
+
+/* Estado de las APIs y herramientas de la IA (Ajustes) */
+.ai-apis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; margin-top: 10px; }
+.ai-api { display: grid; gap: 8px; align-content: start; padding: 14px; background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--line-2); border-radius: 12px; min-width: 0; }
+.ai-api[data-level="ok"] { border-left-color: var(--ok, #2e9e6a); }
+.ai-api[data-level="aviso"] { border-left-color: var(--warn, #d9a21b); }
+.ai-api[data-level="mal"] { border-left-color: var(--danger, #d4483b); }
+.ai-api header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.ai-api-n { font-size: 11px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-2); }
+.ai-api-n[data-level="ok"] { color: var(--ok, #2e9e6a); }
+.ai-api-n[data-level="aviso"] { color: var(--warn, #b07d0c); }
+.ai-api-n[data-level="mal"] { color: var(--danger, #d4483b); }
+.ai-api-k { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; margin: 0; }
+.ai-api-k div { min-width: 0; }
+.ai-api-k dt { font-size: 11px; color: var(--ink-3); }
+.ai-api-k dd { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ai-api-k dd.mal { color: var(--danger, #d4483b); }
+.ai-api-k dd.aviso { color: var(--warn, #b07d0c); }
+.ai-api-ops { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12.5px; }
+.ai-api-ops li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 4px; }
+.ai-api-ops small { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ai-api-err { color: var(--danger, #d4483b); }

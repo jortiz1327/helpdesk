@@ -29,15 +29,7 @@ class AnthropicProvider implements AiProviderConHerramientas
             $cuerpo['thinking'] = ['type' => 'disabled'];
         }
 
-        try {
-            $r = Http::timeout($this->timeout())
-                ->withHeaders(['x-api-key' => $this->key(), 'anthropic-version' => '2023-06-01'])
-                ->acceptJson()
-                ->post($this->url('/v1/messages'), $cuerpo);
-        } catch (Throwable) {
-            throw new AiException('No se pudo contactar con la IA');
-        }
-        $this->exigirOk($r);
+        $r = $this->enviar($cuerpo, 'mensaje');
 
         $text = '';
         foreach ((array) $r->json('content', []) as $bloque) {
@@ -73,15 +65,7 @@ class AnthropicProvider implements AiProviderConHerramientas
             if ($ronda < $maxRondas) {
                 $cuerpo['tools'] = $herramientas;
             }
-            try {
-                $r = Http::timeout($this->timeout())
-                    ->withHeaders(['x-api-key' => $this->key(), 'anthropic-version' => '2023-06-01'])
-                    ->acceptJson()
-                    ->post($this->url('/v1/messages'), $cuerpo);
-            } catch (Throwable) {
-                throw new AiException('No se pudo contactar con la IA');
-            }
-            $this->exigirOk($r);
+            $r = $this->enviar($cuerpo, isset($cuerpo['tools']) ? 'mensaje (con herramienta)' : 'mensaje');
             $entrada += (int) $r->json('usage.input_tokens');
             $salida += (int) $r->json('usage.output_tokens');
             $bloques = (array) $r->json('content', []);
@@ -118,5 +102,29 @@ class AnthropicProvider implements AiProviderConHerramientas
                 'usos'          => $usos,
             ];
         }
+    }
+
+    /** Una llamada a la API, medida (duración y fallos van a Ajustes › Asistente IA). */
+    private function enviar(array $cuerpo, string $operacion)
+    {
+        $t0 = microtime(true);
+        try {
+            $r = Http::timeout($this->timeout())
+                ->withHeaders(['x-api-key' => $this->key(), 'anthropic-version' => '2023-06-01'])
+                ->acceptJson()
+                ->post($this->url('/v1/messages'), $cuerpo);
+        } catch (Throwable) {
+            ApiMonitor::registrar('proveedor', $operacion, microtime(true) - $t0, false, 'sin respuesta');
+            throw new AiException('No se pudo contactar con la IA');
+        }
+        if (! $r->successful()) {
+            ApiMonitor::registrar('proveedor', $operacion, microtime(true) - $t0, false, 'HTTP ' . $r->status());
+            // El mensaje de error del proveedor habla del formato de la petición, no lleva datos del cliente.
+            \Illuminate\Support\Facades\Log::warning('IA proveedor: HTTP ' . $r->status() . ' · ' . mb_substr((string) ($r->json('error.message') ?? ''), 0, 300));
+        } else {
+            ApiMonitor::registrar('proveedor', $operacion, microtime(true) - $t0, true);
+        }
+        $this->exigirOk($r);
+        return $r;
     }
 }

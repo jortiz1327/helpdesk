@@ -446,7 +446,7 @@ class AiKnowledge
     /** Búsqueda manual del agente: lo mismo que la sugerencia pero con más resultados por tipo y sin excluir ningún ticket. */
     public function consultar(string $texto): array
     {
-        return $this->buscar($texto, null, 5, 6, 3, $texto, 3);
+        return $this->buscarSinMedir($texto, null, 5, 6, 3, $texto, 3);   // la mide quien lo llama (ApiMonitor 'la IA busca')
     }
 
     /**
@@ -456,6 +456,11 @@ class AiKnowledge
      * (y más que config('ai.knowledge_min_score'), 0 por defecto).
      */
     public function buscar(string $texto, ?int $ticketId = null, int $nTickets = 3, int $nManuales = 4, int $nCorrecciones = 2, string $asunto = '', int $nPlantillas = 2): array
+    {
+        return ApiMonitor::medir('memoria', 'buscar', fn () => $this->buscarSinMedir($texto, $ticketId, $nTickets, $nManuales, $nCorrecciones, $asunto, $nPlantillas));
+    }
+
+    private function buscarSinMedir(string $texto, ?int $ticketId, int $nTickets, int $nManuales, int $nCorrecciones, string $asunto, int $nPlantillas): array
     {
         $q = trim(mb_substr(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $texto), 0, 600));
         if (mb_strlen($q) < 6) {

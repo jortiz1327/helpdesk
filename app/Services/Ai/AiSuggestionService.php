@@ -117,6 +117,18 @@ class AiSuggestionService
      * Datos del panel de Ajustes: interruptor, proveedor, acierto medido con las valoraciones
      * de los agentes, conocimiento indexado y las últimas correcciones. Nunca lleva la clave.
      */
+    /** Estado de cada API/herramienta que usa la IA, para Ajustes (últimas 24 h; ver ApiMonitor). */
+    private function estadoApis(): array
+    {
+        $prov = (string) config('ai.provider');
+        $apis = [
+            ['id' => 'adminhoteles', 'nombre' => 'AdminHoteles (panel de hoteles)', 'uso' => 'Hotel, correo, antenas, etiquetas y posiciones', 'configurada' => app(HotelsApi::class)->configured()],
+            ['id' => 'proveedor', 'nombre' => 'Proveedor de IA (' . ucfirst($prov) . ')', 'uso' => 'Redacta las sugerencias y, a veces, busca en la memoria', 'configurada' => $this->ai->configured()],
+            ['id' => 'memoria', 'nombre' => 'Memoria (manuales y casos)', 'uso' => 'Búsqueda propia, sin salir del servidor', 'configurada' => true],
+        ];
+        return array_map(fn ($a) => $a + ['umbral_lenta_s' => ApiMonitor::LENTA[$a['id']] ?? 6.0] + ApiMonitor::resumen($a['id']), $apis);
+    }
+
     public function panel(): array
     {
         $prov = (string) config('ai.provider');
@@ -140,6 +152,7 @@ class AiSuggestionService
             'budget'     => $this->presupuesto(),
             'apps_ajenas' => self::ajenas(),
             'hotels_api' => app(HotelsApi::class)->configured() ? HotelsApi::estadoPanel() : null,
+            'apis'       => $this->estadoApis(),
             'knowledge'  => [
                 'tickets' => DB::table('ai_documents')->where('source_type', 'ticket')->count(),
                 'manuals' => DB::table('ai_documents')->where('source_type', 'manual')->count(),
@@ -523,7 +536,9 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         if ($nombre !== 'buscar_memoria' || mb_strlen($q) < 3) {
             return 'Escribe al menos 3 letras de lo que buscas.';
         }
+        $t0 = microtime(true);
         $docs = $this->knowledge->consultar($q);
+        ApiMonitor::registrar('memoria', 'la IA busca (herramienta)', microtime(true) - $t0, true);
         $this->paso('busqueda', null, 'La IA buscó en la memoria: «' . $q . '» → ' . count($docs) . ' resultado' . (count($docs) === 1 ? '' : 's'),
             ['consulta' => $q, 'resultados' => array_map(fn ($d) => ['tipo' => (string) $d->source_type, 'titulo' => mb_substr((string) $d->title, 0, 90)], array_slice($docs, 0, 6))]);
         if (! $docs) {

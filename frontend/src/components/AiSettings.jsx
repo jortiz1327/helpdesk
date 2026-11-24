@@ -131,7 +131,7 @@ export default function AiSettings() {
 
       <AiAppsAjenas lista={d.apps_ajenas || []} busy={busy} onSave={guardarApps} />
 
-      {d.hotels_api && <AiPanelHoteles p={d.hotels_api} />}
+      {d.apis && <AiPanelApis apis={d.apis} hoteles={d.hotels_api} />}
 
       <AiHistorial />
 
@@ -267,74 +267,50 @@ function AiHistorial() {
   )
 }
 
-/* Panel de hoteles: avisa a quien lo gestiona si en las últimas 24 h ha ido lento o ha fallado. */
+/* Estado de cada API o herramienta de la IA (últimas 24 h): llamadas, fallos, lentas, tiempos y caché. */
 const RUTA = { '/api/support/v1/users/lookup': 'comprobar un correo', '/api/support/v1/hotels': 'buscar un hotel' }
-function AiPanelHoteles({ p }) {
-  const nombre = (r) => RUTA[r] || (r.includes('/antennas') ? 'ver las antenas' : r.includes('/tags') ? 'ver una etiqueta' : r.includes('/buffets') ? 'ver los buffets' : r)
-  const titulo = p.nivel === 'ok' ? 'El panel de hoteles responde bien' : p.nivel === 'mal' ? 'El panel de hoteles está fallando' : 'El panel de hoteles ha ido algo lento'
-  return (
-    <div className="card em-card ai-panel-h" data-level={p.nivel} style={{ marginTop: 12 }}>
-      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>{titulo}</h3>
-      {p.nivel === 'ok' ? <p className="em-desc">En las últimas 24 horas no ha habido esperas largas ni fallos al consultarlo.</p> : (
-        <>
-          <p className="em-desc">Últimas 24 horas: {p.fallos} sin respuesta o con error · {p.apps} con alguna app de hotel sin contestar · {p.lentas} lentas (más de 6 s). Cuando falla, la IA lo dice y no afirma nada sobre el hotel ni el correo; un agente espera como máximo unos 25 s. Conviene avisar a quien gestiona el panel.</p>
-          <ul className="ai-corr">
-            {p.recientes.map((x, i) => (
-              <li key={i}><small>{fmtDate(x.at)} · {x.seg} s · {x.motivo}</small><q>Al {nombre(x.ruta)}</q></li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  )
-}
-
-/* Tope mensual: barra de gasto del mes natural, aviso al 80 % y al 100 %, gasto por día y tope editable. */
-function AiBudget({ b, busy, onSave }) {
-  const [v, setV] = useState(String(b.limit))
-  useEffect(() => { setV(String(b.limit)) }, [b.limit])
-  const pct = Math.min(100, b.pct ?? 0)
-  const max = Math.max(0.0001, ...b.days.map((x) => x.cost))
-  const fecha = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
-  const aviso = b.level === 'over'
-    ? `Tope alcanzado: la IA no sugiere a los agentes hasta el ${fecha(b.resets)}. Sube el tope aquí si hay que seguir.`
-    : b.level === 'warn' ? `Llevas el ${Math.round(b.pct)} % del tope mensual. Al llegar al 100 % la IA dejará de sugerir hasta el ${fecha(b.resets)}.` : null
-  return (
-    <div className="card em-card ai-budget" data-level={b.level} style={{ marginTop: 12 }}>
-      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Tope mensual de gasto</h3>
-      {aviso ? <p className="ai-budget-aviso" role="alert">{aviso}</p> : null}
-      <div className="ai-budget-top">
-        <b>{euros(b.spent)}</b><span className="muted"> de {b.limit > 0 ? euros(b.limit) : 'sin tope'} · {fecha(b.from)} a fin de mes{b.pct != null ? ` · ${b.pct.toString().replace('.', ',')} %` : ''}</span>
-      </div>
-      {b.limit > 0 ? <div className="ai-budget-bar" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}><i style={{ width: pct + '%' }} /></div> : null}
-      {b.days.length > 0 && (
-        <div className="ai-budget-days" aria-label="Gasto por día">
-          {b.days.map((x) => <span key={x.dia} title={`${fecha(x.dia)}: ${euros(x.cost)} · ${x.calls} llamadas`}><i style={{ height: Math.max(4, x.cost / max * 100) + '%' }} /></span>)}
-        </div>
-      )}
-      <form className="ai-budget-form" onSubmit={(e) => { e.preventDefault(); onSave(Number(v.replace(',', '.'))) }}>
-        <label>Tope al mes (USD, 0 = sin tope) <input className="input" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} /></label>
-        <button className="btn" disabled={busy}>Guardar</button>
-      </form>
-      <p className="em-desc" style={{ marginTop: 8 }}>
-        Cuenta solo las sugerencias de los agentes (mes natural; se reinicia el día 1). Los chats de prueba ({euros(b.lab)} este mes) y las evaluaciones desde la consola no cortan a los agentes. El crédito de Anthropic es compartido por toda la organización: este tope protege la parte del helpdesk.
-      </p>
-    </div>
-  )
-}
-
-/* Hoteles o aplicaciones que no gestionamos nosotros: la IA no contesta y los pasa a una persona. Uno por línea. */
-function AiAppsAjenas({ lista, busy, onSave }) {
-  const [v, setV] = useState(lista.join('\n'))
-  useEffect(() => { setV(lista.join('\n')) }, [lista])
+const opNombre = (r) => RUTA[r] || (r.includes('/antennas') ? 'ver las antenas' : r.includes('/tags') ? 'ver una etiqueta' : r.includes('/positions') ? 'ver una posición' : r.includes('/users') ? 'comprobar un correo en un hotel' : r.includes('/buffets') ? 'ver los buffets' : r)
+const seg = (ms) => ms == null ? '—' : ms < 1000 ? ms + ' ms' : (ms / 1000).toFixed(1).replace('.', ',') + ' s'
+const NIVEL = { ok: 'Responde bien', aviso: 'Con avisos', mal: 'Está fallando', sin_uso: 'Sin uso en 24 h' }
+function AiPanelApis({ apis, hoteles }) {
   return (
     <div className="card em-card" style={{ marginTop: 12 }}>
-      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Hoteles o aplicaciones que no gestionamos</h3>
-      <p className="em-desc">Si el cliente (en el asunto, el mensaje o el correo) nombra uno de estos, la IA no contesta: lo pasa a una persona. Escribe uno por línea.</p>
-      <form onSubmit={(e) => { e.preventDefault(); onSave(v) }}>
-        <textarea className="input" rows={4} value={v} onChange={(e) => setV(e.target.value)} aria-label="Hoteles o aplicaciones que no gestionamos" placeholder="Hotel Ejemplo" />
-        <button className="btn" disabled={busy} style={{ marginTop: 8 }}>Guardar lista</button>
-      </form>
+      <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Estado de las APIs y herramientas</h3>
+      <p className="em-desc">Últimas 24 horas: cuántas veces se ha usado cada una, cuántas han fallado o han ido lentas y cuánto tardan (p95: lo que tarda el 95 % de las veces). La caché es el porcentaje de consultas que se resolvieron sin volver a preguntar. Solo se anota el nombre de la operación, nunca correos ni textos.</p>
+      <div className="ai-apis">
+        {apis.map((a) => (
+          <section key={a.id} className="ai-api" data-level={a.configurada ? a.nivel : 'sin_uso'} aria-label={a.nombre}>
+            <header>
+              <b>{a.nombre}</b>
+              <span className="ai-api-n" data-level={a.configurada ? a.nivel : 'sin_uso'}>{a.configurada ? NIVEL[a.nivel] : 'Sin configurar'}</span>
+            </header>
+            <small className="muted">{a.uso}</small>
+            {a.configurada && a.llamadas > 0 ? (
+              <>
+                <dl className="ai-api-k">
+                  <div><dt>Llamadas</dt><dd>{a.llamadas}</dd></div>
+                  <div><dt>Fallos</dt><dd className={a.errores ? 'mal' : ''}>{a.errores}</dd></div>
+                  <div><dt>Lentas (+{String(a.umbral_lenta_s).replace('.', ',')} s)</dt><dd className={a.lentas ? 'aviso' : ''}>{a.lentas}</dd></div>
+                  <div><dt>Media</dt><dd>{seg(a.media_ms)}</dd></div>
+                  <div><dt>p95</dt><dd>{seg(a.p95_ms)}</dd></div>
+                  <div><dt>Caché</dt><dd>{a.cache ? a.cache.pct + ' %' : '—'}</dd></div>
+                </dl>
+                <ul className="ai-api-ops">
+                  {a.operaciones.map((o) => (
+                    <li key={o.op}><span>{opNombre(o.op)}</span><small>{o.llamadas}× · media {seg(o.media_ms)} · p95 {seg(o.p95_ms)}{o.errores ? ' · ' + o.errores + ' fallo' + (o.errores > 1 ? 's' : '') : ''}</small></li>
+                  ))}
+                </ul>
+                {a.ultimo_error && <small className="ai-api-err">Último fallo: {fmtDate(a.ultimo_error.at)} · {opNombre(a.ultimo_error.op)} · {a.ultimo_error.nota || 'error'}</small>}
+              </>
+            ) : <p className="em-desc" style={{ margin: '6px 0 0' }}>{a.configurada ? 'Aún no se ha usado en las últimas 24 horas.' : 'Falta configurarla en el servidor.'}</p>}
+            {a.id === 'adminhoteles' && a.nivel !== 'ok' && a.nivel !== 'sin_uso' && (
+              <small className="muted">Cuando falla, la IA lo dice y no afirma nada sobre el hotel ni el correo; un agente espera como máximo unos 25 s. Conviene avisar a quien gestiona el panel{hoteles?.apps ? ` (${hoteles.apps} veces alguna app de hotel no contestó)` : ''}.</small>
+            )}
+          </section>
+        ))}
+      </div>
     </div>
   )
 }
+
+
