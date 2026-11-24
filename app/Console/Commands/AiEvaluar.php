@@ -33,7 +33,7 @@ class AiEvaluar extends Command
             return 'derivar';   // «no sé» o fallo: nada llega al cliente, lo atiende una persona
         }
         $t = mb_strtolower((string) $body);
-        if (preg_match('/un compañero|nuestro equipo (revisar|se pondr|le atend)|lo revisar[aá] (un|nuestro)|te atender[aá] personalmente|le atender[aá] personalmente/u', $t)) {
+        if (preg_match('/un compañero|nuestro equipo (revisar|se pondr|le atend)|lo revisar[aá] (un|nuestro)|te atender[aá] personalmente|le atender[aá] personalmente|derivad[ao] al departamento/u', $t)) {
             return 'derivar';
         }
         $preguntas = substr_count($t, '?') + substr_count($t, '¿');

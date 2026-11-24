@@ -206,7 +206,7 @@ export default function AiSuggestion({ ticketId, onClose, onInsert }) {
               {dest && (
                 <section className="ai-sec ai-dest" aria-label="Derivar">
                   <h3>Para el equipo</h3>
-                  <p className="ai-dest-t"><Icon.warn aria-hidden="true" /> Llévalo a la categoría <b>{dest.categoria}</b></p>
+                  <p className="ai-dest-t"><Icon.warn aria-hidden="true" /> Llévalo a la categoría <b>{dest.categoria}</b>{dest.departamento && dest.departamento !== dest.categoria ? <span className="ai-sub"> · departamento {dest.departamento}</span> : null}</p>
                   {dest.motivo ? <p className="ai-sub">{dest.motivo}</p> : null}
                 </section>
               )}

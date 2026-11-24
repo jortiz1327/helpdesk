@@ -62,7 +62,39 @@ class AiSuggestionService
     /** Estilo pedido por el agente para esta sugerencia: ['largo' => corta|detallada, 'tono' => cercano|formal]. Solo cambia la redacción. */
     private array $estilo = [];
     public const ESTILOS = ['largo' => ['corta', 'detallada'], 'tono' => ['cercano', 'formal']];
-    private const CATEGORIAS_DERIVAR = ['soporte' => 'Soporte', 'garantias' => 'Garantías', 'pedidos' => 'Pedidos y facturas'];
+    /**
+     * Departamentos a los que la IA puede derivar (los válidos, decididos por Juan el 16-nov; la IA no inventa otros).
+     * 'nombre' es lo que se le dice al cliente; 'categoria' y 'categoria_key' son la categoría de ticket de la app a la que lo lleva el
+     * agente (y a la que lo asignará la fase 3). Postventa = categoría «Pedidos y facturas». Proyectos aún no tiene categoría ni reglas:
+     * mientras tanto va a Soporte y la IA no lo usa.
+     */
+    public const DEPARTAMENTOS = [
+        'soporte'   => ['nombre' => 'Soporte',   'categoria' => 'Soporte',            'categoria_key' => 'soporte'],
+        'garantias' => ['nombre' => 'Garantías', 'categoria' => 'Garantías',          'categoria_key' => 'garantias'],
+        'postventa' => ['nombre' => 'Postventa', 'categoria' => 'Pedidos y facturas', 'categoria_key' => 'pedidos_facturas'],
+        'proyectos' => ['nombre' => 'Proyectos', 'categoria' => 'Soporte',            'categoria_key' => 'soporte'],
+    ];
+
+    /** Lo que se le dice al cliente al derivar. Hoy el agente asigna el ticket a mano (será derivado); en la fase 3, al asignarlo solo, «ha sido derivado» (ai.derivacion_asignada). */
+    public static function fraseDerivacion(string $departamento): string
+    {
+        try {
+            $asignada = (bool) config('ai.derivacion_asignada', false);
+        } catch (Throwable) {
+            $asignada = false;   // sin la aplicación cargada (tests unitarios puros)
+        }
+        $verbo = $asignada ? 'ha sido derivada' : 'será derivada';
+        return 'Gracias por su mensaje. Hemos registrado la incidencia y ' . $verbo . ' al departamento de ' . $departamento . ', que la revisará.';
+    }
+
+    /** Si el borrador es la frase corta de siempre y la IA marcó un departamento, se sustituye por la del departamento. */
+    public static function aplicarFraseDerivacion(string $texto, ?array $dest): string
+    {
+        if ($dest && preg_match('/^\s*Gracias por su mensaje\.\s*Hemos registrado la incidencia y el equipo la revisará\.?\s*$/u', $texto)) {
+            return self::fraseDerivacion($dest['departamento']);
+        }
+        return $texto;
+    }
 
     /** Apunta un paso en la traza. $ok: true = bien, false = problema, null = informativo. */
     /** Quien llama (el panel del ticket) recibe cada paso al momento: así el agente ve lo que va haciendo la IA. */
@@ -506,6 +538,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
                 throw new AiException('La respuesta de la IA salió incompleta');
             }
             [$texto, $this->derivarA] = self::sacarDerivacion(trim($r['text']));
+            $texto = self::aplicarFraseDerivacion($texto, $this->derivarA);
             $sabe = $texto !== '' && ! str_contains($texto, self::NO_SABE);
             $dest = $this->derivarA ? ' · llevar a ' . $this->derivarA['categoria'] : '';
             $this->paso('salida', $sabe ? true : null, $sabe ? 'Respuesta preparada · ' . ($this->derivarA ? 'deriva a una persona del equipo' : self::tipoDeRespuesta($texto)) . $dest . ' (estimado)' : 'La IA no se atreve: no hay borrador, lo debe llevar una persona' . $dest);
@@ -589,7 +622,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
     {
         $t = mb_strtolower((string) preg_replace('/\p{Mn}/u', '', \Normalizer::normalize($texto, \Normalizer::FORM_D) ?: $texto));
         $derivar = fn (string $cat, string $motivo) => ['decision' => 'derivar', 'resumen' => "derivar ($motivo)",
-            'instruccion' => "DERIVA. Responde con la frase corta «Gracias por su mensaje. Hemos registrado la incidencia y el equipo la revisará.» sin preguntar nada ni dar pasos, y añade al final «[[DERIVAR:$cat|$motivo]]»."];
+            'instruccion' => "DERIVA. Responde con la frase corta «" . self::fraseDerivacion(self::DEPARTAMENTOS[$cat]['nombre'] ?? 'Soporte') . "» sin preguntar nada ni dar pasos, y añade al final «[[DERIVAR:$cat|$motivo]]»."];
         $yaRespondio = (bool) array_filter($conversacion, fn ($m) => ($m['role'] ?? '') === 'assistant');
 
         // Hoteles o aplicaciones que no gestionamos nosotros (lista editable en Ajustes › Asistente IA): cualquier incidencia la lleva una persona.
@@ -711,9 +744,10 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $dest = null;
         $limpio = preg_replace_callback('/\s*\[\[DERIVAR:\s*([a-záéíóú]+)\s*(?:\|\s*([^\]]*?))?\s*\]\]\s*/iu', function ($m) use (&$dest) {
             $k = strtr(mb_strtolower($m[1]), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
-            $k = str_starts_with($k, 'pedido') ? 'pedidos' : (str_starts_with($k, 'garant') ? 'garantias' : $k);
-            if (isset(self::CATEGORIAS_DERIVAR[$k]) && $dest === null) {
-                $dest = ['categoria' => self::CATEGORIAS_DERIVAR[$k], 'motivo' => mb_substr(trim($m[2] ?? ''), 0, 160)];
+            $k = str_starts_with($k, 'pedido') ? 'postventa' : (str_starts_with($k, 'garant') ? 'garantias' : (str_starts_with($k, 'proyect') ? 'proyectos' : $k));
+            if (isset(self::DEPARTAMENTOS[$k]) && $dest === null) {
+                $d = self::DEPARTAMENTOS[$k];
+                $dest = ['categoria' => $d['categoria'], 'departamento' => $d['nombre'], 'clave' => $k, 'categoria_key' => $d['categoria_key'], 'motivo' => mb_substr(trim($m[2] ?? ''), 0, 160)];
             }
             return "\n";
         }, $texto);
@@ -723,7 +757,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
     /** Clasificación aproximada de lo que hace el borrador, solo para el panel del agente. */
     private static function tipoDeRespuesta(string $t): string
     {
-        if (preg_match('/compañer[oa]s? (del equipo )?(revisar|le atender|comprobar|se pondr)|equipo (de [\wáéíóú\/ ]+ )?(revisar|le atender)/iu', $t)) {
+        if (preg_match('/compañer[oa]s? (del equipo )?(revisar|le atender|comprobar|se pondr)|equipo (de [\wáéíóú\/ ]+ )?(revisar|le atender)|derivad[ao] al departamento/iu', $t)) {
             return 'deriva a una persona del equipo';
         }
         if (preg_match('/\?/u', mb_substr($t, -400))) {

@@ -41,6 +41,8 @@ return [
     'manuals'    => ['cliente'],
     // Puntuación mínima absoluta FULLTEXT (0 = solo cuenta la relativa al mejor resultado; subirla con datos reales si se cuelan casos poco relacionados).
     // La IA puede buscar ella misma en la memoria mientras redacta (herramienta interna; solo proveedores que lo admiten).
+    // Al derivar se le dice al cliente «será derivada al departamento X». Pasar a true cuando el ticket se asigne solo (fase 3): «ha sido derivada».
+    'derivacion_asignada' => (bool) env('AI_DERIVACION_ASIGNADA', false),
     'memoria_herramienta' => (bool) env('AI_MEMORIA_HERRAMIENTA', true),
     'memoria_max_busquedas' => (int) env('AI_MEMORIA_MAX_BUSQUEDAS', 2),
     'knowledge_min_score' => (float) env('AI_KNOWLEDGE_MIN_SCORE', 0.0),

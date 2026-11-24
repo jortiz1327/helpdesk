@@ -375,7 +375,7 @@
       <div><h3><i>E</i>Salida</h3><p class="res">Solo sugerencias: nada se envía al cliente.</p></div>
       <dl>
         <div><dt>Borrador de respuesta</dt><dd>Una respuesta lista para revisar: explica, pide datos o indica el canal.</dd></div>
-        <div><dt>Derivar</dt><dd>Un mensaje corto para el cliente («hemos registrado la incidencia y el equipo la revisará») y, aparte, un bloque <b>«Para el equipo»</b> en el panel: la categoría a la que llevarlo (Soporte, Garantías o Pedidos y facturas) y el motivo. Ese bloque lo ve el agente, no el cliente.</dd></div>
+        <div><dt>Derivar</dt><dd>Un mensaje corto para el cliente («hemos registrado la incidencia y será derivada al departamento de Garantías, que la revisará»: el sistema pone el departamento que elige la IA; en la fase 3, cuando el ticket se asigne solo, dirá «ha sido derivada») y, aparte, un bloque <b>«Para el equipo»</b> en el panel: la categoría a la que llevarlo (Soporte, Garantías o Pedidos y facturas) y el motivo. Ese bloque lo ve el agente, no el cliente.</dd></div>
         <div><dt>No sabe o falla</dt><dd>No hay borrador: el agente ve «La IA no se atreve» o un aviso con «Reintentar». Lo que la IA no supo queda anotado en Ajustes para saber qué documentar.</dd></div>
         <div><dt>Coste</dt><dd>Cada consulta guarda lo que ha costado. El panel suma el gasto estimado del mes, avisa al 80 % y al 100 % del tope y muestra el gasto por día.</dd></div>
       </dl>
