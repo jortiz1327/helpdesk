@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * Chat de pruebas de la IA DENTRO de Ajustes (permiso support.config). Se escribe como si fuera el cliente y el agente
+ * Chat de pruebas de la IA (permiso ai.pruebas: agentes de soporte y encargados; también en Ajustes). Se escribe como si fuera el cliente y el agente
  * contesta con el mismo motor que en los tickets, pero NADA se envía a ningún cliente. Cada conversación, mensaje y
  * corrección queda con el nombre de quien la hizo; una corrección guardada se puede retirar de la memoria y restaurar.
  * Tiene tope de gasto propio (euros al mes, aparte del de los agentes).
@@ -26,7 +26,7 @@ class AiPruebasController extends Controller
 
     public function handle(Request $r)
     {
-        if (! $r->user()?->can('support.config')) {
+        if (! $r->user()?->can('ai.pruebas')) {
             return response()->json(['ok' => false, 'error' => 'No tienes permiso'], 403);
         }
         $post = $r->isMethod('post');
@@ -38,7 +38,7 @@ class AiPruebasController extends Controller
         return match ($accion) {
             'status' => $this->status(),
             'chat' => $this->chat((int) $r->query('id')),
-            'corrections' => $this->corrections(),
+            'corrections' => $this->corrections($r),
             'create' => $this->create($r),
             'send' => $this->send($r),
             'reply' => $this->reply($r),
@@ -84,16 +84,19 @@ class AiPruebasController extends Controller
     }
 
     /** Todas las correcciones escritas en el chat de pruebas, con quién y cuándo, y si están retiradas. */
-    private function corrections()
+    private function corrections(Request $r)
     {
         $filas = DB::table('ai_lab_messages as m')->join('ai_lab_chats as c', 'c.id', '=', 'm.chat_id')
             ->where('m.role', 'assistant')->where('m.rating', 'down')->whereNotNull('m.correction')->orderByDesc('m.rated_at')->orderByDesc('m.id')->limit(300)
-            ->get(['m.id', 'm.chat_id', 'm.body', 'm.correction', 'm.rated_by_name', 'm.rated_at', 'm.retired_at', 'm.retired_by_name', 'c.title']);
-        $items = $filas->map(function ($m) {
+            ->get(['m.id', 'm.chat_id', 'm.body', 'm.correction', 'm.rated_by_name', 'm.rated_by_id', 'm.rated_at', 'm.retired_at', 'm.retired_by_name', 'c.title']);
+        $yo = (int) $r->user()?->id;
+        $todas = (bool) $r->user()?->can('support.config');
+        $items = $filas->map(function ($m) use ($yo, $todas) {
             $q = DB::table('ai_lab_messages')->where('chat_id', $m->chat_id)->where('role', 'user')->where('id', '<', $m->id)->orderByDesc('id')->value('body');
             return [
                 'id' => $m->id, 'chat_id' => $m->chat_id, 'title' => $m->title, 'question' => (string) $q, 'ai' => (string) $m->body,
                 'correction' => $m->correction, 'by' => $m->rated_by_name, 'at' => $m->rated_at,
+                'mine' => (int) $m->rated_by_id === $yo, 'can_retire' => $todas || ((int) $m->rated_by_id === $yo && $yo > 0),
                 'retired' => $m->retired_at !== null, 'retired_by' => $m->retired_by_name, 'retired_at' => $m->retired_at,
             ];
         })->all();
@@ -177,7 +180,7 @@ class AiPruebasController extends Controller
         }
         DB::table('ai_lab_messages')->where('id', $m->id)->update([
             'rating' => $rating, 'correction' => $rating === 'down' ? mb_substr($corr, 0, 4000) : null,
-            'rated_by_name' => $this->quien($r), 'rated_at' => now(), 'retired_at' => null, 'retired_by_name' => null,
+            'rated_by_name' => $this->quien($r), 'rated_by_id' => $r->user()?->id, 'rated_at' => now(), 'retired_at' => null, 'retired_by_name' => null,
         ]);
         $this->knowledge->indexarCorreccionChat((int) $m->id);
         return response()->json(['ok' => true, 'messages' => $this->mensajes((int) $m->chat_id)]);
@@ -190,12 +193,16 @@ class AiPruebasController extends Controller
         if (! $m) {
             return response()->json(['ok' => false, 'error' => 'Corrección no encontrada'], 404);
         }
+        // Cada persona retira sus propias correcciones; retirar las de otros solo lo hace quien configura el soporte (support.config).
+        if (! $r->user()?->can('support.config') && (int) $m->rated_by_id !== (int) $r->user()?->id) {
+            return response()->json(['ok' => false, 'error' => 'Solo quien la escribió o un encargado puede retirar esta corrección'], 403);
+        }
         $retirar = filter_var($r->input('retired'), FILTER_VALIDATE_BOOLEAN);
         DB::table('ai_lab_messages')->where('id', $m->id)->update($retirar
             ? ['retired_at' => now(), 'retired_by_name' => $this->quien($r)]
             : ['retired_at' => null, 'retired_by_name' => null]);
         $this->knowledge->indexarCorreccionChat((int) $m->id);   // la quita o la vuelve a poner en la memoria
-        return $this->corrections();
+        return $this->corrections($r);
     }
 
     private function delete(Request $r)

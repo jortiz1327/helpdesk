@@ -31,6 +31,7 @@ return [
     'permissions' => [
         // --- Helpdesk / tickets ---
         'helpdesk.access'    => ['Acceder al Helpdesk',                        'helpdesk'],
+        'ai.pruebas'        => ['Probar y enseñar a la IA (chat de pruebas)',   'helpdesk'],
         'tickets.create'     => ['Crear tickets',                              'helpdesk'],
         'tickets.view_all'   => ['Ver TODOS los tickets (no solo los propios)', 'helpdesk'],
         'tickets.reply'      => ['Responder tickets',                          'helpdesk'],
@@ -94,7 +95,7 @@ return [
             'permissions' => [
                 'helpdesk.access', 'tickets.create', 'tickets.view_all', 'tickets.reply', 'tickets.assign',
                 'tickets.categorize', 'tickets.close', 'tickets.delete',
-                'tickets.view_times', 'agents.view', 'tickets.export', 'support.config',
+                'tickets.view_times', 'agents.view', 'tickets.export', 'support.config', 'ai.pruebas',
                 'contacts.access', 'contacts.edit',
                 'organizations.view', 'organizations.edit',
                 'shifts.access', 'shifts.manage',
@@ -112,6 +113,7 @@ return [
             'description' => 'Atiende los tickets de sus categorías asignadas. No ve los de otras áreas.',
             'permissions' => [
                 'helpdesk.access', 'tickets.create', 'tickets.reply', 'tickets.categorize', 'tickets.close',
+                'ai.pruebas',
                 'contacts.access', 'contacts.edit',
                 'organizations.view',
                 'shifts.access',

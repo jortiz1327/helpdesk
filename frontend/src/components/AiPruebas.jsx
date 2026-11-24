@@ -14,7 +14,7 @@ import { useToast } from '../App.jsx'
 const ESPERA = 20 // segundos sin que el «cliente» escriba antes de que la IA conteste (como en WhatsApp)
 const eur = (n) => (Number(n) || 0).toFixed(2).replace('.', ',') + ' €'
 
-export default function AiPruebas() {
+export default function AiPruebas({ pagina = false }) {
   const toast = useToast()
   const [vista, setVista] = useState('chats')
   const [st, setSt] = useState(null)
@@ -113,7 +113,7 @@ export default function AiPruebas() {
   const sinValidar = (st.chats || []).reduce((n, c) => n + c.pendientes, 0)
   const tope = pres.level === 'over'
 
-  return (
+  const cuerpo = (
     <div className="pr">
       <div className="pr-aviso" role="note">
         <span className="pr-aviso-ic"><Icon.warn /></span>
@@ -252,6 +252,20 @@ export default function AiPruebas() {
       )}
     </div>
   )
+  if (!pagina) return cuerpo
+  return (
+    <>
+      <header className="page-head ds-head">
+        <span className="ds-head-ic"><Icon.bolt /></span>
+        <div className="ds-head-tx">
+          <h1>Entrenar a la IA</h1>
+          <span className="sub">Prueba la IA escribiendo como si fueras el cliente y enséñale con tus correcciones. No se envía nada a ningún cliente.</span>
+        </div>
+        <div className="spacer" />
+      </header>
+      <div className="page-scroll"><div className="page" style={{ maxWidth: 1240 }}>{cuerpo}</div></div>
+    </>
+  )
 }
 
 function Veredicto({ m }) {
@@ -290,8 +304,10 @@ function Correcciones({ items, busy, onRetirar, onAbrir }) {
               </dl>
               <div className="pr-acts">
                 {x.retired
-                  ? <><button className="btn ghost sm" onClick={() => onRetirar(x, false)} disabled={busy}>Restaurar en la memoria</button><span className="muted">Retirada por {x.retired_by || 'alguien'} · {fmtDate(x.retired_at)}</span></>
-                  : <button className="btn danger sm" onClick={() => onRetirar(x, true)} disabled={busy}>Retirar de la memoria</button>}
+                  ? <>{x.can_retire ? <button className="btn ghost sm" onClick={() => onRetirar(x, false)} disabled={busy}>Restaurar en la memoria</button> : null}<span className="muted">Retirada por {x.retired_by || 'alguien'} · {fmtDate(x.retired_at)}</span></>
+                  : x.can_retire
+                    ? <button className="btn danger sm" onClick={() => onRetirar(x, true)} disabled={busy}>Retirar de la memoria</button>
+                    : <span className="muted">Solo {x.by || 'quien la escribió'} o un encargado puede retirarla.</span>}
               </div>
             </li>
           ))}

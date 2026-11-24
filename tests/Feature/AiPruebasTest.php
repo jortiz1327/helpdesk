@@ -45,9 +45,28 @@ class AiPruebasTest extends TestCase
         return $this->withHeader('X-App-Token', $tok)->{$metodo . 'Json'}($url, $body);
     }
 
-    public function test_solo_con_permiso_de_configuracion(): void
+    public function test_solo_con_el_permiso_de_probar_la_ia(): void
     {
-        $this->api($this->token('agente'), 'status', [], 'get')->assertForbidden();
+        $this->api($this->token('encargado_campanas'), 'status', [], 'get')->assertForbidden();
+    }
+
+    public function test_un_agente_de_soporte_normal_entra_y_solo_retira_sus_correcciones(): void
+    {
+        $tok = $this->token('agente');
+        $this->api($tok, 'status', [], 'get')->assertOk();
+        $id = $this->api($tok, 'create')->json('id');
+        $this->api($tok, 'send', ['id' => $id, 'text' => 'Consulta'])->assertOk();
+        $bot = collect($this->api($tok, 'reply', ['id' => $id])->json('messages'))->last();
+        $this->api($tok, 'rate', ['id' => $bot['id'], 'rating' => 'down', 'correction' => 'Criterio del agente.'])->assertOk();
+        $this->api($tok, 'corrections', [], 'get')->assertJsonPath('items.0.can_retire', true);
+        $this->api($tok, 'retire', ['id' => $bot['id'], 'retired' => true])->assertOk();
+        // Otro agente (no encargado) no puede retirar ni restaurar la de este.
+        $u2 = User::create(['name' => 'Otro', 'email' => 'otro@x.com', 'password' => bcrypt('x')]);
+        $u2->assignRole('agente');
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        $tok2 = TokenService::make($u2);
+        $this->api($tok2, 'corrections', [], 'get')->assertJsonPath('items.0.can_retire', false);
+        $this->api($tok2, 'retire', ['id' => $bot['id'], 'retired' => false])->assertForbidden();
     }
 
     public function test_el_encargado_entra_y_el_tope_por_defecto_son_20_euros(): void

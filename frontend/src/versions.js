@@ -2,8 +2,18 @@
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión. Formato de cada una:
 //   { version: "1.6.4", date: "24 nov 2026", resumen: "…", mejoras: ["…"], arreglos: ["…"] }
 // Las series (1.6, 1.5…) y las subversiones (1.6.4, 1.6.3…) las agrupa solas la ventana de Novedades.
-export const APP_VERSION = "1.6.9";
+export const APP_VERSION = "1.6.10";
 export const VERSIONS = [
+    {
+        version: "1.6.10",
+        date: "24 nov 2026",
+        resumen: "Cualquier agente de soporte puede entrenar a la IA: el chat de pruebas tiene entrada propia en el menú, sin pasar por Ajustes.",
+        mejoras: [
+            "Ayuda › Entrenar a la IA: el chat de pruebas está al alcance de todos los agentes de soporte, no solo de quien configura el sistema.",
+            "Cada persona retira sus propias correcciones; retirar las de otros solo lo hace un encargado.",
+        ],
+        arreglos: [],
+    },
     {
         version: "1.6.9",
         date: "24 nov 2026",

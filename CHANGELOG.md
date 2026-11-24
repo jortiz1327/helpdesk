@@ -3,6 +3,13 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.10] — 2026-11-24
+
+### Mejoras
+
+- Permiso nuevo `ai.pruebas` (agente de soporte y encargado de soporte; el seeder lo concede a los roles existentes) y entrada «Entrenar a la IA» en el grupo Ayuda del menú. El chat de pruebas sigue también en Ajustes.
+- Cada persona retira solo sus correcciones (`rated_by_id`); retirar las de otros exige `support.config`. Migración `add_rated_by_id_to_ai_lab_messages`.
+
 ## [1.6.9] — 2026-11-24
 
 ### Mejoras

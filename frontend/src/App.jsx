@@ -32,6 +32,7 @@ import SendCampaign from "./components/SendCampaign.jsx";
 import CampaignDashboard from "./components/CampaignDashboard.jsx";
 import CampaignEmailSettings from "./components/CampaignEmailSettings.jsx";
 import Manuals from "./components/Manuals.jsx";
+import AiPruebas from "./components/AiPruebas.jsx";
 import WebNotifications from "./components/WebNotifications.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
 import MorningBriefing from "./components/MorningBriefing.jsx";
@@ -359,6 +360,13 @@ const HELP_GROUP = {
             key: "help",
             label: "Manuales",
             icon: Icon.doc,
+            color: "#8696a0",
+        },
+        {
+            key: "aitest",
+            label: "Entrenar a la IA",
+            icon: Icon.bolt,
+            perm: "ai.pruebas",
             color: "#8696a0",
         },
     ],
@@ -1171,6 +1179,7 @@ export default function App() {
                         {view === "wa_config" && <Settings />}
                         {view === "campaign_email_cfg" && <CampaignEmailSettings />}
                         {view === "help" && <Manuals />}
+                        {view === "aitest" && can("ai.pruebas") && <AiPruebas pagina />}
                         {view === "tickets" && (
                             <Tickets user={auth.user} onGo={setView} initialTab={ticketsTab} initialTicket={ticketAbierto} initialOrg={orgFiltro} onTicketCode={setTicketCode} />
                         )}
