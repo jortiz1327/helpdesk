@@ -86,6 +86,25 @@ class HotelsApiCacheTest extends TestCase
         Http::assertSentCount(1);   // solo el lookup
     }
 
+    public function test_usuario_en_hotel_pregunta_por_id_y_distingue_no_figura_de_no_contesta(): void
+    {
+        Http::fake([
+            'panel.test/api/support/v1/hotels/7/users*' => Http::response(['data' => ['encontrado' => true, 'usuario' => ['rol' => 'Admin', 'activo' => true, 'alcance' => 'cadena', 'hoteles' => [['id' => '7', 'nombre' => 'Hotel Sol']]]]]),
+            'panel.test/api/support/v1/hotels/7/buffets*' => Http::response(['data' => ['hotel' => 'Hotel Sol', 'buffets' => [['id' => '31', 'nombre' => 'Principal']]]]),
+            'panel.test/api/support/v1/hotels/8/users*' => Http::response(['data' => ['encontrado' => false]]),
+            'panel.test/api/support/v1/hotels/9/users*' => Http::response('', 503),
+        ]);
+        $api = new HotelsApi();
+        $s = $api->usuarioEnHotel('7', 'D@sol.es');
+        $this->assertSame('7', $s[0]['hotel_id']);
+        $this->assertSame('Hotel Sol', $s[0]['hotel']);
+        $this->assertSame('Admin', $s[0]['rol']);
+        $this->assertSame([], $api->usuarioEnHotel('8', 'x@sol.es'));
+        $this->assertNull($api->usuarioEnHotel('9', 'x@sol.es'));
+        $this->assertNull($api->usuarioEnHotel('no/valido', 'x@sol.es'));
+        $this->assertNull($api->usuarioEnHotel('7', 'sin-arroba'));
+    }
+
     public function test_un_fallo_no_se_recuerda(): void
     {
         Http::fake(['panel.test/*' => Http::response('', 500)]);

@@ -187,6 +187,38 @@ class HotelsApi
     }
 
     /**
+     * ¿Este correo es usuario de ESTE hotel? Pregunta directa por id (hotels/{id}/users?email=): una sola app, del índice, sin depender de
+     * que contesten las demás. Un usuario de cadena también figura en cada hotel de su grupo.
+     *
+     * @return array<int, array<string, mixed>>|null  null = no se pudo preguntar · [] = no figura · [sitio…] = figura (con sus buffets si se conocen)
+     */
+    public function usuarioEnHotel(string $hotelId, ?string $email): ?array
+    {
+        $email = mb_strtolower(trim((string) $email));
+        if (! $this->configured() || ! self::idValido($hotelId) || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+        $d = $this->get("/api/support/v1/hotels/$hotelId/users", ['email' => $email]);
+        if ($d === null) {
+            return null;
+        }
+        if (empty($d['encontrado'])) {
+            return [];
+        }
+        $u = (array) ($d['usuario'] ?? []);
+        $rol = isset($u['rol']) && is_string($u['rol']) && trim($u['rol']) !== '' ? trim($u['rol']) : null;
+        $activo = array_key_exists('activo', $u) ? (bool) $u['activo'] : null;
+        $hotel = '';
+        foreach ((array) ($u['hoteles'] ?? []) as $h) {
+            if (is_array($h) && (string) ($h['id'] ?? '') === $hotelId) {
+                $hotel = self::nombre($h);
+            }
+        }
+        $hotel = $hotel !== '' ? $hotel : self::nombre($d['hotel'] ?? '');
+        return $this->completarBuffets([['buffet_id' => '', 'buffet' => '', 'hotel' => $hotel, 'hotel_id' => $hotelId, 'rol' => $rol, 'activo' => $activo]]);
+    }
+
+    /**
      * Con el índice central el lookup NO trae buffets (solo el hotel, el rol y si está activo): sin su id no se pueden consultar las antenas ni
      * las etiquetas. Se completan desde el propio hotel (hotels/{id}/buffets, en caché). Solo si son pocos hoteles: un usuario de cadena con
      * decenas de hoteles se queda con los nombres, que es lo que hace falta para verificar.

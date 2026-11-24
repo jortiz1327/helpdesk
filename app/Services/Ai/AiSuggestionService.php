@@ -1238,20 +1238,33 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         }
         $this->avisar('Comprobando el correo en AdminHoteles…');
         $v = $api->verificar($e);
+        // Con el hotel localizado (uno solo, con id) y el lookup global sin resultado útil —no figura, las apps no contestaron o figura
+        // pero no en ese hotel—, se pregunta directamente por ese hotel: es una sola app y no depende de las demás.
+        if ($dir && count($dir) === 1 && $this->hotelAmbiguo === null && trim((string) ($dir[0]['id'] ?? '')) !== ''
+            && ! HotelsApi::sinApi($dir) && in_array($v['estado'], ['incompleto', 'no_encontrado', 'encontrado'], true)
+            && ! ($v['estado'] === 'encontrado' && $this->coincideHotel($dir, $v['sitios']))) {
+            $enHotel = $api->usuarioEnHotel((string) $dir[0]['id'], $e);
+            if ($enHotel) {
+                $v = ['estado' => 'encontrado', 'sitios' => array_merge($enHotel, $v['estado'] === 'encontrado' ? $v['sitios'] : [])];
+                $this->paso('correo', null, 'El correo se ha comprobado directamente en el hotel localizado');
+            }
+        }
         // Un usuario DESACTIVADO no cuenta como verificado: solo valen los sitios donde está activo (y si en ninguno, es «desactivado»).
         $todos = $v['sitios'];
         $v['sitios'] = array_values(array_filter($todos, fn ($x) => ($x['activo'] ?? true) !== false));
         if ($v['estado'] === 'encontrado' && $todos && ! $v['sitios']) {
             $v['estado'] = 'desactivado';
         }
-        $sitios = array_slice($v['sitios'], 0, 4);
+        // La comparación con el hotel se hace con TODOS los sitios (un usuario de cadena trae decenas): solo se recorta lo que se muestra.
+        $sitiosTodos = $v['sitios'];
+        $sitios = array_slice($sitiosTodos, 0, 4);
         $this->hotelLocalizado = (bool) $dir;
         $this->hotelSinApi = $dir && $this->hotelAmbiguo === null && HotelsApi::sinApi($dir);
         if ($this->hotelSinApi) {
             $this->paso('hotel', null, 'Hotel de una app que aún no está en la API de soporte: no se puede verificar, lo lleva una persona');
         }
         $this->hotelNoEncontrado = ! $dir && $nombres && ! $dirFalla;
-        $this->estadoCorreo = ($v['estado'] === 'encontrado' && (! $dir || $this->coincideHotel($dir, $sitios))) ? 'verificado' : (string) $v['estado'];
+        $this->estadoCorreo = ($v['estado'] === 'encontrado' && (! $dir || $this->coincideHotel($dir, $sitiosTodos))) ? 'verificado' : (string) $v['estado'];
         // Verificado y de UN solo hotel: se recuerda para no volver a preguntarlo en el próximo ticket.
         if ($this->estadoCorreo === 'verificado' && $contactId && $v['sitios']) {
             $nuevo = ContactoHotel::recordar($contactId, $v['sitios'], (string) ($dir[0]['grupo'] ?? ''));
@@ -1277,7 +1290,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             $this->paso('correo', false, "El correo $e figura, pero su usuario está DESACTIVADO: no se le atiende como usuario");
         } elseif ($v['estado'] === 'no_encontrado') {
             $this->paso('correo', false, "El correo $e no figura como usuario de la aplicación");
-        } elseif ($dir && ! $this->coincideHotel($dir, $sitios)) {
+        } elseif ($dir && ! $this->coincideHotel($dir, $sitiosTodos)) {
             $this->paso('correo', false, "El correo $e figura, pero no asociado al hotel que dice");
         } else {
             $this->paso('correo', true, "Correo $e verificado en: " . implode('; ', array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /'), $sitios)), ['correo' => $e, 'sitios' => array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /'), $sitios)]);
@@ -1336,7 +1349,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
                 . "- Explícaselo con tacto: con ese correo no podemos asociarle a un hotel en nuestro sistema.\n" . $pedir . $tacto . $comun . $derivar;
         }
         // encontrado: ¿coincide con el hotel que dice ser?
-        if ($dir && ! $this->coincideHotel($dir, $sitios)) {
+        if ($dir && ! $this->coincideHotel($dir, $sitiosTodos)) {
             return $cab . "- El cliente dice ser de «" . $dir[0]['nombre'] . "», pero su correo ($e) no figura asociado a ese hotel en la aplicación.\n"
                 . "- Explícaselo con tacto: con el correo que nos indica no podemos asociarle a ese hotel en nuestro sistema.\n" . $pedir . $tacto . $comun . $derivar;
         }
