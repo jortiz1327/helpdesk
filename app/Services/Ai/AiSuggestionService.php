@@ -644,7 +644,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         // correo verificado (ni se intentó comprobar), lo primero es pedir hotel y correo. Salvo: pedidos de material y presupuestos (no
         // dependen del hotel), farmacias, tiendas y supermercados (otras áreas, otra verificación) y quien nombra un sitio que el listado de
         // hoteles no conoce (quizá no sea un hotel; ahí manda VERIFICACIÓN DEL CLIENTE: pedir el nombre exacto y, si sigue sin constar, derivar).
-        $material = preg_match('/presupuesto|(comprar|compra|pedir|pedido|reponer|necesit[a-z]+)\b.{0,40}(pilas|soportes?|recambios?|pinzas|etiquetas)/s', $t);
+        $material = preg_match('/presupuesto|(comprar|compra|pedir|pedido|encarg[a-z]+|reponer|necesit[a-z]+)\b.{0,40}(pilas|soportes?|recambios?|pinzas|etiquetas|tapas)/s', $t);
         // Tienda o comercio (no un hotel): balanza, báscula, caja, carnicería, frutería… De momento los lleva una persona del equipo: ni se
         // les pide «hotel» ni se les explica nada. Solo si aún no hay un correo verificado (si ya es un usuario de la app, manda lo demás).
         // Vocabulario y nombres sacados de los clientes reales que no son hoteles (carnicerías, pescaderías, supermercados, garden, bricolaje, vinos, mascotas, pádel…).

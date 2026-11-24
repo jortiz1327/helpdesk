@@ -165,7 +165,7 @@ const bottomB = yMerge + 20;
 y = seccion('C', 'Decisión en código', 'Lo evidente se decide sin la IA; luego se le dan instrucciones', bottomB + 18);
 dia('d5', C, y, 290, 'sys', ['¿Es un caso tan claro que', 'no hace falta pensarlo?']);
 arr([[C, yMerge], N.d5.t]);
-box('c1', L, N.d5.y + N.d5.h / 2 - 40, 250, 'der', 'Pasa a una persona', ['con el cliente verificado: alérgenos,', 'tótems y garantías (salvo farmacias)']);
+box('c1', L, N.d5.y + N.d5.h / 2 - 40, 250, 'der', 'Pasa a una persona', ['con el cliente verificado: alérgenos,', 'tótems y garantías (con 3 fotos; no farmacias)']);
 arr([N.d5.l, N.c1.r]); lab('Sí', N.d5.l[0] - 10, N.d5.l[1] - 7, 'end');
 box('c2', 960, N.d5.y + N.d5.h / 2 - 40, 290, 'cli', 'Pedir hotel y correo', ['norma de la dirección: en un hotel sin correo', 'verificado, se verifica ANTES de todo', '(salvo material, presupuestos, farmacias,', 'tiendas y sitios que no son hoteles)']);
 arr([N.d5.r, N.c2.l]); lab('Sí', N.d5.r[0] + 10, N.d5.r[1] - 7);
