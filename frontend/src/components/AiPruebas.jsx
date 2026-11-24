@@ -263,7 +263,7 @@ export default function AiPruebas({ pagina = false }) {
         </div>
         <div className="spacer" />
       </header>
-      <div className="page-scroll"><div className="page" style={{ maxWidth: 1240 }}>{cuerpo}</div></div>
+      <div className="page-scroll"><div className="page" style={{ maxWidth: 1700 }}>{cuerpo}</div></div>
     </>
   )
 }
