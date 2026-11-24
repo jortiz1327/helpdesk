@@ -3,6 +3,12 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.11] — 2026-11-24
+
+### Mejoras
+
+- Chat de pruebas de la IA (Entrenar a la IA): tipografía, burbujas, botones, lista y ancho de página más grandes. Solo estilos; sin migraciones.
+
 ## [1.6.10] — 2026-11-24
 
 ### Mejoras
