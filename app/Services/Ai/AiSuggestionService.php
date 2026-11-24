@@ -731,7 +731,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $t = (string) preg_replace('/^.*?(?=^## General)/ms', '', $t);               // quita título y párrafo de presentación
         $t = (string) preg_replace('/^## (Desperdicio|Operativa|Eventos|Wellness|Restaurante).*\z/ms', '', $t);   // módulos de nicho
         $t = (string) preg_replace('/\[([^\]]+)\]\([^)]+\)/u', '$1', $t);            // [Servicios](15-servicios.md) → Servicios
-        return "\nMAPA DE LA APLICACIÓN DE HOTELES (todo esto lo hace el PROPIO HOTEL desde la aplicación, con su usuario y su rol; NO es trabajo del equipo de AEME. Si lo que pide el cliente está aquí, explícalo con la guía (el equipo solo carga platos de ruedas de menú, logos, plantillas y altas de etiquetas nuevas). La guía detallada de cada apartado, si hace falta, sale más abajo)\n" . trim($t) . "\n";
+        return "\nMAPA DE LA APLICACIÓN DE HOTELES (todo esto lo hace el PROPIO HOTEL desde la aplicación, con su usuario y su rol; NO es trabajo del equipo de AEME. Si lo que pide el cliente está aquí, explícalo con la guía (los platos y las ruedas de menú también los gestiona el hotel; el equipo solo hace logos, plantillas y altas de etiquetas nuevas). La guía detallada de cada apartado, si hace falta, sale más abajo)\n" . trim($t) . "\n";
     }
 
     /**

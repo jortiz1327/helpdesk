@@ -152,12 +152,14 @@ un usuario no ve las antenas de una sede, revisar sus **permisos/acceso** a esa 
 ## Configuración de menús (buffet)
 
 ### Cambiar un plato o el menú
-El cliente lo hace desde la **app / panel web** con un usuario con **permisos de cambio de platos**.
-Si no tiene ese usuario, se le crea (pedir su **correo** para darle de alta con permisos).
+El cliente lo hace desde la **app / panel web** (Platos y Ruedas de menús) con un usuario con **permisos de platos**
+(crear, editar, cambiar platos). Si su usuario no tiene el permiso, se lo da el **administrador de su hotel**.
 
 ### Importar platos desde Excel
-Los platos se cargan desde el **Excel** que aporta el cliente; solo se importan los que estén bien
-en el fichero. Si son pocos, puede **añadirlos a mano** (hay **vídeo tutorial** en el apartado de
+Los platos los carga **el propio hotel** desde Platos > Importar platos (permiso de importar platos), con su
+Excel; solo se importan los que estén bien en el fichero. Excepción: si la oferta está bloqueada porque las
+etiquetas están online, solo puede importar un superadministrador (entonces se deriva; para un cambio puntual,
+que edite el plato). Si son pocos, puede **añadirlos a mano** (hay **vídeo tutorial** en el apartado de
 platos para crearlos con todas sus características).
 
 ### Forzar el cambio de menú
