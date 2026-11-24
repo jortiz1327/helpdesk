@@ -30,6 +30,10 @@ class CoherenciaConocimientoTest extends TestCase
         $this->assertSame([], $this->claves('La pila es una CR2450 (AM-BZ2450)', 'plantilla'));
         $this->assertSame(['reinicio-minutos'], $this->claves('Quite las pilas unos 5 minutos y vuelva a ponerlas', 'plantilla'));
         $this->assertSame([], $this->claves('Quite las pilas 15 minutos y vuelva a ponerlas', 'plantilla'));
+        // Una plantilla con un paso por línea: el tiempo no está en la misma línea que las pilas, y se escribe «30min».
+        $this->assertSame(['reinicio-minutos'], $this->claves("Retire la tapa.\nRetire las pilas.\nEspere 30min.\nVuelva a introducir las pilas.", 'plantilla'));
+        $this->assertSame([], $this->claves("Retire las pilas.\nEspere 15 minutos.\nVuelva a introducirlas.", 'plantilla'));
+        $this->assertSame([], $this->claves("El menú cambia en unos 5 min.\nSi no cambia, fuerce la etiqueta.", 'plantilla'), 'sin pilas ni reinicio cerca no cuenta');
         $this->assertSame([], $this->claves('Espere 5 minutos por etiqueta antes de forzar', 'fichero'), '5 minutos sin pilas ni reinicio es otra cosa');
         $this->assertSame(['anadir-etiqueta-solo-plataforma'], $this->claves('Entre en Conectividad > Etiquetas > Añadir etiqueta', 'ticket'));
         $this->assertSame([], $this->claves('Conectividad > Etiquetas > Añadir etiqueta es solo del administrador de la plataforma', 'fichero'));

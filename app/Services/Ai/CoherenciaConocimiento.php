@@ -28,7 +28,9 @@ class CoherenciaConocimiento
      * Hechos vigentes. 'ambito': dónde se comprueba (fichero, correccion, plantilla, ticket). 'prohibido' y 'salvo' se aplican a cada
      * línea ya normalizada (minúsculas y sin tildes). Una línea que cumple 'prohibido' y NO 'salvo' es una contradicción.
      *
-     * @return array<string, array{titulo:string, ambito:array<int,string>, prohibido?:string, salvo?:string, correo_ajeno?:bool}>
+     * 'contexto' (opcional): además, ese patrón debe aparecer en la línea o en las 3 anteriores.
+     *
+     * @return array<string, array{titulo:string, ambito:array<int,string>, prohibido?:string, salvo?:string, contexto?:string, correo_ajeno?:bool}>
      */
     public static function hechos(): array
     {
@@ -59,7 +61,10 @@ class CoherenciaConocimiento
             'reinicio-minutos' => [
                 'titulo' => 'El reinicio de la etiqueta es con las pilas fuera 15 minutos',
                 'ambito' => ['fichero', 'correccion', 'plantilla'],
-                'prohibido' => '/(pila|reinici)[^.\n]{0,80}\b(?!15\b)\d+ ?minutos|\b(?!15\b)\d+ ?minutos[^.\n]{0,80}(pila|reinici)/',
+                // «30min», «30 min» y «30 minutos» en una línea; el tema (pila o reinicio) puede estar en la propia línea o en las 3 anteriores
+                // (los pasos de una plantilla van uno por línea: «Retire las pilas. / Espere 30min.»).
+                'prohibido' => '/\b(?!15\b)\d+ ?min(utos?)?\b/',
+                'contexto' => '/pila|reinici/',
             ],
             'anadir-etiqueta-solo-plataforma' => [
                 'titulo' => 'Conectividad › Etiquetas › Añadir etiqueta es solo del administrador de la plataforma (al cliente se le dice Posiciones › No encuentro la etiqueta)',
@@ -115,11 +120,13 @@ class CoherenciaConocimiento
     {
         $permitidos ??= self::correosPermitidos();
         $out = [];
-        foreach (explode("\n", $texto) as $i => $linea) {
+        $lineas = explode("\n", $texto);
+        foreach ($lineas as $i => $linea) {
             if (trim($linea) === '') {
                 continue;
             }
             $n = self::normalizar($linea);
+            $ventana = self::normalizar(implode("\n", array_slice($lineas, max(0, $i - 3), min(3, $i) + 1)));
             foreach (self::hechos() as $clave => $h) {
                 if (! in_array($ambito, $h['ambito'], true)) {
                     continue;
@@ -131,7 +138,8 @@ class CoherenciaConocimiento
                             $hit = $hit || ! in_array($correo, $permitidos, true);
                         }
                     }
-                } elseif (preg_match($h['prohibido'], $n) && ! (isset($h['salvo']) && preg_match($h['salvo'], $n))) {
+                } elseif (preg_match($h['prohibido'], $n) && ! (isset($h['salvo']) && preg_match($h['salvo'], $n))
+                    && (! isset($h['contexto']) || preg_match($h['contexto'], $ventana))) {
                     $hit = true;
                 }
                 if ($hit) {
