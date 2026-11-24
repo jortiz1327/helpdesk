@@ -156,10 +156,9 @@ El cliente lo hace desde la **app / panel web** (Platos y Ruedas de menús) con 
 (crear, editar, cambiar platos). Si su usuario no tiene el permiso, se lo da el **administrador de su hotel**.
 
 ### Importar platos desde Excel
-Los platos los carga **el propio hotel** desde Platos > Importar platos (permiso de importar platos), con su
-Excel; solo se importan los que estén bien en el fichero. Excepción: si la oferta está bloqueada porque las
-etiquetas están online, solo puede importar un superadministrador (entonces se deriva; para un cambio puntual,
-que edite el plato). Si son pocos, puede **añadirlos a mano** (hay **vídeo tutorial** en el apartado de
+La **importación masiva** desde Excel la hace **el equipo de AEME**: el cliente aporta su Excel y se
+deriva; solo se importan los que estén bien en el fichero. Si son pocos, el hotel puede **añadirlos a mano**
+desde Platos (hay vídeo tutorial) y cualquier cambio puntual lo edita él mismo. Si son pocos, puede **añadirlos a mano** (hay **vídeo tutorial** en el apartado de
 platos para crearlos con todas sus características).
 
 ### Forzar el cambio de menú
