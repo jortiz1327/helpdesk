@@ -27,7 +27,7 @@ No hay un manual general: cada área se genera o se escribe de una forma distint
 |---|---|---|---|
 | Hoteles | Lo genera Claude leyendo el proyecto web de hoteles (un prompt lanzado en la raíz de ese proyecto) | Robert, volviendo a lanzar ese prompt | Cuando cambia la aplicación de hoteles |
 | Soporte: protocolos | Lo escribe Juan a partir de los chats reales del equipo | Juan | Cuando el equipo cambia un protocolo o decide algo nuevo |
-| Portal del cliente (PDF) | Lo generó Claude hace meses; sigue sin revisarse | Claude, con la ayuda de Juan: comprobar si sigue siendo cierto y regenerarlo | La tarjeta lo marca «Toca revisar» cada 90 días |
+| Portal del cliente (PDF) | Lo generó Claude hace meses; sigue sin revisarse | Claude, con la ayuda de Juan: se regenera con `php resources/manuals-src/04-cliente.php` (v1.1, 24-nov-2026) | La tarjeta lo marca «Toca revisar» cada 90 días |
 | Farmacias | Se hará igual que hoteles: un prompt en la raíz del proyecto de farmacias que documente toda la aplicación | Diego | Cuando haya API y cambie AdminFarm |
 | Tiendas y Cloud | Sin definir cómo se documentará | Juan, cuando se haga | Pendiente |
 
