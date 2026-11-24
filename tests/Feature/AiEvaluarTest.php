@@ -112,6 +112,19 @@ class AiEvaluarTest extends TestCase
         $this->assertStringNotContainsString('](15-servicios.md)', $fake->sistema);
     }
 
+    public function test_el_prompt_lleva_el_vocabulario_del_cliente_y_separa_etiquetas_de_pantallas_grandes(): void
+    {
+        $fake = new class implements AiProvider {
+            public string $sistema = '';
+            public function configured(): bool { return true; }
+            public function complete(string $system, array $messages): array { $this->sistema = $system; return ['text' => 'Borrador', 'model' => 'f', 'input_tokens' => 1, 'output_tokens' => 1]; }
+        };
+        app(AiSuggestionService::class)->evaluarCaso('Etiqueta', 'Mis tarjetitas no cambian', null, $fake);
+        foreach (['«tarjetas»', '«tarjetitas»', '«cartelitos»', '«carteles»', '«pantallitas»', 'etiquetas', 'televisores y tótems son pantallas grandes (TV) que NO son etiquetas'] as $x) {
+            $this->assertStringContainsString($x, $fake->sistema);
+        }
+    }
+
     /** Auditoría de contradicciones: se ejecuta con toda la suite, así cada cambio de reglas pasa por aquí. */
     public function test_auditoria_del_prompt_una_sola_prioridad_y_sin_reglas_repetidas(): void
     {
