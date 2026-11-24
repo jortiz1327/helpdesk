@@ -483,7 +483,6 @@ export const api = {
   },
   ticketRelated: (ticket) => req(`ticket_related.php?ticket=${ticket}`),
   aiSummary: (ticket, regen = false) => req(`ai_suggestions.php?action=summary&ticket=${ticket}${regen ? '&regen=1' : ''}`),
-  aiSearch: (q) => req(`ai_suggestions.php?action=search&q=${encodeURIComponent(q)}`),
   aiStatus: () => req('ai_suggestions.php?action=status'),
   aiRate: (id, rating, correction, reason) => req('ai_suggestions.php?action=rate', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, rating, correction, reason }),

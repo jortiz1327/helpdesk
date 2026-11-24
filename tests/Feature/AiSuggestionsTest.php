@@ -816,13 +816,29 @@ class AiSuggestionsTest extends TestCase
         $this->withHeader('X-App-Token', $this->encargado())->postJson('/api/ai_suggestions.php?action=admin_save', ['enabled' => true])->assertStatus(422);
         $this->assertNotSame('1', Setting::get('ai_suggestions_enabled'));
     }
-    public function test_buscador_de_memoria_pide_al_menos_tres_letras_y_no_usa_la_ia(): void
+
+    public function test_la_ia_puede_buscar_en_la_memoria_por_su_cuenta_y_queda_en_la_traza(): void
+    {
+        $this->activar();
+        $tools = new FakeAiHerramientas();
+        $tools->respuesta = 'Hola Marta, entre en Idiomas y elija el idioma.';
+        $this->app->instance(AiProvider::class, $tools);
+        $tok = $this->agente();
+        $tk = $this->ticket('Quiero cambiar el idioma de las etiquetas');
+        $r = $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk();
+        $this->assertSame('ready', $r->json('suggestion.status'));
+        $this->assertSame(1, $tools->herramientaLlamadas, 'la IA pidió una búsqueda');
+        $this->assertSame('buscar_memoria', $tools->ultimaHerramienta);
+        $pasos = array_column($r->json('suggestion.sources.traza') ?? [], 'k');
+        $this->assertContains('busqueda', $pasos);
+    }
+
+    public function test_sin_proveedor_con_herramientas_funciona_igual(): void
     {
         $this->activar();
         $tok = $this->agente();
-        $this->withHeader('X-App-Token', $tok)->getJson('/api/ai_suggestions.php?action=search&q=ab')->assertOk()->assertJsonPath('short', true);
-        $this->withHeader('X-App-Token', $tok)->getJson('/api/ai_suggestions.php?action=search&q=' . urlencode('nada que exista'))->assertOk()->assertJsonPath('results', []);
-        $this->assertSame(0, $this->fake->llamadas, 'buscar no usa la IA');
+        $tk = $this->ticket('Hola, no conecta la etiqueta');
+        $this->withHeader('X-App-Token', $tok)->getJson("/api/ai_suggestions.php?action=suggest&ticket=$tk")->assertOk()->assertJsonPath('suggestion.status', 'ready');
     }
 }
 
@@ -851,4 +867,18 @@ class FakeAi implements AiProvider
         return ['text' => $this->respuesta, 'model' => 'fake', 'input_tokens' => 10, 'output_tokens' => 5];
     }
 
+}
+
+class FakeAiHerramientas extends FakeAi implements \App\Services\Ai\AiProviderConHerramientas
+{
+    public int $herramientaLlamadas = 0;
+    public ?string $ultimaHerramienta = null;
+
+    public function completeConHerramientas(string $system, array $messages, array $herramientas, callable $ejecutar, int $maxRondas = 3): array
+    {
+        $this->herramientaLlamadas++;
+        $this->ultimaHerramienta = $herramientas[0]['name'] ?? null;
+        $ejecutar('buscar_memoria', ['consulta' => 'cambiar idioma etiqueta']);
+        return ['text' => $this->respuesta, 'model' => 'fake', 'input_tokens' => 10, 'output_tokens' => 5, 'usos' => 1];
+    }
 }

@@ -40,6 +40,9 @@ return [
     // Manuales (claves de config/manuals.php) que la IA puede consultar. Solo los pensados para clientes.
     'manuals'    => ['cliente'],
     // Puntuación mínima absoluta FULLTEXT (0 = solo cuenta la relativa al mejor resultado; subirla con datos reales si se cuelan casos poco relacionados).
+    // La IA puede buscar ella misma en la memoria mientras redacta (herramienta interna; solo proveedores que lo admiten).
+    'memoria_herramienta' => (bool) env('AI_MEMORIA_HERRAMIENTA', true),
+    'memoria_max_busquedas' => (int) env('AI_MEMORIA_MAX_BUSQUEDAS', 2),
     'knowledge_min_score' => (float) env('AI_KNOWLEDGE_MIN_SCORE', 0.0),
 
     // Precio en USD por millón de tokens [entrada, salida], solo para ESTIMAR el gasto en Ajustes (la factura real es la del proveedor).

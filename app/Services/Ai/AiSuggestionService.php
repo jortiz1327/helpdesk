@@ -471,11 +471,22 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
         $this->paso('memoria', null, 'Memoria consultada: ' . count($faqs) . ' preguntas frecuentes · ' . count($ejemplos) . ' respuestas de ejemplo · ' . count($casos) . ' casos/manuales parecidos'
             . ($casos ? ' (' . implode('; ', array_map(fn ($d) => mb_substr((string) ($d->title ?? ''), 0, 60), array_slice($casos, 0, 4))) . ')' : ''),
             ['faqs' => count($faqs), 'ejemplos' => count($ejemplos), 'casos' => array_map(fn ($d) => ['tipo' => (string) ($d->source_type ?? ''), 'titulo' => mb_substr((string) ($d->title ?? ''), 0, 90)], array_slice($casos, 0, 6))]);
-        $fuentes = fn () => json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_map(fn ($d) => (int) $d->id, $casos), 'traza' => $this->traza, 'derivar' => $this->derivarA, 'estilo' => $this->estilo ?: null]);
+        $extraDocs = [];   // lo que la IA buscó ella misma durante la redacción (también cuenta como fuente)
+        $fuentes = function () use ($faqs, $ejemplos, $casos, &$extraDocs) {
+            return json_encode(['faqs' => array_column($faqs, 'id'), 'examples' => array_column($ejemplos, 'id'), 'docs' => array_values(array_unique(array_merge(array_map(fn ($d) => (int) $d->id, $casos), $extraDocs))), 'traza' => $this->traza, 'derivar' => $this->derivarA, 'estilo' => $this->estilo ?: null]);
+        };
         $fila = ['sources' => $fuentes()];
         $this->avisar('Redactando la respuesta…');
         try {
-            $r = $ai->complete($this->instrucciones($t, $faqs, $ejemplos, $casos) . $this->notaEstilo(), $this->comoTurnos($conversacion));
+            $sistema = $this->instrucciones($t, $faqs, $ejemplos, $casos) . $this->notaEstilo();
+            if ($ai instanceof AiProviderConHerramientas && config('ai.memoria_herramienta', true)) {
+                // La IA consulta la memoria por su cuenta si lo que se le dio no basta (como una herramienta interna; el agente no ve ningún botón).
+                $r = $ai->completeConHerramientas($sistema, $this->comoTurnos($conversacion), [self::HERRAMIENTA_MEMORIA],
+                    fn (string $nombre, array $entrada) => $this->buscarParaLaIa($nombre, $entrada, $extraDocs),
+                    (int) config('ai.memoria_max_busquedas', 2));
+            } else {
+                $r = $ai->complete($sistema, $this->comoTurnos($conversacion));
+            }
             if (! empty($r['truncated'])) {
                 // Un texto cortado a medias no se puede enseñar como si estuviera completo.
                 $fila += ['model' => $r['model'], 'input_tokens' => $r['input_tokens'], 'output_tokens' => $r['output_tokens']];   // se pagó aunque no sirva
@@ -496,6 +507,38 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
             $fila['sources'] = $fuentes();
             return $fila + ['status' => 'failed', 'body' => null, 'error' => mb_substr($e instanceof AiException ? $e->getMessage() : 'Error inesperado', 0, 250)];
         }
+    }
+
+    /** La herramienta que ve la IA. Las pautas de uso van aquí (el prompt está al límite de su tamaño). */
+    public const HERRAMIENTA_MEMORIA = [
+        'name' => 'buscar_memoria',
+        'description' => 'Busca en los manuales de la aplicación, los casos ya resueltos y las correcciones del equipo. Úsala SOLO si lo que ya se te ha dado no cubre lo que pregunta el cliente, o para comprobar el nombre exacto de una pantalla o botón antes de nombrarlo. Pocas palabras clave en español (no frases enteras). Si no encuentras nada útil, no inventes: sigue las reglas (pedir datos o pasarlo a una persona).',
+        'input_schema' => ['type' => 'object', 'properties' => ['consulta' => ['type' => 'string', 'description' => 'Palabras clave de lo que buscas, p. ej. «cambiar idioma etiqueta»']], 'required' => ['consulta']],
+    ];
+
+    /** Ejecuta la búsqueda que pide la IA y apunta en la traza qué buscó. Los documentos ya vienen sin datos personales. */
+    private function buscarParaLaIa(string $nombre, array $entrada, array &$extraDocs): string
+    {
+        $q = is_string($entrada['consulta'] ?? null) ? trim(mb_substr($entrada['consulta'], 0, 200)) : '';
+        if ($nombre !== 'buscar_memoria' || mb_strlen($q) < 3) {
+            return 'Escribe al menos 3 letras de lo que buscas.';
+        }
+        $docs = $this->knowledge->consultar($q);
+        $this->paso('busqueda', null, 'La IA buscó en la memoria: «' . $q . '» → ' . count($docs) . ' resultado' . (count($docs) === 1 ? '' : 's'),
+            ['consulta' => $q, 'resultados' => array_map(fn ($d) => ['tipo' => (string) $d->source_type, 'titulo' => mb_substr((string) $d->title, 0, 90)], array_slice($docs, 0, 6))]);
+        if (! $docs) {
+            return 'No hay nada parecido en la memoria.';
+        }
+        $out = [];
+        foreach (array_slice($docs, 0, 5) as $d) {
+            $extraDocs[] = (int) $d->id;
+            $txt = (string) $d->content;
+            $out[] = '[' . $d->source_type . '] ' . $d->title . "
+" . (mb_strlen($txt) > 700 ? mb_substr($txt, 0, 700) . '…' : $txt);
+        }
+        return implode("
+---
+", $out);
     }
 
     public const AJENAS_POR_DEFECTO = ['Don Pancho'];

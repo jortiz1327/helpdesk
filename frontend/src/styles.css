@@ -4615,16 +4615,3 @@ input[type="time"].cmp-var::-webkit-calendar-picker-indicator:hover { opacity: 1
 .tkm-hotel small { color: var(--ink-2); }
 .tkm-hotel.old { border-style: dashed; opacity: .8; }
 .tkm-hotel.old svg { fill: var(--ink-2); }
-/* Buscador de la memoria (cajón de la IA) */
-.ai-bq { width: 100%; font: inherit; font-size: 14px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; }
-.ai-bq:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.ai-bt { display: flex; gap: 6px; flex-wrap: wrap; }
-.ai-bchip { font: inherit; font-size: 12.5px; font-weight: 650; color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: 99px; padding: 4px 11px; cursor: pointer; }
-.ai-bchip span { color: var(--ink-3); font-weight: 600; margin-left: 3px; }
-.ai-bchip.on { color: #fff; background: var(--primary); border-color: var(--primary); }
-.ai-bchip.on span { color: #fff; opacity: 0.85; }
-.ai-bres { display: grid; gap: 6px; padding: 12px 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; }
-.ai-bres p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); white-space: pre-line; overflow-wrap: anywhere; }
-.ai-bh { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 14px; }
-.ai-btipo { font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 8px; border-radius: 99px; color: var(--primary); background: var(--primary-soft); }
-.ai-btipo.ticket { color: var(--secondary); background: rgba(37, 211, 102, 0.14); }
