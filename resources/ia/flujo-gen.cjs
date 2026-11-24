@@ -129,7 +129,7 @@ lab('Sí', C + 12, N.p1.b[1] + 22);
 dia('h1', A, yTop, 280, 'api', ['¿Podemos consultar el panel', 'de hoteles? (solo lectura)'], { badge: '4' });
 box('h1x', T, N.h1.y + N.h1.h / 2 - 28, 200, 'no', 'Sin datos del hotel', ['la IA se los pregunta', 'al cliente']);
 arr([N.h1.r, N.h1x.l]); lab('No', N.h1.r[0] + 10, N.h1.r[1] - 7);
-box('h2', A, N.h1.y + N.h1.h + IN, 280, 'api', 'Busca el hotel', ['por el correo del ticket, el nombre', 'del mensaje o la firma, o la etiqueta', '(listado en caché; si no consta,', 'quizá no sea un hotel)']);
+box('h2', A, N.h1.y + N.h1.h + IN, 280, 'api', 'Busca el hotel', ['por el correo del ticket, el nombre', '(aunque traiga palabras de más), la', 'firma o la etiqueta; se identifica por', 'su id. Si no consta, quizá no sea hotel;', 'apps aún sin API: lo lleva una persona']);
 arr([N.h1.b, N.h2.t]); lab('Sí', A + 12, N.h1.b[1] + 22);
 dia('h3', A, N.h2.y + N.h2.h + IN, 280, 'api', ['¿Reconocemos el correo como', 'usuario de la aplicación?']);
 arr([N.h2.b, N.h3.t]);
@@ -139,8 +139,10 @@ dia('h4', A, N.h3.y + N.h3.h + IN, 280, 'api', ['¿El hotel que dice el cliente'
 arr([N.h3.b, N.h4.t]); lab('Sí', A + 12, N.h3.b[1] + 22);
 box('h4x', T, N.h4.y + N.h4.h / 2 - 36, 200, 'no', 'No es el mismo', ['se le explica con tacto', 'y lo atiende una persona']);
 arr([N.h4.r, N.h4x.l]); lab('No', N.h4.r[0] + 10, N.h4.r[1] - 7);
-box('h5', A, N.h4.y + N.h4.h + IN, 280, 'api', 'Datos del hotel para la IA', ['su rol y si el usuario está activo', 'antenas conectadas y desconectadas', 'estado de la etiqueta']);
+box('h5', A, N.h4.y + N.h4.h + IN, 280, 'api', 'Datos del hotel para la IA', ['su rol y si el usuario está activo', 'antenas conectadas y desconectadas', 'estado de la etiqueta y de la posición']);
 arr([N.h4.b, N.h5.t]); lab('Sí', A + 12, N.h4.b[1] + 22);
+box('h6', A, N.h5.y + N.h5.h + IN, 280, 'api', 'Historial del cliente', ['sus últimos tickets y los de su hotel,', 'resumidos (solo con el correo verificado)']);
+arr([N.h5.b, N.h6.t]);
 
 arr([N.b1.b, [C, yl]], { noarrow: true });
 arr([[L, yl], [A, yl]], { noarrow: true });
@@ -148,14 +150,14 @@ arr([[L, yl], N.m1.t]);
 arr([[C, yl], N.p1.t]);
 arr([[A, yl], N.h1.t]);
 
-const yBottomAll = Math.max(N.m2.y + N.m2.h, N.p2.y + N.p2.h, N.h5.y + N.h5.h);
+const yBottomAll = Math.max(N.m2.y + N.m2.h, N.p2.y + N.p2.h, N.h6.y + N.h6.h);
 const yMerge = yBottomAll + 34;
 chip('sf', N.p1.l[0] - 85, N.p1.l[1] - 16, 120, 'sys', 'Sin fotos: sigue', true);
 arr([N.p1.l, N.sf.r]);
 lab('No', N.p1.l[0] - 5, N.p1.l[1] - 22, 'end');
 arr([N.m2.b, [L, yMerge]], { noarrow: true });
 arr([N.p2.b, [C, yMerge]], { noarrow: true });
-arr([N.h5.b, [A, yMerge]], { noarrow: true });
+arr([N.h6.b, [A, yMerge]], { noarrow: true });
 arr([[L, yMerge], [A, yMerge]], { noarrow: true });
 const bottomB = yMerge + 20;
 

@@ -3,6 +3,26 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.4] — 2026-11-24
+
+### Mejoras
+
+- Asistente de IA › historial del cliente: la sugerencia recibe como contexto los últimos 3 tickets anteriores (12 meses) del mismo contacto y de otros usuarios de su mismo hotel (sede recordada y vigente), resumidos en una línea (lo que pidió y lo que contestó una persona, con datos personales tapados, sin notas internas ni nombres de otros contactos). Solo con el correo VERIFICADO y en tickets reales; sin llamada extra a la IA (`HistorialCliente`).
+- Hotel: búsqueda palabra a palabra cuando el nombre trae palabras de más («Bahía Príncipe Explore Turquesa») y nombre suelto tras «en» («Islantilla»).
+- Verificación: el correo se comprueba también directamente en el hotel localizado (`hotels/{id}/users?email=`) como respaldo del lookup global, y la coincidencia hotel-correo usa todos los sitios (antes se recortaba a 4 y un usuario de cadena podía salir «no asociado»).
+- Hotel identificado por su id de AdminHoteles (enlace del contacto por hotel o marca y comprobación de que el correo es de ese hotel); correo de WhatsApp guardado en la ficha cuando lo da el cliente y está verificado; buffets y antenas completados desde el hotel.
+- Hoteles de aplicaciones sin API de soporte (Poseidón, Hoteles03, Fira Barcelona, Lavaka): se derivan a Soporte sin pedir más datos (`HotelsApi::APPS_SIN_API`).
+- Posiciones: si el cliente nombra una (p. ej. CL02-05) se consulta `buffets/{id}/positions` (existe, activa, etiqueta y plato).
+- Reglas: platos sueltos, ruedas de menú, idiomas y plantilla de etiqueta los gestiona el hotel; el equipo hace el logo, importar platos desde Excel y el alta en Conectividad (solo la plataforma); las etiquetas nuevas se vinculan desde Posiciones. Se derivan seguimientos de presupuestos y pedidos, plazos de envío y PDA; sustituir lo ya comprado se explica; querer comprar etiquetas rotas es un pedido de material.
+- Novedades (ventana de versiones) rediseñada: series (1.6, 1.5…) y subversiones, con mejoras y arreglos en tarjetas, tema claro/oscuro y móvil. Las versiones viven ahora en `frontend/src/versions.js`.
+- `/ia/flujo` y la formación de los agentes al día con todo lo anterior.
+- Migraciones: `2026_11_20_160000_add_reason_to_ai_ratings`, `2026_11_23_100000_create_ai_summaries`, `2026_11_23_200000_add_hotel_link_to_sedes_and_contacts`, `2026_11_23_210000_add_marca_link_to_contacts`. Al desplegar: `php artisan ai:indexar --solo=correcciones`.
+
+### Arreglos
+
+- Modificar los platos de un menú ya no se deriva al equipo por error (lo hace el hotel).
+- Quien tiene acceso a más de 4 hoteles ya no sale como «no asociado» a un hotel que sí es suyo.
+
 ## [1.6.3] — 2026-11-22
 
 ### Mejoras
