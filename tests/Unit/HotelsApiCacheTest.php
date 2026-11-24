@@ -105,6 +105,19 @@ class HotelsApiCacheTest extends TestCase
         $this->assertNull($api->usuarioEnHotel('7', 'sin-arroba'));
     }
 
+    public function test_posicion_por_codigo(): void
+    {
+        Http::fake([
+            'panel.test/api/support/v1/buffets/31/positions*' => Http::response(['data' => ['posiciones' => [['codigo' => 'CL02-05', 'activa' => true, 'isleta' => 'Isla 2', 'buffet' => 'Principal', 'etiqueta' => 'ETQ-14', 'plato' => 'Paella']]]]),
+            'panel.test/api/support/v1/buffets/32/positions*' => Http::response(['data' => ['posiciones' => []]]),
+        ]);
+        $api = new HotelsApi();
+        $p = $api->posicion(['buffet_id' => '31'], 'CL02-05');
+        $this->assertSame(['CL02-05', true, 'ETQ-14', 'Paella'], [$p['codigo'], $p['activa'], $p['etiqueta'], $p['plato']]);
+        $this->assertSame([], $api->posicion(['buffet_id' => '32'], 'ZZ9-9'));
+        $this->assertNull($api->posicion(['buffet_id' => ''], 'CL02-05'));
+    }
+
     public function test_un_fallo_no_se_recuerda(): void
     {
         Http::fake(['panel.test/*' => Http::response('', 500)]);

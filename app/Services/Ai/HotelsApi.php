@@ -431,6 +431,40 @@ class HotelsApi
     }
 
     /**
+     * Una posición del buffet por su código exacto (buffets/{id}/positions?code=): si existe, si está activa, qué etiqueta (nombre, nunca MAC)
+     * y qué plato tiene. null si no se pudo leer; [] si ese código no existe en el buffet.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function posicion(array $sitio, string $codigo): ?array
+    {
+        $id = (string) ($sitio['buffet_id'] ?? '');
+        $codigo = trim($codigo);
+        if (! self::idValido($id) || $codigo === '') {
+            return null;
+        }
+        $d = $this->get("/api/support/v1/buffets/$id/positions", ['code' => $codigo]);
+        if ($d === null) {
+            return null;
+        }
+        $lista = $d['posiciones'] ?? $d['positions'] ?? (array_is_list($d) ? $d : []);
+        $p = is_array($lista) && isset($lista[0]) && is_array($lista[0]) ? $lista[0] : null;
+        if (! $p) {
+            return [];
+        }
+        $plato = self::pick($p, ['plato', 'dish']);
+        $etq = self::pick($p, ['etiqueta', 'tag']);
+        $activa = self::pick($p, ['activa', 'active']);
+        return [
+            'codigo'   => (string) self::pick($p, ['codigo', 'code'], $codigo),
+            'activa'   => $activa !== null ? (bool) $activa : null,
+            'isleta'   => self::pick($p, ['isleta', 'island']) !== null ? self::nombre(self::pick($p, ['isleta', 'island'])) : null,
+            'etiqueta' => $etq !== null ? self::nombre($etq) : null,
+            'plato'    => $plato !== null ? self::nombre($plato) : null,
+        ];
+    }
+
+    /**
      * Estado de UNA etiqueta (por su código) dentro de ese buffet: en línea, batería, señal, última
      * actualización y su antena. null si no es de ese buffet. Nunca de otro hotel.
      */

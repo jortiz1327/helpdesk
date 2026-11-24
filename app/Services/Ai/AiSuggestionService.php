@@ -1403,6 +1403,24 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
                     . ($ap ? ', la sirve la antena ' . $ap['name'] . ($ap['online'] ? ' (con conexión)' : ' (SIN CONEXIÓN)') : '') . ".\n";
             }
         }
+        // Posiciones concretas que menciona el cliente (código tipo CL02-05): existe, está activa, qué etiqueta y qué plato tiene.
+        if (! $pedido && $sitios) {
+            preg_match_all('/\b[A-Z]{1,4}\d{1,3}-\d{1,3}\b/', $textoCliente, $pm);
+            foreach (array_slice(array_unique($pm[0] ?? []), 0, 3) as $cp) {
+                $p = null;
+                foreach ($sitios as $x) {
+                    if (($x['buffet_id'] ?? '') !== '' && ($p = $api->posicion($x, $cp))) {
+                        $p['buffet'] = $x['buffet'];
+                        break;
+                    }
+                }
+                if (! $p) {
+                    continue;
+                }
+                $this->paso('posicion', null, "Posición $cp (" . $p['buffet'] . '): ' . ($p['activa'] === false ? 'INACTIVA' : 'activa') . ($p['etiqueta'] ? ', etiqueta ' . $p['etiqueta'] : ', SIN etiqueta') . ($p['plato'] ? ', plato «' . $p['plato'] . '»' : ', sin plato'));
+                $s .= "- Posición {$cp} (" . $p['buffet'] . '): ' . ($p['activa'] === false ? 'INACTIVA' : 'activa') . ($p['etiqueta'] ? ', etiqueta ' . $p['etiqueta'] : ', sin etiqueta vinculada') . ($p['plato'] ? ', plato «' . $p['plato'] . '»' : ', sin plato asignado') . ".\n";
+            }
+        }
         if ($pedido) {
             $this->paso('filtro', null, 'Es un pedido de material: no se consultan antenas ni rol');
             return $s;
