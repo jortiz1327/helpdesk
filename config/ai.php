@@ -63,6 +63,10 @@ return [
 
     // Precio en USD por millón de tokens [entrada, salida], solo para ESTIMAR el gasto en Ajustes (la factura real es la del proveedor).
     // Comprobar en la web del proveedor; se puede ajustar sin tocar código con AI_PRICE_IN / AI_PRICE_OUT.
+    // Chat de pruebas de Ajustes: tope mensual propio (euros) y cambio dólar→euro para estimarlo (los precios están en dólares).
+    'lab_budget_month_eur' => (float) env('AI_LAB_BUDGET_EUR', 20),
+    'usd_eur' => (float) env('AI_USD_EUR', 0.92),
+
     'prices' => [
         'default' => [(float) env('AI_PRICE_IN', 1.0), (float) env('AI_PRICE_OUT', 5.0)],
     ],

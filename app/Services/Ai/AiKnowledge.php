@@ -143,8 +143,9 @@ class AiKnowledge
     public function indexarCorreccionChat(int $msgId): void
     {
         $m = DB::table('ai_lab_messages as m')->join('ai_lab_chats as c', 'c.id', '=', 'm.chat_id')->where('m.id', $msgId)
-            ->first(['m.id', 'm.chat_id', 'm.body', 'm.rating', 'm.correction', 'c.title', 'c.contact_name']);
-        if (! $m || $m->rating !== 'down' || trim((string) $m->correction) === '') {
+            ->first(['m.id', 'm.chat_id', 'm.body', 'm.rating', 'm.correction', 'm.retired_at', 'c.title', 'c.contact_name']);
+        // Una corrección retirada desde Ajustes no está en la memoria hasta que se restaure.
+        if (! $m || $m->rating !== 'down' || trim((string) $m->correction) === '' || ($m->retired_at ?? null) !== null) {
             $this->quitarCorreccionChat($msgId);
             return;
         }

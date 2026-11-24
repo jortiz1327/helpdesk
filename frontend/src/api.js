@@ -509,6 +509,13 @@ export const api = {
   aiAdminReview: (id, status) => req('ai_suggestions.php?action=admin_review', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }),
   }),
+  // Chat de pruebas de la IA (Ajustes, permiso support.config): nada se envía a ningún cliente
+  pruebasStatus: () => req('ai_pruebas.php?action=status'),
+  pruebasChat: (id) => req('ai_pruebas.php?action=chat&id=' + id),
+  pruebasCorrections: () => req('ai_pruebas.php?action=corrections'),
+  pruebasPost: (action, body = {}) => req('ai_pruebas.php?action=' + action, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }),
   // Borrar ticket entero (requiere tickets.delete)
   deleteTicket: (id) => req('tickets.php?action=delete', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),

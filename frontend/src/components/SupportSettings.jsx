@@ -6,6 +6,7 @@ import { useToast, useConfirm } from '../App.jsx'
 import Select from './Select.jsx'
 import Settings from './Settings.jsx'
 import AiSettings from './AiSettings.jsx'
+import AiPruebas from './AiPruebas.jsx'
 
 /* ---------------------------------------------------------------------------
  * CONFIGURACIÓN — solo superadmin / encargado (permiso support.config). Hub con
@@ -48,6 +49,7 @@ const SECCIONES = [
     { key: 'faqs',       label: 'Portal y FAQ',            icon: Icon.globe,  desc: 'Lo que ve el cliente: Centro de atención y Preguntas frecuentes.' },
     { key: 'csat',       label: 'Satisfacción',            icon: Icon.star,   desc: 'Encuesta CSAT del portal (1-5★) al resolver una incidencia.' },
     { key: 'ai',         label: 'Asistente IA',            icon: Icon.bolt,   desc: 'Sugerencias de respuesta para los agentes, su acierto y su base de conocimiento.' },
+    { key: 'aitest',    label: 'Chat de pruebas IA',     icon: Icon.chat,  desc: 'Prueba la IA escribiendo como si fueras el cliente y enséñale con tus correcciones. No se envía nada a ningún cliente.' },
   ] },
   { grupo: 'Correo', items: [
     { key: 'email', label: 'Buzón y envío',       icon: Icon.mail,   desc: 'Entrada, salida, pie y diagnóstico.' },
@@ -116,6 +118,7 @@ export default function SupportSettings({ user }) {
           {tab === 'sla' && <SlaSettings />}
           {tab === 'csat' && <CsatSettings />}
           {tab === 'ai' && <AiSettings />}
+          {tab === 'aitest' && <AiPruebas />}
           {tab === 'hours' && <BusinessHours />}
           {tab === 'security' && <SecuritySettings />}
           {tab === 'cron' && <CronStatus />}

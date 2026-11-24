@@ -223,6 +223,18 @@ class AiSuggestionService
         return $coste;
     }
 
+    /** Tope mensual en EUROS del chat de pruebas (Ajustes › Chat de pruebas), aparte del de los agentes. 0 = sin tope. */
+    public function topeLabEur(): float
+    {
+        return max(0.0, (float) Setting::get('ai_lab_budget_month_eur', (string) config('ai.lab_budget_month_eur', 20)));
+    }
+
+    /** Gasto estimado del chat de pruebas en el mes natural, en euros (los precios están en dólares: se convierte con ai.usd_eur). */
+    public function gastoLabEur(): float
+    {
+        return $this->gastoTabla('ai_lab_messages', now()->startOfMonth()) * (float) config('ai.usd_eur', 0.92);
+    }
+
     /** Tope mensual (USD, mes natural) del uso REAL de los agentes. 0 = sin tope. Se cambia en Ajustes. */
     public function topeMensual(): float
     {
