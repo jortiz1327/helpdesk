@@ -29,10 +29,12 @@ class CoherenciaConocimientoTest extends TestCase
         $this->assertSame(['pila-otra-referencia'], $this->claves('La pila es una CR2032', 'plantilla'));
         $this->assertSame([], $this->claves('La pila es una CR2450 (AM-BZ2450)', 'plantilla'));
         $this->assertSame(['reinicio-minutos'], $this->claves('Quite las pilas unos 5 minutos y vuelva a ponerlas', 'plantilla'));
-        $this->assertSame([], $this->claves('Quite las pilas 15 minutos y vuelva a ponerlas', 'plantilla'));
+        $this->assertSame([], $this->claves('Quite las pilas 30 minutos y vuelva a ponerlas', 'plantilla'));
+        $this->assertSame(['reinicio-minutos'], $this->claves('Quite las pilas 15 minutos y vuelva a ponerlas', 'plantilla'), 'el reinicio es de 30 minutos');
         // Una plantilla con un paso por línea: el tiempo no está en la misma línea que las pilas, y se escribe «30min».
-        $this->assertSame(['reinicio-minutos'], $this->claves("Retire la tapa.\nRetire las pilas.\nEspere 30min.\nVuelva a introducir las pilas.", 'plantilla'));
-        $this->assertSame([], $this->claves("Retire las pilas.\nEspere 15 minutos.\nVuelva a introducirlas.", 'plantilla'));
+        $this->assertSame(['reinicio-minutos'], $this->claves("Retire la tapa.\nRetire las pilas.\nEspere 15min.\nVuelva a introducir las pilas.", 'plantilla'));
+        $this->assertSame([], $this->claves("Retire las pilas.\nEspere 30min.\nVuelva a introducirlas.", 'plantilla'));
+        $this->assertSame([], $this->claves("Retire las pilas.\nEspere 30 minutos.\nVuelva a introducirlas.", 'plantilla'));
         $this->assertSame([], $this->claves("El menú cambia en unos 5 min.\nSi no cambia, fuerce la etiqueta.", 'plantilla'), 'sin pilas ni reinicio cerca no cuenta');
         $this->assertSame([], $this->claves('Espere 5 minutos por etiqueta antes de forzar', 'fichero'), '5 minutos sin pilas ni reinicio es otra cosa');
         $this->assertSame(['anadir-etiqueta-solo-plataforma'], $this->claves('Entre en Conectividad > Etiquetas > Añadir etiqueta', 'ticket'));
@@ -60,7 +62,7 @@ class CoherenciaConocimientoTest extends TestCase
             'desfasado' => 0, 'indexed_at' => now(),
         ]);
         $ins('1', 'Las pilas VARTA son compatibles, pruebe con unas nuevas');
-        $ins('2', 'Pruebe con pilas Beidongli y quite las pilas 15 minutos');
+        $ins('2', 'Pruebe con pilas Beidongli y quite las pilas 30 minutos');
         $simulado = C::revisarBase(false);
         $this->assertSame(1, $simulado['tickets_marcados']);
         $this->assertSame(0, DB::table('ai_documents')->where('desfasado', 1)->count(), 'en simulación no se marca nada');

@@ -8,7 +8,7 @@ Cuando una o varias etiquetas fallan (se quedan en blanco, no responden, no actu
 
 1. Retire la tapa trasera (puede usar un destornillador plano como leve palanca).
 2. Extraiga las pilas.
-3. Espere 15 minutos.
+3. Espere 30 minutos.
 4. Inserte de nuevo las pilas (parte plana hacia usted).
 5. Coloque la tapa trasera.
 6. Acceda a la aplicación de gestión de las etiquetas.

@@ -708,7 +708,7 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
                     'instruccion' => 'PIDE SOLO el nombre de su establecimiento y el correo con el que accede a nuestra aplicación (como máximo esas dos preguntas). No des por hecho que es un hotel (puede ser tienda o farmacia): no digas «hotel» ni «aplicación de hoteles», sin dar pasos ni derivar.'];
             }
             return ['decision' => 'responder', 'resumen' => 'reinicio de la etiqueta bloqueada antes de derivar',
-                'instruccion' => 'Alguna de las etiquetas solo está BLOQUEADA o no cambia (sin daño visible): NO derives todavía. Explica el protocolo de reinicio de la etiqueta de la guía (quitar las pilas 15 minutos, con las antenas en línea) para esa. NO menciones la etiqueta dañada (humedad, pantalla rota) ni prometas sustituir o enviar nada. Si el correo no está verificado, pídelo primero (VERIFICACIÓN DEL CLIENTE).'];
+                'instruccion' => 'Alguna de las etiquetas solo está BLOQUEADA o no cambia (sin daño visible): NO derives todavía. Explica el protocolo de reinicio de la etiqueta de la guía (quitar las pilas 30 minutos, con las antenas en línea) para esa. NO menciones la etiqueta dañada (humedad, pantalla rota) ni prometas sustituir o enviar nada. Si el correo no está verificado, pídelo primero (VERIFICACIÓN DEL CLIENTE).'];
         }
         $sinEnvio = ! preg_match('/envi|garantia|repuesto|pedido|presupuesto|nuevas etiquetas|comprar/', $t);
         $reasignar = $sinEnvio && preg_match('/(sustitu|reempla|cambiar).{0,120}(rot[ao]s?|pantalla)|(rot[ao]s?|pantalla).{0,120}(sustitu|reempla)/s', $t) && preg_match('/\balta\b/', $t);

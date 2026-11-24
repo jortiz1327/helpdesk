@@ -240,7 +240,7 @@ pasos **en orden** (uno cada vez, no todos de golpe):
 **Paso 1 — Descartar batería con un REINICIO de la etiqueta** (siempre **dentro del rango de la antena**):
 1) Retirar la tapa trasera (se puede usar un destornillador plano como leve palanca).
 2) Extraer las pilas.
-3) Esperar **15 minutos**.
+3) Esperar **30 minutos**.
 4) Volver a poner las pilas (**parte plana hacia el cliente**).
 5) Colocar la tapa.
 6) Entrar en la app de gestión y **hacer un cambio en la posición** correspondiente.

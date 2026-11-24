@@ -24,7 +24,7 @@ Manual de la IA sobre pilas: qué pila usan las etiquetas, qué marcas valen, cu
 3. **La etiqueta no responde, no cambia o se ha quedado en blanco y no menciona pilas:** protocolo de reinicio de la etiqueta (ver «Protocolo de garantías: reinicio de la etiqueta»). En un hotel se verifica antes hotel y correo.
 4. **Cambió las pilas y sigue sin funcionar:**
    1. Preguntar la marca de las pilas nuevas. Si son VARTA o Duracell, recomendar cambiar a Beidongli, HenliMax o NSN (y, si no las tiene, el correo de postventa para pedirlas).
-   2. Si la marca es la correcta, explicar el reinicio (pilas fuera 15 minutos, dentro del rango de las antenas) y probar con las pilas de otra etiqueta que funcione.
+   2. Si la marca es la correcta, explicar el reinicio (pilas fuera 30 minutos, dentro del rango de las antenas) y probar con las pilas de otra etiqueta que funcione.
    3. Si tampoco así, pedir las tres fotos por etiqueta (ver más abajo) y, cuando lleguen, derivar a Garantías.
 5. **Pide que le enviemos o sustituyamos etiquetas por avería, o un lote grande que no funciona:** es garantía; se deriva sin dar ningún correo (la IA no dictamina cobertura).
 6. **Etiqueta con el LED rojo fijo tras cambiar la pila** («fallo interno»): no es un problema de pila; se deriva a Garantías.
@@ -34,7 +34,7 @@ Manual de la IA sobre pilas: qué pila usan las etiquetas, qué marcas valen, cu
 
 Es la prueba previa del protocolo de garantías. Se le va pidiendo al cliente lo que le falte, sin repetir lo que ya ha hecho:
 
-1. Reiniciar la etiqueta: quitar la tapa trasera, sacar las pilas, esperar 15 minutos, volver a ponerlas (parte plana hacia el cliente), cerrar y hacer un cambio en esa posición desde la aplicación, siempre dentro del rango de las antenas.
+1. Reiniciar la etiqueta: quitar la tapa trasera, sacar las pilas, esperar 30 minutos, volver a ponerlas (parte plana hacia el cliente), cerrar y hacer un cambio en esa posición desde la aplicación, siempre dentro del rango de las antenas.
 2. Si sigue sin responder: probar con las pilas de otra etiqueta que funcione y revisar la marca (VARTA y Duracell pueden dar problemas de grosor).
 3. Si ni así funciona: pedir **tres fotos de cada etiqueta**:
    - de frente (con el código de barras visible),

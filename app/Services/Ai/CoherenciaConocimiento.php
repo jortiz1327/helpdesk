@@ -59,11 +59,11 @@ class CoherenciaConocimiento
                 'salvo' => '/\bno (es|son|vale|valen|sirve)\b/',
             ],
             'reinicio-minutos' => [
-                'titulo' => 'El reinicio de la etiqueta es con las pilas fuera 15 minutos',
+                'titulo' => 'El reinicio de la etiqueta es con las pilas fuera 30 minutos',
                 'ambito' => ['fichero', 'correccion', 'plantilla'],
                 // «30min», «30 min» y «30 minutos» en una línea; el tema (pila o reinicio) puede estar en la propia línea o en las 3 anteriores
                 // (los pasos de una plantilla van uno por línea: «Retire las pilas. / Espere 30min.»).
-                'prohibido' => '/\b(?!15\b)\d+ ?min(utos?)?\b/',
+                'prohibido' => '/\b(?!30(?!\d))\d+ ?min(utos?)?\b/',
                 'contexto' => '/pila|reinici/',
             ],
             'anadir-etiqueta-solo-plataforma' => [
