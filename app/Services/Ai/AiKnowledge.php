@@ -382,14 +382,27 @@ class AiKnowledge
         if (preg_match('/\b(desayuno|almuerzo|comida|cena|snacks?|brunch|merienda|horarios?|apertura|cierre|abrimos|ventana de tiempo)\b/iu', $texto)) {
             $raices[] = 'servic';
         }
-        return $raices;
+        // Lo que el cliente cuenta con sus palabras y apunta a una guía por su TÍTULO (medido con `ai:evaluar-busqueda`: sin esto la
+        // guía correcta salía en 2 de cada 3 casos; los textos largos con «cambiar etiquetas» arrastraban a las guías del restaurante).
+        $reglas = [
+            'conectiv' => '/\b(antenas?|repetidor(es)?|desconectad[ao]s?|offline|wifi|internet|sin (se[ñn]al|conexi[oó]n)|no (hay|tenemos|tiene|tienen) (se[ñn]al|conexi[oó]n))\b/iu',
+            'posicion' => '/\bposici[oó]n(es)?\b|\b(activ(ar|aci[oó]n)|vincul(ar|aci[oó]n)|asign(ar|aci[oó]n)|extras?)\b.{0,60}\betiquetas?\b/iu',
+            'rued' => '/\b(forz(ar|amos|ado|ando)\b.{0,15}\bmen[uú]|rueda|cambios? de (men[uú]|buffet)|buffet reducido|men[uú]s? (de|del) d[ií]a)\b/iu',
+            'isleta' => '/\b(isl(a|as|eta|etas))\b/iu',
+        ];
+        foreach ($reglas as $raiz => $patron) {
+            if (preg_match($patron, $texto)) {
+                $raices[] = $raiz;
+            }
+        }
+        return array_values(array_unique($raices));
     }
 
     /**
      * Guías cuyo TÍTULO nombra lo que dice el asunto («no sale el segundo idioma» → la guía «Idiomas»): la búsqueda por texto las
      * pierde cuando otras guías repiten más la palabra. Hasta 2, el primer trozo de cada una, las de título más corto primero.
      */
-    private function guiasPorTitulo(string $asunto, array $yaIncluidos): array
+    private function guiasPorTitulo(string $asunto, array $yaIncluidos, string $texto = ''): array
     {
         $paradas = array_flip(explode(' ', self::PARADAS));
         $raices = [];
@@ -401,7 +414,7 @@ class AiKnowledge
             }
             $raices[] = mb_substr($p, 0, $l <= 6 ? $l - 2 : $l - 3);
         }
-        $raices = array_merge($raices, $this->raicesPorSinonimo($asunto));
+        $raices = array_merge($raices, $this->raicesPorSinonimo($asunto . ' ' . mb_substr($texto, 0, 500)));
         if (! $raices) {
             return [];
         }
@@ -490,7 +503,7 @@ class AiKnowledge
 
         $manuales = $buscar('manual', $nManuales);
         if ($nManuales > 0) {
-            $manuales = array_merge($this->guiasPorTitulo($asunto, array_column($manuales, 'id')), $manuales);
+            $manuales = array_merge($this->guiasPorTitulo($asunto, array_column($manuales, 'id'), $texto), $manuales);
         }
 
         return array_merge($buscar('correccion', $nCorrecciones), $buscar('plantilla', $nPlantillas), $buscar('ticket', $nTickets), $manuales);
