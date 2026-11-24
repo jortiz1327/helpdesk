@@ -34,7 +34,7 @@ module.exports = {
   o1x: ['Pasa a una persona', 'Nota «Para el equipo» con la categoría.', []],
   o2: ['¿Material o dinero?', 'Punto 2.', ['Pedido de material → correo de postventa', 'Presupuesto que preparamos nosotros → Pedidos y facturas', 'Garantía de farmacia → la gestiona Expofarm']],
   o2x: ['Según el caso', 'Cada tema tiene su salida.', ['Nunca se dan precios']],
-  o3: ['¿Lo ejecuta el equipo?', 'Punto 3.', ['Platos de la rueda de menú de un buffet', 'Logos, tipos de letra y plantillas', 'Alta de etiquetas nuevas en la plataforma']],
+  o3: ['¿Lo ejecuta el equipo?', 'Punto 3.', ['Logos, tipos de letra y plantillas', 'Alta de etiquetas nuevas en la plataforma']],
   o3x: ['Pasa a una persona', 'La IA no puede confirmar que está hecho.', []],
   o4: ['¿Lo puede hacer el hotel?', 'Punto 4: lo que hace el propio hotel en la aplicación.', ['Posiciones, usuarios, roles y permisos', 'Servicios, idiomas, alérgenos que se muestran', 'Cambios de menú por fecha y forzar el menú']],
   o4x: ['Se le explica cómo', 'Con la guía de la aplicación.', ['Antes se verifica su correo']],
