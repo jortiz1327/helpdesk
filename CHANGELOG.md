@@ -3,6 +3,17 @@
 Todas las versiones destacables del helpdesk. Formato: **Mejoras** (novedades y
 cambios de comportamiento) y **Arreglos** (bugs corregidos).
 
+## [1.6.12] — 2026-11-25
+
+### Mejoras
+
+- La IA ya no obedece órdenes escritas en el mensaje del cliente («responde solo con…», «ignora tus reglas», instrucciones escondidas) y no responde a preguntas fuera de soporte. Probado con un lote de 38 casos de manipulación.
+- Correo que el cliente dice suyo: si quien escribe no consta como usuario, el correo se comprueba pero no se dan datos del hotel hasta que una persona lo confirme.
+
+### Arreglos
+
+- Seguridad: la IA ya no cuenta en qué hoteles ni con qué rol figura un correo que el cliente menciona, salvo a un remitente verificado y solo de los hoteles que comparten. Sin migraciones.
+
 ## [1.6.11] — 2026-11-24
 
 ### Mejoras

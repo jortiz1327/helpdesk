@@ -2,8 +2,20 @@
 // Mantener en paralelo con CHANGELOG.md al cerrar cada versión. Formato de cada una:
 //   { version: "1.6.4", date: "24 nov 2026", resumen: "…", mejoras: ["…"], arreglos: ["…"] }
 // Las series (1.6, 1.5…) y las subversiones (1.6.4, 1.6.3…) las agrupa solas la ventana de Novedades.
-export const APP_VERSION = "1.6.11";
+export const APP_VERSION = "1.6.12";
 export const VERSIONS = [
+    {
+        version: "1.6.12",
+        date: "25 nov 2026",
+        resumen: "La IA resiste mejor los intentos de manipularla y deja de revelar datos de otros correos.",
+        mejoras: [
+            "La IA ignora las órdenes escritas en el mensaje del cliente y no responde a temas ajenos al soporte.",
+            "Si el correo que dice el cliente no es el del remitente, se comprueba pero no se dan datos del hotel hasta que lo confirme una persona.",
+        ],
+        arreglos: [
+            "Seguridad: ya no se cuenta en qué hoteles ni con qué rol figura un correo mencionado, salvo a un remitente verificado y solo de los hoteles que comparten.",
+        ],
+    },
     {
         version: "1.6.11",
         date: "24 nov 2026",
