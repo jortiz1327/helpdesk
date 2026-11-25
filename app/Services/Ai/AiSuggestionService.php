@@ -1255,18 +1255,29 @@ Reglas: usa solo lo que dicen los mensajes, no inventes nada ni des pasos nuevos
     private function correosMencionados(string $texto, string $contactEmail): string
     {
         $api = app(HotelsApi::class);
-        if (! $api->configured()) {
+        // Seguridad: solo quien YA está verificado puede preguntar por otros correos. Si no, mencionar el correo de un tercero
+        // serviría para averiguar dónde trabaja esa persona y con qué rol.
+        if (! $api->configured() || $this->estadoCorreo !== 'verificado' || $this->correoVerificado === '') {
             return '';
         }
         $propios = array_filter([mb_strtolower($this->correoVerificado), mb_strtolower(trim($contactEmail))]);
         $otros = array_slice(array_values(array_filter(self::correosEnTexto($texto), fn ($c) => ! in_array(mb_strtolower($c), $propios, true))), 0, 2);
+        // Establecimientos del propio remitente: de un tercero solo se cuenta lo que está en ESTOS; el resto no se revela.
+        $mios = array_map(fn ($x) => mb_strtolower(trim((string) ($x['hotel'] ?? ''))),
+            array_filter((array) ($api->verificar($this->correoVerificado)['sitios'] ?? []), fn ($x) => ($x['activo'] ?? true) !== false));
         $s = '';
         foreach ($otros as $c) {
             $v = $api->verificar($c);
             $activos = array_values(array_filter($v['sitios'] ?? [], fn ($x) => ($x['activo'] ?? true) !== false));
-            if ($v['estado'] === 'encontrado' && $activos) {
-                $lista = implode('; ', array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /') . (! empty($x['rol']) ? ' (rol «' . $x['rol'] . '»)' : ''), array_slice($activos, 0, 4)));
-                $dato = "YA es usuario ACTIVO de la aplicación en: $lista";
+            $comunes = array_values(array_filter($activos, fn ($x) => in_array(mb_strtolower(trim((string) ($x['hotel'] ?? ''))), $mios, true)));
+            if ($v['estado'] === 'encontrado' && $activos && ! $comunes) {
+                // Existe, pero en otros establecimientos: no se dice dónde ni con qué rol.
+                $dato = 'figura como usuario, pero NO en el establecimiento de quien escribe. NO digas en qué hoteles está, ni su rol, ni si existe en otros sitios: '
+                    . 'di solo que no puedes confirmarlo por este canal y que lo revisará una persona del equipo';
+                $this->paso('correo_mencionado', null, "Correo mencionado en el mensaje, $c: existe fuera de los establecimientos del remitente (no se detalla)", ['correo' => $c]);
+            } elseif ($v['estado'] === 'encontrado' && $activos) {
+                $lista = implode('; ', array_map(fn ($x) => trim($x['hotel'] . ' / ' . $x['buffet'], ' /') . (! empty($x['rol']) ? ' (rol «' . $x['rol'] . '»)' : ''), array_slice($comunes, 0, 4)));
+                $dato = "YA es usuario ACTIVO de la aplicación en: $lista (solo se cuentan los establecimientos que también son de quien escribe; NO menciones ningún otro)";
                 $this->paso('correo_mencionado', true, "Correo mencionado en el mensaje, $c: ya es usuario activo en " . $lista, ['correo' => $c]);
             } elseif ($v['estado'] === 'encontrado') {
                 $dato = 'figura como usuario pero DESACTIVADO';

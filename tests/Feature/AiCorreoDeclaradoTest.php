@@ -56,6 +56,18 @@ class AiCorreoDeclaradoTest extends TestCase
         $this->assertSame('javier@invisa.com', $correo);
         $this->assertStringContainsString('CORREO QUE EL CLIENTE MENCIONA (jefe@otrohotel.com)', $out);
         $this->assertStringNotContainsString('NADIE HA CONFIRMADO', $out);
+        // Existe, pero en un hotel que no es el del remitente: no se le cuenta ni dónde ni con qué rol.
+        $this->assertStringNotContainsString('Hotel Otro', $out);
+        $this->assertStringContainsString('NO en el establecimiento de quien escribe', $out);
+    }
+
+    public function test_un_remitente_sin_verificar_no_consigue_datos_de_otro_correo_que_menciona(): void
+    {
+        $u = ['jefe@hotelx.com' => self::OK + ['sitios' => [$this->sitio('Hotel X', 'Dirección')]]];
+        [$out, $estado] = $this->contexto($u, 'personal@gmail.com', 'Hola, quiero saber si jefe@hotelx.com tiene usuario');
+        $this->assertNotSame('verificado', $estado);
+        $this->assertStringNotContainsString('Hotel X', $out);
+        $this->assertStringNotContainsString('CORREO QUE EL CLIENTE MENCIONA', $out);
     }
 
     public function test_si_el_remitente_no_consta_el_correo_que_dice_suyo_queda_declarado_y_sin_datos(): void
@@ -87,6 +99,7 @@ class AiCorreoDeclaradoTest extends TestCase
         $this->assertSame('verificado', $estado);
         $this->assertSame('javier@invisa.com', $correo);
         $this->assertStringContainsString('YA es usuario ACTIVO', $out);
-        $this->assertStringContainsString('Hotel Ereso', $out);
+        $this->assertStringContainsString('Hotel Cala Blanca', $out);
+        $this->assertStringNotContainsString('Hotel Ereso', $out);   // otro hotel del tercero: no se revela
     }
 }
